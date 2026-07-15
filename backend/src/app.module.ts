@@ -3,6 +3,10 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AuthModule } from './auth/auth.module';
+import { SinhVienModule } from './sinh-vien/sinh-vien.module';
+import { GiangVienModule } from './giang-vien/giang-vien.module';
+import { KhoaModule } from './khoa/khoa.module';
 
 @Module({
   imports: [
@@ -18,7 +22,7 @@ import { AppService } from './app.service';
       useFactory: (configService: ConfigService) => ({
         type: 'mssql',
         host: configService.get<string>('DB_HOST', 'localhost'),
-        port: configService.get<number>('DB_PORT', 1433),
+        port: Number(configService.get('DB_PORT', 1433)),
         username: configService.get<string>('DB_USERNAME', 'sa'),
         password: configService.get<string>('DB_PASSWORD', ''),
         database: configService.get<string>('DB_DATABASE', 'QLKienTap'),
@@ -30,6 +34,12 @@ import { AppService } from './app.service';
         },
       }),
     }),
+
+    // Dang ky cac phan he nghiep vu
+    AuthModule,
+    SinhVienModule,
+    GiangVienModule,
+    KhoaModule,
   ],
   controllers: [AppController],
   providers: [AppService],
