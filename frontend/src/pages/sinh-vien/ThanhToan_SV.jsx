@@ -308,7 +308,7 @@ export default function ThanhToan_SV() {
                         badgeClass = 'bg-primary/10 text-primary border border-primary/20';
                         statusText = 'Đã đóng';
                       } else if (pay.trang_thai === 'ChuaDong') {
-                        badgeClass = 'bg-warning-yellow/15 text-yellow-750 border border-warning-yellow/40';
+                        badgeClass = 'bg-[#DBD468]/20 text-slate-700 border border-[#DBD468]/60';
                         statusText = 'Chưa đóng';
                       } else if (pay.trang_thai === 'ViPham') {
                         badgeClass = 'bg-red-50 text-red-700 border border-red-200';
@@ -402,7 +402,7 @@ export default function ThanhToan_SV() {
                   {refundRequests.map((ref) => {
                     let statusClass = '';
                     if (ref.status === 'Đã hoàn tiền') statusClass = 'bg-primary/10 text-primary border border-primary/25';
-                    else if (ref.status === 'Chờ xử lý') statusClass = 'bg-warning-yellow/15 text-yellow-750 border border-warning-yellow/40';
+                    else if (ref.status === 'Chờ xử lý') statusClass = 'bg-[#DBD468]/20 text-slate-700 border border-[#DBD468]/60';
                     else statusClass = 'bg-red-50 text-red-650 border border-red-200';
 
                     return (

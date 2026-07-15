@@ -311,7 +311,7 @@ export default function DashBoard_SV() {
                   className="p-4 rounded-xl bg-[#f8faf1]/80 hover:bg-[#f2f5ec] transition-all cursor-pointer flex gap-4 items-start border border-surface-variant/20 group shadow-sm hover:scale-[1.01]"
                 >
                   <div className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${
-                    notif.da_doc ? 'bg-transparent' : 'bg-warning-yellow'
+                    notif.da_doc ? 'bg-transparent' : 'bg-[#DBD468]'
                   }`}></div>
                   <div className="flex-1 min-w-0">
                     <h4 className="text-sm font-bold text-on-surface truncate group-hover:text-primary transition-colors">

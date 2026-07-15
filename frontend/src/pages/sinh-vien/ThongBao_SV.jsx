@@ -61,16 +61,16 @@ export default function ThongBao_SV() {
                 <div
                   key={item.id}
                   onClick={() => handleRead(item)}
-                  className={`p-3 rounded-lg border cursor-pointer transition-all ${
-                    activeNotif?.id === item.id ? 'border-blue-500 bg-blue-50/30' : 'border-slate-100 hover:bg-slate-50'
+                  className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
+                    activeNotif?.id === item.id ? 'border-[#407F3E] bg-[#407F3E]/5' : 'border-slate-100 hover:bg-slate-50'
                   }`}
                 >
                   <div className="flex justify-between items-start gap-2">
-                    <h4 className={`text-xs font-semibold ${item.da_doc ? 'text-slate-600' : 'text-slate-900 font-bold'}`}>
+                    <h4 className={`text-xs font-semibold ${item.da_doc ? 'text-slate-500' : 'text-slate-800 font-bold'}`}>
                       {item.tieu_de}
                     </h4>
                     {!item.da_doc && (
-                      <span className="w-2.5 h-2.5 bg-blue-600 rounded-full shrink-0 mt-0.5"></span>
+                      <span className="w-2.5 h-2.5 bg-[#DBD468] rounded-full shrink-0 mt-0.5 shadow-sm"></span>
                     )}
                   </div>
                   <span className="text-[10px] text-slate-400 block mt-1">

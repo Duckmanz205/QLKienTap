@@ -1,211 +1,418 @@
-import React, { useState, useEffect } from 'react';
-import { khoaApi } from '../../services/api';
-import { Bell, PlusCircle, Send, Search, CheckCircle2, AlertCircle, Volume2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Bell, Search, Plus, RotateCcw, Trash2, X, Sparkles, Check, Clock } from 'lucide-react';
+
+const initialMockAnnouncements = [
+  { 
+    id: 1, 
+    title: 'Cập nhật lịch xuất phát chuyến tham quan Nhà máy Sữa Vinamilk Bình Dương', 
+    createdAt: '2026-10-12 08:30', 
+    recipients: ['Sinh viên'], 
+    status: 'Đang hiển thị' 
+  },
+  { 
+    id: 2, 
+    title: 'Họp hội đồng xét duyệt đề cương kiến tập học kỳ phụ năm học 2026-2027', 
+    createdAt: '2026-10-10 14:15', 
+    recipients: ['Giảng viên'], 
+    status: 'Lên lịch',
+    scheduledAt: '2026-10-18 09:00' 
+  },
+  { 
+    id: 3, 
+    title: 'Thông báo nộp học phí và hoàn tất hồ sơ đăng ký kiến tập tự do khóa 14', 
+    createdAt: '2026-10-08 10:00', 
+    recipients: ['Sinh viên', 'Giảng viên'], 
+    status: 'Bản nháp' 
+  }
+];
 
 export default function ThongBao_Khoa() {
-  const [notifications, setNotifications] = useState([]);
-  const [courses, setCourses] = useState([]);
+  const [announcements, setAnnouncements] = useState(initialMockAnnouncements);
   const [searchTerm, setSearchTerm] = useState('');
+  const [recipientFilter, setRecipientFilter] = useState('Tất cả');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedAnn, setSelectedAnn] = useState(null);
 
-  // Form fields
+  // Compose form states
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const [selectedKhoaId, setSelectedKhoaId] = useState(''); // Empty means all departments
+  const [selectedRecipients, setSelectedRecipients] = useState(['Sinh viên']);
+  const [sendMethod, setSendMethod] = useState('now'); // now or schedule
+  const [scheduleTime, setScheduleTime] = useState('');
+  const [classFilter, setClassFilter] = useState('Tất cả');
 
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
-  const [currentUser, setCurrentUser] = useState(null);
-
-  useEffect(() => {
-    fetchData();
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      try {
-        const parsed = JSON.parse(userStr);
-        if (parsed.user) {
-          setCurrentUser(parsed.user);
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    }
-  }, []);
-
-  const fetchData = async () => {
-    try {
-      const notRes = await khoaApi.getNotifications();
-      setNotifications(notRes.data);
-
-      const courseRes = await khoaApi.getCourses();
-      setCourses(courseRes.data);
-    } catch (err) {
-      console.error(err);
-    }
+  const getRecipientBadgeClass = (rec) => {
+    if (rec.includes('Sinh viên') && rec.includes('Giảng viên')) return 'bg-slate-500 text-white';
+    if (rec.includes('Sinh viên')) return 'bg-[#89B449] text-white'; // Secondary green
+    return 'bg-[#407F3E] text-white'; // Primary green
   };
 
-  const handleSendNotification = async (e) => {
+  const getStatusBadgeClass = (status) => {
+    if (status === 'Đang hiển thị') return 'bg-[#89B449] text-white'; // Secondary green
+    if (status === 'Lên lịch') return 'bg-[#DBD468] text-slate-800'; // Warning yellow
+    return 'bg-[#E7E0C4] text-slate-700'; // Muted gray
+  };
+
+  const handleComposeSubmit = (e) => {
     e.preventDefault();
-    if (!currentUser) {
-      setError('Bạn cần đăng nhập để thực hiện hành động này.');
+    if (!title || !content) {
+      alert("Vui lòng nhập đầy đủ tiêu đề và nội dung!");
       return;
     }
-    try {
-      setError('');
-      setMessage('');
-      await khoaApi.createNotification({
-        tieu_de: title,
-        noi_dung: content,
-        nguoi_gui_id: currentUser.id,
-        khoa_id: selectedKhoaId ? Number(selectedKhoaId) : undefined,
-      });
-      setMessage('Đăng thông báo lên bảng tin thành công!');
-      setTitle('');
-      setContent('');
-      setSelectedKhoaId('');
-      fetchData();
-    } catch (err) {
-      console.error(err);
-      setError('Lỗi khi gửi thông báo.');
+    const newAnn = {
+      id: announcements.length + 1,
+      title,
+      createdAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
+      recipients: selectedRecipients,
+      status: sendMethod === 'now' ? 'Đang hiển thị' : 'Lên lịch',
+      scheduledAt: sendMethod === 'schedule' ? scheduleTime : undefined
+    };
+    setAnnouncements(prev => [newAnn, ...prev]);
+    setShowAddModal(false);
+    // Reset form
+    setTitle('');
+    setContent('');
+    setSelectedRecipients(['Sinh viên']);
+    setSendMethod('now');
+    setScheduleTime('');
+  };
+
+  const handleDelete = (id, titleStr) => {
+    if (confirm(`Bạn có chắc chắn muốn xóa thông báo: "${titleStr}"?`)) {
+      setAnnouncements(prev => prev.filter(a => a.id !== id));
     }
   };
 
-  const filteredNotifications = notifications.filter(n => 
-    n.tieu_de.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    n.noi_dung.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const handleResend = (ann) => {
+    if (ann.status === 'Đang hiển thị') {
+      if (confirm(`Thu hồi thông báo "${ann.title}"?`)) {
+        setAnnouncements(prev => prev.map(a => a.id === ann.id ? { ...a, status: 'Bản nháp' } : a));
+      }
+    } else {
+      if (confirm(`Gửi lại thông báo "${ann.title}" ngay bây giờ?`)) {
+        setAnnouncements(prev => prev.map(a => a.id === ann.id ? { ...a, status: 'Đang hiển thị' } : a));
+      }
+    }
+  };
+
+  const filteredAnnouncements = announcements.filter(ann => {
+    const matchesSearch = ann.title.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesFilter = recipientFilter === 'Tất cả' || 
+      (recipientFilter === 'Sinh viên' && ann.recipients.includes('Sinh viên')) ||
+      (recipientFilter === 'Giảng viên' && ann.recipients.includes('Giảng viên'));
+    return matchesSearch && matchesFilter;
+  });
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-          <Bell className="text-primary w-6 h-6 animate-bounce" />
-          Bảng tin & Thông báo Khoa
-        </h2>
-        <p className="text-slate-500 text-sm">Gửi thông báo khẩn cấp, nhắc nhở hoặc quy chế học tập trực tiếp đến ứng dụng của sinh viên và giảng viên</p>
+    <div className="flex flex-col gap-6 font-sans">
+      {/* Page Title & Add Action */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-black text-slate-800 tracking-tight">
+            Thông báo
+          </h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Tạo và gửi thông báo quan trọng đến sinh viên hoặc giảng viên dẫn đoàn, theo dõi lịch chấm bài.
+          </p>
+        </div>
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="flex items-center gap-2 px-5 py-2.5 bg-[#407F3E] hover:bg-[#407F3E]/95 text-white rounded-xl text-sm font-bold transition-all shadow-sm cursor-pointer self-start sm:self-center"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Tạo thông báo mới</span>
+        </button>
       </div>
 
-      {message && (
-        <div className="bg-emerald-50 border border-emerald-500/30 text-emerald-800 px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-          {message}
-        </div>
-      )}
-
-      {error && (
-        <div className="bg-rose-50 border border-rose-500/30 text-rose-800 px-4 py-3 rounded-xl text-sm font-semibold">
-          {error}
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Create Announcement Form */}
-        <div className="bg-white p-6 rounded-2xl border border-primary/10 shadow-sm space-y-4 lg:col-span-1 h-fit">
-          <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-            <PlusCircle className="text-primary w-5 h-5" />
-            <h3 className="text-sm font-bold text-slate-800">Tạo thông báo mới</h3>
-          </div>
-          <form onSubmit={handleSendNotification} className="space-y-4 text-xs font-semibold text-slate-700">
-            <div>
-              <label className="block mb-1">Tiêu đề thông báo</label>
-              <input
-                type="text"
-                required
-                value={title}
-                onChange={e => setTitle(e.target.value)}
-                placeholder="Ví dụ: Lịch nộp báo cáo kiến tập chính thức"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-primary font-medium"
-              />
-            </div>
-
-            <div>
-              <label className="block mb-1">Đối tượng nhận tin</label>
-              <select
-                value={selectedKhoaId}
-                onChange={e => setSelectedKhoaId(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-primary font-medium"
-              >
-                <option value="">Gửi toàn bộ Sinh viên & Giảng viên</option>
-                {courses.map(c => (
-                  <option key={c.id} value={c.id}>Chỉ gửi khoa: {c.ten_khoa}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block mb-1">Nội dung chi tiết</label>
-              <textarea
-                required
-                rows="6"
-                value={content}
-                onChange={e => setContent(e.target.value)}
-                placeholder="Nhập nội dung thông tin cần truyền tải..."
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-primary font-medium resize-none"
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="w-full bg-primary hover:bg-[#2c6b2d] text-white py-2.5 rounded-xl font-bold transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer text-sm"
+      {/* Filter Card */}
+      <div className="bg-white rounded-2xl border border-[#E7E0C4] p-5 shadow-sm">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+          {/* Đối tượng nhận */}
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">
+              Đối tượng nhận
+            </label>
+            <select
+              value={recipientFilter}
+              onChange={e => setRecipientFilter(e.target.value)}
+              className="w-full bg-[#E7E0C4]/10 border border-[#E7E0C4] rounded-xl px-4 py-2.5 text-sm text-slate-700 font-bold hover:bg-[#E7E0C4]/20 transition-all cursor-pointer outline-none focus:ring-2 focus:ring-[#407F3E]/20"
             >
-              <Send className="w-4 h-4" /> Đăng thông báo
-            </button>
-          </form>
-        </div>
+              <option value="Tất cả">Tất cả đối tượng</option>
+              <option value="Sinh viên">Sinh viên</option>
+              <option value="Giảng viên">Giảng viên</option>
+            </select>
+          </div>
 
-        {/* Bulletins list */}
-        <div className="bg-white p-6 rounded-2xl border border-primary/10 shadow-sm lg:col-span-2 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-3">
-            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-              <Volume2 className="text-secondary w-5 h-5" />
-              Lịch sử các thông báo đã đăng
-            </h3>
-            <div className="relative w-full sm:w-64">
-              <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+          {/* Tìm kiếm */}
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">
+              Tìm kiếm
+            </label>
+            <div className="relative flex items-center bg-[#E7E0C4]/10 rounded-xl border border-[#E7E0C4] focus-within:ring-2 focus-within:ring-[#407F3E]/20 transition-all">
+              <Search className="absolute left-4 text-slate-400 w-4 h-4" />
               <input
                 type="text"
-                placeholder="Tìm nội dung thông báo..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-4 py-1.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-primary font-semibold"
+                placeholder="Tìm kiếm thông báo..."
+                className="w-full bg-transparent text-sm text-slate-800 pl-11 pr-4 py-2.5 outline-none placeholder:text-slate-400 font-semibold"
               />
             </div>
           </div>
-
-          <div className="space-y-4">
-            {filteredNotifications.map(n => (
-              <div 
-                key={n.id} 
-                className="p-4 rounded-xl bg-slate-50 hover:bg-[#f8faf1]/40 border border-slate-100 hover:border-primary/10 transition-all space-y-2.5"
-              >
-                <div className="flex justify-between items-start gap-4">
-                  <div className="space-y-0.5">
-                    <h4 className="font-bold text-slate-800 text-sm">{n.tieu_de}</h4>
-                    <div className="flex items-center gap-2 text-[10px] text-slate-400 font-semibold">
-                      <span>Người gửi: {n.nguoiGui?.ten_hien_thi || 'Văn phòng khoa'}</span>
-                      <span>•</span>
-                      <span>{new Date(n.ngay_gui).toLocaleString('vi-VN')}</span>
-                      {n.khoa && (
-                        <>
-                          <span>•</span>
-                          <span className="text-[#89B449]">Phạm vi: {n.khoa.ten_khoa}</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <p className="text-slate-600 text-xs leading-relaxed whitespace-pre-wrap font-medium">
-                  {n.noi_dung}
-                </p>
-              </div>
-            ))}
-            {filteredNotifications.length === 0 && (
-              <div className="text-center py-12 text-slate-400 font-medium">
-                Không tìm thấy thông báo nào
-              </div>
-            )}
-          </div>
         </div>
       </div>
+
+      {/* Main Table Card */}
+      <div className="bg-white rounded-2xl border border-[#E7E0C4] shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left whitespace-nowrap">
+            <thead className="bg-[#E7E0C4] text-slate-700 font-bold text-[11px] uppercase tracking-wider border-b border-[#E7E0C4]">
+              <tr>
+                <th className="px-6 py-4 font-bold border-r border-[#E7E0C4]/40">Tiêu đề thông báo</th>
+                <th className="px-6 py-4 font-bold border-r border-[#E7E0C4]/40">Ngày tạo</th>
+                <th className="px-6 py-4 font-bold border-r border-[#E7E0C4]/40">Đối tượng nhận</th>
+                <th className="px-6 py-4 font-bold">Trạng thái</th>
+                <th className="px-6 py-4 font-bold text-center">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#E7E0C4]/40 text-slate-800 font-medium">
+              {filteredAnnouncements.map((ann) => (
+                <tr key={ann.id} className="hover:bg-[#E7E0C4]/10 transition-colors duration-200">
+                  <td className="px-6 py-4 border-r border-[#E7E0C4]/40 max-w-sm truncate" title={ann.title}>
+                    <button 
+                      onClick={() => setSelectedAnn(ann)}
+                      className="font-bold text-slate-805 hover:text-[#407F3E] text-sm text-left transition-colors"
+                    >
+                      {ann.title}
+                    </button>
+                  </td>
+                  <td className="px-6 py-4 text-xs font-mono font-bold text-slate-500 border-r border-[#E7E0C4]/40">{ann.createdAt}</td>
+                  <td className="px-6 py-4 border-r border-[#E7E0C4]/40">
+                    <span className={`inline-block px-3 py-0.5 rounded-full text-[10px] font-bold shadow-sm ${getRecipientBadgeClass(ann.recipients)}`}>
+                      {ann.recipients.join(' & ')}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`inline-block px-3 py-0.5 rounded-full text-[10px] font-bold shadow-sm ${getStatusBadgeClass(ann.status)}`}>
+                      {ann.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <div className="flex items-center justify-center gap-3">
+                      {/* Resend / Recall */}
+                      <button
+                        onClick={() => handleResend(ann)}
+                        className="p-1.5 text-slate-400 hover:text-[#407F3E] hover:bg-slate-50 rounded-xl transition-all cursor-pointer"
+                        title={ann.status === 'Đang hiển thị' ? "Thu hồi thông báo" : "Gửi lại thông báo"}
+                      >
+                        <RotateCcw className="w-4.5 h-4.5" />
+                      </button>
+                      {/* Delete */}
+                      <button
+                        onClick={() => handleDelete(ann.id, ann.title)}
+                        className="p-1.5 text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-xl transition-all cursor-pointer"
+                        title="Xóa thông báo"
+                      >
+                        <Trash2 className="w-4.5 h-4.5" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* View Detail Dialog */}
+      {selectedAnn && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl overflow-hidden flex flex-col">
+            <div className="p-6 border-b border-[#E7E0C4] bg-[#E7E0C4]/30 flex items-center justify-between">
+              <h2 className="font-extrabold text-slate-800 text-lg flex items-center gap-2">
+                <Bell className="w-5 h-5 text-[#407F3E]" />
+                <span>Chi tiết thông báo</span>
+              </h2>
+              <button 
+                onClick={() => setSelectedAnn(null)} 
+                className="text-slate-450 hover:text-slate-700 text-2xl font-bold cursor-pointer"
+              >
+                &times;
+              </button>
+            </div>
+            <div className="p-6 space-y-4 text-sm font-semibold text-slate-650">
+              <h3 className="text-lg font-black text-slate-850 leading-snug">{selectedAnn.title}</h3>
+              <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs text-slate-400 font-bold py-2 border-y border-slate-100">
+                <span>Ngày tạo: {selectedAnn.createdAt}</span>
+                <span>Người nhận: {selectedAnn.recipients.join(' & ')}</span>
+              </div>
+              <p className="text-slate-600 leading-relaxed font-medium whitespace-pre-line py-2">
+                Nội dung chi tiết thông báo sẽ được lưu trữ trên bảng tin của IMS portal để sinh viên và giảng viên truy cập trực tuyến.
+              </p>
+            </div>
+            <div className="p-4 bg-slate-50 border-t border-[#E7E0C4] flex justify-end">
+              <button 
+                onClick={() => setSelectedAnn(null)} 
+                className="px-5 py-2 bg-slate-700 hover:bg-slate-800 text-white font-bold rounded-xl text-xs cursor-pointer"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating compose modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b border-[#E7E0C4] bg-white flex items-center justify-between">
+              <h2 className="font-black text-slate-800 text-lg flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-[#407F3E]" />
+                <span>+ Soạn thông báo mới</span>
+              </h2>
+              <button 
+                onClick={() => setShowAddModal(false)} 
+                className="text-slate-450 hover:text-slate-700 text-2xl font-bold cursor-pointer"
+              >
+                &times;
+              </button>
+            </div>
+            <form onSubmit={handleComposeSubmit} className="p-6 space-y-4 overflow-y-auto flex-1 font-semibold text-sm">
+              {/* Tiêu đề thông báo */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  Tiêu đề thông báo *
+                </label>
+                <input 
+                  type="text" 
+                  value={title} 
+                  onChange={e => setTitle(e.target.value)} 
+                  placeholder="Nhập tiêu đề thông báo..." 
+                  required 
+                  className="w-full px-4 py-2.5 border border-[#E7E0C4] bg-slate-50 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-[#407F3E]/20 text-slate-700" 
+                />
+              </div>
+
+              {/* Nội dung thông báo */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  Nội dung thông báo *
+                </label>
+                <textarea 
+                  value={content} 
+                  onChange={e => setContent(e.target.value)} 
+                  placeholder="Nhập nội dung thông báo..." 
+                  required 
+                  rows={4} 
+                  className="w-full px-4 py-2.5 border border-[#E7E0C4] bg-slate-50 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[#407F3E]/20 text-slate-700"
+                ></textarea>
+              </div>
+
+              {/* Select multichip dropdown: Đối tượng nhận */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                  Đối tượng nhận
+                </label>
+                <div className="flex gap-4">
+                  {['Sinh viên', 'Giảng viên'].map(role => (
+                    <label key={role} className="flex items-center gap-1.5 text-xs font-bold text-slate-700 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={selectedRecipients.includes(role)} 
+                        onChange={() => {
+                          setSelectedRecipients(prev => 
+                            prev.includes(role) ? prev.filter(r => r !== role) : [...prev, role]
+                          );
+                        }} 
+                        className="rounded border-slate-350 text-[#407F3E] focus:ring-[#407F3E]/25" 
+                      />
+                      <span>{role}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Radio group Phương thức gửi */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                  Phương thức gửi
+                </label>
+                <div className="flex gap-6">
+                  <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-700 text-xs">
+                    <input 
+                      type="radio" 
+                      name="sendMethod" 
+                      value="now" 
+                      checked={sendMethod === 'now'} 
+                      onChange={() => setSendMethod('now')} 
+                      className="text-[#407F3E] focus:ring-[#407F3E]/20" 
+                    />
+                    <span>Gửi ngay</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-700 text-xs">
+                    <input 
+                      type="radio" 
+                      name="sendMethod" 
+                      value="schedule" 
+                      checked={sendMethod === 'schedule'} 
+                      onChange={() => setSendMethod('schedule')} 
+                      className="text-[#407F3E] focus:ring-[#407F3E]/20" 
+                    />
+                    <span>Lên lịch gửi</span>
+                  </label>
+                </div>
+                {sendMethod === 'schedule' && (
+                  <div className="mt-3 animate-fade-in">
+                    <label className="block text-[11px] font-bold text-slate-450 uppercase mb-1">Thời gian gửi dự kiến</label>
+                    <input 
+                      type="datetime-local" 
+                      value={scheduleTime} 
+                      onChange={e => setScheduleTime(e.target.value)} 
+                      required 
+                      className="px-4 py-2 border border-[#E7E0C4] bg-slate-50 rounded-xl text-xs font-bold text-slate-700 outline-none" 
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Select multichip: Lọc theo lớp/chuyến */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  Lọc theo lớp/chuyến (Tùy chọn)
+                </label>
+                <select
+                  value={classFilter}
+                  onChange={e => setClassFilter(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-[#E7E0C4] bg-slate-50 rounded-xl text-xs font-bold text-slate-700 outline-none cursor-pointer"
+                >
+                  <option value="Tất cả">Tất cả lớp / chuyến tham quan</option>
+                  <option value="14ĐHTP01">14ĐHTP01</option>
+                  <option value="14ĐHTP02">14ĐHTP02</option>
+                  <option value="14ĐHTP03">14ĐHTP03</option>
+                </select>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-4 flex justify-end gap-3 border-t border-[#E7E0C4]">
+                <button 
+                  type="button" 
+                  onClick={() => setShowAddModal(false)} 
+                  className="px-5 py-2.5 border border-[#E7E0C4] rounded-xl text-slate-650 text-xs font-bold hover:bg-slate-50 cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button 
+                  type="submit" 
+                  className="px-5 py-2.5 bg-[#407F3E] hover:bg-[#407F3E]/95 text-white rounded-xl text-xs font-bold shadow-md cursor-pointer"
+                >
+                  Gửi thông báo
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

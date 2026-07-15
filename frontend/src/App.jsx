@@ -37,6 +37,11 @@ import SupervisorAssignment_Khoa from './pages/khoa/SupervisorAssignment_Khoa';
 import LeaderAssignment_Khoa from './pages/khoa/LeaderAssignment_Khoa';
 import ThongBao_Khoa from './pages/khoa/ThongBao_Khoa';
 import BaoCaoThongKe_Khoa from './pages/khoa/BaoCaoThongKe_Khoa';
+import TaiKhoanNguoiDung_Khoa from './pages/khoa/TaiKhoanNguoiDung_Khoa';
+import QuanLyLePhi_Khoa from './pages/khoa/QuanLyLePhi_Khoa';
+import KetQuaKienTap_MaTranDiem_Khoa from './pages/khoa/KetQuaKienTap_MaTranDiem_Khoa';
+import DuyetHoanPhi_Khoa from './pages/khoa/DuyetHoanPhi_Khoa';
+import XemTruocBaoCaoThamQuan_Khoa from './pages/khoa/XemTruocBaoCaoThamQuan_Khoa';
 
 export default function App() {
   return (
@@ -85,6 +90,11 @@ export default function App() {
           <Route path="khoa/factories" element={<DanhMuc_NhaMay_Khoa />} />
           <Route path="khoa/trips" element={<ChuyenThamQuan_DSLoc />} />
           <Route path="khoa/boards" element={<HoiDongChamBaoCao_Khoa />} />
+          <Route path="khoa/accounts" element={<TaiKhoanNguoiDung_Khoa />} />
+          <Route path="khoa/fees" element={<QuanLyLePhi_Khoa />} />
+          <Route path="khoa/results" element={<KetQuaKienTap_MaTranDiem_Khoa />} />
+          <Route path="khoa/refund-approval" element={<DuyetHoanPhi_Khoa />} />
+          <Route path="khoa/visit-report" element={<XemTruocBaoCaoThamQuan_Khoa />} />
         </Route>
 
         {/* Fallback redirect */}
