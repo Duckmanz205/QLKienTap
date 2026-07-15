@@ -1,0 +1,2 @@
+# Placeholder — thư mục chứa file model đã train
+# Các file lớn (.pkl, .h5, .pt, .onnx) nên dùng Git LFS hoặc thêm vào .gitignore

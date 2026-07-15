@@ -47,3 +47,44 @@ coverage/
 # SonarQube (se dung trong tuong lai)
 # ====================================
 .scannerwork/
+
+# ====================================
+# Tai lieu / Documents
+# ====================================
+TaiLieu/
+*.pdf
+
+# ====================================
+# Python / AI Service
+# ====================================
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+.venv/
+*.pkl
+*.h5
+*.pt
+*.onnx
+*.pth
+.ipynb_checkpoints/
+ai-service/models/*.pkl
+ai-service/models/*.h5
+ai-service/models/*.pt
+ai-service/models/*.onnx
+ai-service/data/*.csv
+ai-service/data/*.json
+
+# ====================================
+# Flutter / Mobile
+# ====================================
+mobile/.dart_tool/
+mobile/.packages
+mobile/build/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/ios/Pods/
+mobile/ios/.symlinks/
+*.iml
