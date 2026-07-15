@@ -14,7 +14,6 @@ Hệ thống quản lý toàn diện quy trình kiến tập nhà máy dành cho
 - [Hướng dẫn cài đặt](#-hướng-dẫn-cài-đặt)
 - [Tài khoản thử nghiệm](#-tài-khoản-thử-nghiệm)
 - [Cơ sở dữ liệu](#-cơ-sở-dữ-liệu)
-- [Tác giả](#-tác-giả)
 
 ---
 
@@ -245,9 +244,7 @@ Hệ thống sử dụng **33 bảng** trên SQL Server, được định nghĩa
 
 ## 👤 Tác giả
 
-- **Sinh viên thực hiện**: *(Điền tên)*
-- **MSSV**: *(Điền MSSV)*
-- **Giảng viên hướng dẫn**: *(Điền tên GVHD)*
+- **Sinh viên thực hiện**: *Nguyễn Văn Đức - Nguyễn Vĩnh Khang - Phạm Văn Mãnh*
 - **Trường**: Đại học Công Thương TP.HCM (HUIT)
 - **Năm**: 2025 – 2026
 
