@@ -1,0 +1,24 @@
+# requirements.txt — AI Service Dependencies
+# Uncomment the frameworks you need
+
+# === Web Framework (chọn 1) ===
+fastapi==0.115.*
+uvicorn[standard]==0.34.*
+# flask==3.1.*
+
+# === Machine Learning ===
+# scikit-learn==1.6.*
+# pandas==2.2.*
+# numpy==2.1.*
+
+# === Deep Learning (chọn 1 nếu cần) ===
+# torch==2.6.*
+# tensorflow==2.18.*
+
+# === NLP / Text Processing ===
+# transformers==4.48.*
+# underthesea==6.8.*          # NLP tiếng Việt
+
+# === Utilities ===
+python-dotenv==1.1.*
+requests==2.32.*
