@@ -1,236 +1,496 @@
-import React, { useState, useEffect } from 'react';
-import { khoaApi } from '../../services/api';
+import React, { useState } from 'react';
+import { Calendar, Clock, MapPin, Users, Plus, Gavel, Search, Sparkles, X, ChevronDown, Check, UserPlus } from 'lucide-react';
+
+const initialMockBoards = [
+  { 
+    id: 'HD-01', 
+    name: 'HĐ Chấm Báo Cáo Công Nghệ Thực Phẩm - Nhóm 1', 
+    scheduleName: 'Lịch kiến tập HK1 2026-2027', 
+    date: '2026-11-15 08:00', 
+    location: 'Phòng A.101 - Cơ sở chính', 
+    members: ['ThS. Nguyễn Văn A', 'TS. Trần Thị B', 'ThS. Lê Minh Tuấn'], 
+    numStudents: 25, 
+    status: 'Sắp diễn ra' 
+  },
+  { 
+    id: 'HD-02', 
+    name: 'HĐ Chấm Báo Cáo Công Nghệ Thực Phẩm - Nhóm 2', 
+    scheduleName: 'Lịch kiến tập HK1 2026-2027', 
+    date: '2026-11-15 13:30', 
+    location: 'Phòng A.102 - Cơ sở chính', 
+    members: ['TS. Lê Thị B', 'ThS. Trần Văn C'], 
+    numStudents: 20, 
+    status: 'Đang diễn ra' 
+  },
+  { 
+    id: 'HD-03', 
+    name: 'HĐ Báo Cáo Đợt Sớm - K14 Công Nghệ Thực Phẩm', 
+    scheduleName: 'Lịch kiến tập K14 - Học kỳ phụ', 
+    date: '2026-11-10 08:00', 
+    location: 'Phòng B.201 - Cơ sở chính', 
+    members: ['TS. Nguyễn Tiến Dũng', 'ThS. Đỗ Minh Phương'], 
+    numStudents: 18, 
+    status: 'Đã kết thúc' 
+  }
+];
+
+const mockStudents = [
+  { mssv: '2001200123', name: 'Nguyễn Văn Nam', class: '14ĐHTP01' },
+  { mssv: '2001200124', name: 'Trần Thị Thu Thủy', class: '14ĐHTP01' },
+  { mssv: '2001200125', name: 'Phạm Hữu Đạt', class: '14ĐHTP02' },
+  { mssv: '2001200126', name: 'Lê Hoài Bảo', class: '14ĐHTP02' },
+  { mssv: '2001200127', name: 'Đặng Minh Khang', class: '14ĐHTP03' },
+  { mssv: '2001200128', name: 'Vũ Thị Minh Ngọc', class: '14ĐHTP03' }
+];
 
 export default function HoiDongChamBaoCao_Khoa() {
-  const [schedules, setSchedules] = useState([]);
-  const [lecturers, setLecturers] = useState([]);
-  const [enrollments, setEnrollments] = useState([]); // List of students for final grade computation
-  
-  // Board setup form states
-  const [scheduleId, setScheduleId] = useState('');
+  const [boards, setBoards] = useState(initialMockBoards);
+  const [scheduleFilter, setScheduleFilter] = useState('Tất cả');
+  const [boardFilter, setBoardFilter] = useState('Tất cả');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedBoard, setSelectedBoard] = useState(null);
+
+  // Form states
   const [boardName, setBoardName] = useState('');
-  const [boardDate, setBoardDate] = useState('');
-  const [boardRoom, setBoardRoom] = useState('');
+  const [appliedSchedule, setAppliedSchedule] = useState('');
+  const [dateTime, setDateTime] = useState('');
+  const [room, setRoom] = useState('');
+  const [selectedMembers, setSelectedMembers] = useState(['ThS. Nguyễn Văn A', 'TS. Trần Thị B']);
+  const [selectedStudents, setSelectedStudents] = useState([]);
 
-  // Add Member form states
-  const [activeBoardIdForMember, setActiveBoardIdForMember] = useState(null);
-  const [memberLecturerId, setMemberLecturerId] = useState('');
-  const [memberRole, setMemberRole] = useState('ThanhVien'); // ChuTich | ThuKy | ThanhVien
+  // Available lecturers for selection
+  const availableLecturers = ['ThS. Nguyễn Văn A', 'TS. Trần Thị B', 'ThS. Lê Minh Tuấn', 'TS. Lê Thị B', 'ThS. Trần Văn C', 'TS. Nguyễn Tiến Dũng', 'ThS. Đỗ Minh Phương'];
 
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    try {
-      const s = await khoaApi.getSchedules(); setSchedules(s.data);
-      const l = await khoaApi.getLecturers(); setLecturers(l.data.filter(x => x.du_dk_hoi_dong));
-
-      // Mock list of students needing final grade lock
-      setEnrollments([
-        { id: 1, sinhVien: { ho_ten: 'Nguyễn Văn A', mssv: '20032101', ten_lop: '14DHTP1' }, lichKienTap: { ten_lich: 'Kế hoạch K14 Thực phẩm' }, diem_tong_ket: null, trang_thai: 'DangThucHien' },
-        { id: 2, sinhVien: { ho_ten: 'Trần Thị B', mssv: '20032102', ten_lop: '14DHTP1' }, lichKienTap: { ten_lich: 'Kế hoạch K14 Thực phẩm' }, diem_tong_ket: 8.5, trang_thai: 'Dat' },
-      ]);
-    } catch (err) {
-      console.error(err);
-    }
+  const getStatusBadgeClass = (status) => {
+    if (status === 'Sắp diễn ra') return 'bg-[#DBD468] text-slate-800'; // Warning yellow
+    if (status === 'Đang diễn ra') return 'bg-[#89B449] text-white'; // Secondary green
+    return 'bg-[#E7E0C4] text-slate-700'; // Muted gray
   };
 
-  const handleCreateBoard = async (e) => {
+  const handleCreateBoardSubmit = (e) => {
     e.preventDefault();
-    setMessage('');
-    try {
-      await khoaApi.createBoard({
-        scheduleId: Number(scheduleId),
-        name: boardName,
-        date: new Date(boardDate),
-        room: boardRoom,
-      });
-      setMessage('Tạo hội đồng chấm vấn đáp thành công');
-      setScheduleId(''); setBoardName(''); setBoardDate(''); setBoardRoom('');
-      fetchData();
-    } catch (err) {
-      console.error(err);
+    if (!boardName || !dateTime || !room) {
+      alert("Vui lòng nhập đầy đủ thông tin bắt buộc!");
+      return;
     }
+    const newBoard = {
+      id: `HD-0${boards.length + 1}`,
+      name: boardName,
+      scheduleName: appliedSchedule || 'Chưa chọn',
+      date: dateTime.replace('T', ' '),
+      location: room,
+      members: selectedMembers,
+      numStudents: selectedStudents.length || 15,
+      status: 'Sắp diễn ra'
+    };
+    setBoards(prev => [newBoard, ...prev]);
+    setShowAddModal(false);
+    // Reset states
+    setBoardName('');
+    setDateTime('');
+    setRoom('');
+    setSelectedStudents([]);
   };
 
-  const handleAddMember = async (e) => {
-    e.preventDefault();
-    setMessage('');
-    try {
-      await khoaApi.addBoardMember({
-        boardId: activeBoardIdForMember,
-        lecturerId: Number(memberLecturerId),
-        role: memberRole,
-      });
-      setMessage('Thêm thành viên hội đồng thành công');
-      setActiveBoardIdForMember(null);
-      setMemberLecturerId('');
-      setMemberRole('ThanhVien');
-      fetchData();
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleLockGrades = async (enrollmentId) => {
-    setMessage('');
-    setError('');
-    try {
-      const userJson = localStorage.getItem('user');
-      const { user } = JSON.parse(userJson);
-      const res = await khoaApi.lockGrades({
-        termStudentId: enrollmentId,
-        userId: user.id,
-      });
-      setMessage(res.data.message);
-      fetchData();
-    } catch (err) {
-      setError(err.response?.data?.message || 'Chốt và khóa điểm thất bại');
-    }
+  const toggleStudentSelection = (mssv) => {
+    setSelectedStudents(prev => 
+      prev.includes(mssv) ? prev.filter(id => id !== mssv) : [...prev, mssv]
+    );
   };
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-800">Hội đồng chấm & Khóa điểm học phần</h2>
-        <p className="text-slate-500 text-sm">Thiết lập các hội đồng chấm vấn đáp, phân công thành viên ban giám khảo và chốt khóa điểm tổng kết học phần</p>
+    <div className="flex flex-col gap-6">
+      {/* Title block with "+ Tạo buổi báo cáo" button */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-black text-slate-800 tracking-tight">
+            Hội đồng chấm báo cáo
+          </h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Thiết lập và quản lý danh sách các hội đồng đánh giá báo cáo tham quan nhà máy của sinh viên.
+          </p>
+        </div>
+        <button 
+          onClick={() => setShowAddModal(true)}
+          className="flex items-center gap-2 px-5 py-2.5 bg-[#407F3E] hover:bg-[#407F3E]/95 text-white rounded-xl text-sm font-bold transition-all shadow-sm cursor-pointer self-start sm:self-center"
+        >
+          <Plus className="w-5 h-5" />
+          <span>Tạo buổi báo cáo</span>
+        </button>
       </div>
 
-      {message && (
-        <div className="bg-green-50 border border-green-500 text-green-700 px-4 py-3 rounded-lg text-sm font-medium">
-          {message}
-        </div>
-      )}
-      {error && (
-        <div className="bg-red-50 border border-red-500 text-red-700 px-4 py-3 rounded-lg text-sm font-medium">
-          {error}
-        </div>
-      )}
+      {/* Filter Bar Card */}
+      <div className="bg-white rounded-2xl border border-[#E7E0C4] p-5 shadow-sm">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Lịch kiến tập filter */}
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">
+              Lịch kiến tập
+            </label>
+            <select
+              value={scheduleFilter}
+              onChange={e => setScheduleFilter(e.target.value)}
+              className="w-full bg-[#E7E0C4]/10 border border-[#E7E0C4] rounded-xl px-4 py-2.5 text-sm text-slate-700 font-bold hover:bg-[#E7E0C4]/20 transition-all cursor-pointer outline-none focus:ring-2 focus:ring-[#407F3E]/20"
+            >
+              <option value="Tất cả">Tất cả lịch kiến tập</option>
+              <option value="Lịch kiến tập HK1 2026-2027">Lịch kiến tập HK1 2026-2027</option>
+              <option value="Lịch kiến tập K14 - Học kỳ phụ">Lịch kiến tập K14 - Học kỳ phụ</option>
+            </select>
+          </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Create Board Form */}
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4 lg:col-span-1 text-xs">
-          <h3 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">Tạo hội đồng chấm báo cáo</h3>
-          <form onSubmit={handleCreateBoard} className="space-y-4">
-            <div>
-              <label className="block font-medium text-slate-700">Lịch kiến tập áp dụng</label>
-              <select required value={scheduleId} onChange={e => setScheduleId(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded bg-white">
-                <option value="">-- Chọn lịch kế hoạch --</option>
-                {schedules.map(s => <option key={s.id} value={s.id}>{s.ten_lich}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block font-medium text-slate-700">Tên hội đồng</label>
-              <input type="text" required value={boardName} onChange={e => setBoardName(e.target.value)} placeholder="Ví dụ: Hội đồng Thực phẩm Nhóm 1" className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded" />
-            </div>
-            <div>
-              <label className="block font-medium text-slate-700">Ngày họp hội đồng</label>
-              <input type="date" required value={boardDate} onChange={e => setBoardDate(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded" />
-            </div>
-            <div>
-              <label className="block font-medium text-slate-700">Phòng họp / Địa điểm</label>
-              <input type="text" required value={boardRoom} onChange={e => setBoardRoom(e.target.value)} placeholder="Ví dụ: Phòng D402" className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded" />
-            </div>
-            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded font-semibold">Tạo hội đồng</button>
-          </form>
-        </div>
-
-        {/* Board List / Setup Member */}
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm lg:col-span-2 space-y-4 text-xs">
-          <h3 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">Quản lý hội đồng vấn đáp</h3>
-          <p className="text-slate-500">Mời thầy/cô đủ điều kiện vào ban hội đồng.</p>
-          <div className="flex gap-2">
-            <button onClick={() => { setActiveBoardIdForMember(1); }} className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-3 py-1.5 rounded font-semibold">
-              + Phân nhiệm vụ thành viên (Hội đồng mẫu)
-            </button>
+          {/* Hội đồng filter */}
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">
+              Hội đồng
+            </label>
+            <select
+              value={boardFilter}
+              onChange={e => setBoardFilter(e.target.value)}
+              className="w-full bg-[#E7E0C4]/10 border border-[#E7E0C4] rounded-xl px-4 py-2.5 text-sm text-slate-700 font-bold hover:bg-[#E7E0C4]/20 transition-all cursor-pointer outline-none focus:ring-2 focus:ring-[#407F3E]/20"
+            >
+              <option value="Tất cả">Tất cả hội đồng</option>
+              <option value="Sắp diễn ra">Sắp diễn ra</option>
+              <option value="Đang diễn ra">Đang diễn ra</option>
+              <option value="Đã kết thúc">Đã kết thúc</option>
+            </select>
           </div>
         </div>
       </div>
 
-      {/* Add Board Member Form */}
-      {activeBoardIdForMember && (
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-md space-y-4 text-xs">
-          <h3 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">Mời giảng viên vào ban hội đồng</h3>
-          <form onSubmit={handleAddMember} className="flex flex-wrap gap-4 items-end">
-            <div className="w-64">
-              <label className="block font-medium text-slate-700">Giảng viên (Đạt chuẩn)</label>
-              <select required value={memberLecturerId} onChange={e => setMemberLecturerId(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded bg-white">
-                <option value="">-- Chọn giảng viên --</option>
-                {lecturers.map(gv => <option key={gv.id} value={gv.id}>{gv.ho_ten} ({gv.ma_gv})</option>)}
-              </select>
-            </div>
-            <div className="w-48">
-              <label className="block font-medium text-slate-700">Vai trò trong hội đồng</label>
-              <select value={memberRole} onChange={e => setMemberRole(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded bg-white">
-                <option value="ChuTich">Chủ tịch Hội đồng</option>
-                <option value="ThuKy">Thư ký Hội đồng</option>
-                <option value="ThanhVien">Ủy viên phản biện</option>
-              </select>
-            </div>
-            <div className="flex gap-2">
-              <button type="button" onClick={() => setActiveBoardIdForMember(null)} className="px-4 py-2 border border-slate-300 rounded text-slate-700">Hủy</button>
-              <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded font-semibold">Thêm thành viên</button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* Lock Grades Section */}
-      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4 text-xs">
-        <h3 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">Chốt học phần & Khóa điểm tổng kết</h3>
-        <p className="text-slate-500">
-          Chỉ chốt khi sinh viên đã hoàn thành đầy đủ 3 bài báo cáo thu hoạch và có đủ điểm vấn đáp của các thành viên hội đồng.
-        </p>
-
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200 text-xs">
-            <thead className="bg-slate-50 text-slate-700 font-semibold text-left">
+      {/* Main Table Card */}
+      <div className="bg-white rounded-2xl border border-[#E7E0C4] shadow-sm overflow-hidden">
+        <div className="overflow-x-auto font-sans">
+          <table className="w-full text-left whitespace-nowrap">
+            <thead className="bg-[#E7E0C4] text-slate-700 font-bold text-[11px] uppercase tracking-wider border-b border-[#E7E0C4]">
               <tr>
-                <th className="px-4 py-2">MSSV</th>
-                <th className="px-4 py-2">Sinh viên</th>
-                <th className="px-4 py-2">Lớp</th>
-                <th className="px-4 py-2">Đợt học phần</th>
-                <th className="px-4 py-2">Điểm tổng kết</th>
-                <th className="px-4 py-2">Trạng thái</th>
-                <th className="px-4 py-2 text-right">Khóa điểm</th>
+                <th className="px-6 py-4 font-bold">Tên buổi báo cáo</th>
+                <th className="px-6 py-4 font-bold">Ngày báo cáo</th>
+                <th className="px-6 py-4 font-bold">Địa điểm</th>
+                <th className="px-6 py-4 font-bold">Danh sách hội đồng</th>
+                <th className="px-6 py-4 font-bold">Danh sách SV</th>
+                <th className="px-6 py-4 font-bold">Trạng thái</th>
+                <th className="px-6 py-4 font-bold text-center">Thao tác</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 text-slate-600">
-              {enrollments.map(e => (
-                <tr key={e.id} className="hover:bg-slate-55">
-                  <td className="px-4 py-3 font-semibold text-slate-800">{e.sinhVien?.mssv}</td>
-                  <td className="px-4 py-3">{e.sinhVien?.ho_ten}</td>
-                  <td className="px-4 py-3">{e.sinhVien?.ten_lop}</td>
-                  <td className="px-4 py-3">{e.lichKienTap?.ten_lich}</td>
-                  <td className="px-4 py-3 font-bold text-slate-800">
-                    {e.diem_tong_ket !== null ? `${e.diem_tong_ket}/10` : 'Chưa chốt'}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
-                      e.trang_thai === 'Dat' ? 'bg-green-50 text-green-700' :
-                      e.trang_thai === 'KhongDat' ? 'bg-red-50 text-red-700' :
-                      'bg-blue-50 text-blue-700'
-                    }`}>
-                      {e.trang_thai}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {e.trang_thai === 'DangThucHien' && (
-                      <button onClick={() => handleLockGrades(e.id)} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded font-semibold transition-colors">
-                        Tính & Chốt
+            <tbody className="divide-y divide-[#E7E0C4]/40 text-slate-800 font-medium">
+              {boards
+                .filter(b => scheduleFilter === 'Tất cả' || b.scheduleName === scheduleFilter)
+                .filter(b => boardFilter === 'Tất cả' || b.status === boardFilter)
+                .map((board) => (
+                  <tr key={board.id} className="hover:bg-[#E7E0C4]/10 transition-colors duration-250">
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col">
+                        <span className="font-bold text-slate-800 text-sm">{board.name}</span>
+                        <span className="text-[10px] text-slate-400 font-bold mt-0.5">{board.scheduleName}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-sm font-semibold text-slate-600">{board.date}</td>
+                    <td className="px-6 py-4 text-sm font-semibold text-[#407F3E]">
+                      <div className="flex items-center gap-1.5">
+                        <MapPin size={14} className="text-slate-400" />
+                        <span>{board.location}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-wrap gap-1 max-w-xs">
+                        {board.members.map((mem, idx) => (
+                          <span key={idx} className="inline-block bg-[#E7E0C4]/40 text-slate-700 text-[10px] px-2 py-0.5 rounded-full font-bold border border-[#E7E0C4]/80">
+                            {mem}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <button 
+                        onClick={() => alert(`Xem danh sách ${board.numStudents} sinh viên báo cáo buổi: ${board.name}`)}
+                        className="inline-flex items-center gap-1.5 text-xs text-[#407F3E] hover:underline font-bold"
+                      >
+                        <Users size={14} />
+                        <span>Xem DS ({board.numStudents})</span>
                       </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-block px-3 py-0.5 rounded-full text-[10px] font-bold shadow-sm ${getStatusBadgeClass(board.status)}`}>
+                        {board.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <button
+                        onClick={() => setSelectedBoard(board)}
+                        className="px-3 py-1.5 border border-[#E7E0C4] text-slate-600 hover:text-[#407F3E] hover:bg-[#E7E0C4]/20 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                      >
+                        Chi tiết
+                      </button>
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Detail Modal */}
+      {selectedBoard && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl overflow-hidden flex flex-col">
+            <div className="p-6 border-b border-[#E7E0C4] bg-[#E7E0C4]/30 flex items-center justify-between">
+              <h2 className="font-extrabold text-slate-800 text-lg flex items-center gap-2">
+                <Gavel className="w-5 h-5 text-[#407F3E]" />
+                <span>Chi tiết buổi hội đồng</span>
+              </h2>
+              <button 
+                onClick={() => setSelectedBoard(null)} 
+                className="text-slate-450 hover:text-slate-800 text-2xl font-bold cursor-pointer"
+              >
+                &times;
+              </button>
+            </div>
+            <div className="p-6 space-y-4 text-sm font-semibold text-slate-650">
+              <div>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Tên buổi báo cáo</p>
+                <p className="text-slate-800 font-bold text-base mt-0.5">{selectedBoard.name}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Lịch áp dụng</p>
+                  <p className="text-slate-700 font-bold mt-0.5">{selectedBoard.scheduleName}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Thời gian</p>
+                  <p className="text-slate-700 font-bold mt-0.5">{selectedBoard.date}</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Phòng báo cáo</p>
+                <p className="text-slate-700 font-bold mt-0.5">{selectedBoard.location}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1.5">Danh sách giám khảo</p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedBoard.members.map((m, idx) => (
+                    <span key={idx} className="bg-[#407F3E]/10 text-[#407F3E] text-xs px-3 py-1 rounded-full font-bold border border-[#407F3E]/20">
+                      {m}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="p-4 bg-slate-50 border-t border-[#E7E0C4] flex justify-end">
+              <button 
+                onClick={() => setSelectedBoard(null)} 
+                className="px-5 py-2 bg-slate-700 hover:bg-slate-800 text-white font-bold rounded-xl text-xs cursor-pointer"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating "+ Tạo buổi báo cáo" Modal Mockup */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-xl rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b border-[#E7E0C4] bg-white flex items-center justify-between">
+              <h2 className="font-black text-slate-800 text-lg flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-[#407F3E]" />
+                <span>+ Tạo buổi báo cáo</span>
+              </h2>
+              <button 
+                onClick={() => setShowAddModal(false)} 
+                className="text-slate-450 hover:text-slate-700 text-2xl font-bold cursor-pointer"
+              >
+                &times;
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateBoardSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
+              {/* Tên buổi báo cáo */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  Tên buổi báo cáo *
+                </label>
+                <input 
+                  type="text" 
+                  value={boardName} 
+                  onChange={e => setBoardName(e.target.value)} 
+                  placeholder="Ví dụ: Buổi bảo vệ báo cáo tham quan Vinamilk - HĐ1" 
+                  required 
+                  className="w-full px-4 py-2.5 border border-[#E7E0C4] bg-slate-50 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-[#407F3E]/20 text-slate-700" 
+                />
+              </div>
+
+              {/* Lịch kiến tập áp dụng */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  Lịch kiến tập áp dụng
+                </label>
+                <select 
+                  value={appliedSchedule} 
+                  onChange={e => setAppliedSchedule(e.target.value)} 
+                  className="w-full px-4 py-2.5 border border-[#E7E0C4] bg-slate-50 rounded-xl text-sm font-semibold cursor-pointer outline-none focus:ring-2 focus:ring-[#407F3E]/20 text-slate-700"
+                >
+                  <option value="Lịch kiến tập HK1 2026-2027">Lịch kiến tập HK1 2026-2027</option>
+                  <option value="Lịch kiến tập K14 - Học kỳ phụ">Lịch kiến tập K14 - Học kỳ phụ</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Ngày báo cáo (date-time picker) */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                    Ngày báo cáo *
+                  </label>
+                  <input 
+                    type="datetime-local" 
+                    value={dateTime} 
+                    onChange={e => setDateTime(e.target.value)} 
+                    required 
+                    className="w-full px-4 py-2.5 border border-[#E7E0C4] bg-slate-50 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-[#407F3E]/20 text-slate-750" 
+                  />
+                </div>
+                {/* Địa điểm */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                    Địa điểm *
+                  </label>
+                  <input 
+                    type="text" 
+                    value={room} 
+                    onChange={e => setRoom(e.target.value)} 
+                    placeholder="Ví dụ: Phòng A.101" 
+                    required 
+                    className="w-full px-4 py-2.5 border border-[#E7E0C4] bg-slate-50 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-[#407F3E]/20 text-slate-700" 
+                  />
+                </div>
+              </div>
+
+              {/* Select multichip dropdown: Chọn thành viên hội đồng */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                  Chọn thành viên hội đồng
+                </label>
+                <div className="flex flex-wrap gap-1.5 p-3 border border-[#E7E0C4] rounded-xl bg-slate-50/50 mb-2 min-h-[44px]">
+                  {selectedMembers.map((m) => (
+                    <span key={m} className="inline-flex items-center gap-1 bg-[#407F3E] text-white text-[11px] px-2.5 py-0.5 rounded-full font-bold">
+                      {m}
+                      <button 
+                        type="button" 
+                        onClick={() => setSelectedMembers(prev => prev.filter(x => x !== m))}
+                        className="hover:text-red-200 font-bold ml-1"
+                      >
+                        &times;
+                      </button>
+                    </span>
+                  ))}
+                  {selectedMembers.length === 0 && (
+                    <span className="text-slate-400 text-xs italic font-semibold">Chưa chọn thành viên nào</span>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-32 overflow-y-auto p-1">
+                  {availableLecturers.map((lec) => {
+                    const isSelected = selectedMembers.includes(lec);
+                    return (
+                      <button
+                        key={lec}
+                        type="button"
+                        onClick={() => {
+                          setSelectedMembers(prev => 
+                            isSelected ? prev.filter(x => x !== lec) : [...prev, lec]
+                          );
+                        }}
+                        className={`text-left px-3 py-1.5 rounded-lg border text-xs font-bold transition-all flex items-center justify-between ${
+                          isSelected 
+                            ? 'border-[#407F3E] bg-[#407F3E]/5 text-[#407F3E]' 
+                            : 'border-slate-200 bg-white text-slate-650 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span>{lec}</span>
+                        {isSelected && <Check size={12} />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Checklist Chọn sinh viên báo cáo */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Chọn sinh viên báo cáo * ({selectedStudents.length} đã chọn)
+                  </label>
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      if (selectedStudents.length === mockStudents.length) {
+                        setSelectedStudents([]);
+                      } else {
+                        setSelectedStudents(mockStudents.map(s => s.mssv));
+                      }
+                    }}
+                    className="text-xs text-[#407F3E] hover:underline font-bold"
+                  >
+                    {selectedStudents.length === mockStudents.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+                  </button>
+                </div>
+                <div className="border border-[#E7E0C4] rounded-xl overflow-hidden max-h-48 overflow-y-auto">
+                  <table className="w-full text-left text-xs whitespace-nowrap">
+                    <thead className="bg-[#E7E0C4]/60 text-slate-600 font-bold uppercase tracking-wider sticky top-0">
+                      <tr>
+                        <th className="px-4 py-2 text-center w-10">Chọn</th>
+                        <th className="px-4 py-2">MSSV</th>
+                        <th className="px-4 py-2">Họ tên</th>
+                        <th className="px-4 py-2">Lớp</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#E7E0C4]/40 font-semibold text-slate-700 bg-white">
+                      {mockStudents.map((st) => {
+                        const isChecked = selectedStudents.includes(st.mssv);
+                        return (
+                          <tr 
+                            key={st.mssv} 
+                            onClick={() => toggleStudentSelection(st.mssv)}
+                            className={`hover:bg-[#E7E0C4]/10 cursor-pointer transition-colors ${isChecked ? 'bg-[#407F3E]/5' : ''}`}
+                          >
+                            <td className="px-4 py-2 text-center" onClick={e => e.stopPropagation()}>
+                              <input 
+                                type="checkbox" 
+                                checked={isChecked} 
+                                onChange={() => toggleStudentSelection(st.mssv)}
+                                className="rounded text-[#407F3E] focus:ring-[#407F3E]/20"
+                              />
+                            </td>
+                            <td className="px-4 py-2 font-mono text-[#407F3E]">{st.mssv}</td>
+                            <td className="px-4 py-2 font-bold">{st.name}</td>
+                            <td className="px-4 py-2 text-slate-500">{st.class}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Submit / Cancel Buttons */}
+              <div className="pt-4 flex justify-end gap-3 border-t border-[#E7E0C4]">
+                <button 
+                  type="button" 
+                  onClick={() => setShowAddModal(false)} 
+                  className="px-5 py-2.5 border border-[#E7E0C4] rounded-xl text-slate-600 text-xs font-bold hover:bg-slate-50 cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button 
+                  type="submit" 
+                  className="px-5 py-2.5 bg-[#407F3E] hover:bg-[#407F3E]/95 text-white rounded-xl text-xs font-bold shadow-md cursor-pointer"
+                >
+                  Tạo buổi báo cáo
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

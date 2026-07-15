@@ -452,7 +452,7 @@ export default function LichTrinhDoan_SV() {
                         {s.name.split(' ').pop()?.[0]}
                       </div>
                       {s.isLeader && (
-                        <div className="absolute -bottom-1 -right-1 bg-warning-yellow rounded-full w-4 h-4 border border-white flex items-center justify-center shadow-md">
+                        <div className="absolute -bottom-1 -right-1 bg-[#DBD468] rounded-full w-4 h-4 border border-white flex items-center justify-center shadow-md">
                           <Star className="w-2.5 h-2.5 fill-on-surface text-on-surface" />
                         </div>
                       )}
@@ -502,7 +502,7 @@ export default function LichTrinhDoan_SV() {
             <div className="mt-6 pt-5 border-t border-surface-container flex flex-wrap gap-4 items-center justify-between text-xs text-on-surface-variant font-bold">
               <div className="flex gap-4">
                 <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-warning-yellow shadow-inner"></span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#DBD468] shadow-inner"></span>
                   <span>Trưởng nhóm</span>
                 </div>
                 <div className="flex items-center gap-1.5">

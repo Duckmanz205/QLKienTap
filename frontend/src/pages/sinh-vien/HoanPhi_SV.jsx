@@ -245,7 +245,7 @@ export default function HoanPhi_SV() {
                     statusClass = 'bg-primary/10 text-primary border border-primary/20';
                     statusText = 'Đã hoàn tiền';
                   } else if (ref.trang_thai === 'ChoXuLy') {
-                    statusClass = 'bg-warning-yellow/15 text-yellow-750 border border-warning-yellow/40';
+                    statusClass = 'bg-[#DBD468]/20 text-slate-700 border border-[#DBD468]/60';
                     statusText = 'Chờ xử lý';
                   } else {
                     statusClass = 'bg-red-50 text-red-650 border border-red-200';

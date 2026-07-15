@@ -88,12 +88,12 @@ export default function DashBoard_GV() {
         {/* Card 2: Bài thu hoạch cần chấm */}
         <div className="bg-white rounded-3xl p-6 shadow-sm border border-surface-variant/40 flex flex-col justify-between relative overflow-hidden group hover:scale-[1.02] transition-all">
           {pendingGradingCount > 0 && (
-            <div className="absolute top-4 right-4 bg-warning-yellow/20 text-on-surface border border-warning-yellow/40 px-2.5 py-0.5 rounded-full font-bold text-[9px] uppercase tracking-wider flex items-center gap-1">
-              <AlertTriangle className="w-3 h-3 text-on-surface-variant" />
+            <div className="absolute top-4 right-4 bg-[#DBD468]/20 text-slate-800 border border-[#DBD468]/40 px-2.5 py-0.5 rounded-full font-bold text-[9px] uppercase tracking-wider flex items-center gap-1">
+              <AlertTriangle className="w-3 h-3 text-slate-650" />
               <span>Cần xử lý</span>
             </div>
           )}
-          <div className="absolute -right-6 -top-6 w-24 h-24 bg-warning-yellow/5 rounded-full blur-xl"></div>
+          <div className="absolute -right-6 -top-6 w-24 h-24 bg-[#DBD468]/5 rounded-full blur-xl"></div>
           <div className="flex items-start justify-between mb-4">
             <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center shadow-inner border border-amber-100">
               <CheckSquare className="w-6 h-6" />
