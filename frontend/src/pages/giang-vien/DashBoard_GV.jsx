@@ -37,8 +37,8 @@ export default function DashBoard_GV() {
       const tripsRes = await giangVienApi.getLedTrips(gvId);
       setTrips(tripsRes.data);
 
-      const reportsRes = await giangVienApi.getGuidedReports(gvId);
-      setReports(reportsRes.data);
+      const reportsRes = await giangVienApi.getGuidedReports(gvId, { limit: 1000 });
+      setReports(reportsRes.data.data || []);
     } catch (err) {
       console.error(err);
     }

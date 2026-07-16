@@ -9,6 +9,26 @@ const api = axios.create({
   },
 });
 
+api.interceptors.request.use(
+  (config) => {
+    const userJson = localStorage.getItem('user');
+    if (userJson) {
+      try {
+        const { token } = JSON.parse(userJson);
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+      } catch (e) {
+        console.error('Error parsing user token', e);
+      }
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 export const authApi = {
   login: (ten_dang_nhap, mat_khau) => api.post('/auth/login', { ten_dang_nhap, mat_khau }),
   changePassword: (userId, oldPass, newPass) => api.post('/auth/change-password', { userId, oldPass, newPass }),
@@ -41,7 +61,7 @@ export const giangVienApi = {
   getTripRegistrations: (tripId) => api.get(`/giang-vien/trip-registrations/${tripId}`),
   takeAttendance: (data) => api.post('/giang-vien/take-attendance', data),
   gradePrepAndBonus: (data) => api.post('/giang-vien/grade-prep-bonus', data),
-  getGuidedReports: (lecturerId) => api.get(`/giang-vien/guided-reports/${lecturerId}`),
+  getGuidedReports: (lecturerId, params) => api.get(`/giang-vien/guided-reports/${lecturerId}`, { params }),
   gradeReport: (data) => api.post('/giang-vien/grade-report', data),
   getBoardSessions: (lecturerId) => api.get(`/giang-vien/board-sessions/${lecturerId}`),
   submitBoardScore: (data) => api.post('/giang-vien/submit-board-score', data),
@@ -58,7 +78,7 @@ export const khoaApi = {
   createFactory: (data) => api.post('/khoa/factories', data),
   updateFactory: (id, data) => api.put(`/khoa/factories/${id}`, data),
   getLecturers: () => api.get('/khoa/lecturers'),
-  getStudents: () => api.get('/khoa/students'),
+  getStudents: (params) => api.get('/khoa/students', { params }),
   getCampaigns: () => api.get('/khoa/campaigns'),
   createCampaign: (data) => api.post('/khoa/campaigns', data),
   getSchedules: () => api.get('/khoa/schedules'),
@@ -75,10 +95,10 @@ export const khoaApi = {
   addBoardMember: (data) => api.post('/khoa/add-board-member', data),
   lockGrades: (data) => api.post('/khoa/lock-grades', data),
   getDashboardStats: () => api.get('/khoa/dashboard-stats'),
-  getRegistrations: () => api.get('/khoa/registrations'),
-  getRefundRequests: () => api.get('/khoa/refund-requests'),
+  getRegistrations: (params) => api.get('/khoa/registrations', { params }),
+  getRefundRequests: (params) => api.get('/khoa/refund-requests', { params }),
   approveRefund: (data) => api.post('/khoa/approve-refund', data),
-  getEnrollments: () => api.get('/khoa/enrollments'),
+  getEnrollments: (params) => api.get('/khoa/enrollments', { params }),
   getNotifications: () => api.get('/khoa/notifications'),
   createNotification: (data) => api.post('/khoa/notifications', data),
   getRetakeReport: () => api.get('/khoa/retake-students-report'),

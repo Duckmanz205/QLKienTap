@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AuthModule } from '../auth/auth.module';
 import { GiangVienController } from './giang-vien.controller';
 import { GiangVienService } from './giang-vien.service';
 import {
@@ -35,6 +36,7 @@ import {
       DiemHoiDong_ChiTiet,
       HoiDongChamBaoCao,
     ]),
+    AuthModule,
   ],
   controllers: [GiangVienController],
   providers: [GiangVienService],

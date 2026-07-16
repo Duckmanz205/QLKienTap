@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AuthModule } from '../auth/auth.module';
 import { KhoaController } from './khoa.controller';
 import { KhoaService } from './khoa.service';
 import {
@@ -67,6 +68,7 @@ import {
       BoChuyenBaoCao_Chuyen,
       KetQuaHocPhan,
     ]),
+    AuthModule,
   ],
   controllers: [KhoaController],
   providers: [KhoaService],

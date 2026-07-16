@@ -20,6 +20,12 @@ export default function DanhMuc_SinhVien_Khoa() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterClass, setFilterClass] = useState('All');
   
+  // Pagination States
+  const [page, setPage] = useState(1);
+  const [limit] = useState(15);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalStudents, setTotalStudents] = useState(0);
+  
   // Wizard States
   const [showWizard, setShowWizard] = useState(false);
   const [wizardStep, setWizardStep] = useState(1);
@@ -41,13 +47,16 @@ export default function DanhMuc_SinhVien_Khoa() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetchData();
+    fetchData(1, searchTerm);
   }, []);
 
-  const fetchData = async () => {
+  const fetchData = async (targetPage = page, search = searchTerm) => {
     try {
-      const svRes = await khoaApi.getStudents();
-      setStudents(svRes.data);
+      const svRes = await khoaApi.getStudents({ page: targetPage, limit, search });
+      setStudents(svRes.data.data || []);
+      setTotalStudents(svRes.data.total || 0);
+      setTotalPages(svRes.data.totalPages || 1);
+      setPage(targetPage);
 
       const schRes = await khoaApi.getSchedules();
       setSchedules(schRes.data);
@@ -62,10 +71,8 @@ export default function DanhMuc_SinhVien_Khoa() {
   // Filtered Students list
   const uniqueClasses = Array.from(new Set(students.map(s => s.ten_lop).filter(Boolean)));
   const filteredStudents = students.filter(s => {
-    const matchesSearch = s.ho_ten.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          s.mssv.includes(searchTerm);
     const matchesClass = filterClass === 'All' || s.ten_lop === filterClass;
-    return matchesSearch && matchesClass;
+    return matchesClass;
   });
 
   // Drag and drop handlers
@@ -232,7 +239,11 @@ export default function DanhMuc_SinhVien_Khoa() {
             type="text" 
             placeholder="Tìm theo MSSV hoặc Họ tên sinh viên..." 
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              setSearchTerm(val);
+              fetchData(1, val);
+            }}
             className="w-full pl-9 pr-4 py-1.5 border border-slate-200 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:outline-none"
           />
         </div>
@@ -292,6 +303,32 @@ export default function DanhMuc_SinhVien_Khoa() {
               )}
             </tbody>
           </table>
+        </div>
+        
+        {/* Pagination Footer */}
+        <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between bg-slate-50/50">
+          <div className="text-slate-500 font-semibold">
+            Hiển thị {filteredStudents.length} / {totalStudents} sinh viên
+          </div>
+          <div className="flex gap-1.5">
+            <button
+              disabled={page <= 1}
+              onClick={() => fetchData(page - 1)}
+              className="px-2.5 py-1 bg-white border border-slate-250 rounded hover:bg-slate-50 disabled:opacity-50 text-slate-600 font-semibold"
+            >
+              Trước
+            </button>
+            <span className="px-3 py-1 text-slate-700 font-bold bg-slate-100 rounded">
+              Trang {page} / {totalPages}
+            </span>
+            <button
+              disabled={page >= totalPages}
+              onClick={() => fetchData(page + 1)}
+              className="px-2.5 py-1 bg-white border border-slate-250 rounded hover:bg-slate-50 disabled:opacity-50 text-slate-600 font-semibold"
+            >
+              Sau
+            </button>
+          </div>
         </div>
       </div>
 

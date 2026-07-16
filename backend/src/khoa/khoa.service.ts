@@ -90,7 +90,31 @@ export class KhoaService {
   // Giang Vien & Sinh Vien
   // -------------------------------------------------------------
   async getLecturers() { return this.gvRepo.find(); }
-  async getStudents() { return this.svRepo.find({ relations: { khoa: true } }); }
+  async getStudents(page: number = 1, limit: number = 10, search?: string) {
+    const queryBuilder = this.svRepo.createQueryBuilder('sinhVien')
+      .leftJoinAndSelect('sinhVien.khoa', 'khoa');
+
+    if (search) {
+      queryBuilder.where('sinhVien.mssv LIKE :search OR sinhVien.ho_ten LIKE :search', { search: `%${search}%` });
+    }
+
+    const take = limit;
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await queryBuilder
+      .orderBy('sinhVien.mssv', 'ASC')
+      .take(take)
+      .skip(skip)
+      .getManyAndCount();
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
 
   // -------------------------------------------------------------
   // Dot Kien Tap & Lich Kien Tap
@@ -422,27 +446,87 @@ export class KhoaService {
     };
   }
 
-  // List all student registrations
-  async getRegistrations() {
-    return this.phieuRepo.find({
-      relations: {
-        sinhVien: { khoa: true },
-        chuyenThamQuan: { nhaMay: true, lichKienTap: true },
-        yeuCauHuy: true,
-        hoaDon: true,
-      },
-      order: { ngay_dang_ky: 'DESC' },
-    });
+  // List all student registrations with pagination and filters
+  async getRegistrations(
+    page: number = 1,
+    limit: number = 10,
+    search?: string,
+    status?: string,
+    lichKienTapId?: number,
+    chuyenThamQuanId?: number,
+  ) {
+    const queryBuilder = this.phieuRepo.createQueryBuilder('phieu')
+      .leftJoinAndSelect('phieu.sinhVien', 'sinhVien')
+      .leftJoinAndSelect('sinhVien.khoa', 'khoa')
+      .leftJoinAndSelect('phieu.chuyenThamQuan', 'chuyen')
+      .leftJoinAndSelect('chuyen.nhaMay', 'nhaMay')
+      .leftJoinAndSelect('chuyen.lichKienTap', 'lich')
+      .leftJoinAndSelect('phieu.yeuCauHuy', 'yeuCauHuy')
+      .leftJoinAndSelect('phieu.hoaDon', 'hoaDon');
+
+    if (search) {
+      queryBuilder.andWhere('(sinhVien.mssv LIKE :search OR sinhVien.ho_ten LIKE :search OR nhaMay.ten_nha_may LIKE :search)', { search: `%${search}%` });
+    }
+
+    if (status && status !== 'All') {
+      queryBuilder.andWhere('phieu.trang_thai = :status', { status });
+    }
+
+    if (lichKienTapId) {
+      queryBuilder.andWhere('chuyen.lich_kien_tap_id = :lichKienTapId', { lichKienTapId });
+    }
+
+    if (chuyenThamQuanId) {
+      queryBuilder.andWhere('phieu.chuyen_tham_quan_id = :chuyenThamQuanId', { chuyenThamQuanId });
+    }
+
+    const take = limit;
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await queryBuilder
+      .orderBy('phieu.ngay_dang_ky', 'DESC')
+      .take(take)
+      .skip(skip)
+      .getManyAndCount();
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
-  // List all refund requests
-  async getRefundRequests() {
-    return this.hoanPhiRepo.find({
-      relations: {
-        hoaDon: { phieuDangKy: { sinhVien: true, chuyenThamQuan: { nhaMay: true } } },
-      },
-      order: { ngay_nop: 'DESC' },
-    });
+  // List all refund requests with pagination
+  async getRefundRequests(page: number = 1, limit: number = 10, search?: string) {
+    const queryBuilder = this.hoanPhiRepo.createQueryBuilder('don')
+      .leftJoinAndSelect('don.hoaDon', 'hoaDon')
+      .leftJoinAndSelect('hoaDon.phieuDangKy', 'phieu')
+      .leftJoinAndSelect('phieu.sinhVien', 'sinhVien')
+      .leftJoinAndSelect('phieu.chuyenThamQuan', 'chuyen')
+      .leftJoinAndSelect('chuyen.nhaMay', 'nhaMay');
+
+    if (search) {
+      queryBuilder.andWhere('(sinhVien.mssv LIKE :search OR sinhVien.ho_ten LIKE :search)', { search: `%${search}%` });
+    }
+
+    const take = limit;
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await queryBuilder
+      .orderBy('don.ngay_nop', 'DESC')
+      .take(take)
+      .skip(skip)
+      .getManyAndCount();
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   // Approve or reject refund request
@@ -463,15 +547,32 @@ export class KhoaService {
     return { message: isApproved ? 'Phê duyệt hoàn phí thành công' : 'Từ chối hoàn phí thành công' };
   }
 
-  // Get student enrollments for advisor assignment
-  async getEnrollments() {
-    return this.lksvRepo.find({
-      relations: {
-        sinhVien: true,
-        lichKienTap: true,
-      },
-      order: { id: 'DESC' },
-    });
+  // Get student enrollments for advisor assignment with pagination
+  async getEnrollments(page: number = 1, limit: number = 10, search?: string) {
+    const queryBuilder = this.lksvRepo.createQueryBuilder('enrollment')
+      .leftJoinAndSelect('enrollment.sinhVien', 'sinhVien')
+      .leftJoinAndSelect('enrollment.lichKienTap', 'lich');
+
+    if (search) {
+      queryBuilder.andWhere('(sinhVien.mssv LIKE :search OR sinhVien.ho_ten LIKE :search)', { search: `%${search}%` });
+    }
+
+    const take = limit;
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await queryBuilder
+      .orderBy('enrollment.id', 'DESC')
+      .take(take)
+      .skip(skip)
+      .getManyAndCount();
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   // Get all notifications

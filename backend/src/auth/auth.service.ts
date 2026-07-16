@@ -1,7 +1,9 @@
 import { Injectable, UnauthorizedException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { JwtService } from '@nestjs/jwt';
 import { TaiKhoan, SinhVien, GiangVien } from '../entities/qlkt.entity';
+import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class AuthService {
@@ -12,6 +14,7 @@ export class AuthService {
     private sinhVienRepo: Repository<SinhVien>,
     @InjectRepository(GiangVien)
     private giangVienRepo: Repository<GiangVien>,
+    private jwtService: JwtService,
   ) {}
 
   async login(ten_dang_nhap: string, mat_khau: string) {
@@ -24,15 +27,8 @@ export class AuthService {
       throw new UnauthorizedException('Tài khoản đã bị khóa');
     }
 
-    // Luu y: Trong moi truong thuc te su dung bcrypt. O day so sanh truc tiep mat khau
-    // vi du lieu import dang luu dang plaintext hoac hash don gian.
-    const isPasswordValid = 
-      user.mat_khau_hash === mat_khau ||
-      (user.mat_khau_hash === '$2b$10$hash_placeholder' && (
-        (user.vai_tro === 'SinhVien' && mat_khau === 'SvHuit2025') ||
-        (user.vai_tro === 'GiangVien' && mat_khau === 'GvHuit2025') ||
-        (user.vai_tro === 'QuanLyKhoa' && mat_khau === 'AdminHuit2025')
-      ));
+    // Dung bcrypt so sanh mat khau hash
+    const isPasswordValid = await bcrypt.compare(mat_khau, user.mat_khau_hash);
     if (!isPasswordValid) {
       throw new UnauthorizedException('Mật khẩu không chính xác');
     }
@@ -54,8 +50,11 @@ export class AuthService {
       });
     }
 
+    const payload = { sub: user.id, username: user.ten_dang_nhap, role: user.vai_tro };
+    const token = this.jwtService.sign(payload);
+
     return {
-      token: `mock-jwt-token-for-user-${user.id}`,
+      token,
       user: {
         id: user.id,
         ten_dang_nhap: user.ten_dang_nhap,
@@ -72,11 +71,13 @@ export class AuthService {
       throw new NotFoundException('Không tìm thấy tài khoản');
     }
 
-    if (user.mat_khau_hash !== oldPass) {
+    const isOldPassValid = await bcrypt.compare(oldPass, user.mat_khau_hash);
+    if (!isOldPassValid) {
       throw new BadRequestException('Mật khẩu cũ không chính xác');
     }
 
-    user.mat_khau_hash = newPass;
+    const salt = await bcrypt.genSalt(10);
+    user.mat_khau_hash = await bcrypt.hash(newPass, salt);
     user.phai_doi_mat_khau = false;
     await this.taiKhoanRepo.save(user);
 
