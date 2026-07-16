@@ -1,73 +1,16 @@
-# 📱 Mobile App — Flutter Client cho QLKienTap
+# mobile
 
-## Mục đích
+A new Flutter project.
 
-Ứng dụng di động Flutter dùng chung **Backend NestJS** với Frontend React.
+## Getting Started
 
-## Kiến trúc tổng quan
+This project is a starting point for a Flutter application.
 
-```
-┌─────────────────┐     ┌─────────────────┐     ┌──────────────┐
-│  Frontend React │     │  Mobile Flutter │     │  AI Service  │
-│   (Port 5173)   │     │  (Android/iOS)  │     │  (Port 8000) │
-└────────┬────────┘     └────────┬────────┘     └──────┬───────┘
-         │                       │                      │
-         └───────────┬───────────┘                      │
-                     ▼                                  │
-              ┌──────────────┐                          │
-              │   Backend    │◄─────────────────────────┘
-              │ NestJS :3000 │
-              └──────┬───────┘
-                     ▼
-              ┌──────────────┐
-              │  SQL Server  │
-              │  :1433       │
-              └──────────────┘
-```
+A few resources to get you started if this is your first Flutter project:
 
-## Khởi tạo dự án Flutter
+- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
+- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
 
-```bash
-cd mobile
-flutter create --org vn.edu.huit --project-name qlkientap .
-```
-
-## API Base URL
-
-Khi chạy trên máy ảo Android (emulator):
-```dart
-// Android Emulator dùng 10.0.2.2 thay cho localhost
-const String apiBaseUrl = 'http://10.0.2.2:3000/api';
-
-// Thiết bị thật trên cùng WiFi: dùng IP LAN
-// const String apiBaseUrl = 'http://192.168.1.xxx:3000/api';
-```
-
-## Cấu trúc thư mục (sau khi flutter create)
-
-```
-mobile/
-├── lib/
-│   ├── main.dart
-│   ├── models/           ← Data models (SinhVien, GiangVien...)
-│   ├── services/         ← API service classes
-│   ├── screens/          ← Các màn hình
-│   └── widgets/          ← Widget tái sử dụng
-├── android/
-├── ios/
-├── pubspec.yaml
-└── README.md             ← File này
-```
-
-## Lưu ý Backend CORS
-
-Backend đã cấu hình CORS trong `backend/src/main.ts`. Khi phát triển mobile,
-bạn cần thêm origin hoặc bật wildcard:
-
-```typescript
-// backend/src/main.ts
-app.enableCors({
-  origin: true,  // Cho phép tất cả origin khi dev
-  credentials: true,
-});
-```
+For help getting started with Flutter development, view the
+[online documentation](https://docs.flutter.dev/), which offers tutorials,
+samples, guidance on mobile development, and a full API reference.
