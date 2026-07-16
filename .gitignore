@@ -88,3 +88,8 @@ mobile/android/local.properties
 mobile/ios/Pods/
 mobile/ios/.symlinks/
 *.iml
+
+# ====================================
+# Upload folder (local fallback, production dung R2)
+# ====================================
+uploads/

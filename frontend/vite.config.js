@@ -9,7 +9,7 @@ export default defineConfig({
     // Proxy tat ca request /api/* sang backend
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
       },
