@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, LessThanOrEqual } from 'typeorm';
+import { TaskQueueService } from '../queue/task-queue.service';
 import {
   NamHoc,
   HocKy,
@@ -65,6 +66,7 @@ export class KhoaService {
     @InjectRepository(BoChuyenBaoCao) private boRepo: Repository<BoChuyenBaoCao>,
     @InjectRepository(BoChuyenBaoCao_Chuyen) private boCRepo: Repository<BoChuyenBaoCao_Chuyen>,
     @InjectRepository(KetQuaHocPhan) private kqRepo: Repository<KetQuaHocPhan>,
+    private readonly taskQueueService: TaskQueueService,
   ) {}
 
   // -------------------------------------------------------------
@@ -597,6 +599,22 @@ export class KhoaService {
     }
     notif.ngay_gui = new Date();
     notif.da_chinh_sua = false;
-    return this.thongBaoRepo.save(notif);
+    
+    const savedNotif = await this.thongBaoRepo.save(notif);
+
+    // Queue background jobs for email and reminder notification
+    await this.taskQueueService.addJob('send-email', {
+      to: 'sinhvien-khoa@hcmute.edu.vn',
+      subject: `[Thông báo kiến tập] ${savedNotif.tieu_de}`,
+      body: savedNotif.noi_dung,
+    });
+
+    await this.taskQueueService.addJob('send-reminder', {
+      studentId: 0, // 0 denotes all students in the campaign
+      title: savedNotif.tieu_de,
+      message: 'Khoa vừa cập nhật thông báo mới về đợt kiến tập.',
+    });
+
+    return savedNotif;
   }
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { khoaApi } from '../../services/api';
+import api, { khoaApi } from '../../services/api';
 import { 
   Upload, 
   Plus, 
@@ -102,9 +102,25 @@ export default function DanhMuc_SinhVien_Khoa() {
     }
   };
 
-  const processFile = (file) => {
+  const processFile = async (file) => {
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Kích thước tệp Excel vượt quá hạn mức 5MB.');
+      return;
+    }
     setFileName(file.name);
-    generateSamplePreview();
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      await api.post('/upload/excel', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        }
+      });
+      generateSamplePreview();
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.message || 'Không thể tải tệp Excel lên máy chủ.');
+    }
   };
 
   const generateSamplePreview = () => {

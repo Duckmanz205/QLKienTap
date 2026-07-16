@@ -4,12 +4,16 @@ import { NamHoc, HocKy, Khoa, NhaMay, DotKienTap, LichKienTap, ChuyenThamQuan } 
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { TaskQueueService } from '../queue/task-queue.service';
 
 @Controller('khoa')
 @UseGuards(AuthGuard, RolesGuard)
 @Roles('Khoa')
 export class KhoaController {
-  constructor(private readonly khoaService: KhoaService) {}
+  constructor(
+    private readonly khoaService: KhoaService,
+    private readonly taskQueueService: TaskQueueService,
+  ) {}
 
   @Get('years')
   async getYears() {
@@ -222,5 +226,23 @@ export class KhoaController {
   @Post('notifications')
   async createNotification(@Body() body: { tieu_de: string; noi_dung: string; nguoi_gui_id: number; khoa_id?: number }) {
     return this.khoaService.createNotification(body);
+  }
+
+  @Post('export-student-list')
+  async exportStudentList(@Body() body: { campaignId?: number }) {
+    const fileName = `student_export_${Date.now()}.xlsx`;
+    
+    // Add job to background queue
+    await this.taskQueueService.addJob('export-file', {
+      type: 'student_list',
+      filter: { campaignId: body.campaignId },
+      outputFileName: fileName,
+    });
+
+    return {
+      message: 'Yêu cầu xuất file đã được đưa vào hàng đợi xử lý nền.',
+      fileName,
+      downloadUrl: `/api/upload/file/excels/${fileName}`,
+    };
   }
 }
