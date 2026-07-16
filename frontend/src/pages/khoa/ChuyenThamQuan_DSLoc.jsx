@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { khoaApi } from '../../services/api';
+import VirtualList from '../../components/VirtualList';
 import { 
   Compass, 
   Users, 
@@ -21,6 +22,7 @@ import {
 
 export default function ChuyenThamQuan_DSLoc() {
   const [activeTab, setActiveTab] = useState('trips'); // 'trips' | 'registrations' | 'cancels' | 'refunds' | 'gvhd'
+  const [useVirtualScroll, setUseVirtualScroll] = useState(false);
 
   // Data states
   const [trips, setTrips] = useState([]);
@@ -31,6 +33,25 @@ export default function ChuyenThamQuan_DSLoc() {
   const [registrations, setRegistrations] = useState([]);
   const [refundRequests, setRefundRequests] = useState([]);
   const [enrollments, setEnrollments] = useState([]); // LichKienTap_SinhVien for GVHD assignment
+
+  // Pagination states for registrations
+  const [regPage, setRegPage] = useState(1);
+  const [regLimit] = useState(15);
+  const [regTotalPages, setRegTotalPages] = useState(1);
+  const [regTotal, setRegTotal] = useState(0);
+
+  // Pagination states for refund requests
+  const [refPage, setRefPage] = useState(1);
+  const [refLimit] = useState(15);
+  const [refTotalPages, setRefTotalPages] = useState(1);
+  const [refTotal, setRefTotal] = useState(0);
+
+  // Pagination states for enrollments (GVHD)
+  const [enPage, setEnPage] = useState(1);
+  const [enLimit] = useState(15);
+  const [enTotalPages, setEnTotalPages] = useState(1);
+  const [enTotal, setEnTotal] = useState(0);
+  const [enSearchQuery, setEnSearchQuery] = useState('');
 
   // Create Trip form state
   const [nhaMayId, setNhaMayId] = useState('');
@@ -82,58 +103,168 @@ export default function ChuyenThamQuan_DSLoc() {
     }
   }, []);
 
-  const fetchData = async () => {
+  const fetchTripsAndMetadata = async () => {
     try {
-      setError('');
-      // Load trips
       const tRes = await khoaApi.getTrips(); 
       setTrips(tRes.data);
 
-      // Load plans/schedules
       const sRes = await khoaApi.getSchedules(); 
       setSchedules(sRes.data);
 
-      // Load factories (only active ones)
       const fRes = await khoaApi.getFactories(); 
       setFactories(fRes.data.filter(x => x.trang_thai === 'HoatDong'));
 
-      // Load lecturers
       const lRes = await khoaApi.getLecturers(); 
       setLecturers(lRes.data);
+    } catch (err) {
+      console.error(err);
+      setError('Lỗi khi tải metadata từ backend.');
+    }
+  };
 
-      // Load students
-      const svRes = await khoaApi.getStudents(); 
-      setStudents(svRes.data);
+  const fetchRegistrations = async (pageVal = regPage, query = searchQuery, statusVal = selectedRegStatus, planId = selectedPlanId, tripId = selectedTripId, forceVirtual = useVirtualScroll) => {
+    try {
+      const params = {
+        page: forceVirtual ? 1 : pageVal,
+        limit: forceVirtual ? 1000 : regLimit,
+        search: query || undefined,
+        status: statusVal !== 'All' ? statusVal : undefined,
+        lichKienTapId: planId !== 'All' ? Number(planId) : undefined,
+        chuyenThamQuanId: tripId !== 'All' ? Number(tripId) : undefined,
+      };
+      const res = await khoaApi.getRegistrations(params);
+      setRegistrations(res.data.data || []);
+      setRegTotal(res.data.total || 0);
+      setRegTotalPages(res.data.totalPages || 1);
+      setRegPage(forceVirtual ? 1 : pageVal);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
-      // Load registrations (cancellations can be extracted from here)
-      const regRes = await khoaApi.getRegistrations();
-      setRegistrations(regRes.data);
+  const fetchRefundRequests = async (pageVal = refPage) => {
+    try {
+      const res = await khoaApi.getRefundRequests({ page: pageVal, limit: refLimit });
+      setRefundRequests(res.data.data || []);
+      setRefTotal(res.data.total || 0);
+      setRefTotalPages(res.data.totalPages || 1);
+      setRefPage(pageVal);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
-      // Load refund requests
-      const refRes = await khoaApi.getRefundRequests();
-      setRefundRequests(refRes.data);
+  const fetchEnrollments = async (pageVal = enPage, query = enSearchQuery, forceVirtual = useVirtualScroll) => {
+    try {
+      const res = await khoaApi.getEnrollments({ page: forceVirtual ? 1 : pageVal, limit: forceVirtual ? 1000 : enLimit, search: query || undefined });
+      setEnrollments(res.data.data || []);
+      setEnTotal(res.data.total || 0);
+      setEnTotalPages(res.data.totalPages || 1);
+      setEnPage(forceVirtual ? 1 : pageVal);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
-      // Load cohort enrollments for GVHD mapping
-      // If we don't have a direct endpoint, let's extract students in active schedules
-      const tempEnrollments = [];
-      // To simulate cohort enrollment list matching plans
-      svRes.data.forEach((sv, index) => {
-        // Map to a schedule
-        const linkedSch = sRes.data[index % sRes.data.length];
-        if (linkedSch) {
-          tempEnrollments.push({
-            id: sv.id, // using student ID as enrollment placeholder
-            sinhVien: sv,
-            lichKienTap: linkedSch,
-          });
-        }
-      });
-      setEnrollments(tempEnrollments);
-
+  const fetchData = async () => {
+    try {
+      setError('');
+      await fetchTripsAndMetadata();
+      await fetchRegistrations(1);
+      await fetchRefundRequests(1);
+      await fetchEnrollments(1);
     } catch (err) {
       console.error(err);
       setError('Lỗi khi đồng bộ cơ sở dữ liệu từ backend.');
     }
+  };
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      fetchRegistrations(1, searchQuery, selectedRegStatus, selectedPlanId, selectedTripId, useVirtualScroll);
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery, selectedRegStatus, selectedPlanId, selectedTripId, useVirtualScroll]);
+
+  useEffect(() => {
+    if (activeTab === 'gvhd') {
+      const delayDebounceFn = setTimeout(() => {
+        fetchEnrollments(1, enSearchQuery, useVirtualScroll);
+      }, 300);
+      return () => clearTimeout(delayDebounceFn);
+    }
+  }, [enSearchQuery, activeTab, useVirtualScroll]);
+
+  useEffect(() => {
+    if (activeTab === 'refunds') {
+      fetchRefundRequests(1);
+    }
+  }, [activeTab]);
+
+  const renderVirtualRegistration = (reg, index) => {
+    return (
+      <div className="flex border-b border-slate-100 items-center text-xs py-2 hover:bg-slate-50/30 h-[60px]" style={{ width: '100%' }}>
+        <div className="w-[20%] pl-4 pr-2 truncate">
+          <span className="font-bold text-slate-800 block">{reg.sinhVien?.ho_ten}</span>
+          <span className="font-mono text-[10px] text-slate-400 block">{reg.sinhVien?.mssv}</span>
+        </div>
+        <div className="w-[15%] px-2 truncate font-semibold text-slate-600">{reg.sinhVien?.ten_lop}</div>
+        <div className="w-[30%] px-2 truncate">
+          <span className="font-medium text-slate-800 block">{reg.chuyenThamQuan?.nhaMay?.ten_nha_may}</span>
+          <span className="text-[10px] text-slate-400 block">Hình thức: {reg.chuyenThamQuan?.hinh_thuc}</span>
+        </div>
+        <div className="w-[15%] px-2 truncate font-mono text-slate-500">{new Date(reg.ngay_dang_ky).toLocaleString('vi-VN')}</div>
+        <div className="w-[10%] px-2 truncate">
+          {reg.hoaDon?.trang_thai === 'DaDongDungHan' && (
+            <span className="inline-flex items-center gap-0.5 text-emerald-600 bg-emerald-50 border border-emerald-100 text-[10px] px-1.5 py-0.5 rounded font-bold">
+              Đã nộp
+            </span>
+          )}
+          {reg.hoaDon?.trang_thai === 'DaHoanPhi' && (
+            <span className="inline-flex items-center gap-0.5 text-slate-500 bg-slate-50 border border-slate-100 text-[10px] px-1.5 py-0.5 rounded font-bold">
+              Đã hoàn phí
+            </span>
+          )}
+          {(!reg.hoaDon || reg.hoaDon?.trang_thai === 'ChuaDong') && (
+            <span className="inline-flex items-center gap-0.5 text-rose-500 bg-rose-50 border border-rose-100 text-[10px] px-1.5 py-0.5 rounded font-semibold">
+              Chưa đóng
+            </span>
+          )}
+        </div>
+        <div className="w-[10%] px-2 truncate">
+          <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+            reg.trang_thai === 'HopLe' ? 'bg-emerald-50 text-emerald-700 border border-emerald-150' :
+            reg.trang_thai === 'ChoDuyet' ? 'bg-indigo-50 text-indigo-700 border border-indigo-150' :
+            reg.trang_thai === 'DaHuy' ? 'bg-slate-100 text-slate-500 border border-slate-200' :
+            'bg-rose-50 text-rose-700 border border-rose-150'
+          }`}>
+            {reg.trang_thai === 'HopLe' ? 'Đã duyệt / Hợp lệ' :
+             reg.trang_thai === 'ChoDuyet' ? 'Chờ duyệt' :
+             reg.trang_thai === 'DaHuy' ? 'Đã hủy' : 'Bị loại / Khác'}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
+  const renderVirtualEnrollment = (e, index) => {
+    return (
+      <div className="flex border-b border-slate-100 items-center text-xs py-2 hover:bg-slate-50/50 h-[60px]" style={{ width: '100%' }}>
+        <div className="w-[20%] pl-6 pr-2 font-mono text-slate-500 font-semibold">{e.sinhVien?.mssv}</div>
+        <div className="w-[25%] px-2 font-bold text-slate-800 truncate">{e.sinhVien?.ho_ten}</div>
+        <div className="w-[15%] px-2 font-semibold text-slate-600 truncate">{e.sinhVien?.ten_lop}</div>
+        <div className="w-[25%] px-2 text-slate-500 truncate">{e.lichKienTap?.ten_lich}</div>
+        <div className="w-[15%] px-2 pr-6 text-right">
+          <button 
+            onClick={() => { setActiveGuideEnrollmentId(e.id); setGuideLecturerId(''); }} 
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg font-bold transition-all shadow-sm"
+          >
+            Phân GVHD
+          </button>
+        </div>
+      </div>
+    );
   };
 
   // Create Trip
@@ -516,7 +647,7 @@ export default function ChuyenThamQuan_DSLoc() {
       {activeTab === 'registrations' && (
         <div className="space-y-4 text-xs">
           {/* Filters controls */}
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-5 gap-4">
             <div>
               <label className="block text-[11px] font-bold text-slate-500 mb-1">Chọn kế hoạch lớp:</label>
               <select 
@@ -582,76 +713,140 @@ export default function ChuyenThamQuan_DSLoc() {
                 />
               </div>
             </div>
+
+            <div className="flex items-center pt-5">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input 
+                  type="checkbox"
+                  checked={useVirtualScroll}
+                  onChange={(e) => setUseVirtualScroll(e.target.checked)}
+                  className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-350"
+                />
+                <span className="text-[11px] font-bold text-slate-700">Virtual Scroll (Không phân trang)</span>
+              </label>
+            </div>
           </div>
 
           {/* Main Registrations Table */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider font-bold border-b border-slate-200">
-                  <tr>
-                    <th className="p-3 pl-4">Sinh viên (MSSV)</th>
-                    <th className="p-3">Lớp học</th>
-                    <th className="p-3">Doanh nghiệp đăng ký</th>
-                    <th className="p-3">Thời gian đăng ký</th>
-                    <th className="p-3">Lệ phí</th>
-                    <th className="p-3">Trạng thái</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-700">
-                  {filteredRegs.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="p-12 text-center text-slate-400">Không tìm thấy bản ghi đăng ký nào khớp bộ lọc</td>
-                    </tr>
-                  ) : (
-                    filteredRegs.map((reg) => (
-                      <tr key={reg.id} className="hover:bg-slate-50/30">
-                        <td className="p-3 pl-4">
-                          <span className="font-bold text-slate-800 block">{reg.sinhVien?.ho_ten}</span>
-                          <span className="font-mono text-[10px] text-slate-400 block">{reg.sinhVien?.mssv}</span>
-                        </td>
-                        <td className="p-3 font-semibold text-slate-600">{reg.sinhVien?.ten_lop}</td>
-                        <td className="p-3">
-                          <span className="font-medium text-slate-800 block">{reg.chuyenThamQuan?.nhaMay?.ten_nha_may}</span>
-                          <span className="text-[10px] text-slate-400 block">Hình thức: {reg.chuyenThamQuan?.hinh_thuc}</span>
-                        </td>
-                        <td className="p-3 font-mono text-slate-500">{new Date(reg.ngay_dang_ky).toLocaleString('vi-VN')}</td>
-                        <td className="p-3">
-                          {reg.hoaDon?.trang_thai === 'DaDongDungHan' && (
-                            <span className="inline-flex items-center gap-0.5 text-emerald-600 bg-emerald-50 border border-emerald-100 text-[10px] px-1.5 py-0.5 rounded font-bold">
-                              Đã nộp
-                            </span>
-                          )}
-                          {reg.hoaDon?.trang_thai === 'DaHoanPhi' && (
-                            <span className="inline-flex items-center gap-0.5 text-slate-500 bg-slate-50 border border-slate-100 text-[10px] px-1.5 py-0.5 rounded font-bold">
-                              Đã hoàn phí
-                            </span>
-                          )}
-                          {(!reg.hoaDon || reg.hoaDon?.trang_thai === 'ChuaDong') && (
-                            <span className="inline-flex items-center gap-0.5 text-rose-500 bg-rose-50 border border-rose-100 text-[10px] px-1.5 py-0.5 rounded font-semibold">
-                              Chưa đóng
-                            </span>
-                          )}
-                        </td>
-                        <td className="p-3">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
-                            reg.trang_thai === 'HopLe' ? 'bg-emerald-50 text-emerald-700 border border-emerald-150' :
-                            reg.trang_thai === 'ChoDuyet' ? 'bg-indigo-50 text-indigo-700 border border-indigo-150' :
-                            reg.trang_thai === 'DaHuy' ? 'bg-slate-100 text-slate-500 border border-slate-200' :
-                            'bg-rose-50 text-rose-700 border border-rose-150'
-                          }`}>
-                            {reg.trang_thai === 'HopLe' ? 'Đã duyệt / Hợp lệ' :
-                             reg.trang_thai === 'ChoDuyet' ? 'Chờ duyệt' :
-                             reg.trang_thai === 'DaHuy' ? 'Đã hủy' : 'Bị loại / Khác'}
-                          </span>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+          {useVirtualScroll ? (
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              {/* Virtual Header */}
+              <div className="flex bg-slate-50 text-slate-500 uppercase tracking-wider font-bold border-b border-slate-200 py-3 text-[11px]">
+                <div className="w-[20%] pl-4 pr-2">Sinh viên (MSSV)</div>
+                <div className="w-[15%] px-2">Lớp học</div>
+                <div className="w-[30%] px-2">Doanh nghiệp đăng ký</div>
+                <div className="w-[15%] px-2">Thời gian đăng ký</div>
+                <div className="w-[10%] px-2">Lệ phí</div>
+                <div className="w-[10%] px-2">Trạng thái</div>
+              </div>
+              
+              {/* Virtual List */}
+              {filteredRegs.length === 0 ? (
+                <div className="p-12 text-center text-slate-400">Không tìm thấy bản ghi đăng ký nào khớp bộ lọc</div>
+              ) : (
+                <VirtualList
+                  items={filteredRegs}
+                  itemHeight={60}
+                  height={450}
+                  renderItem={renderVirtualRegistration}
+                />
+              )}
             </div>
-          </div>
+          ) : (
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider font-bold border-b border-slate-200">
+                    <tr>
+                      <th className="p-3 pl-4">Sinh viên (MSSV)</th>
+                      <th className="p-3">Lớp học</th>
+                      <th className="p-3">Doanh nghiệp đăng ký</th>
+                      <th className="p-3">Thời gian đăng ký</th>
+                      <th className="p-3">Lệ phí</th>
+                      <th className="p-3">Trạng thái</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-700">
+                    {filteredRegs.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="p-12 text-center text-slate-400">Không tìm thấy bản ghi đăng ký nào khớp bộ lọc</td>
+                      </tr>
+                    ) : (
+                      filteredRegs.map((reg) => (
+                        <tr key={reg.id} className="hover:bg-slate-50/30">
+                          <td className="p-3 pl-4">
+                            <span className="font-bold text-slate-800 block">{reg.sinhVien?.ho_ten}</span>
+                            <span className="font-mono text-[10px] text-slate-400 block">{reg.sinhVien?.mssv}</span>
+                          </td>
+                          <td className="p-3 font-semibold text-slate-600">{reg.sinhVien?.ten_lop}</td>
+                          <td className="p-3">
+                            <span className="font-medium text-slate-800 block">{reg.chuyenThamQuan?.nhaMay?.ten_nha_may}</span>
+                            <span className="text-[10px] text-slate-400 block">Hình thức: {reg.chuyenThamQuan?.hinh_thuc}</span>
+                          </td>
+                          <td className="p-3 font-mono text-slate-500">{new Date(reg.ngay_dang_ky).toLocaleString('vi-VN')}</td>
+                          <td className="p-3">
+                            {reg.hoaDon?.trang_thai === 'DaDongDungHan' && (
+                              <span className="inline-flex items-center gap-0.5 text-emerald-600 bg-emerald-50 border border-emerald-100 text-[10px] px-1.5 py-0.5 rounded font-bold">
+                                Đã nộp
+                              </span>
+                            )}
+                            {reg.hoaDon?.trang_thai === 'DaHoanPhi' && (
+                              <span className="inline-flex items-center gap-0.5 text-slate-500 bg-slate-50 border border-slate-100 text-[10px] px-1.5 py-0.5 rounded font-bold">
+                                Đã hoàn phí
+                              </span>
+                            )}
+                            {(!reg.hoaDon || reg.hoaDon?.trang_thai === 'ChuaDong') && (
+                              <span className="inline-flex items-center gap-0.5 text-rose-500 bg-rose-50 border border-rose-100 text-[10px] px-1.5 py-0.5 rounded font-semibold">
+                                Chưa đóng
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+                              reg.trang_thai === 'HopLe' ? 'bg-emerald-50 text-emerald-700 border border-emerald-150' :
+                              reg.trang_thai === 'ChoDuyet' ? 'bg-indigo-50 text-indigo-700 border border-indigo-150' :
+                              reg.trang_thai === 'DaHuy' ? 'bg-slate-100 text-slate-500 border border-slate-200' :
+                              'bg-rose-50 text-rose-700 border border-rose-150'
+                            }`}>
+                              {reg.trang_thai === 'HopLe' ? 'Đã duyệt / Hợp lệ' :
+                               reg.trang_thai === 'ChoDuyet' ? 'Chờ duyệt' :
+                               reg.trang_thai === 'DaHuy' ? 'Đã hủy' : 'Bị loại / Khác'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              
+              {/* Registrations Pagination */}
+              <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <div className="text-slate-500 font-semibold">
+                  Hiển thị {filteredRegs.length} / {regTotal} đăng ký
+                </div>
+                <div className="flex gap-1.5">
+                  <button
+                    disabled={regPage <= 1}
+                    onClick={() => fetchRegistrations(regPage - 1)}
+                    className="px-2.5 py-1 bg-white border border-slate-200 rounded hover:bg-slate-50 disabled:opacity-50 text-slate-600 font-semibold"
+                  >
+                    Trước
+                  </button>
+                  <span className="px-3 py-1 text-slate-700 font-bold bg-slate-100 rounded">
+                    Trang {regPage} / {regTotalPages}
+                  </span>
+                  <button
+                    disabled={regPage >= regTotalPages}
+                    onClick={() => fetchRegistrations(regPage + 1)}
+                    className="px-2.5 py-1 bg-white border border-slate-200 rounded hover:bg-slate-50 disabled:opacity-50 text-slate-600 font-semibold"
+                  >
+                    Sau
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -789,6 +984,32 @@ export default function ChuyenThamQuan_DSLoc() {
                 ))
               )}
             </div>
+            
+            {/* Refunds Pagination */}
+            <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div className="text-slate-500 font-semibold">
+                Hiển thị {refundRequests.length} / {refTotal} yêu cầu hoàn phí
+              </div>
+              <div className="flex gap-1.5">
+                <button
+                  disabled={refPage <= 1}
+                  onClick={() => fetchRefundRequests(refPage - 1)}
+                  className="px-2.5 py-1 bg-white border border-slate-200 rounded hover:bg-slate-50 disabled:opacity-50 text-slate-600 font-semibold"
+                >
+                  Trước
+                </button>
+                <span className="px-3 py-1 text-slate-700 font-bold bg-slate-100 rounded">
+                  Trang {refPage} / {refTotalPages}
+                </span>
+                <button
+                  disabled={refPage >= refTotalPages}
+                  onClick={() => fetchRefundRequests(refPage + 1)}
+                  className="px-2.5 py-1 bg-white border border-slate-200 rounded hover:bg-slate-50 disabled:opacity-50 text-slate-600 font-semibold"
+                >
+                  Sau
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -804,39 +1025,121 @@ export default function ChuyenThamQuan_DSLoc() {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-250">
-                <thead className="bg-slate-50 text-slate-600 font-bold text-left">
-                  <tr>
-                    <th className="px-4 py-3 pl-6">MSSV</th>
-                    <th className="px-4 py-3">Họ tên sinh viên</th>
-                    <th className="px-4 py-3">Lớp học</th>
-                    <th className="px-4 py-3">Lịch học phần</th>
-                    <th className="px-4 py-3 text-right pr-6">Phân bổ giảng viên</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-700">
-                  {enrollments.map(e => (
-                    <tr key={e.id} className="hover:bg-slate-50/50">
-                      <td className="px-4 py-3 pl-6 font-mono text-slate-500 font-semibold">{e.sinhVien?.mssv}</td>
-                      <td className="px-4 py-3 font-bold text-slate-800">{e.sinhVien?.ho_ten}</td>
-                      <td className="px-4 py-3 font-semibold text-slate-600">{e.sinhVien?.ten_lop}</td>
-                      <td className="px-4 py-3 text-slate-500">{e.lichKienTap?.ten_lich}</td>
-                      <td className="px-4 py-3 text-right pr-6">
-                        <button 
-                          onClick={() => { setActiveGuideEnrollmentId(e.id); setGuideLecturerId(''); }} 
-                          className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg font-bold transition-all shadow-sm"
-                        >
-                          Phân GVHD
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {/* Search Box for GVHD */}
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="relative flex-1 max-w-md">
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                <Search size={14} />
+              </span>
+              <input 
+                type="text" 
+                placeholder="Tìm theo MSSV hoặc Họ tên sinh viên..." 
+                value={enSearchQuery}
+                onChange={(e) => {
+                  setEnSearchQuery(e.target.value);
+                  setEnPage(1);
+                }}
+                className="w-full pl-9 pr-4 py-1.5 border border-slate-200 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+              />
+            </div>
+            <div className="flex items-center gap-4 text-slate-500 font-semibold">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input 
+                  type="checkbox"
+                  checked={useVirtualScroll}
+                  onChange={(e) => setUseVirtualScroll(e.target.checked)}
+                  className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-350"
+                />
+                <span className="text-[11px] font-bold text-slate-700">Virtual Scroll</span>
+              </label>
+              <span>Tổng số phân công: {enTotal}</span>
             </div>
           </div>
+
+          {useVirtualScroll ? (
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              {/* Virtual Header */}
+              <div className="flex bg-slate-50 text-slate-600 font-bold py-3 text-[11px] border-b border-slate-200">
+                <div className="w-[20%] pl-6 pr-2">MSSV</div>
+                <div className="w-[25%] px-2">Họ tên sinh viên</div>
+                <div className="w-[15%] px-2">Lớp học</div>
+                <div className="w-[25%] px-2">Lịch học phần</div>
+                <div className="w-[15%] px-2 pr-6 text-right">Phân bổ giảng viên</div>
+              </div>
+
+              {/* Virtual List */}
+              {enrollments.length === 0 ? (
+                <div className="p-12 text-center text-slate-400">Không tìm thấy sinh viên nào</div>
+              ) : (
+                <VirtualList
+                  items={enrollments}
+                  itemHeight={60}
+                  height={450}
+                  renderItem={renderVirtualEnrollment}
+                />
+              )}
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-slate-250">
+                  <thead className="bg-slate-50 text-slate-600 font-bold text-left">
+                    <tr>
+                      <th className="px-4 py-3 pl-6">MSSV</th>
+                      <th className="px-4 py-3">Họ tên sinh viên</th>
+                      <th className="px-4 py-3">Lớp học</th>
+                      <th className="px-4 py-3">Lịch học phần</th>
+                      <th className="px-4 py-3 text-right pr-6">Phân bổ giảng viên</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-700">
+                    {enrollments.map(e => (
+                      <tr key={e.id} className="hover:bg-slate-50/50">
+                        <td className="px-4 py-3 pl-6 font-mono text-slate-500 font-semibold">{e.sinhVien?.mssv}</td>
+                        <td className="px-4 py-3 font-bold text-slate-800">{e.sinhVien?.ho_ten}</td>
+                        <td className="px-4 py-3 font-semibold text-slate-600">{e.sinhVien?.ten_lop}</td>
+                        <td className="px-4 py-3 text-slate-500">{e.lichKienTap?.ten_lich}</td>
+                        <td className="px-4 py-3 text-right pr-6">
+                          <button 
+                            onClick={() => { setActiveGuideEnrollmentId(e.id); setGuideLecturerId(''); }} 
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg font-bold transition-all shadow-sm"
+                          >
+                            Phân GVHD
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+              {/* Enrollments Pagination */}
+              <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <div className="text-slate-500 font-semibold">
+                  Hiển thị {enrollments.length} / {enTotal} sinh viên
+                </div>
+                <div className="flex gap-1.5">
+                  <button
+                    disabled={enPage <= 1}
+                    onClick={() => fetchEnrollments(enPage - 1)}
+                    className="px-2.5 py-1 bg-white border border-slate-200 rounded hover:bg-slate-50 disabled:opacity-50 text-slate-600 font-semibold"
+                  >
+                    Trước
+                  </button>
+                  <span className="px-3 py-1 text-slate-700 font-bold bg-slate-100 rounded">
+                    Trang {enPage} / {enTotalPages}
+                  </span>
+                  <button
+                    disabled={enPage >= enTotalPages}
+                    onClick={() => fetchEnrollments(enPage + 1)}
+                    className="px-2.5 py-1 bg-white border border-slate-200 rounded hover:bg-slate-50 disabled:opacity-50 text-slate-600 font-semibold"
+                  >
+                    Sau
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

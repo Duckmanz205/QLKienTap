@@ -51,7 +51,7 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
       const t = await khoaApi.getTerms(); setTerms(t.data);
       const c = await khoaApi.getCampaigns(); setCampaigns(c.data);
       const s = await khoaApi.getSchedules(); setSchedules(s.data);
-      const sv = await khoaApi.getStudents(); setStudents(sv.data);
+      const sv = await khoaApi.getStudents({ limit: 1000 }); setStudents(sv.data.data || []);
     } catch (err) {
       console.error(err);
     }

@@ -1,7 +1,12 @@
-import { Controller, Get, Post, Body, Param, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, ParseIntPipe, UseGuards } from '@nestjs/common';
 import { SinhVienService } from './sinh-vien.service';
+import { AuthGuard } from '../auth/guards/auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 @Controller('sinh-vien')
+@UseGuards(AuthGuard, RolesGuard)
+@Roles('SinhVien')
 export class SinhVienController {
   constructor(private readonly svService: SinhVienService) {}
 

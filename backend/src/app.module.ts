@@ -7,6 +7,8 @@ import { AuthModule } from './auth/auth.module';
 import { SinhVienModule } from './sinh-vien/sinh-vien.module';
 import { GiangVienModule } from './giang-vien/giang-vien.module';
 import { KhoaModule } from './khoa/khoa.module';
+import { UploadModule } from './upload/upload.module';
+import { QueueModule } from './queue/queue.module';
 
 @Module({
   imports: [
@@ -40,6 +42,8 @@ import { KhoaModule } from './khoa/khoa.module';
     SinhVienModule,
     GiangVienModule,
     KhoaModule,
+    UploadModule,
+    QueueModule,
   ],
   controllers: [AppController],
   providers: [AppService],

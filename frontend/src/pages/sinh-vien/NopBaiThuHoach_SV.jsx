@@ -11,7 +11,7 @@ import {
   Laptop,
   Calendar
 } from 'lucide-react';
-import { sinhVienApi } from '../../services/api';
+import api, { sinhVienApi } from '../../services/api';
 
 export default function NopBaiThuHoach_SV() {
   const [student, setStudent] = useState(null);
@@ -65,53 +65,92 @@ export default function NopBaiThuHoach_SV() {
     }
   };
 
-  const startUploadSimulation = (reg) => {
-    setActiveUploadId(reg.id);
-    setUploadProgress(0);
-    
-    const fileBase = reg.chuyenThamQuan.nhaMay?.ten_nha_may
-      .toLowerCase()
-      .replace(/ /g, '_')
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "");
-    
-    const pdfName = `Bao_cao_${fileBase}_${student.mssv}.pdf`;
-    setSimulatedFile(pdfName);
-    
-    const isFree = reg.chuyenThamQuan.cach_to_chuc === 'TuDo';
-    const proofName = isFree ? `Minh_chung_doanh_nghiep_${fileBase}.jpg` : '';
-    if (isFree) {
-      setSimulatedProofFile(proofName);
+  const handleRealUpload = async (event, reg) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Check size limit: 5MB
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Kích thước tệp báo cáo vượt quá hạn mức 5MB.');
+      return;
     }
 
-    const interval = setInterval(() => {
-      setUploadProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setTimeout(async () => {
-            try {
-              await sinhVienApi.submitReport({
-                studentId: student.id,
-                registrationId: reg.id,
-                fileBaoCaoUrl: pdfName,
-                fileXacNhanUrl: isFree ? proofName : undefined
-              });
-              
-              setMessage('Tải lên bài thu hoạch thành công!');
-              setActiveUploadId(null);
-              setUploadProgress(0);
-              fetchData(student.id);
-            } catch (err) {
-              setError(err.response?.data?.message || 'Lỗi khi nộp bài thu hoạch.');
-              setActiveUploadId(null);
-              setUploadProgress(0);
-            }
-          }, 300);
-          return 100;
+    setActiveUploadId(reg.id);
+    setUploadProgress(10);
+    setMessage('');
+    setError('');
+    setSimulatedFile(file.name);
+
+    try {
+      // 1. Upload report file
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const uploadRes = await api.post('/upload/report', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          setUploadProgress(percentCompleted);
         }
-        return prev + 25;
       });
-    }, 200);
+
+      const fileBaoCaoUrl = uploadRes.data.url;
+      let fileXacNhanUrl = undefined;
+
+      // 2. If it's a free proposed trip, prompt for proof image
+      const isFree = reg.chuyenThamQuan.cach_to_chuc === 'TuDo';
+      if (isFree) {
+        const confirmUploadProof = window.confirm('Đây là chuyến tự chọn. Bạn cần đính kèm tệp minh chứng/xác nhận tham quan từ doanh nghiệp (định dạng JPG, JPEG, PNG, dưới 2MB). Bạn có muốn chọn tệp ngay bây giờ?');
+        if (confirmUploadProof) {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = 'image/*';
+          
+          const proofFile = await new Promise((resolve) => {
+            input.onchange = (e) => resolve(e.target.files[0]);
+            input.click();
+          });
+
+          if (proofFile) {
+            if (proofFile.size > 2 * 1024 * 1024) {
+              alert('Kích thước tệp minh chứng vượt quá hạn mức 2MB.');
+              setActiveUploadId(null);
+              return;
+            }
+
+            setSimulatedProofFile(proofFile.name);
+            const proofFormData = new FormData();
+            proofFormData.append('file', proofFile);
+
+            const proofRes = await api.post('/upload/payment', proofFormData, {
+              headers: {
+                'Content-Type': 'multipart/form-data',
+              }
+            });
+            fileXacNhanUrl = proofRes.data.url;
+          }
+        }
+      }
+
+      // 3. Submit report to database
+      await sinhVienApi.submitReport({
+        studentId: student.id,
+        registrationId: reg.id,
+        fileBaoCaoUrl,
+        fileXacNhanUrl
+      });
+
+      setMessage('Đã nộp bài thu hoạch thành công!');
+      fetchData(student.id);
+    } catch (err) {
+      console.error(err);
+      setError(err.response?.data?.message || 'Không thể tải tệp lên. Vui lòng kiểm tra lại định dạng tệp.');
+    } finally {
+      setActiveUploadId(null);
+      setUploadProgress(0);
+    }
   };
 
   const handleSelectCouncilReport = (regId, isChecked) => {
@@ -312,13 +351,18 @@ export default function NopBaiThuHoach_SV() {
                       </div>
                     ) : (
                       <div className="mt-4 flex justify-end gap-2">
-                        <button
-                          onClick={() => startUploadSimulation(reg)}
+                        <label
                           className="px-5 py-2.5 rounded-xl text-xs font-black tracking-wider uppercase flex items-center gap-1.5 bg-primary text-white hover:bg-primary-container shadow-sm active:scale-95 cursor-pointer"
                         >
                           <Upload className="w-4 h-4" />
                           <span>{isSubmitted ? 'Nộp lại bài' : isFree ? 'Nộp bài & Xác nhận DN' : 'Nộp bài'}</span>
-                        </button>
+                          <input
+                            type="file"
+                            accept=".pdf,.docx,.doc"
+                            className="hidden"
+                            onChange={(e) => handleRealUpload(e, reg)}
+                          />
+                        </label>
                       </div>
                     )}
                   </div>

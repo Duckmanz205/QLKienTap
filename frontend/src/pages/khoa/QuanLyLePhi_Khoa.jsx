@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { CreditCard, Search, Upload, Download, Check, Info, DollarSign, Clock, AlertTriangle, X } from 'lucide-react';
+import api from '../../services/api';
 
 const initialFeeRecords = [
   { mssv: '2001200123', name: 'Nguyễn Văn Nam', class: '14ĐHTP01', amount: 1500000, payDate: '2026-10-12', payMethod: 'Chuyển khoản', status: 'Đã nộp' },
@@ -62,10 +63,28 @@ export default function QuanLyLePhi_Khoa() {
   const handleExcelUploadClick = () => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.xlsx, .csv';
-    input.onchange = (e) => {
+    input.accept = '.xlsx, .xls';
+    input.onchange = async (e) => {
       if (e.target.files && e.target.files[0]) {
-        alert(`Đã nhận file ${e.target.files[0].name}. Tiến hành đối soát giao dịch nộp lệ phí kiến tập.`);
+        const file = e.target.files[0];
+        if (file.size > 5 * 1024 * 1024) {
+          alert('Kích thước tệp Excel vượt quá hạn mức 5MB.');
+          return;
+        }
+        
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+          const uploadRes = await api.post('/upload/excel', formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            }
+          });
+          alert(`Đã nạp file đối soát ${file.name} lên máy chủ thành công. URL: ${uploadRes.data.url}`);
+        } catch (err) {
+          console.error(err);
+          alert(err.response?.data?.message || 'Không thể nạp tệp Excel đối soát.');
+        }
       }
     };
     input.click();

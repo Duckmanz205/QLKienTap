@@ -176,36 +176,57 @@ export class GiangVienService {
     return { message: 'Cập nhật điểm chuẩn bị và điểm cộng thành công', diem };
   }
 
-  // Lay danh sach bai thu hoach can cham
-  async getGuidedStudentReports(lecturerId: number) {
+  // Lay danh sach bai thu hoach can cham với phân trang
+  async getGuidedStudentReports(
+    lecturerId: number,
+    page: number = 1,
+    limit: number = 10,
+    search?: string,
+    status?: string,
+  ) {
     // Tim tat ca sinh vien duoc huong dan
     const guidedSvIds = (await this.phanCongRepo.find({
       where: { giang_vien_id: lecturerId, trang_thai: 'DangHoatDong' },
       relations: { lichKienTapSinhVien: true },
     })).map(a => a.lichKienTapSinhVien.sinh_vien_id);
 
-    if (guidedSvIds.length === 0) return [];
+    if (guidedSvIds.length === 0) return { data: [], total: 0, page, limit, totalPages: 0 };
 
-    // Lay tat ca phieu dang ky cua cac sinh vien nay
-    const phieus = await this.phieuRepo.find({
-      where: { sinh_vien_id: In(guidedSvIds) },
-    });
-    const phieuIds = phieus.map(p => p.id);
-    if (phieuIds.length === 0) return [];
+    const queryBuilder = this.baiThuRepo.createQueryBuilder('baiThu')
+      .leftJoinAndSelect('baiThu.phieuDangKy', 'phieu')
+      .leftJoinAndSelect('phieu.sinhVien', 'sinhVien')
+      .leftJoinAndSelect('phieu.chuyenThamQuan', 'chuyen')
+      .leftJoinAndSelect('chuyen.nhaMay', 'nhaMay')
+      .where('phieu.sinh_vien_id IN (:...guidedSvIds)', { guidedSvIds });
 
-    // Lay tat ca bai thu hoach
-    return this.baiThuRepo.find({
-      where: { phieu_dang_ky_id: In(phieuIds) },
-      relations: {
-        phieuDangKy: {
-          sinhVien: true,
-          chuyenThamQuan: {
-            nhaMay: true,
-          },
-        },
-      },
-      order: { ngay_nop: 'DESC' },
-    });
+    if (search) {
+      queryBuilder.andWhere('(sinhVien.ho_ten LIKE :search OR sinhVien.mssv LIKE :search)', { search: `%${search}%` });
+    }
+
+    if (status && status !== 'all') {
+      if (status === 'graded') {
+        queryBuilder.andWhere('baiThu.trang_thai = :statusVal', { statusVal: 'DaCham' });
+      } else if (status === 'pending') {
+        queryBuilder.andWhere('baiThu.trang_thai != :statusVal', { statusVal: 'DaCham' });
+      }
+    }
+
+    const take = limit;
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await queryBuilder
+      .orderBy('baiThu.ngay_nop', 'DESC')
+      .take(take)
+      .skip(skip)
+      .getManyAndCount();
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   // Cham diem bai thu hoach

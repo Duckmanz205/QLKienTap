@@ -33,25 +33,49 @@ export default function ChamBaiThuHoach_GV() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Pagination states
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+
   useEffect(() => {
     const userJson = localStorage.getItem('user');
     if (userJson) {
       const { user } = JSON.parse(userJson);
       giangVienApi.getProfile(user.id).then(res => {
         setLecturer(res.data);
-        fetchReports(res.data.id);
+        fetchReports(res.data.id, 1, searchTerm, statusFilter);
       }).catch(err => console.error(err));
     }
   }, []);
 
-  const fetchReports = async (gvId) => {
+  const fetchReports = async (gvId = lecturer?.id, pageVal = page, search = searchTerm, status = statusFilter) => {
+    if (!gvId) return;
     try {
-      const res = await giangVienApi.getGuidedReports(gvId);
-      setReports(res.data);
+      const res = await giangVienApi.getGuidedReports(gvId, {
+        page: pageVal,
+        limit,
+        search: search || undefined,
+        status: status !== 'all' ? status : undefined
+      });
+      setReports(res.data.data || []);
+      setTotal(res.data.total || 0);
+      setTotalPages(res.data.totalPages || 1);
+      setPage(pageVal);
     } catch (err) {
       console.error(err);
     }
   };
+
+  useEffect(() => {
+    if (lecturer) {
+      const delayDebounceFn = setTimeout(() => {
+        fetchReports(lecturer.id, 1, searchTerm, statusFilter);
+      }, 300);
+      return () => clearTimeout(delayDebounceFn);
+    }
+  }, [searchTerm, statusFilter, lecturer]);
 
   const handleSelectReport = (rep) => {
     setSelectedReport(rep);
@@ -104,19 +128,7 @@ export default function ChamBaiThuHoach_GV() {
   }
 
   // Filtered reports
-  const filteredReports = reports.filter(r => {
-    const matchesSearch = 
-      r.phieuDangKy?.sinhVien?.ho_ten?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.phieuDangKy?.sinhVien?.mssv?.includes(searchTerm);
-    
-    if (statusFilter === 'graded') {
-      return matchesSearch && r.trang_thai === 'DaCham';
-    }
-    if (statusFilter === 'pending') {
-      return matchesSearch && r.trang_thai !== 'DaCham';
-    }
-    return matchesSearch;
-  });
+  const filteredReports = reports;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -170,7 +182,7 @@ export default function ChamBaiThuHoach_GV() {
                   statusFilter === 'all' ? 'bg-primary text-white shadow-sm' : 'bg-[#f8faf1] border border-surface-variant text-slate-600 hover:bg-[#ecefe6]'
                 }`}
               >
-                Tất cả ({reports.length})
+                Tất cả
               </button>
               <button 
                 onClick={() => setStatusFilter('pending')}
@@ -178,7 +190,7 @@ export default function ChamBaiThuHoach_GV() {
                   statusFilter === 'pending' ? 'bg-primary text-white shadow-sm' : 'bg-[#f8faf1] border border-surface-variant text-slate-600 hover:bg-[#ecefe6]'
                 }`}
               >
-                Chờ chấm ({reports.filter(r => r.trang_thai !== 'DaCham').length})
+                Chờ chấm
               </button>
               <button 
                 onClick={() => setStatusFilter('graded')}
@@ -186,7 +198,7 @@ export default function ChamBaiThuHoach_GV() {
                   statusFilter === 'graded' ? 'bg-primary text-white shadow-sm' : 'bg-[#f8faf1] border border-surface-variant text-slate-600 hover:bg-[#ecefe6]'
                 }`}
               >
-                Đã chấm ({reports.filter(r => r.trang_thai === 'DaCham').length})
+                Đã chấm
               </button>
             </div>
           </div>
@@ -256,6 +268,32 @@ export default function ChamBaiThuHoach_GV() {
                   )}
                 </tbody>
               </table>
+            </div>
+
+            {/* Reports Pagination */}
+            <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between bg-[#f8faf1]/50">
+              <div className="text-slate-500 font-semibold text-xs">
+                Hiển thị {filteredReports.length} / {total} bài thu hoạch
+              </div>
+              <div className="flex gap-1.5">
+                <button
+                  disabled={page <= 1}
+                  onClick={() => fetchReports(lecturer.id, page - 1, searchTerm, statusFilter)}
+                  className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 text-slate-600 font-bold text-xs cursor-pointer"
+                >
+                  Trước
+                </button>
+                <span className="px-3.5 py-1.5 text-slate-700 font-extrabold bg-slate-105 rounded-lg text-xs">
+                  Trang {page} / {totalPages}
+                </span>
+                <button
+                  disabled={page >= totalPages}
+                  onClick={() => fetchReports(lecturer.id, page + 1, searchTerm, statusFilter)}
+                  className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 text-slate-600 font-bold text-xs cursor-pointer"
+                >
+                  Sau
+                </button>
+              </div>
             </div>
           </div>
         </div>

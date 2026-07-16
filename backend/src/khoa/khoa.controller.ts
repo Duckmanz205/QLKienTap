@@ -1,10 +1,19 @@
-import { Controller, Get, Post, Put, Body, Param, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, ParseIntPipe, Query, UseGuards } from '@nestjs/common';
 import { KhoaService } from './khoa.service';
 import { NamHoc, HocKy, Khoa, NhaMay, DotKienTap, LichKienTap, ChuyenThamQuan } from '../entities/qlkt.entity';
+import { AuthGuard } from '../auth/guards/auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { TaskQueueService } from '../queue/task-queue.service';
 
 @Controller('khoa')
+@UseGuards(AuthGuard, RolesGuard)
+@Roles('Khoa')
 export class KhoaController {
-  constructor(private readonly khoaService: KhoaService) {}
+  constructor(
+    private readonly khoaService: KhoaService,
+    private readonly taskQueueService: TaskQueueService,
+  ) {}
 
   @Get('years')
   async getYears() {
@@ -57,8 +66,16 @@ export class KhoaController {
   }
 
   @Get('students')
-  async getStudents() {
-    return this.khoaService.getStudents();
+  async getStudents(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('search') search?: string,
+  ) {
+    return this.khoaService.getStudents(
+      page ? Number(page) : 1,
+      limit ? Number(limit) : 10,
+      search,
+    );
   }
 
   @Get('campaigns')
@@ -152,13 +169,35 @@ export class KhoaController {
   }
 
   @Get('registrations')
-  async getRegistrations() {
-    return this.khoaService.getRegistrations();
+  async getRegistrations(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+    @Query('lichKienTapId') lichKienTapId?: number,
+    @Query('chuyenThamQuanId') chuyenThamQuanId?: number,
+  ) {
+    return this.khoaService.getRegistrations(
+      page ? Number(page) : 1,
+      limit ? Number(limit) : 10,
+      search,
+      status,
+      lichKienTapId ? Number(lichKienTapId) : undefined,
+      chuyenThamQuanId ? Number(chuyenThamQuanId) : undefined,
+    );
   }
 
   @Get('refund-requests')
-  async getRefundRequests() {
-    return this.khoaService.getRefundRequests();
+  async getRefundRequests(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('search') search?: string,
+  ) {
+    return this.khoaService.getRefundRequests(
+      page ? Number(page) : 1,
+      limit ? Number(limit) : 10,
+      search,
+    );
   }
 
   @Post('approve-refund')
@@ -167,8 +206,16 @@ export class KhoaController {
   }
 
   @Get('enrollments')
-  async getEnrollments() {
-    return this.khoaService.getEnrollments();
+  async getEnrollments(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('search') search?: string,
+  ) {
+    return this.khoaService.getEnrollments(
+      page ? Number(page) : 1,
+      limit ? Number(limit) : 10,
+      search,
+    );
   }
 
   @Get('notifications')
@@ -179,5 +226,23 @@ export class KhoaController {
   @Post('notifications')
   async createNotification(@Body() body: { tieu_de: string; noi_dung: string; nguoi_gui_id: number; khoa_id?: number }) {
     return this.khoaService.createNotification(body);
+  }
+
+  @Post('export-student-list')
+  async exportStudentList(@Body() body: { campaignId?: number }) {
+    const fileName = `student_export_${Date.now()}.xlsx`;
+    
+    // Add job to background queue
+    await this.taskQueueService.addJob('export-file', {
+      type: 'student_list',
+      filter: { campaignId: body.campaignId },
+      outputFileName: fileName,
+    });
+
+    return {
+      message: 'Yêu cầu xuất file đã được đưa vào hàng đợi xử lý nền.',
+      fileName,
+      downloadUrl: `/api/upload/file/excels/${fileName}`,
+    };
   }
 }
