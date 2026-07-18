@@ -56,7 +56,7 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
       setAvailableTrips(avRes.data);
 
       // 3. Fetch Factories for Proposal
-      const facRes = await khoaApi.getFactories();
+      const facRes = await sinhVienApi.getFactories();
       setFactories(facRes.data);
     } catch (err) {
       console.error('Error fetching trips:', err);

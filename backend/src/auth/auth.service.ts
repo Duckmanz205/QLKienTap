@@ -7,6 +7,8 @@ import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class AuthService {
+  private failedAttempts = new Map<string, { count: number; lockUntil: Date | null }>();
+
   constructor(
     @InjectRepository(TaiKhoan)
     private taiKhoanRepo: Repository<TaiKhoan>,
@@ -18,26 +20,52 @@ export class AuthService {
   ) {}
 
   async login(ten_dang_nhap: string, mat_khau: string) {
+    if (!ten_dang_nhap || !mat_khau) {
+      throw new BadRequestException('Vui lòng nhập đầy đủ thông tin');
+    }
+
+    const now = new Date();
+    const failedInfo = this.failedAttempts.get(ten_dang_nhap);
+    if (failedInfo && failedInfo.lockUntil && failedInfo.lockUntil > now) {
+      const remainingSeconds = Math.ceil((failedInfo.lockUntil.getTime() - now.getTime()) / 1000);
+      throw new UnauthorizedException(`Tài khoản của bạn đã bị khóa tạm thời trong 5 phút do nhập sai 5 lần liên tiếp. Vui lòng thử lại sau ${remainingSeconds} giây.`);
+    }
+
     const user = await this.taiKhoanRepo.findOne({ where: { ten_dang_nhap } });
+
+    const recordFailedAttempt = () => {
+      const current = this.failedAttempts.get(ten_dang_nhap) || { count: 0, lockUntil: null };
+      current.count += 1;
+      if (current.count >= 5) {
+        current.lockUntil = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes lock
+        this.failedAttempts.set(ten_dang_nhap, current);
+        throw new UnauthorizedException('Tên đăng nhập hoặc mật khẩu không chính xác. Tài khoản của bạn đã bị khóa tạm thời trong 5 phút do nhập sai 5 lần liên tiếp.');
+      } else {
+        this.failedAttempts.set(ten_dang_nhap, current);
+        throw new UnauthorizedException('Tên đăng nhập hoặc mật khẩu không chính xác');
+      }
+    };
+
     if (!user) {
-      throw new UnauthorizedException('Tài khoản không tồn tại');
+      recordFailedAttempt();
+      throw new UnauthorizedException('Tên đăng nhập hoặc mật khẩu không chính xác');
     }
 
     if (user.trang_thai === 'KhoaTaiKhoan') {
-      throw new UnauthorizedException('Tài khoản đã bị khóa');
+      throw new UnauthorizedException('Tài khoản của bạn đã bị khóa, vui lòng liên hệ quản lý Khoa');
     }
 
-    // Dung bcrypt so sanh mat khau hash
     const isPasswordValid = await bcrypt.compare(mat_khau, user.mat_khau_hash);
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Mật khẩu không chính xác');
+      recordFailedAttempt();
+      throw new UnauthorizedException('Tên đăng nhập hoặc mật khẩu không chính xác');
     }
 
-    // Cap nhat ngay dang nhap cuoi
+    this.failedAttempts.delete(ten_dang_nhap);
+
     user.lan_dang_nhap_cuoi = new Date();
     await this.taiKhoanRepo.save(user);
 
-    // Lay thong tin chi tiet tuy vai tro
     let details: any = null;
     if (user.vai_tro === 'SinhVien') {
       details = await this.sinhVienRepo.findOne({
@@ -74,6 +102,12 @@ export class AuthService {
     const isOldPassValid = await bcrypt.compare(oldPass, user.mat_khau_hash);
     if (!isOldPassValid) {
       throw new BadRequestException('Mật khẩu cũ không chính xác');
+    }
+
+    // Validate password complexity
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+    if (!passwordRegex.test(newPass)) {
+      throw new BadRequestException('Mật khẩu mới phải đạt độ phức tạp tối thiểu (tối thiểu 8 ký tự, bao gồm ít nhất 1 chữ hoa, 1 chữ thường và 1 chữ số).');
     }
 
     const salt = await bcrypt.genSalt(10);

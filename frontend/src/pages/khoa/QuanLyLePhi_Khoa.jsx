@@ -90,6 +90,23 @@ export default function QuanLyLePhi_Khoa() {
     input.click();
   };
 
+  const exportReport = () => {
+    let csvContent = '\uFEFF';
+    csvContent += 'MSSV,Họ tên,Lớp,Số tiền,Ngày nộp,Phương thức,Trạng thái\n';
+    feeRecords.forEach(rec => {
+      csvContent += `"${rec.mssv}","${rec.name}","${rec.class}","${rec.amount}","${rec.payDate}","${rec.payMethod}","${rec.status}"\n`;
+    });
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a'); 
+    link.href = url; 
+    link.download = `BaoCaoLePhi_${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(link); 
+    link.click(); 
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="flex flex-col gap-6 font-sans">
       {/* Page Title & Top-Right Actions */}
@@ -111,7 +128,7 @@ export default function QuanLyLePhi_Khoa() {
             <span>Nhập Excel đối soát</span>
           </button>
           <button
-            onClick={() => alert("Xuất báo cáo danh sách thu chi lệ phí kiến tập.")}
+            onClick={exportReport}
             className="flex items-center gap-2 px-4 py-2 border border-[#407F3E] text-[#407F3E] hover:bg-[#407F3E]/5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-sm bg-white"
           >
             <Download className="w-4 h-4" />

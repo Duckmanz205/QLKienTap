@@ -23,9 +23,10 @@ import {
   Users,
   Award,
   Eye,
+  EyeOff,
   Key
 } from 'lucide-react';
-import { sinhVienApi } from '../services/api';
+import { sinhVienApi, authApi } from '../services/api';
 
 export default function Layout() {
   const navigate = useNavigate();
@@ -56,8 +57,8 @@ export default function Layout() {
 
   if (!userJson) return null;
 
-  const { user } = JSON.parse(userJson);
-  const { vai_tro, ten_dang_nhap, details } = user;
+  const { user, token } = JSON.parse(userJson);
+  const { vai_tro, ten_dang_nhap, details, phai_doi_mat_khau } = user;
   const fullName = details?.ho_ten || ten_dang_nhap;
 
   // Poll notifications for student count badge
@@ -74,6 +75,19 @@ export default function Layout() {
     localStorage.removeItem('user');
     navigate('/login');
   };
+
+  if (phai_doi_mat_khau) {
+    return (
+      <ForceChangePasswordView 
+        user={user}
+        onPasswordChanged={(updatedUser) => {
+          localStorage.setItem('user', JSON.stringify({ user: updatedUser, token }));
+          window.location.reload();
+        }}
+        onLogout={handleLogout}
+      />
+    );
+  }
 
   const getActiveViewLabel = () => {
     const path = location.pathname;
@@ -596,6 +610,203 @@ export default function Layout() {
         <main className="flex-1 overflow-auto pt-24 pb-8 px-6 md:px-8 bg-[#E7E0C4]/10">
           <Outlet />
         </main>
+      </div>
+    </div>
+  );
+}
+
+function ForceChangePasswordView({ user, onPasswordChanged, onLogout }) {
+  const [oldPass, setOldPass] = useState('');
+  const [newPass, setNewPass] = useState('');
+  const [confirmPass, setConfirmPass] = useState('');
+  const [showOld, setShowOld] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  const hasMinLength = newPass.length >= 8;
+  const hasUpperCase = /[A-Z]/.test(newPass);
+  const hasLowerCase = /[a-z]/.test(newPass);
+  const hasNumber = /[0-9]/.test(newPass);
+  const isMatch = newPass === confirmPass && confirmPass !== '';
+  const isValid = hasMinLength && hasUpperCase && hasLowerCase && hasNumber && isMatch;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!isValid) return;
+    setError('');
+    setLoading(true);
+
+    try {
+      await authApi.changePassword(user.id, oldPass, newPass);
+      setSuccess(true);
+      setTimeout(() => {
+        onPasswordChanged({ ...user, phai_doi_mat_khau: false });
+      }, 1500);
+    } catch (err) {
+      console.error(err);
+      setError(err.response?.data?.message || 'Đổi mật khẩu thất bại, vui lòng thử lại.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#f8faf1] flex flex-col justify-center items-center py-12 px-4 sm:px-6 lg:px-8 font-sans">
+      <div className="max-w-md w-full bg-white rounded-3xl shadow-xl border border-slate-100 p-6 md:p-8 space-y-6">
+        
+        {/* Header */}
+        <div className="text-center">
+          <div className="mx-auto w-14 h-14 bg-[#e5ffdc] text-[#407F3E] rounded-2xl flex items-center justify-center shadow-inner mb-4">
+            <Key className="w-7 h-7" />
+          </div>
+          <h2 className="text-2xl font-black text-slate-800">Yêu cầu đổi mật khẩu</h2>
+          <p className="mt-2 text-xs text-slate-500 leading-relaxed">
+            Tài khoản của bạn đang sử dụng mật khẩu mặc định. Để bảo vệ dữ liệu học tập và thông tin cá nhân, vui lòng đổi mật khẩu mới để tiếp tục.
+          </p>
+        </div>
+
+        {success ? (
+          <div className="bg-[#e5ffdc] border border-[#407F3E]/20 text-[#407F3E] p-6 rounded-2xl text-center space-y-2">
+            <div className="w-10 h-10 bg-[#407F3E] text-white rounded-full flex items-center justify-center mx-auto mb-2">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h3 className="font-bold text-base">Đổi mật khẩu thành công!</h3>
+            <p className="text-xs text-[#407F3E]/80">Đang chuyển hướng vào hệ thống...</p>
+          </div>
+        ) : (
+          <form className="space-y-4" onSubmit={handleSubmit}>
+            {error && (
+              <div className="bg-red-500/10 border border-red-500 text-[#ba1a1a] px-4 py-3 rounded-xl text-xs font-semibold leading-relaxed">
+                {error}
+              </div>
+            )}
+
+            {/* Current Password */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">
+                Mật khẩu hiện tại (Mặc định)
+              </label>
+              <div className="relative">
+                <input
+                  type={showOld ? 'text' : 'password'}
+                  required
+                  value={oldPass}
+                  onChange={(e) => setOldPass(e.target.value)}
+                  placeholder="Nhập mật khẩu hiện tại"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#407F3E]/50 focus:border-transparent text-sm transition-all font-medium"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowOld(!showOld)}
+                  className="absolute right-3.5 top-3 text-slate-450 hover:text-slate-600 cursor-pointer"
+                >
+                  {showOld ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {/* New Password */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">
+                Mật khẩu mới
+              </label>
+              <div className="relative">
+                <input
+                  type={showNew ? 'text' : 'password'}
+                  required
+                  value={newPass}
+                  onChange={(e) => setNewPass(e.target.value)}
+                  placeholder="Nhập mật khẩu mới"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#407F3E]/50 focus:border-transparent text-sm transition-all font-medium"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNew(!showNew)}
+                  className="absolute right-3.5 top-3 text-slate-450 hover:text-slate-600 cursor-pointer"
+                >
+                  {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Confirm Password */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">
+                Xác nhận mật khẩu mới
+              </label>
+              <div className="relative">
+                <input
+                  type={showConfirm ? 'text' : 'password'}
+                  required
+                  value={confirmPass}
+                  onChange={(e) => setConfirmPass(e.target.value)}
+                  placeholder="Xác nhận mật khẩu mới"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#407F3E]/50 focus:border-transparent text-sm transition-all font-medium"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirm(!showConfirm)}
+                  className="absolute right-3.5 top-3 text-slate-450 hover:text-slate-600 cursor-pointer"
+                >
+                  {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Requirements list */}
+            <div className="bg-[#f8faf1] rounded-2xl p-4 border border-[#e5ffdc] space-y-2">
+              <p className="text-[10px] font-bold text-[#407F3E] uppercase tracking-wider mb-1">
+                Yêu cầu mật khẩu phức tạp:
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-semibold text-slate-600">
+                <div className="flex items-center gap-1.5">
+                  <span className={`w-1.5 h-1.5 rounded-full ${hasMinLength ? 'bg-[#407F3E]' : 'bg-red-400'}`}></span>
+                  <span className={hasMinLength ? 'text-[#407F3E]' : 'text-slate-500'}>Tối thiểu 8 ký tự</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className={`w-1.5 h-1.5 rounded-full ${hasUpperCase ? 'bg-[#407F3E]' : 'bg-red-400'}`}></span>
+                  <span className={hasUpperCase ? 'text-[#407F3E]' : 'text-slate-500'}>Ít nhất 1 chữ hoa (A-Z)</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className={`w-1.5 h-1.5 rounded-full ${hasLowerCase ? 'bg-[#407F3E]' : 'bg-red-400'}`}></span>
+                  <span className={hasLowerCase ? 'text-[#407F3E]' : 'text-slate-500'}>Ít nhất 1 chữ thường (a-z)</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className={`w-1.5 h-1.5 rounded-full ${hasNumber ? 'bg-[#407F3E]' : 'bg-red-400'}`}></span>
+                  <span className={hasNumber ? 'text-[#407F3E]' : 'text-slate-500'}>Ít nhất 1 chữ số (0-9)</span>
+                </div>
+                <div className="flex items-center gap-1.5 sm:col-span-2">
+                  <span className={`w-1.5 h-1.5 rounded-full ${isMatch ? 'bg-[#407F3E]' : 'bg-red-400'}`}></span>
+                  <span className={isMatch ? 'text-[#407F3E]' : 'text-slate-500'}>Mật khẩu xác nhận trùng khớp</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Buttons */}
+            <div className="pt-2 flex flex-col sm:flex-row gap-3">
+              <button
+                type="submit"
+                disabled={loading || !isValid}
+                className="flex-1 flex justify-center py-2.5 px-4 border border-transparent rounded-xl shadow-md text-sm font-bold text-white bg-[#407F3E] hover:bg-[#2c6b2d] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#407F3E] disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
+              >
+                {loading ? 'Đang cập nhật...' : 'Cập nhật mật khẩu'}
+              </button>
+              <button
+                type="button"
+                onClick={onLogout}
+                className="flex items-center justify-center gap-1.5 py-2.5 px-4 border border-slate-200 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-100 transition-all cursor-pointer"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Đăng xuất</span>
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );

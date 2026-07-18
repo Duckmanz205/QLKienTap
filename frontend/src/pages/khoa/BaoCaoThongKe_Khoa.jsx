@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { khoaApi } from '../../services/api';
+import api, { khoaApi } from '../../services/api';
 import { FileSpreadsheet, BarChart3, ArrowRight, CheckCircle, AlertTriangle, Users, Download, Calendar, Layers, Search, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -128,9 +128,81 @@ export default function BaoCaoThongKe_Khoa() {
     }
   ];
 
+  const downloadReport = async (reportId, reportTitle) => {
+    try {
+      setLoading(true);
+      const res = await khoaApi.getRegistrations({ limit: 10000 });
+      const regs = res.data.data || [];
+      
+      let csvContent = '\uFEFF';
+      let fileName = reportId;
+      
+      if (reportId === 'REP-02') {
+        csvContent += 'MSSV,Họ tên,Lớp,Chuyến đi,Nhà máy,Hình thức,Trạng thái\n';
+        const filtered = regs.filter(r => r.trang_thai === 'DaThamGia' || r.trang_thai === 'HoanThanh' || r.trang_thai === 'HopLe');
+        filtered.forEach(r => {
+          csvContent += `"${r.sinhVien?.mssv || ''}","${r.sinhVien?.ho_ten || ''}","${r.sinhVien?.ten_lop || ''}","${r.chuyenThamQuan?.ten_chuyen || ''}","${r.chuyenThamQuan?.nhaMay?.ten_nha_may || ''}","${r.chuyenThamQuan?.hinh_thuc || ''}","${r.trang_thai}"\n`;
+        });
+      } else if (reportId === 'REP-03') {
+        csvContent += 'MSSV,Họ tên,Lớp,Chuyến đi,Nhà máy,Trạng thái\n';
+        const filtered = regs.filter(r => r.trang_thai === 'ChoDuyet' || r.trang_thai === 'BiLoai' || r.trang_thai === 'DaHuy' || r.trang_thai === 'VangMat');
+        filtered.forEach(r => {
+          csvContent += `"${r.sinhVien?.mssv || ''}","${r.sinhVien?.ho_ten || ''}","${r.sinhVien?.ten_lop || ''}","${r.chuyenThamQuan?.ten_chuyen || ''}","${r.chuyenThamQuan?.nhaMay?.ten_nha_may || ''}","${r.trang_thai}"\n`;
+        });
+      } else if (reportId === 'REP-04') {
+        const studentRegCount = {};
+        regs.forEach(r => {
+          if (r.trang_thai === 'DaThamGia' || r.trang_thai === 'HoanThanh' || r.trang_thai === 'HopLe') {
+            const sv = r.sinhVien;
+            if (sv) {
+              if (!studentRegCount[sv.mssv]) {
+                studentRegCount[sv.mssv] = { name: sv.ho_ten, class: sv.ten_lop, count: 0 };
+              }
+              studentRegCount[sv.mssv].count += 1;
+            }
+          }
+        });
+        
+        csvContent += 'MSSV,Họ tên,Lớp,Số chuyến đã tham quan,Đủ điều kiện HĐ\n';
+        Object.keys(studentRegCount).forEach(mssv => {
+          const item = studentRegCount[mssv];
+          if (item.count >= 3) {
+            csvContent += `"${mssv}","${item.name}","${item.class || ''}","${item.count}","Đủ điều kiện"\n`;
+          }
+        });
+      } else if (reportId === 'REP-05') {
+        csvContent += 'MSSV,Họ tên,Lớp,Chuyến đi,Lệ phí cần đóng,Đã đóng,Trạng thái hóa đơn\n';
+        regs.forEach(r => {
+          const fee = r.hoaDon?.so_tien || 0;
+          const paid = r.hoaDon?.trang_thai === 'DaDongDungHan' || r.hoaDon?.trang_thai === 'DaDongTreHan' ? fee : 0;
+          const statusLabel = r.hoaDon?.trang_thai || 'ChuaTao';
+          csvContent += `"${r.sinhVien?.mssv || ''}","${r.sinhVien?.ho_ten || ''}","${r.sinhVien?.ten_lop || ''}","${r.chuyenThamQuan?.ten_chuyen || ''}","${fee}","${paid}","${statusLabel}"\n`;
+        });
+      } else {
+        alert('Loại báo cáo không hợp lệ hoặc đang được cập nhật.');
+        return;
+      }
+      
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a'); 
+      link.href = url; 
+      link.download = `${fileName}_${new Date().toISOString().slice(0,10)}.csv`;
+      document.body.appendChild(link); 
+      link.click(); 
+      document.body.removeChild(link);
+      
+    } catch (err) {
+      console.error(err);
+      alert('Đã xảy ra lỗi khi tải dữ liệu báo cáo.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleReportAction = (rep) => {
     if (rep.actionPath) navigate(rep.actionPath);
-    else alert(`Kết xuất báo cáo Excel: "${rep.title}" thành công!`);
+    else downloadReport(rep.id, rep.title);
   };
 
   const filteredRetake = retakeStudents.filter(s => 
@@ -205,7 +277,7 @@ export default function BaoCaoThongKe_Khoa() {
                   </button>
                   {rep.isExcelReady && (
                     <button 
-                      onClick={() => alert(`Tải tệp Excel báo cáo ${rep.id} mẫu...`)} 
+                      onClick={() => downloadReport(rep.id, rep.title)} 
                       className="p-2 hover:bg-[#E7E0C4]/20 text-slate-400 hover:text-[#407F3E] rounded-xl transition-all cursor-pointer"
                     >
                       <FileSpreadsheet className="w-4 h-4" />

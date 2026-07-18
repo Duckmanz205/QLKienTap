@@ -30,6 +30,23 @@ export default function XemTruocBaoCaoThamQuan_Khoa() {
     return <XCircle className="w-3.5 h-3.5 text-red-500" />;
   };
 
+  const exportExcel = () => {
+    let csvContent = '\uFEFF';
+    csvContent += 'Mã chuyến,Tên chuyến,Nhà máy,Ngày,Đăng ký,Thực tế,Trạng thái\n';
+    initialTripDetails.forEach(t => {
+      csvContent += `"${t.id}","${t.name}","${t.factory}","${t.date}","${t.registeredCount}","${t.actualCount}","${t.status}"\n`;
+    });
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a'); 
+    link.href = url; 
+    link.download = `ThongKeTripDetails_${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(link); 
+    link.click(); 
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -40,7 +57,7 @@ export default function XemTruocBaoCaoThamQuan_Khoa() {
             <p className="text-sm text-slate-500">Thống kê phân bổ sinh viên đăng ký tham quan thực tế tại các nhà máy.</p>
           </div>
         </div>
-        <button onClick={() => alert('Xuất Excel...')} className="flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-[#2c6b2d] text-white rounded-xl text-sm font-semibold shadow-sm cursor-pointer self-start">
+        <button onClick={exportExcel} className="flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-[#2c6b2d] text-white rounded-xl text-sm font-semibold shadow-sm cursor-pointer self-start">
           <FileSpreadsheet className="w-4 h-4" /><span>Xuất Excel thống kê</span>
         </button>
       </div>

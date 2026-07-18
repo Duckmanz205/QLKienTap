@@ -255,21 +255,27 @@ export default function RegistrationManagement_Khoa() {
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-650 font-semibold">
                 {filteredRegs.map(r => {
-                  let statusClass = 'bg-slate-50 text-slate-600 border-slate-200/50';
+                  let statusClass = 'bg-slate-50 text-slate-600 border-slate-200';
                   let statusLabel = r.trang_thai;
                   if (r.trang_thai === 'ChoDuyet') {
                     statusLabel = 'Chờ duyệt học phí';
-                    statusClass = 'bg-amber-50 text-amber-700 border-amber-250/50';
-                  } else if (r.trang_thai === 'DaDangKy') {
-                    statusLabel = 'Đăng ký tạm';
-                    statusClass = 'bg-blue-50 text-blue-700 border-blue-250/50';
-                  } else if (r.trang_thai === 'ChinhThuc') {
-                    statusLabel = 'Chính thức';
-                    statusClass = 'bg-emerald-50 text-emerald-700 border-emerald-250/50';
+                    statusClass = 'bg-amber-50 text-amber-700 border-amber-250';
+                  } else if (r.trang_thai === 'HopLe') {
+                    statusLabel = 'Hợp lệ / Đã duyệt';
+                    statusClass = 'bg-emerald-50 text-emerald-700 border-emerald-250';
                   } else if (r.trang_thai === 'DaHuy') {
                     statusLabel = 'Đã hủy';
-                    statusClass = 'bg-rose-50 text-rose-700 border-rose-250/50';
+                    statusClass = 'bg-slate-100 text-slate-500 border-slate-200';
+                  } else if (r.trang_thai === 'BiLoai') {
+                    statusLabel = 'Bị loại';
+                    statusClass = 'bg-rose-50 text-rose-700 border-rose-250';
+                  } else if (r.trang_thai === 'DaThamGia') {
+                    statusLabel = 'Đã tham gia';
+                    statusClass = 'bg-emerald-50 text-emerald-700 border-emerald-250';
                   }
+
+                  const le_phi_da_dong = r.hoaDon?.trang_thai === 'DaDongDungHan' ? Number(r.hoaDon.so_tien) : 0;
+                  const le_phi_con_no = (r.hoaDon?.trang_thai === 'ChuaDong' || r.hoaDon?.trang_thai === 'ViPham') ? Number(r.hoaDon.so_tien) : 0;
 
                   return (
                     <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
@@ -286,11 +292,11 @@ export default function RegistrationManagement_Khoa() {
                       </td>
                       <td className="px-4 py-3.5">
                         <div className="flex flex-col">
-                          <span className={r.le_phi_da_dong > 0 ? 'text-emerald-600 font-bold' : 'text-slate-400'}>
-                            Đã đóng: {Number(r.le_phi_da_dong).toLocaleString('vi-VN')}đ
+                          <span className={le_phi_da_dong > 0 ? 'text-emerald-600 font-bold' : 'text-slate-400'}>
+                            Đã đóng: {le_phi_da_dong.toLocaleString('vi-VN')}đ
                           </span>
                           <span className="text-[10px] text-slate-400 font-medium">
-                            Còn nợ: {Number(r.le_phi_con_no).toLocaleString('vi-VN')}đ
+                            Còn nợ: {le_phi_con_no.toLocaleString('vi-VN')}đ
                           </span>
                         </div>
                       </td>

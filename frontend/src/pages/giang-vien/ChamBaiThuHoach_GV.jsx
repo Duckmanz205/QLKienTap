@@ -13,7 +13,7 @@ import {
   CheckCircle,
   FileSpreadsheet
 } from 'lucide-react';
-import { giangVienApi } from '../../services/api';
+import api, { giangVienApi } from '../../services/api';
 
 export default function ChamBaiThuHoach_GV() {
   const [lecturer, setLecturer] = useState(null);
@@ -239,8 +239,8 @@ export default function ChamBaiThuHoach_GV() {
                           <td className="py-4 px-6 font-bold text-on-surface group-hover:text-primary transition-colors">
                             {r.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may}
                           </td>
-                          <td className="py-4 px-6 text-xs text-primary font-mono truncate max-w-[150px]" title={r.bai_thu_hoach_url}>
-                            {r.bai_thu_hoach_url || 'Báo cáo.pdf'}
+                          <td className="py-4 px-6 text-xs text-primary font-mono truncate max-w-[150px]" title={r.file_bao_cao}>
+                            {r.file_bao_cao ? r.file_bao_cao.split('/').pop() : 'Báo cáo.pdf'}
                           </td>
                           <td className="py-4 px-6 text-on-surface-variant font-medium">
                             {new Date(r.ngay_nop).toLocaleDateString('vi-VN')}
@@ -331,17 +331,42 @@ export default function ChamBaiThuHoach_GV() {
               <div className="bg-slate-800 text-white px-6 py-3 flex items-center justify-between text-xs font-semibold">
                 <div className="flex items-center gap-2">
                   <FileText className="w-4 h-4 text-red-400" />
-                  <span className="truncate max-w-[280px]">{selectedReport.bai_thu_hoach_url || 'BaoCao_KienTap.pdf'}</span>
+                  <span className="truncate max-w-[280px]">{selectedReport.file_bao_cao ? selectedReport.file_bao_cao.split('/').pop() : 'BaoCao_KienTap.pdf'}</span>
                 </div>
                 <div className="flex items-center gap-4 text-slate-300">
                   <span>Trang 1 / 4</span>
                   <div className="h-4 w-[1px] bg-slate-600"></div>
                   <button 
-                    onClick={() => alert('Đang tải file minh chứng...')}
+                    onClick={() => {
+                      if (selectedReport.file_bao_cao) {
+                        const url = selectedReport.file_bao_cao.startsWith('http') 
+                          ? selectedReport.file_bao_cao 
+                          : `${api.defaults.baseURL || ''}${selectedReport.file_bao_cao}`;
+                        window.open(url, '_blank');
+                      } else {
+                        alert('Không tìm thấy tệp tin báo cáo.');
+                      }
+                    }}
                     className="hover:text-white transition-colors flex items-center gap-1 cursor-pointer font-bold"
                   >
                     <Download className="w-3.5 h-3.5" /> <span>Tải xuống</span>
                   </button>
+                  {selectedReport.file_xac_nhan_tham_quan && (
+                    <>
+                      <div className="h-4 w-[1px] bg-slate-600"></div>
+                      <button 
+                        onClick={() => {
+                          const url = selectedReport.file_xac_nhan_tham_quan.startsWith('http') 
+                            ? selectedReport.file_xac_nhan_tham_quan 
+                            : `${api.defaults.baseURL || ''}${selectedReport.file_xac_nhan_tham_quan}`;
+                          window.open(url, '_blank');
+                        }}
+                        className="hover:text-white transition-colors flex items-center gap-1 cursor-pointer font-bold text-emerald-450"
+                      >
+                        <Download className="w-3.5 h-3.5" /> <span>Minh chứng DN</span>
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
 

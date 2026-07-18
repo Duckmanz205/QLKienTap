@@ -8,7 +8,7 @@ import { TaskQueueService } from '../queue/task-queue.service';
 
 @Controller('khoa')
 @UseGuards(AuthGuard, RolesGuard)
-@Roles('Khoa')
+@Roles('QuanLyKhoa', 'Khoa')
 export class KhoaController {
   constructor(
     private readonly khoaService: KhoaService,
@@ -114,8 +114,20 @@ export class KhoaController {
   }
 
   @Post('approve-trip')
-  async approveTrip(@Body() body: { tripId: number; approverId: number; isApproved: boolean }) {
-    return this.khoaService.approveProposeTrip(body.tripId, body.approverId, body.isApproved);
+  async approveTrip(
+    @Body() body: { 
+      tripId?: number; 
+      approverId?: number; 
+      isApproved?: boolean;
+      registrationId?: number;
+      hanhDong?: string;
+    }
+  ) {
+    if (body.registrationId) {
+      const isApproved = body.hanhDong === 'DuyetThanhToan';
+      return this.khoaService.approveRegistrationPayment(body.registrationId, isApproved);
+    }
+    return this.khoaService.approveProposeTrip(body.tripId!, body.approverId!, body.isApproved!);
   }
 
   @Post('approve-cancel')

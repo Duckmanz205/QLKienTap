@@ -38,6 +38,7 @@ export const authApi = {
 
 export const sinhVienApi = {
   getProfile: (accountId) => api.get(`/sinh-vien/profile/${accountId}`),
+  getFactories: () => api.get('/sinh-vien/factories'),
   getAvailableTrips: (studentId) => api.get(`/sinh-vien/available-trips/${studentId}`),
   getRegisteredTrips: (studentId) => api.get(`/sinh-vien/registered-trips/${studentId}`),
   registerTrip: (studentId, tripId) => api.post('/sinh-vien/register', { studentId, tripId }),
