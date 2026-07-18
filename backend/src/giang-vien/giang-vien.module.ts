@@ -17,6 +17,7 @@ import {
   HoiDong_ThanhVien,
   DiemHoiDong_ChiTiet,
   HoiDongChamBaoCao,
+  DanhSachDen,
 } from '../entities/qlkt.entity';
 
 @Module({
@@ -35,6 +36,7 @@ import {
       HoiDong_ThanhVien,
       DiemHoiDong_ChiTiet,
       HoiDongChamBaoCao,
+      DanhSachDen,
     ]),
     AuthModule,
   ],

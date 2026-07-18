@@ -11,7 +11,7 @@ import {
   Undo,
   X
 } from 'lucide-react';
-import { sinhVienApi } from '../../services/api';
+import api, { sinhVienApi } from '../../services/api';
 
 export default function HoanPhi_SV() {
   const [student, setStudent] = useState(null);
@@ -23,6 +23,40 @@ export default function HoanPhi_SV() {
   const [showRefundModal, setShowRefundModal] = useState(false);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState('');
   const [fileScanUrl, setFileScanUrl] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState('');
+
+  const handleFileChange = async (e) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Kích thước tệp vượt quá hạn mức 5MB.');
+        return;
+      }
+      
+      setUploading(true);
+      setUploadedFileName(file.name);
+      
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const uploadRes = await api.post('/upload/attachment', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          }
+        });
+        
+        setFileScanUrl(uploadRes.data.url);
+      } catch (err) {
+        console.error(err);
+        alert('Tải lên minh chứng thất bại.');
+        setUploadedFileName('');
+      } finally {
+        setUploading(false);
+      }
+    }
+  };
   
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -325,16 +359,17 @@ export default function HoanPhi_SV() {
 
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-on-surface uppercase tracking-wider block">
-                  Tập tin minh chứng hoàn tiền (file biên lai / đơn) <span className="text-red-500">*</span>
+                  Tập tin minh chứng hoàn tiền (PDF/Ảnh) <span className="text-red-500">*</span>
                 </label>
                 <input 
-                  type="text" 
-                  value={fileScanUrl}
-                  onChange={(e) => setFileScanUrl(e.target.value)}
-                  placeholder="Ví dụ: Scan_bien_lai_vietcombank.pdf"
+                  type="file" 
+                  onChange={handleFileChange}
+                  accept="application/pdf,image/*"
                   className="w-full px-4 py-2.5 bg-[#f8faf1] border border-surface-variant rounded-xl text-sm focus:border-primary focus:outline-none"
-                  required
+                  required={!fileScanUrl}
                 />
+                {uploading && <p className="text-xs text-amber-600 font-semibold mt-1">Đang tải lên tệp tin...</p>}
+                {fileScanUrl && <p className="text-xs text-primary font-semibold mt-1">✓ Đã tải lên: {uploadedFileName || fileScanUrl.split('/').pop()}</p>}
               </div>
 
               <div className="pt-4 border-t border-surface-variant flex justify-end gap-3">

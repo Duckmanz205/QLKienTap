@@ -15,6 +15,11 @@ export class SinhVienController {
     return this.svService.getStudentByAccountId(accountId);
   }
 
+  @Get('factories')
+  async getFactories() {
+    return this.svService.getFactories();
+  }
+
   @Get('available-trips/:studentId')
   async getAvailableTrips(@Param('studentId', ParseIntPipe) studentId: number) {
     return this.svService.getAvailableTrips(studentId);

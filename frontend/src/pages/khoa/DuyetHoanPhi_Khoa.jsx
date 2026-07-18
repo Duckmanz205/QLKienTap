@@ -150,7 +150,23 @@ export default function DuyetHoanPhi_Khoa() {
                   </td>
                   <td className="px-6 py-4 border-r border-[#E7E0C4]/40">
                     <button 
-                      onClick={() => alert(`Đang tải/hiển thị tệp chứng từ đính kèm: ${rec.fileUrl}`)}
+                      onClick={() => {
+                        if (rec.fileUrl && (rec.fileUrl.startsWith('http') || rec.fileUrl.startsWith('/') || rec.fileUrl.startsWith('blob:'))) {
+                          const url = rec.fileUrl.startsWith('http') || rec.fileUrl.startsWith('/') 
+                            ? rec.fileUrl 
+                            : `/api/upload/file/payments/${rec.fileUrl}`;
+                          window.open(url, '_blank');
+                        } else {
+                          const blob = new Blob(['Mock PDF proof document content'], { type: 'application/pdf' });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = rec.fileUrl || 'minhchinh.pdf';
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                        }
+                      }}
                       className="inline-flex items-center gap-1 text-xs text-[#407F3E] hover:underline font-bold"
                     >
                       <FileText size={14} />

@@ -313,6 +313,28 @@ export default function ChuyenThamQuan_DSLoc() {
     }
   };
 
+  // Approve or Reject student proposed trip
+  const handleApproveProposedTrip = async (tripId, isApproved) => {
+    setMessage('');
+    setError('');
+    const actionText = isApproved ? 'duyệt' : 'từ chối';
+    if (!window.confirm(`Bạn có chắc chắn muốn ${actionText} đề xuất chuyến đi tự do này?`)) {
+      return;
+    }
+    try {
+      const res = await khoaApi.approveTrip({
+        tripId,
+        approverId: currentUserId,
+        isApproved,
+      });
+      setMessage(res.data.message);
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      setError(err.response?.data?.message || `Thực hiện ${actionText} đề xuất thất bại.`);
+    }
+  };
+
   // Assign GVDD (lead lecturer)
   const handleAssignLeader = async (e) => {
     e.preventDefault();
@@ -440,7 +462,19 @@ export default function ChuyenThamQuan_DSLoc() {
           }`}
         >
           <Compass size={14} />
-          Chuyến đi & Lọc tự động ({trips.length})
+          Chuyến đi & Lọc tự động ({trips.filter(t => t.cach_to_chuc !== 'TuDo').length})
+        </button>
+
+        <button 
+          onClick={() => setActiveTab('proposed_trips')}
+          className={`px-4 py-2.5 text-xs font-bold transition-all border-b-2 rounded-t-lg flex items-center gap-2 ${
+            activeTab === 'proposed_trips' 
+              ? 'border-indigo-600 text-indigo-600 bg-indigo-50/20' 
+              : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-55'
+          }`}
+        >
+          <ShieldCheck size={14} />
+          Duyệt đề xuất tự do ({trips.filter(t => t.cach_to_chuc === 'TuDo' && t.trang_thai_duyet_tudo === 'ChoDuyet').length})
         </button>
 
         <button 
@@ -569,7 +603,7 @@ export default function ChuyenThamQuan_DSLoc() {
             <h3 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2 flex items-center justify-between">
               <span>Hàng đợi điều phối các chuyến tham quan</span>
               <span className="bg-indigo-55 text-indigo-700 font-semibold px-2 py-0.5 rounded-full text-[10px]">
-                {trips.length} chuyến đi
+                {trips.filter(t => t.cach_to_chuc !== 'TuDo').length} chuyến đi
               </span>
             </h3>
 
@@ -585,7 +619,7 @@ export default function ChuyenThamQuan_DSLoc() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700">
-                  {trips.map(t => {
+                  {trips.filter(t => t.cach_to_chuc !== 'TuDo').map(t => {
                     const activeCount = registrations.filter(r => r.chuyen_tham_quan_id === t.id && (r.trang_thai === 'HopLe' || r.trang_thai === 'DaThamGia')).length;
                     const pendingCount = registrations.filter(r => r.chuyen_tham_quan_id === t.id && r.trang_thai === 'ChoDuyet').length;
 
@@ -639,6 +673,110 @@ export default function ChuyenThamQuan_DSLoc() {
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: Proposed Trips (Self-Proposed by Students) */}
+      {activeTab === 'proposed_trips' && (
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4 text-xs">
+          <h3 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2 flex items-center justify-between">
+            <span>Danh sách chuyến đi tự do (Sinh viên tự đề xuất)</span>
+            <span className="bg-amber-50 text-amber-700 font-semibold px-2 py-0.5 rounded-full text-[10px]">
+              {trips.filter(t => t.cach_to_chuc === 'TuDo' && t.trang_thai_duyet_tudo === 'ChoDuyet').length} chờ duyệt
+            </span>
+          </h3>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200">
+              <thead className="bg-slate-50 text-slate-500 font-bold text-left">
+                <tr>
+                  <th className="px-4 py-3">Sinh viên đề xuất</th>
+                  <th className="px-4 py-3">Nhà máy / Doanh nghiệp</th>
+                  <th className="px-4 py-3">Kế hoạch đợt học</th>
+                  <th className="px-4 py-3">Thời gian tham quan</th>
+                  <th className="px-4 py-3">Hình thức</th>
+                  <th className="px-4 py-3">Trạng thái duyệt</th>
+                  <th className="px-4 py-3 text-right">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-slate-700">
+                {trips.filter(t => t.cach_to_chuc === 'TuDo').map(t => {
+                  let badgeClass = 'bg-amber-50 text-amber-700 border border-amber-100';
+                  let label = 'Chờ duyệt';
+                  if (t.trang_thai_duyet_tudo === 'DaDuyet') {
+                    badgeClass = 'bg-emerald-50 text-emerald-700 border border-emerald-100';
+                    label = 'Đã duyệt';
+                  } else if (t.trang_thai_duyet_tudo === 'TuChoi') {
+                    badgeClass = 'bg-rose-50 text-rose-700 border border-rose-100';
+                    label = 'Từ chối';
+                  }
+
+                  return (
+                    <tr key={t.id} className="hover:bg-slate-50/40">
+                      <td className="px-4 py-3 font-semibold">
+                        <div className="text-slate-800 font-bold">{t.deXuatBoi?.ho_ten || 'N/A'}</div>
+                        <div className="text-[10px] text-slate-400">MSSV: {t.deXuatBoi?.mssv || 'N/A'}</div>
+                      </td>
+                      <td className="px-4 py-3 font-semibold text-slate-850">
+                        {t.nhaMay?.ten_nha_may}
+                      </td>
+                      <td className="px-4 py-3 text-slate-500 font-medium">
+                        {t.lichKienTap?.ten_lich}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="font-semibold text-slate-750">
+                          {new Date(t.ngay_tham_quan).toLocaleDateString('vi-VN')}
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">
+                          {t.gio_bat_dau.slice(0, 5)} - {t.gio_ket_thuc.slice(0, 5)}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+                          t.hinh_thuc === 'TrucTuyen' ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'bg-amber-50 text-amber-700 border border-amber-100'
+                        }`}>
+                          {t.hinh_thuc === 'TrucTuyen' ? 'Trực tuyến' : 'Trực tiếp'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${badgeClass}`}>
+                          {label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right space-x-1.5">
+                        {t.trang_thai_duyet_tudo === 'ChoDuyet' && (
+                          <>
+                            <button
+                              onClick={() => handleApproveProposedTrip(t.id, true)}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded font-bold shadow-sm cursor-pointer"
+                            >
+                              Duyệt
+                            </button>
+                            <button
+                              onClick={() => handleApproveProposedTrip(t.id, false)}
+                              className="bg-rose-600 hover:bg-rose-700 text-white px-2.5 py-1 rounded font-bold shadow-sm cursor-pointer"
+                            >
+                              Từ chối
+                            </button>
+                          </>
+                        )}
+                        {t.trang_thai_duyet_tudo !== 'ChoDuyet' && (
+                          <span className="text-slate-400 text-[10px]">Đã xử lý</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {trips.filter(t => t.cach_to_chuc === 'TuDo').length === 0 && (
+                  <tr>
+                    <td colSpan="7" className="text-center py-8 text-slate-450 font-medium">
+                      Không có đề xuất chuyến đi tự do nào.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

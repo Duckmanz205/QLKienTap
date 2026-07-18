@@ -5,6 +5,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { TaiKhoan, SinhVien, GiangVien } from '../entities/qlkt.entity';
+import { AuthGuard } from './guards/auth.guard';
+import { RolesGuard } from './guards/roles.guard';
 
 @Module({
   imports: [
@@ -21,7 +23,7 @@ import { TaiKhoan, SinhVien, GiangVien } from '../entities/qlkt.entity';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService],
-  exports: [AuthService, JwtModule],
+  providers: [AuthService, AuthGuard, RolesGuard],
+  exports: [AuthService, JwtModule, AuthGuard, RolesGuard, TypeOrmModule],
 })
 export class AuthModule {}

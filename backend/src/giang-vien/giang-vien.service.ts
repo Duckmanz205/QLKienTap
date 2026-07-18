@@ -15,6 +15,7 @@ import {
   HoiDong_ThanhVien,
   DiemHoiDong_ChiTiet,
   HoiDongChamBaoCao,
+  DanhSachDen,
 } from '../entities/qlkt.entity';
 
 @Injectable()
@@ -32,6 +33,7 @@ export class GiangVienService {
     @InjectRepository(HoiDong_ThanhVien) private hoiDongThanhVienRepo: Repository<HoiDong_ThanhVien>,
     @InjectRepository(DiemHoiDong_ChiTiet) private diemHoiDongRepo: Repository<DiemHoiDong_ChiTiet>,
     @InjectRepository(HoiDongChamBaoCao) private hoiDongRepo: Repository<HoiDongChamBaoCao>,
+    @InjectRepository(DanhSachDen) private blacklistRepo: Repository<DanhSachDen>,
   ) {}
 
   // Lay thong tin GV bang TaiKhoan ID
@@ -134,6 +136,15 @@ export class GiangVienService {
         phieu.trang_thai = 'DaThamGia';
       } else if (record.status === 'Vang' || record.status === 'TuChoiThamGia') {
         phieu.trang_thai = 'VangMat';
+
+        // Auto put to blacklist with penalty category 'DangKyKhongThamGia' (5 trips demoted priority)
+        const black = new DanhSachDen();
+        black.sinh_vien_id = phieu.sinh_vien_id;
+        black.ly_do = 'DangKyKhongThamGia';
+        black.phieu_dang_ky_id = phieu.id;
+        black.ngay_ghi_nhan = new Date();
+        black.con_hieu_luc = true;
+        await this.blacklistRepo.save(black);
       }
       await this.phieuRepo.save(phieu);
     }
