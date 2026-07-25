@@ -1,6 +1,0 @@
-{
-  "name": "Internship Management System",
-  "description": "Hệ thống Quản lý Thực tập và Kiến tập dành cho Giảng viên Khoa Công nghệ Thực phẩm",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
