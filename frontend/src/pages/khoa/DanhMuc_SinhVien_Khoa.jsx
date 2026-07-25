@@ -435,11 +435,18 @@ export default function DanhMuc_SinhVien_Khoa() {
                       <Upload size={32} className="text-slate-400 mx-auto mb-3" />
                       <p className="font-bold text-slate-700">Kéo thả tệp tin Excel chứa danh sách SV tại đây</p>
                       <p className="text-[10px] text-slate-400 mt-1">Hỗ trợ tệp đính kèm .xlsx, .xls</p>
-                      <div className="mt-4 flex items-center justify-center gap-2">
+                      <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
                         <label className="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg font-semibold hover:bg-slate-50 cursor-pointer">
                           Chọn tệp thủ công
                           <input type="file" accept=".xlsx, .xls" onChange={handleFileChange} className="hidden" />
                         </label>
+                        <a 
+                          href="http://localhost:3000/api/upload/file/templates/mau_import_sinh_vien.xlsx"
+                          download
+                          className="px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-250 rounded-lg font-semibold hover:bg-emerald-100 transition-colors"
+                        >
+                          Tải tệp mẫu
+                        </a>
                         <button 
                           type="button"
                           onClick={generateSamplePreview}

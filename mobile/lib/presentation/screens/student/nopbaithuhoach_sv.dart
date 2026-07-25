@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../../core/network/api_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/state/app_state.dart';
 
@@ -10,10 +13,14 @@ class NopBaiThuHoachSVScreen extends StatefulWidget {
 }
 
 class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
-  // State values for mock file uploads
+  // State values for file uploads
   final Map<String, String> _uploadedReports = {};
   final Map<String, String> _uploadedConfirms = {};
   final Map<String, String> _reportFileSizes = {};
+
+  // Uploading states
+  final Map<String, bool> _uploadingReports = {};
+  final Map<String, bool> _uploadingConfirms = {};
 
   // Campaign checklist
   final Set<String> _campaignSelectedTrips = {};
@@ -45,6 +52,9 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
 
               final isUploaded = _uploadedReports.containsKey(sub.id) || sub.fileName != null;
               final isConfirmUploaded = _uploadedConfirms.containsKey(sub.id) || sub.hasConfirmationFile;
+
+              final isUploadingReport = _uploadingReports[sub.id] ?? false;
+              final isUploadingConfirm = _uploadingConfirms[sub.id] ?? false;
 
               return Card(
                 margin: const EdgeInsets.only(bottom: 16),
@@ -87,17 +97,94 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
                       const Divider(height: 24),
                       
                       _buildUploadDropzone(
-                        title: 'Bài báo cáo thu hoạch (PDF)',
+                        title: 'Bài báo cáo thu hoạch (PDF/DOCX)',
                         isUploaded: isUploaded,
+                        isUploading: isUploadingReport,
                         fileName: _uploadedReports[sub.id] ?? sub.fileName,
                         fileSize: _reportFileSizes[sub.id] ?? sub.fileSize,
-                        onTap: () {
-                          setState(() {
-                            _uploadedReports[sub.id] = 'baocao_${sub.id.substring(4)}.pdf';
-                            _reportFileSizes[sub.id] = '1.8 MB';
-                          });
-                          appStateProvider.uploadReport(sub.id, _uploadedReports[sub.id]!, '1.8 MB');
+                        onTap: () async {
+                          if (isUploadingReport) return;
+                          try {
+                            final pickerResult = await FilePicker.pickFiles(
+                              type: FileType.custom,
+                              allowedExtensions: ['pdf', 'docx', 'doc'],
+                            );
+                            if (pickerResult != null && pickerResult.files.single.path != null) {
+                              final file = pickerResult.files.single;
+                              setState(() {
+                                _uploadingReports[sub.id] = true;
+                              });
+
+                              final sizeInMb = file.size / (1024 * 1024);
+                              final fileSizeStr = '${sizeInMb.toStringAsFixed(1)} MB';
+
+                              final success = await appStateProvider.uploadReport(
+                                sub.id,
+                                file.path!,
+                                file.name,
+                                fileSizeStr,
+                              );
+
+                              setState(() {
+                                _uploadingReports[sub.id] = false;
+                                if (success) {
+                                  _uploadedReports[sub.id] = file.name;
+                                  _reportFileSizes[sub.id] = fileSizeStr;
+                                }
+                              });
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(success ? 'Nộp báo cáo thành công!' : 'Nộp báo cáo thất bại.'),
+                                  backgroundColor: success ? AppColors.secondary : AppColors.danger,
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            setState(() {
+                              _uploadingReports[sub.id] = false;
+                            });
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Lỗi chọn/tải file lên: $e'), backgroundColor: AppColors.danger),
+                            );
+                          }
                         },
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          TextButton.icon(
+                            onPressed: () async {
+                              final uri = Uri.parse('${ApiService.baseUrl}/upload/file/templates/huong_dan_viet_bao_cao.pdf');
+                              if (await canLaunchUrl(uri)) {
+                                await launchUrl(uri, mode: LaunchMode.externalApplication);
+                              }
+                            },
+                            icon: const Icon(Icons.picture_as_pdf, size: 14, color: AppColors.primary),
+                            label: const Text('Quy chuẩn Báo cáo (PDF)', style: TextStyle(fontSize: 11, color: AppColors.primary)),
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                          ),
+                          TextButton.icon(
+                            onPressed: () async {
+                              final uri = Uri.parse('${ApiService.baseUrl}/upload/file/templates/mau_nhat_ky_thuc_tap.xlsx');
+                              if (await canLaunchUrl(uri)) {
+                                await launchUrl(uri, mode: LaunchMode.externalApplication);
+                              }
+                            },
+                            icon: const Icon(Icons.table_chart, size: 14, color: AppColors.secondary),
+                            label: const Text('Mẫu Nhật ký (Excel)', style: TextStyle(fontSize: 11, color: AppColors.secondary)),
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                          ),
+                        ],
                       ),
 
                       if (sub.tripName.contains('Cát Lái') || sub.typeText.contains('tự do')) ...[
@@ -105,13 +192,50 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
                         _buildUploadDropzone(
                           title: 'Giấy xác nhận tham quan (bắt buộc)',
                           isUploaded: isConfirmUploaded,
+                          isUploading: isUploadingConfirm,
                           fileName: _uploadedConfirms[sub.id] ?? sub.confirmationFileName,
-                          fileSize: isConfirmUploaded ? '850 KB' : null,
-                          onTap: () {
-                            setState(() {
-                              _uploadedConfirms[sub.id] = 'giayxacnhan_${sub.id.substring(4)}.pdf';
-                            });
-                            appStateProvider.uploadConfirmationFile(sub.id, _uploadedConfirms[sub.id]!);
+                          fileSize: isConfirmUploaded ? 'Đã đính kèm' : null,
+                          onTap: () async {
+                            if (isUploadingConfirm) return;
+                            try {
+                              final pickerResult = await FilePicker.pickFiles(
+                                type: FileType.custom,
+                                allowedExtensions: ['pdf', 'docx', 'doc', 'jpg', 'jpeg', 'png'],
+                              );
+                              if (pickerResult != null && pickerResult.files.single.path != null) {
+                                final file = pickerResult.files.single;
+                                setState(() {
+                                  _uploadingConfirms[sub.id] = true;
+                                });
+
+                                final success = await appStateProvider.uploadConfirmationFile(
+                                  sub.id,
+                                  file.path!,
+                                  file.name,
+                                );
+
+                                setState(() {
+                                  _uploadingConfirms[sub.id] = false;
+                                  if (success) {
+                                    _uploadedConfirms[sub.id] = file.name;
+                                  }
+                                });
+
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(success ? 'Nộp giấy xác nhận thành công!' : 'Nộp giấy xác nhận thất bại.'),
+                                    backgroundColor: success ? AppColors.secondary : AppColors.danger,
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              setState(() {
+                                _uploadingConfirms[sub.id] = false;
+                              });
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Lỗi chọn/tải file lên: $e'), backgroundColor: AppColors.danger),
+                              );
+                            }
                           },
                         ),
                       ],
@@ -194,6 +318,7 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
   Widget _buildUploadDropzone({
     required String title,
     required bool isUploaded,
+    required bool isUploading,
     required String? fileName,
     required String? fileSize,
     required VoidCallback onTap,
@@ -213,11 +338,17 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
         ),
         child: Row(
           children: [
-            Icon(
-              isUploaded ? Icons.check_circle : Icons.cloud_upload_outlined,
-              color: isUploaded ? AppColors.secondary : AppColors.primary,
-              size: 28,
-            ),
+            isUploading
+                ? const SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                  )
+                : Icon(
+                    isUploaded ? Icons.check_circle : Icons.cloud_upload_outlined,
+                    color: isUploaded ? AppColors.secondary : AppColors.primary,
+                    size: 28,
+                  ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -233,13 +364,15 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    isUploaded ? '$fileName ($fileSize)' : 'Bấm để chọn file PDF',
+                    isUploaded
+                        ? '$fileName${fileSize != null ? ' ($fileSize)' : ''}'
+                        : 'Bấm để chọn file tài liệu',
                     style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
                   ),
                 ],
               ),
             ),
-            if (isUploaded)
+            if (isUploaded && !isUploading)
               const Icon(Icons.cached, size: 16, color: AppColors.textMuted),
           ],
         ),

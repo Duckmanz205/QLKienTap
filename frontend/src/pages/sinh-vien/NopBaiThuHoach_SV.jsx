@@ -233,6 +233,33 @@ export default function NopBaiThuHoach_SV() {
         
         {/* Left Column: List of Submissions */}
         <div className="lg:col-span-8 space-y-6">
+          {/* Templates download section */}
+          <div className="bg-[#f0f9ff] border border-blue-200 rounded-2xl p-5 shadow-sm space-y-3">
+            <h3 className="font-bold text-sm text-blue-900 flex items-center gap-2">
+              <FileText className="w-5 h-5 text-blue-600" />
+              Tài liệu hướng dẫn & Biểu mẫu mẫu
+            </h3>
+            <p className="text-xs text-blue-700 leading-relaxed font-semibold">
+              Để đảm bảo các báo cáo của bạn được duyệt nhanh chóng, vui lòng tải các tài liệu hướng dẫn và mẫu nhật ký bên dưới:
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <a 
+                href="http://localhost:3000/api/upload/file/templates/huong_dan_viet_bao_cao.pdf"
+                download
+                className="px-4 py-2 bg-white text-blue-700 border border-blue-300 rounded-xl text-xs font-bold hover:bg-blue-50 transition-colors inline-flex items-center gap-2 shadow-xs"
+              >
+                <span>📄 Quy chuẩn viết báo cáo (PDF)</span>
+              </a>
+              <a 
+                href="http://localhost:3000/api/upload/file/templates/mau_nhat_ky_thuc_tap.xlsx"
+                download
+                className="px-4 py-2 bg-white text-emerald-700 border border-emerald-300 rounded-xl text-xs font-bold hover:bg-emerald-50 transition-colors inline-flex items-center gap-2 shadow-xs"
+              >
+                <span>📊 Mẫu Nhật ký tuần (Excel)</span>
+              </a>
+            </div>
+          </div>
+
           {/* Progress Banner */}
           <div className="bg-white rounded-2xl border border-surface-variant/40 p-5 shadow-sm flex items-center justify-between">
             <div className="flex items-center gap-4">

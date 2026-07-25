@@ -1,0 +1,286 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script>tailwind.config={theme:{extend:{"colors":{"on-surface":"#191d17","surface-bright":"#f8faf1","surface-container":"#ecefe6","on-primary-fixed":"#002203","on-primary":"#ffffff","tertiary-fixed-dim":"#ffb0ca","on-secondary-fixed":"#111f00","background":"#f8faf1","outline-variant":"#c0c9bb","on-tertiary-fixed-variant":"#782b4c","danger-soft":"#E68A8C","warning-yellow":"#DBD468","surface-container-high":"#e6e9e0","inverse-surface":"#2e322c","secondary-container":"#c0ef7c","surface-dim":"#d8dbd2","primary-fixed-dim":"#93d78b","tertiary-container":"#ad5577","on-error-container":"#93000a","on-secondary-fixed-variant":"#324f00","error":"#ba1a1a","on-tertiary-fixed":"#3e001f","error-container":"#ffdad6","primary-container":"#407f3e","primary":"#266528","tertiary-fixed":"#ffd9e3","on-primary-container":"#e5ffdc","tertiary":"#8f3d5e","surface":"#f8faf1","secondary-fixed-dim":"#a8d565","surface-muted":"#E7E0C4","on-tertiary-container":"#fff6f6","primary-fixed":"#aef4a5","on-secondary":"#ffffff","surface-container-highest":"#e0e4db","secondary":"#446900","on-secondary-container":"#476d01","surface-container-low":"#f2f5ec","on-surface-variant":"#41493e","on-error":"#ffffff","surface-container-lowest":"#ffffff","on-background":"#191d17","text-slate":"#334155","outline":"#717a6d","secondary-fixed":"#c3f17e","inverse-on-surface":"#eff2e9","surface-variant":"#e0e4db","on-tertiary":"#ffffff","surface-tint":"#2c6b2d","on-primary-fixed-variant":"#105217","inverse-primary":"#93d78b"},"borderRadius":{"DEFAULT":"0.25rem","lg":"0.5rem","xl":"0.75rem","full":"9999px"},"spacing":{"header-height":"64px","sidebar-width":"260px","padding-card":"1.5rem","gutter":"1rem","margin-container":"1.5rem"},"fontFamily":{"body-md":["Inter"],"headline-md":["Inter"],"headline-lg":["Inter"],"headline-sm":["Inter"],"label-md":["Inter"],"body-lg":["Inter"]},"fontSize":{"body-md":["14px",{"lineHeight":"20px","fontWeight":"400"}],"headline-md":["24px",{"lineHeight":"32px","fontWeight":"600"}],"headline-lg":["30px",{"lineHeight":"38px","fontWeight":"700"}],"headline-sm":["20px",{"lineHeight":"28px","fontWeight":"600"}],"label-md":["12px",{"lineHeight":"16px","letterSpacing":"0.05em","fontWeight":"600"}],"body-lg":["16px",{"lineHeight":"24px","fontWeight":"400"}]}}}}</script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"></head><body class="bg-surface-muted font-body-md text-on-surface"><aside class="fixed left-0 top-0 h-full w-[256px] bg-primary-container z-50 flex flex-col text-on-primary"><div class="h-header-height flex items-center px-6 border-b border-white/10"><span class="font-headline-sm font-bold tracking-tight">Quản lý Kiến tập</span></div><nav class="flex-1 py-6 space-y-1 overflow-y-auto" data-active-classes="bg-secondary-container text-on-secondary-container font-bold"><div class="px-4"><a class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-on-primary/80 hover:bg-white/10 hover:text-on-primary transition-all" data-path="trang-chu" href="#"><span class="material-symbols-outlined text-[20px]">home</span><span class="text-body-md">Trang chủ</span></a></div><div class="pt-4 pb-2 px-8"><span class="text-label-md text-on-primary/60 uppercase">Kiến tập của tôi</span></div><div class="px-4 space-y-1"><a class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-on-primary/80 hover:bg-white/10 hover:text-on-primary transition-all" data-path="chuyen-tham-quan" href="#"><span class="material-symbols-outlined text-[20px]">explore</span><span class="text-body-md">Chuyến tham quan</span></a><a class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-on-primary/80 hover:bg-white/10 hover:text-on-primary transition-all" data-path="lich-trinh-doan" href="#"><span class="material-symbols-outlined text-[20px]">event_note</span><span class="text-body-md">Lịch trình đoàn</span></a><a class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-on-primary/80 hover:bg-white/10 hover:text-on-primary transition-all" data-path="nop-bai-thu-hoach" href="#"><span class="material-symbols-outlined text-[20px]">upload_file</span><span class="text-body-md">Nộp bài thu hoạch</span></a><a class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-on-primary/80 hover:bg-white/10 hover:text-on-primary transition-all" data-path="ket-qua-diem" href="#"><span class="material-symbols-outlined text-[20px]">grade</span><span class="text-body-md">Kết quả &amp; điểm</span></a></div><div class="pt-4 pb-2 px-8"><span class="text-label-md text-on-primary/60 uppercase">Tài chính</span></div><div class="px-4 space-y-1"><a class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-on-primary/80 hover:bg-white/10 hover:text-on-primary transition-all" data-path="thanh-toan" href="#"><span class="material-symbols-outlined text-[20px]">payments</span><span class="text-body-md">Thanh toán</span></a><a class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-on-primary/80 hover:bg-white/10 hover:text-on-primary transition-all" data-path="hoan-phi" href="#"><span class="material-symbols-outlined text-[20px]">assignment_return</span><span class="text-body-md">Hoàn phí</span></a></div><div class="px-4 pt-4"><a class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-on-primary/80 hover:bg-white/10 hover:text-on-primary transition-all" data-path="thong-bao" href="#"><span class="material-symbols-outlined text-[20px]">notifications</span><span class="text-body-md">Thông báo</span></a></div></nav><div class="p-4 border-t border-white/10"><button class="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-on-primary/80 hover:bg-danger-soft hover:text-on-primary transition-all"><span class="material-symbols-outlined text-[20px]">logout</span><span class="text-body-md">Đăng xuất</span></button></div></aside><div class="pl-[256px]"><header class="fixed top-0 left-[256px] right-0 h-header-height bg-surface-lowest border-b border-surface-muted z-40 flex items-center justify-between px-gutter shadow-[0_1px_8px_rgba(0,0,0,0.02)]"><div class="flex items-center gap-2 text-on-surface-variant"><span class="material-symbols-outlined">grid_view</span><span class="text-body-md font-medium">/ Trang chủ</span></div><div class="flex items-center gap-6"><div class="relative flex items-center justify-center cursor-pointer"><span class="material-symbols-outlined text-on-surface-variant">notifications</span><div class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-warning-yellow rounded-full border-2 border-surface-lowest"></div></div><div class="flex items-center gap-3 bg-surface-container-low pl-3 pr-1 py-1 rounded-full border border-surface-muted"><span class="text-body-md font-medium text-on-surface">Nguyễn Văn A</span><div class="px-2.5 py-0.5 rounded-full bg-surface-muted text-label-md text-on-surface-variant">Sinh viên</div><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="pt-header-height min-h-screen"><div class="p-margin-container"><div class="flex flex-col w-full gap-8">
+<div class="flex flex-col md:flex-row justify-between items-start gap-4">
+<div>
+<h1 class="text-headline-lg font-bold text-on-surface">Nộp bài thu hoạch</h1>
+<p class="text-body-md text-on-surface-variant mt-2 max-w-2xl">Quản lý và tải lên các báo cáo cho những chuyến tham quan kiến tập. Lưu ý hạn chót nộp bài để tránh bị trừ điểm.</p>
+</div>
+<div class="flex items-center gap-3 bg-surface-container rounded-xl p-4 shadow-sm min-w-[200px]">
+<div class="w-12 h-12 rounded-full bg-secondary-container flex items-center justify-center text-on-secondary-container">
+<span class="material-symbols-outlined text-[24px]">task</span>
+</div>
+<div>
+<div class="text-label-md text-on-surface-variant uppercase tracking-wider mb-1">Tiến độ nộp bài</div>
+<div class="text-headline-sm font-bold text-on-surface">2<span class="text-body-md text-on-surface-variant font-normal">/5 chuyến</span></div>
+</div>
+</div>
+</div>
+<!-- Bento Layout for Submission Cards -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
+<!-- Left Column: Vertical List of Trips -->
+<div class="lg:col-span-8 flex flex-col gap-6 w-full">
+<h2 class="text-headline-md font-bold text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">list_alt</span>
+                Danh sách chuyến kiến tập
+            </h2>
+<!-- Card 1: Pending (Chưa nộp) -->
+<div class="bg-surface-container-lowest rounded-xl shadow-sm p-6 relative overflow-hidden group transition-all duration-300 hover:shadow-md">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-warning-yellow rounded-l-xl"></div>
+<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+<div>
+<div class="flex items-center gap-3 mb-1">
+<span class="bg-surface-container px-2 py-1 rounded-md text-label-md text-on-surface-variant font-medium">Trực tiếp</span>
+<span class="bg-warning-yellow px-2 py-1 rounded-md text-label-md text-on-surface font-medium flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">schedule</span> Chưa nộp
+                            </span>
+</div>
+<h3 class="text-headline-sm font-bold text-on-surface mt-2">Nhà máy Acecook Việt Nam</h3>
+<div class="text-body-md text-on-surface-variant mt-1 flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px]">calendar_today</span> 15/10/2023
+                            <span class="mx-2 text-outline-variant">•</span>
+<span class="material-symbols-outlined text-[16px]">event_busy</span> Hạn chót: 22/10/2023
+                        </div>
+</div>
+<button class="bg-primary text-on-primary px-5 py-2.5 rounded-lg text-body-md font-medium hover:bg-surface-tint transition-colors w-full sm:w-auto shadow-sm" onclick="toggleUpload('upload-1')">
+                        Nộp bài
+                    </button>
+</div>
+<!-- Expandable Upload Zone -->
+<div class="hidden mt-6 pt-6 relative before:absolute before:top-0 before:left-0 before:right-0 before:h-px before:bg-surface-muted" id="upload-1">
+<div class="bg-surface-container-low border-2 border-dashed border-outline-variant rounded-xl p-8 flex flex-col items-center justify-center text-center hover:bg-surface-container transition-colors cursor-pointer relative overflow-hidden group/zone">
+<div class="absolute inset-0 bg-primary/5 opacity-0 group-hover/zone:opacity-100 transition-opacity"></div>
+<div class="w-16 h-16 bg-surface-container rounded-full flex items-center justify-center text-primary mb-4 shadow-sm z-10">
+<span class="material-symbols-outlined text-[32px]">cloud_upload</span>
+</div>
+<div class="text-body-lg font-medium text-on-surface z-10">Kéo thả file PDF vào đây hoặc <span class="text-primary font-bold">chọn file</span></div>
+<div class="text-body-md text-on-surface-variant mt-2 z-10">Định dạng hỗ trợ: .pdf (Tối đa 10MB)</div>
+</div>
+</div>
+</div>
+<!-- Card 2: Submitted (Đã nộp) -->
+<div class="bg-surface-container-lowest rounded-xl shadow-sm p-6 relative overflow-hidden transition-all duration-300">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-secondary-fixed rounded-l-xl"></div>
+<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+<div>
+<div class="flex items-center gap-3 mb-1">
+<span class="bg-surface-container px-2 py-1 rounded-md text-label-md text-on-surface-variant font-medium">Trực tuyến</span>
+<span class="bg-secondary-fixed px-2 py-1 rounded-md text-label-md text-on-secondary-fixed font-medium flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">check_circle</span> Đã nộp
+                            </span>
+</div>
+<h3 class="text-headline-sm font-bold text-on-surface mt-2">Hội thảo Techcombank Data Center</h3>
+<div class="text-body-md text-on-surface-variant mt-1 flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px]">calendar_today</span> 02/10/2023
+                            <span class="mx-2 text-outline-variant">•</span>
+<span class="material-symbols-outlined text-[16px]">done_all</span> Đã nộp: 05/10/2023
+                        </div>
+</div>
+<button class="bg-surface-container text-on-surface-variant px-5 py-2.5 rounded-lg text-body-md font-medium hover:bg-surface-variant transition-colors w-full sm:w-auto flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[20px]">edit</span>
+                        Chỉnh sửa
+                    </button>
+</div>
+<!-- Submitted File View -->
+<div class="mt-4 bg-surface-container-low rounded-lg p-4 flex items-center justify-between border border-surface-muted">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 bg-error/10 rounded-lg flex items-center justify-center text-error">
+<span class="material-symbols-outlined">picture_as_pdf</span>
+</div>
+<div>
+<div class="text-body-md font-medium text-on-surface">Bao_cao_Techcombank_NguyenVanA.pdf</div>
+<div class="text-label-md text-on-surface-variant">2.4 MB • Tải lên lúc 14:30, 05/10</div>
+</div>
+</div>
+<button class="w-8 h-8 rounded-full hover:bg-surface-variant flex items-center justify-center text-on-surface-variant transition-colors">
+<span class="material-symbols-outlined text-[20px]">download</span>
+</button>
+</div>
+</div>
+<!-- Card 3: Late (Trễ hạn) -->
+<div class="bg-surface-container-lowest rounded-xl shadow-sm p-6 relative overflow-hidden group transition-all duration-300">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-danger-soft rounded-l-xl"></div>
+<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+<div>
+<div class="flex items-center gap-3 mb-1">
+<span class="bg-surface-container px-2 py-1 rounded-md text-label-md text-on-surface-variant font-medium">Trực tiếp</span>
+<span class="bg-danger-soft px-2 py-1 rounded-md text-label-md text-on-surface font-medium flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">warning</span> Trễ hạn - Trừ điểm
+                            </span>
+</div>
+<h3 class="text-headline-sm font-bold text-on-surface mt-2">Khu công nghệ cao Samsung Bắc Ninh</h3>
+<div class="text-body-md text-on-surface-variant mt-1 flex items-center gap-2 text-error">
+<span class="material-symbols-outlined text-[16px]">event_busy</span> Hạn chót: 28/09/2023 (Quá hạn 15 ngày)
+                        </div>
+</div>
+<button class="bg-surface-container text-on-surface-variant px-5 py-2.5 rounded-lg text-body-md font-medium hover:bg-surface-variant transition-colors w-full sm:w-auto" onclick="toggleUpload('upload-3')">
+                        Nộp trễ
+                    </button>
+</div>
+<div class="hidden mt-6 pt-6 relative before:absolute before:top-0 before:left-0 before:right-0 before:h-px before:bg-surface-muted" id="upload-3">
+<div class="bg-error-container/30 border-2 border-dashed border-danger-soft/50 rounded-xl p-8 flex flex-col items-center justify-center text-center cursor-pointer relative">
+<div class="w-16 h-16 bg-error-container rounded-full flex items-center justify-center text-on-error-container mb-4 shadow-sm z-10">
+<span class="material-symbols-outlined text-[32px]">upload_file</span>
+</div>
+<div class="text-body-lg font-medium text-on-surface z-10">Kéo thả file bài nộp trễ vào đây</div>
+<div class="text-label-md text-on-surface-variant mt-2 z-10">Lưu ý: Bài nộp sẽ bị trừ 20% số điểm tối đa</div>
+</div>
+</div>
+</div>
+<!-- Card 4: Self-organized (Tự do) - Pending -->
+<div class="bg-surface-container-lowest rounded-xl shadow-sm p-6 relative overflow-hidden group transition-all duration-300">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-warning-yellow rounded-l-xl"></div>
+<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+<div>
+<div class="flex items-center gap-3 mb-1">
+<span class="bg-inverse-surface text-inverse-on-surface px-2 py-1 rounded-md text-label-md font-medium">Tự do</span>
+<span class="bg-warning-yellow px-2 py-1 rounded-md text-label-md text-on-surface font-medium flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">schedule</span> Chưa nộp
+                            </span>
+</div>
+<h3 class="text-headline-sm font-bold text-on-surface mt-2">Công ty Phần mềm FPT (FSoft)</h3>
+<div class="text-body-md text-on-surface-variant mt-1 flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px]">calendar_today</span> 20/10/2023
+                            <span class="mx-2 text-outline-variant">•</span>
+<span class="material-symbols-outlined text-[16px]">event_busy</span> Hạn chót: 27/10/2023
+                        </div>
+</div>
+<button class="bg-primary text-on-primary px-5 py-2.5 rounded-lg text-body-md font-medium hover:bg-surface-tint transition-colors w-full sm:w-auto shadow-sm" onclick="toggleUpload('upload-4')">
+                        Nộp bài &amp; Minh chứng
+                    </button>
+</div>
+<div class="hidden mt-6 pt-6 relative before:absolute before:top-0 before:left-0 before:right-0 before:h-px before:bg-surface-muted flex flex-col md:flex-row gap-6" id="upload-4">
+<div class="flex-1">
+<div class="text-body-md font-medium text-on-surface mb-3 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[18px]">article</span> Bài thu hoạch
+                        </div>
+<div class="bg-surface-container-low border-2 border-dashed border-outline-variant rounded-xl p-6 flex flex-col items-center justify-center text-center hover:bg-surface-container transition-colors cursor-pointer h-[160px]">
+<span class="material-symbols-outlined text-[28px] text-on-surface-variant mb-2">note_add</span>
+<span class="text-body-md text-on-surface-variant">Tải lên báo cáo (.pdf)</span>
+</div>
+</div>
+<div class="flex-1 relative">
+<div class="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-surface-container-lowest border border-surface-muted rounded-full hidden md:flex items-center justify-center z-10 text-outline text-[12px] font-bold">
+                            +
+                        </div>
+<div class="text-body-md font-medium text-on-surface mb-3 flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary text-[18px]">verified</span> Giấy xác nhận (Bắt buộc)
+                        </div>
+<div class="bg-surface-container-low border-2 border-dashed border-outline-variant rounded-xl p-6 flex flex-col items-center justify-center text-center hover:bg-surface-container transition-colors cursor-pointer h-[160px]">
+<span class="material-symbols-outlined text-[28px] text-on-surface-variant mb-2">add_photo_alternate</span>
+<span class="text-body-md text-on-surface-variant">Tải lên scan/ảnh chụp (.pdf, .jpg)</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: Council Report Selection (Sticky) -->
+<div class="lg:col-span-4 w-full h-fit sticky top-[88px]">
+<!-- Using an inner div with absolute positioning for a decorative background element -->
+<div class="relative bg-surface-container-lowest rounded-2xl p-6 shadow-md border-t-4 border-primary overflow-hidden">
+<div class="absolute -top-16 -right-16 w-32 h-32 bg-primary/10 rounded-full blur-2xl pointer-events-none"></div>
+<div class="relative z-10">
+<h3 class="text-headline-sm font-bold text-on-surface mb-2 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">gavel</span>
+                        Chọn báo cáo Hội đồng
+                    </h3>
+<div class="bg-surface-container rounded-lg p-3 mb-5 border border-outline-variant/30 flex gap-3">
+<span class="material-symbols-outlined text-on-surface-variant text-[20px] mt-0.5">info</span>
+<p class="text-label-md text-on-surface-variant leading-relaxed">
+                            Chọn tối thiểu <strong class="text-on-surface">2 chuyến trực tiếp</strong> và <strong class="text-on-surface">1 chuyến trực tuyến</strong> đã nộp để báo cáo trước Hội đồng đánh giá cuối kỳ.
+                        </p>
+</div>
+<!-- Condition Tracker -->
+<div class="flex gap-2 mb-6">
+<div class="flex-1 bg-surface-container-low rounded-lg p-2 border border-surface-muted text-center">
+<div class="text-headline-md font-bold text-primary">0<span class="text-body-md text-on-surface-variant font-normal">/2</span></div>
+<div class="text-label-md text-on-surface-variant uppercase tracking-wide mt-1">Trực tiếp</div>
+</div>
+<div class="flex-1 bg-surface-container-low rounded-lg p-2 border border-surface-muted text-center">
+<div class="text-headline-md font-bold text-secondary">1<span class="text-body-md text-on-surface-variant font-normal">/1</span></div>
+<div class="text-label-md text-on-surface-variant uppercase tracking-wide mt-1">Trực tuyến</div>
+</div>
+</div>
+<!-- Checklist -->
+<div class="space-y-3 mb-8">
+<div class="text-label-md font-bold text-on-surface-variant uppercase tracking-wider mb-2 border-b border-surface-muted pb-1">Danh sách đủ điều kiện</div>
+<!-- Checkbox Item 1 (Checked) -->
+<label class="flex items-start gap-3 p-3 bg-surface-container-low rounded-lg border border-surface-muted cursor-pointer hover:bg-surface-container transition-colors group relative overflow-hidden">
+<div class="absolute inset-0 bg-primary/5 opacity-100 transition-opacity"></div>
+<div class="relative flex items-center justify-center pt-1 z-10">
+<input checked="" class="w-5 h-5 rounded border-outline text-primary focus:ring-primary accent-primary cursor-pointer" type="checkbox">
+</div>
+<div class="relative z-10 flex-1">
+<div class="text-body-md font-bold text-on-surface line-clamp-1">Hội thảo Techcombank Data Center</div>
+<div class="text-label-md text-on-surface-variant mt-1">Trực tuyến • 05/10/2023</div>
+</div>
+</label>
+<!-- Checkbox Item 2 (Disabled - Not Submitted) -->
+<label class="flex items-start gap-3 p-3 bg-surface-muted/30 rounded-lg border border-surface-muted/50 cursor-not-allowed opacity-60">
+<div class="flex items-center justify-center pt-1">
+<input class="w-5 h-5 rounded border-outline/50 cursor-not-allowed" disabled="" type="checkbox">
+</div>
+<div class="flex-1">
+<div class="text-body-md font-medium text-on-surface-variant line-clamp-1">Nhà máy Acecook Việt Nam</div>
+<div class="text-label-md text-error mt-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">warning</span> Chưa nộp bài
+                                </div>
+</div>
+</label>
+<!-- Checkbox Item 3 (Disabled - Not Submitted) -->
+<label class="flex items-start gap-3 p-3 bg-surface-muted/30 rounded-lg border border-surface-muted/50 cursor-not-allowed opacity-60">
+<div class="flex items-center justify-center pt-1">
+<input class="w-5 h-5 rounded border-outline/50 cursor-not-allowed" disabled="" type="checkbox">
+</div>
+<div class="flex-1">
+<div class="text-body-md font-medium text-on-surface-variant line-clamp-1">Công ty Phần mềm FPT</div>
+<div class="text-label-md text-error mt-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">warning</span> Chưa nộp bài
+                                </div>
+</div>
+</label>
+</div>
+<!-- Footer Action -->
+<div class="flex justify-end pt-4 border-t border-surface-muted">
+<!-- Button is muted/disabled state since conditions (0/2 direct) aren't met -->
+<button class="bg-surface-variant text-on-surface-variant/50 px-6 py-3 rounded-lg text-body-md font-bold w-full flex items-center justify-center gap-2 cursor-not-allowed transition-all" disabled="">
+<span class="material-symbols-outlined text-[20px]">how_to_reg</span>
+                            Xác nhận lựa chọn
+                        </button>
+</div>
+<div class="text-center mt-3">
+<span class="text-label-md text-error flex items-center justify-center gap-1">
+<span class="material-symbols-outlined text-[14px]">info</span> Chưa đủ số lượng yêu cầu
+                         </span>
+</div>
+</div>
+</div>
+<!-- Decorative Graphic Below the Sticky Card -->
+<div class="mt-6 hidden lg:block opacity-70 grayscale">
+<div class="bg-cover bg-center w-full h-40 rounded-xl mix-blend-multiply opacity-50" data-alt="A minimal, isometric illustration of a stack of academic papers and a graduation cap, designed in a corporate flat style using earthy greens and beige, blending softly into the background without a border." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuB6EXGE2HqyUQp8BjDuEnfjjFd8abpf9wOrN1Qv5nRUECa3mn2Jp4R1IrMicHHboECjSoADsFkObSgBh3GtMrFOvsvb7fo9P-7cqoObhd9xvgqG3zJ5g4OXDu_cKEHoCevpKsSWmKlQKtVKd80mbk6AhiT50xPNblY3ShzW7N1wJC2JHVPgJn_-Qw9PMbRcQsbbtj-5Vmwx2bq8HRm2QOyTxaB2CszZPubTsac_Rt2HwYOda-n7hNJ4Jw')"></div>
+</div>
+</div>
+</div>
+</div>
+<script>
+    function toggleUpload(id) {
+        const el = document.getElementById(id);
+        if (el.classList.contains('hidden')) {
+            el.classList.remove('hidden');
+            // Small animation effect
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(-10px)';
+            setTimeout(() => {
+                el.style.transition = 'all 0.3s ease';
+                el.style.opacity = '1';
+                el.style.transform = 'translateY(0)';
+            }, 10);
+        } else {
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(-10px)';
+            setTimeout(() => {
+                el.classList.add('hidden');
+            }, 300);
+        }
+    }
+</script></div></main></div></body></html>

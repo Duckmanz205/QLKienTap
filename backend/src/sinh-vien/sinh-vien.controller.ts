@@ -1,8 +1,17 @@
-import { Controller, Get, Post, Body, Param, ParseIntPipe, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  ParseIntPipe,
+  UseGuards,
+} from '@nestjs/common';
 import { SinhVienService } from './sinh-vien.service';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentUser, JwtPayloadUser } from '../auth/decorators/user.decorator';
 
 @Controller('sinh-vien')
 @UseGuards(AuthGuard, RolesGuard)
@@ -10,9 +19,18 @@ import { Roles } from '../auth/decorators/roles.decorator';
 export class SinhVienController {
   constructor(private readonly svService: SinhVienService) {}
 
+  @Get('profile')
+  async getMyProfile(@CurrentUser() user: JwtPayloadUser) {
+    return this.svService.getStudentByAccountId(user.sub);
+  }
+
   @Get('profile/:accountId')
-  async getProfile(@Param('accountId', ParseIntPipe) accountId: number) {
-    return this.svService.getStudentByAccountId(accountId);
+  async getProfile(
+    @CurrentUser() user: JwtPayloadUser,
+    @Param('accountId', ParseIntPipe) accountId: number,
+  ) {
+    // Ep buoc luon lay profile cua sinh vien dang dang nhap de chong IDOR
+    return this.svService.getStudentByAccountId(user.sub);
   }
 
   @Get('factories')
@@ -20,25 +38,44 @@ export class SinhVienController {
     return this.svService.getFactories();
   }
 
+  @Get('available-trips')
+  async getMyAvailableTrips(@CurrentUser() user: JwtPayloadUser) {
+    const student = await this.svService.getStudentByAccountId(user.sub);
+    return this.svService.getAvailableTrips(student.id);
+  }
+
   @Get('available-trips/:studentId')
-  async getAvailableTrips(@Param('studentId', ParseIntPipe) studentId: number) {
-    return this.svService.getAvailableTrips(studentId);
+  async getAvailableTrips(@CurrentUser() user: JwtPayloadUser) {
+    const student = await this.svService.getStudentByAccountId(user.sub);
+    return this.svService.getAvailableTrips(student.id);
+  }
+
+  @Get('registered-trips')
+  async getMyRegisteredTrips(@CurrentUser() user: JwtPayloadUser) {
+    const student = await this.svService.getStudentByAccountId(user.sub);
+    return this.svService.getStudentRegisteredTrips(student.id);
   }
 
   @Get('registered-trips/:studentId')
-  async getRegisteredTrips(@Param('studentId', ParseIntPipe) studentId: number) {
-    return this.svService.getStudentRegisteredTrips(studentId);
+  async getRegisteredTrips(@CurrentUser() user: JwtPayloadUser) {
+    const student = await this.svService.getStudentByAccountId(user.sub);
+    return this.svService.getStudentRegisteredTrips(student.id);
   }
 
   @Post('register')
-  async registerTrip(@Body() body: { studentId: number; tripId: number }) {
-    return this.svService.registerTrip(body.studentId, body.tripId);
+  async registerTrip(
+    @CurrentUser() user: JwtPayloadUser,
+    @Body() body: { tripId: number },
+  ) {
+    const student = await this.svService.getStudentByAccountId(user.sub);
+    return this.svService.registerTrip(student.id, body.tripId);
   }
 
   @Post('propose-trip')
   async proposeTrip(
-    @Body() body: {
-      studentId: number;
+    @CurrentUser() user: JwtPayloadUser,
+    @Body()
+    body: {
       nhaMayId: number;
       ngayThamQuan: Date;
       gioBatDau: string;
@@ -46,8 +83,9 @@ export class SinhVienController {
       hinhThuc: string;
     },
   ) {
+    const student = await this.svService.getStudentByAccountId(user.sub);
     return this.svService.proposeTrip(
-      body.studentId,
+      student.id,
       body.nhaMayId,
       body.ngayThamQuan,
       body.gioBatDau,
@@ -58,62 +96,102 @@ export class SinhVienController {
 
   @Post('request-cancel')
   async requestCancel(
-    @Body() body: {
-      studentId: number;
+    @CurrentUser() user: JwtPayloadUser,
+    @Body()
+    body: {
       registrationId: number;
       lyDo: string;
       fileMinhChung: string;
     },
   ) {
+    const student = await this.svService.getStudentByAccountId(user.sub);
     return this.svService.requestCancel(
-      body.studentId,
+      student.id,
       body.registrationId,
       body.lyDo,
       body.fileMinhChung,
     );
   }
 
+  @Get('invoices')
+  async getMyInvoices(@CurrentUser() user: JwtPayloadUser) {
+    const student = await this.svService.getStudentByAccountId(user.sub);
+    return this.svService.getInvoices(student.id);
+  }
+
   @Get('invoices/:studentId')
-  async getInvoices(@Param('studentId', ParseIntPipe) studentId: number) {
-    return this.svService.getInvoices(studentId);
+  async getInvoices(@CurrentUser() user: JwtPayloadUser) {
+    const student = await this.svService.getStudentByAccountId(user.sub);
+    return this.svService.getInvoices(student.id);
   }
 
   @Post('pay-invoice/:invoiceId')
-  async payInvoice(@Param('invoiceId', ParseIntPipe) invoiceId: number) {
-    return this.svService.payInvoice(invoiceId);
+  async payInvoice(
+    @CurrentUser() user: JwtPayloadUser,
+    @Param('invoiceId', ParseIntPipe) invoiceId: number,
+  ) {
+    const student = await this.svService.getStudentByAccountId(user.sub);
+    return this.svService.payInvoiceForStudent(student.id, invoiceId);
   }
 
   @Post('request-refund')
-  async requestRefund(@Body() body: { invoiceId: number; fileScanUrl: string }) {
-    return this.svService.requestRefund(body.invoiceId, body.fileScanUrl);
+  async requestRefund(
+    @CurrentUser() user: JwtPayloadUser,
+    @Body() body: { invoiceId: number; fileScanUrl: string },
+  ) {
+    const student = await this.svService.getStudentByAccountId(user.sub);
+    return this.svService.requestRefundForStudent(
+      student.id,
+      body.invoiceId,
+      body.fileScanUrl,
+    );
+  }
+
+  @Get('refund-requests')
+  async getMyRefundRequests(@CurrentUser() user: JwtPayloadUser) {
+    const student = await this.svService.getStudentByAccountId(user.sub);
+    return this.svService.getRefundRequests(student.id);
   }
 
   @Get('refund-requests/:studentId')
-  async getRefundRequests(@Param('studentId', ParseIntPipe) studentId: number) {
-    return this.svService.getRefundRequests(studentId);
+  async getRefundRequests(@CurrentUser() user: JwtPayloadUser) {
+    const student = await this.svService.getStudentByAccountId(user.sub);
+    return this.svService.getRefundRequests(student.id);
+  }
+
+  @Get('notifications')
+  async getMyNotifications(@CurrentUser() user: JwtPayloadUser) {
+    const student = await this.svService.getStudentByAccountId(user.sub);
+    return this.svService.getNotifications(student.id);
   }
 
   @Get('notifications/:studentId')
-  async getNotifications(@Param('studentId', ParseIntPipe) studentId: number) {
-    return this.svService.getNotifications(studentId);
+  async getNotifications(@CurrentUser() user: JwtPayloadUser) {
+    const student = await this.svService.getStudentByAccountId(user.sub);
+    return this.svService.getNotifications(student.id);
   }
 
   @Post('mark-notification-read')
-  async markNotificationRead(@Body() body: { accountId: number; notifId: number }) {
-    return this.svService.markNotificationRead(body.accountId, body.notifId);
+  async markNotificationRead(
+    @CurrentUser() user: JwtPayloadUser,
+    @Body() body: { notifId: number },
+  ) {
+    return this.svService.markNotificationRead(user.sub, body.notifId);
   }
 
   @Post('submit-report')
   async submitReport(
-    @Body() body: {
-      studentId: number;
+    @CurrentUser() user: JwtPayloadUser,
+    @Body()
+    body: {
       registrationId: number;
       fileBaoCaoUrl: string;
       fileXacNhanUrl?: string;
     },
   ) {
+    const student = await this.svService.getStudentByAccountId(user.sub);
     return this.svService.submitReport(
-      body.studentId,
+      student.id,
       body.registrationId,
       body.fileBaoCaoUrl,
       body.fileXacNhanUrl,
@@ -122,21 +200,30 @@ export class SinhVienController {
 
   @Post('select-representative-trips')
   async selectRepresentativeTrips(
-    @Body() body: {
-      studentId: number;
+    @CurrentUser() user: JwtPayloadUser,
+    @Body()
+    body: {
       termStudentId: number;
       registrationIds: number[];
     },
   ) {
+    const student = await this.svService.getStudentByAccountId(user.sub);
     return this.svService.selectRepresentativeTrips(
-      body.studentId,
+      student.id,
       body.termStudentId,
       body.registrationIds,
     );
   }
 
+  @Get('grades')
+  async getMyGrades(@CurrentUser() user: JwtPayloadUser) {
+    const student = await this.svService.getStudentByAccountId(user.sub);
+    return this.svService.getStudentGrades(student.id);
+  }
+
   @Get('grades/:studentId')
-  async getGrades(@Param('studentId', ParseIntPipe) studentId: number) {
-    return this.svService.getStudentGrades(studentId);
+  async getGrades(@CurrentUser() user: JwtPayloadUser) {
+    const student = await this.svService.getStudentByAccountId(user.sub);
+    return this.svService.getStudentGrades(student.id);
   }
 }

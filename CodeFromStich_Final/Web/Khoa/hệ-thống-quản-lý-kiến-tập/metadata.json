@@ -1,0 +1,6 @@
+{
+  "name": "Hệ thống Quản lý Kiến tập",
+  "description": "Hệ thống quản lý kiến tập toàn diện cho khoa Công nghệ Thực phẩm, bao gồm quản lý người dùng, hội đồng chấm, thông báo, lệ phí, hoàn phí, kết quả kiến tập và báo cáo thống kê.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

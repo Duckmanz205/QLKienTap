@@ -99,13 +99,26 @@ class _LecturerPortalState extends State<LecturerPortal> {
                 icon: const Icon(Icons.menu, color: AppColors.primary),
                 onPressed: () => setState(() => _profileSubScreen = true),
               ),
-        title: Text(
-          pageTitle,
-          style: const TextStyle(
-            color: AppColors.primary,
-            fontSize: 16,
-            fontWeight: FontWeight.w900,
-          ),
+        title: Row(
+          children: [
+            Image.asset(
+              'assets/images/huit_logo.png',
+              height: 28,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                pageTitle,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ],
         ),
         actions: [
           Stack(

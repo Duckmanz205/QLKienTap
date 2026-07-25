@@ -145,16 +145,13 @@ export default function Layout() {
       <div className="min-h-screen bg-[#f8faf1] flex font-sans">
         {/* Sidebar */}
         <aside className="fixed left-0 top-0 h-screen w-[260px] bg-[#407F3E] text-white z-50 flex flex-col shadow-xl border-r border-[#2c6b2d]/10">
-          <div className="p-6 flex flex-col gap-3 items-center border-b border-white/10 bg-[#2c6b2d]/15">
-            <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center shadow-inner">
-              <BookOpen className="text-white w-6 h-6" />
-            </div>
+          <div className="p-5 flex flex-col gap-1.5 items-center border-b border-white/10 bg-[#2c6b2d]/15">
             <div className="text-center">
-              <span className="font-bold text-[16px] leading-tight text-white uppercase tracking-wider block">
+              <span className="font-extrabold text-[16px] leading-tight text-white uppercase tracking-wider block">
                 Quản lý kiến tập
               </span>
-              <span className="text-[11px] text-[#e5ffdc]/70 font-semibold tracking-widest block uppercase mt-0.5">
-                Khoa CNTP
+              <span className="text-[11px] text-[#e5ffdc]/80 font-semibold tracking-widest block uppercase mt-0.5">
+                HUIT — Khoa CNTP
               </span>
             </div>
           </div>
@@ -221,13 +218,17 @@ export default function Layout() {
         <div className="flex-1 flex flex-col pl-[260px] min-w-0">
           {/* Header */}
           <header className="fixed top-0 left-[260px] right-0 h-16 bg-white border-b border-surface-variant/60 z-40 flex items-center justify-between px-6 shadow-sm">
-            <div className="flex items-center gap-2 text-on-surface-variant font-medium text-sm">
-              <Link to="/sinh-vien" className="hover:text-primary transition-colors flex items-center gap-1">
-                <Home className="w-4 h-4" />
-                <span>IMS Portal</span>
-              </Link>
-              <ChevronRight className="w-3 h-3 text-outline/50" />
-              <span className="text-on-surface font-semibold">{getActiveViewLabel()}</span>
+            <div className="flex items-center gap-4 min-w-0">
+              <img src="/huit-logo.png" alt="HUIT Logo" className="h-11 md:h-[46px] w-auto object-contain shrink-0 py-0.5" />
+              <div className="h-6 w-[1px] bg-slate-200 shrink-0"></div>
+              <div className="flex items-center gap-2 text-on-surface-variant font-medium text-sm truncate">
+                <Link to="/sinh-vien" className="hover:text-primary transition-colors flex items-center gap-1 font-semibold shrink-0">
+                  <Home className="w-4 h-4" />
+                  <span>IMS Portal</span>
+                </Link>
+                <ChevronRight className="w-3 h-3 text-outline/50 shrink-0" />
+                <span className="text-on-surface font-semibold truncate">{getActiveViewLabel()}</span>
+              </div>
             </div>
 
             <div className="flex items-center gap-6">
@@ -280,16 +281,13 @@ export default function Layout() {
       <div className="min-h-screen bg-[#f8faf1] flex font-sans">
         {/* Sidebar */}
         <aside className="fixed left-0 top-0 h-screen w-[260px] bg-[#407F3E] text-white z-50 flex flex-col shadow-xl border-r border-[#2c6b2d]/10">
-          <div className="p-6 flex flex-col gap-3 items-center border-b border-white/10 bg-[#2c6b2d]/15">
-            <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center shadow-inner">
-              <BookOpen className="text-white w-6 h-6" />
-            </div>
+          <div className="p-5 flex flex-col gap-1.5 items-center border-b border-white/10 bg-[#2c6b2d]/15">
             <div className="text-center">
-              <span className="font-bold text-[16px] leading-tight text-white uppercase tracking-wider block">
+              <span className="font-extrabold text-[16px] leading-tight text-white uppercase tracking-wider block">
                 Quản lý kiến tập
               </span>
-              <span className="text-[11px] text-[#e5ffdc]/70 font-semibold tracking-widest block uppercase mt-0.5">
-                Giảng viên
+              <span className="text-[11px] text-[#e5ffdc]/80 font-semibold tracking-widest block uppercase mt-0.5">
+                HUIT — Giảng viên
               </span>
             </div>
           </div>
@@ -351,13 +349,17 @@ export default function Layout() {
         <div className="flex-1 flex flex-col pl-[260px] min-w-0">
           {/* Header */}
           <header className="fixed top-0 left-[260px] right-0 h-16 bg-white border-b border-surface-variant/60 z-40 flex items-center justify-between px-6 shadow-sm">
-            <div className="flex items-center gap-2 text-on-surface-variant font-medium text-sm">
-              <Link to="/giang-vien" className="hover:text-primary transition-colors flex items-center gap-1">
-                <Home className="w-4 h-4" />
-                <span>IMS Portal</span>
-              </Link>
-              <ChevronRight className="w-3 h-3 text-outline/50" />
-              <span className="text-on-surface font-semibold">{getActiveViewLabel()}</span>
+            <div className="flex items-center gap-4 min-w-0">
+              <img src="/huit-logo.png" alt="HUIT Logo" className="h-11 md:h-[46px] w-auto object-contain shrink-0 py-0.5" />
+              <div className="h-6 w-[1px] bg-slate-200 shrink-0"></div>
+              <div className="flex items-center gap-2 text-on-surface-variant font-medium text-sm truncate">
+                <Link to="/giang-vien" className="hover:text-primary transition-colors flex items-center gap-1 font-semibold shrink-0">
+                  <Home className="w-4 h-4" />
+                  <span>IMS Portal</span>
+                </Link>
+                <ChevronRight className="w-3 h-3 text-outline/50 shrink-0" />
+                <span className="text-on-surface font-semibold truncate">{getActiveViewLabel()}</span>
+              </div>
             </div>
 
             <div className="flex items-center gap-6">
@@ -433,16 +435,13 @@ export default function Layout() {
     <div className="min-h-screen bg-[#E7E0C4]/30 flex font-sans">
       {/* Sidebar */}
       <aside className="fixed left-0 top-0 h-screen w-[264px] bg-[#407F3E] text-white z-50 flex flex-col shadow-xl border-r border-[#2c6b2d]/10">
-        <div className="p-6 flex flex-col gap-3 items-center border-b border-white/10 bg-white/5">
-          <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center shadow-inner">
-            <BookOpen className="text-white w-6 h-6" />
-          </div>
+        <div className="p-5 flex flex-col gap-1.5 items-center border-b border-white/10 bg-white/5">
           <div className="text-center">
-            <span className="font-bold text-[16px] leading-tight text-white uppercase tracking-wider block">
+            <span className="font-extrabold text-[16px] leading-tight text-white uppercase tracking-wider block">
               Quản lý kiến tập
             </span>
-            <span className="text-[11px] text-[#e5ffdc]/70 font-semibold tracking-widest block uppercase mt-0.5">
-              Quản lý Khoa
+            <span className="text-[11px] text-[#e5ffdc]/80 font-semibold tracking-widest block uppercase mt-0.5">
+              HUIT — Quản lý Khoa
             </span>
           </div>
         </div>
@@ -576,13 +575,17 @@ export default function Layout() {
       <div className="flex-1 flex flex-col pl-[264px] min-w-0">
         {/* Header */}
         <header className="fixed top-0 left-[264px] right-0 h-16 bg-white border-b border-[#E7E0C4] z-40 flex items-center justify-between px-6 shadow-sm">
-          <div className="flex items-center gap-2 text-slate-600 font-medium text-sm">
-            <Link to="/khoa" className="hover:text-[#407F3E] transition-colors flex items-center gap-1">
-              <Home className="w-4 h-4" />
-              <span>IMS Portal</span>
-            </Link>
-            <ChevronRight className="w-3 h-3 text-slate-400" />
-            <span className="text-slate-800 font-semibold">{getActiveViewLabel()}</span>
+          <div className="flex items-center gap-4 min-w-0">
+            <img src="/huit-logo.png" alt="HUIT Logo" className="h-11 md:h-[46px] w-auto object-contain shrink-0 py-0.5" />
+            <div className="h-6 w-[1px] bg-slate-200 shrink-0"></div>
+            <div className="flex items-center gap-2 text-slate-600 font-medium text-sm truncate">
+              <Link to="/khoa" className="hover:text-[#407F3E] transition-colors flex items-center gap-1 font-semibold shrink-0">
+                <Home className="w-4 h-4" />
+                <span>IMS Portal</span>
+              </Link>
+              <ChevronRight className="w-3 h-3 text-slate-400 shrink-0" />
+              <span className="text-slate-800 font-semibold truncate">{getActiveViewLabel()}</span>
+            </div>
           </div>
 
           <div className="flex items-center gap-6">

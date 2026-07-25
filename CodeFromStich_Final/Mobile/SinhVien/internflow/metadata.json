@@ -1,0 +1,6 @@
+{
+  "name": "InternFlow",
+  "description": "Cổng thông tin và quản lý chuyến đi thực tế, kiến tập và thực tập dành cho sinh viên.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -368,6 +368,16 @@ export default function HoanPhi_SV() {
                   className="w-full px-4 py-2.5 bg-[#f8faf1] border border-surface-variant rounded-xl text-sm focus:border-primary focus:outline-none"
                   required={!fileScanUrl}
                 />
+                <div className="mt-1 flex items-center justify-between text-[11px] font-semibold text-slate-500">
+                  <span>* Yêu cầu file PDF hoặc ảnh chụp rõ nét</span>
+                  <a 
+                    href="http://localhost:3000/api/upload/file/templates/mau_don_xin_hoan_phi.docx"
+                    download
+                    className="text-primary hover:underline flex items-center gap-1 font-bold"
+                  >
+                    📥 Tải đơn hoàn phí mẫu (.docx)
+                  </a>
+                </div>
                 {uploading && <p className="text-xs text-amber-600 font-semibold mt-1">Đang tải lên tệp tin...</p>}
                 {fileScanUrl && <p className="text-xs text-primary font-semibold mt-1">✓ Đã tải lên: {uploadedFileName || fileScanUrl.split('/').pop()}</p>}
               </div>

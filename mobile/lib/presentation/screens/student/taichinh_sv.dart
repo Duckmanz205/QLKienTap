@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../../core/network/api_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/state/app_state.dart';
 
@@ -13,6 +16,8 @@ class _TaiChinhSVScreenState extends State<TaiChinhSVScreen> {
   String _financeTab = 'payment'; // 'payment' or 'refund'
   String? _refundSelectedInvoice;
   String? _refundUploadedFile;
+  String? _refundLocalFilePath;
+  bool _isUploadingRefund = false;
 
   @override
   Widget build(BuildContext context) {
@@ -235,10 +240,25 @@ class _TaiChinhSVScreenState extends State<TaiChinhSVScreen> {
               const SizedBox(height: 12),
 
               GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _refundUploadedFile = 'DonHoanPhi_DaDuyet.pdf';
-                  });
+                onTap: () async {
+                  if (_isUploadingRefund) return;
+                  try {
+                    final pickerResult = await FilePicker.pickFiles(
+                      type: FileType.custom,
+                      allowedExtensions: ['pdf', 'docx', 'doc', 'jpg', 'jpeg', 'png'],
+                    );
+                    if (pickerResult != null && pickerResult.files.single.path != null) {
+                      final file = pickerResult.files.single;
+                      setState(() {
+                        _refundUploadedFile = file.name;
+                        _refundLocalFilePath = file.path;
+                      });
+                    }
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Lỗi chọn file: $e'), backgroundColor: AppColors.danger),
+                    );
+                  }
                 },
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
@@ -249,29 +269,72 @@ class _TaiChinhSVScreenState extends State<TaiChinhSVScreen> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.attach_file, color: AppColors.primary),
+                      _isUploadingRefund
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                            )
+                          : const Icon(Icons.attach_file, color: AppColors.primary),
                       const SizedBox(width: 8),
-                      Text(
-                        _refundUploadedFile ?? 'File đơn đã được BCN khoa duyệt',
-                        style: TextStyle(fontSize: 12, color: _refundUploadedFile != null ? AppColors.secondary : Colors.grey.shade600),
+                      Expanded(
+                        child: Text(
+                          _refundUploadedFile ?? 'File đơn đã được BCN khoa duyệt',
+                          style: TextStyle(fontSize: 12, color: _refundUploadedFile != null ? AppColors.secondary : Colors.grey.shade600),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () async {
+                    final uri = Uri.parse('${ApiService.baseUrl}/upload/file/templates/mau_don_xin_hoan_phi.docx');
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    }
+                  },
+                  icon: const Icon(Icons.download, size: 14, color: AppColors.primary),
+                  label: const Text('Tải mẫu đơn hoàn phí (.docx)', style: TextStyle(fontSize: 11, color: AppColors.primary)),
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                 ),
               ),
               const SizedBox(height: 16),
 
               ElevatedButton(
-                onPressed: _refundSelectedInvoice != null && _refundUploadedFile != null
-                    ? () {
-                        final pay = appState.payments.firstWhere((p) => p.id == _refundSelectedInvoice);
-                        appStateProvider.addRefund('HĐ: ${pay.name.replaceAll('Chuyến: ', '')}', '50.000đ');
+                onPressed: _refundSelectedInvoice != null && _refundUploadedFile != null && !_isUploadingRefund
+                    ? () async {
                         setState(() {
-                          _refundSelectedInvoice = null;
-                          _refundUploadedFile = null;
+                          _isUploadingRefund = true;
+                        });
+                        final pay = appState.payments.firstWhere((p) => p.id == _refundSelectedInvoice);
+                        final success = await appStateProvider.addRefund(
+                          'HĐ: ${pay.name.replaceAll('Chuyến: ', '')}',
+                          '50.000đ',
+                          localPath: _refundLocalFilePath,
+                          fileName: _refundUploadedFile,
+                        );
+                        setState(() {
+                          _isUploadingRefund = false;
+                          if (success) {
+                            _refundSelectedInvoice = null;
+                            _refundUploadedFile = null;
+                            _refundLocalFilePath = null;
+                          }
                         });
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Nộp đơn hoàn phí thành công!')),
+                          SnackBar(
+                            content: Text(success ? 'Nộp đơn hoàn phí thành công!' : 'Nộp đơn hoàn phí thất bại.'),
+                            backgroundColor: success ? AppColors.secondary : AppColors.danger,
+                          ),
                         );
                       }
                     : null,

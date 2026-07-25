@@ -1,0 +1,6 @@
+{
+  "name": "Hệ thống Quản lý Kiến tập - IMS Portal",
+  "description": "Cổng thông tin quản lý chuyến đi kiến tập thực tế, lịch trình đoàn, nộp báo cáo bài thu hoạch và thanh toán tài chính dành cho sinh viên.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

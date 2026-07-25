@@ -1,0 +1,6 @@
+{
+  "name": "Quản lý Kiến tập",
+  "description": "Hệ thống quản lý, phân công cố vấn hướng dẫn, xếp lịch doanh nghiệp và phê duyệt minh chứng hủy chuyến kiến tập dành cho Văn phòng Khoa.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

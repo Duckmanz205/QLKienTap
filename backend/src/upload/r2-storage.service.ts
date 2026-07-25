@@ -30,20 +30,32 @@ export class R2StorageService implements OnModuleInit {
   readonly BUCKET_REPORTS: string;
   readonly BUCKET_PAYMENTS: string;
   readonly BUCKET_ATTACHMENTS: string;
-  
+
   readonly PUBLIC_URL_REPORTS: string;
   readonly PUBLIC_URL_PAYMENTS: string;
   readonly PUBLIC_URL_ATTACHMENTS: string;
   private publicUrl: string;
 
   constructor(private config: ConfigService) {
-    this.BUCKET_REPORTS = this.config.get('R2_BUCKET_REPORTS', 'qlkientap-reports');
-    this.BUCKET_PAYMENTS = this.config.get('R2_BUCKET_PAYMENTS', 'qlkientap-payments');
-    this.BUCKET_ATTACHMENTS = this.config.get('R2_BUCKET_ATTACHMENTS', 'qlkientap-attachments');
-    
+    this.BUCKET_REPORTS = this.config.get(
+      'R2_BUCKET_REPORTS',
+      'qlkientap-reports',
+    );
+    this.BUCKET_PAYMENTS = this.config.get(
+      'R2_BUCKET_PAYMENTS',
+      'qlkientap-payments',
+    );
+    this.BUCKET_ATTACHMENTS = this.config.get(
+      'R2_BUCKET_ATTACHMENTS',
+      'qlkientap-attachments',
+    );
+
     this.PUBLIC_URL_REPORTS = this.config.get('R2_PUBLIC_URL_REPORTS', '');
     this.PUBLIC_URL_PAYMENTS = this.config.get('R2_PUBLIC_URL_PAYMENTS', '');
-    this.PUBLIC_URL_ATTACHMENTS = this.config.get('R2_PUBLIC_URL_ATTACHMENTS', '');
+    this.PUBLIC_URL_ATTACHMENTS = this.config.get(
+      'R2_PUBLIC_URL_ATTACHMENTS',
+      '',
+    );
     this.publicUrl = this.config.get('R2_PUBLIC_URL', '');
   }
 
@@ -55,8 +67,8 @@ export class R2StorageService implements OnModuleInit {
     if (!accountId || !accessKeyId || !secretAccessKey) {
       this.logger.warn(
         '⚠️  R2 credentials chưa được cấu hình trong .env — ' +
-        'Upload sẽ fallback về lưu local disk. ' +
-        'Thêm R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY vào backend/.env để kích hoạt.',
+          'Upload sẽ fallback về lưu local disk. ' +
+          'Thêm R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY vào backend/.env để kích hoạt.',
       );
       this.isConfigured = false;
       return;
@@ -70,7 +82,9 @@ export class R2StorageService implements OnModuleInit {
       });
 
       // Kiểm tra kết nối bằng HEAD bucket
-      await this.s3.send(new HeadBucketCommand({ Bucket: this.BUCKET_REPORTS }));
+      await this.s3.send(
+        new HeadBucketCommand({ Bucket: this.BUCKET_REPORTS }),
+      );
       this.isConfigured = true;
       this.logger.log('✅ Cloudflare R2 connected successfully');
     } catch (err) {
@@ -128,7 +142,11 @@ export class R2StorageService implements OnModuleInit {
    * Tạo signed URL để download file (có thời hạn).
    * Dùng cho bucket private — GV/SV click download → backend trả signed URL.
    */
-  async getSignedUrl(bucket: string, key: string, expiresIn = 3600): Promise<string> {
+  async getSignedUrl(
+    bucket: string,
+    key: string,
+    expiresIn = 3600,
+  ): Promise<string> {
     if (!this.isReady()) {
       throw new Error('R2 Storage chưa được cấu hình.');
     }
@@ -146,9 +164,7 @@ export class R2StorageService implements OnModuleInit {
       throw new Error('R2 Storage chưa được cấu hình.');
     }
 
-    await this.s3!.send(
-      new DeleteObjectCommand({ Bucket: bucket, Key: key }),
-    );
+    await this.s3!.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
     this.logger.log(`🗑️ Deleted: ${bucket}/${key}`);
   }
 

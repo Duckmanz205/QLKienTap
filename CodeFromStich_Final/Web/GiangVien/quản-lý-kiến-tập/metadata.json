@@ -1,0 +1,6 @@
+{
+  "name": "Quản lý Kiến tập",
+  "description": "Hệ thống quản lý kiến tập doanh nghiệp dành cho Giảng viên và Sinh viên",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

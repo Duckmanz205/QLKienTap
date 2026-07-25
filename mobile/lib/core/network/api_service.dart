@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'secure_storage.dart';
 
 class ApiService {
-  static String baseUrl = 'http://10.0.2.2:3000'; // Default Android Emulator localhost forwarding port
+  static String baseUrl = 'http://10.0.2.2:3000/api'; // Default Android Emulator localhost forwarding port
   static String? token;
   static int? userId;
   static String? role;
@@ -293,5 +293,29 @@ class ApiService {
       'phieuId': phieuId,
       'score': score,
     });
+  }
+
+  // File Upload Helper
+  static Future<Map<String, dynamic>> uploadFile(String path, String filePath, String fieldName) async {
+    try {
+      final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/$path'));
+      request.headers.addAll(_headers);
+      request.files.add(await http.MultipartFile.fromPath(fieldName, filePath));
+      
+      final streamedResponse = await request.send().timeout(const Duration(seconds: 15));
+      final response = await http.Response.fromStream(streamedResponse);
+      
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return jsonDecode(response.body);
+      } else if (response.statusCode == 401) {
+        onUnauthorized?.call();
+        throw Exception('Phiên làm việc hết hạn. Vui lòng đăng nhập lại (401).');
+      } else {
+        throw Exception('API Server returned code ${response.statusCode}: ${response.body}');
+      }
+    } catch (e) {
+      print('ApiService uploadFile $path failed: $e');
+      rethrow;
+    }
   }
 }
