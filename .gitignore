@@ -93,3 +93,16 @@ mobile/ios/.symlinks/
 # Upload folder (local fallback, production dung R2)
 # ====================================
 uploads/
+
+# ====================================
+# Non-code folders & history files
+# ====================================
+CodeFromStich/
+CodeFromStich_Final/
+DB/
+MoTa/
+docs/
+images/
+liabry/
+chat_history.md
+

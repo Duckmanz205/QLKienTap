@@ -92,29 +92,31 @@ class _LoginScreenState extends State<LoginScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Icon(
-                  Icons.domain,
-                  size: 72,
-                  color: AppColors.primary,
+                Center(
+                  child: Image.asset(
+                    'assets/images/huit_logo.png',
+                    height: 85,
+                    fit: BoxFit.contain,
+                  ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 const Text(
                   'QUẢN LÝ KIẾN TẬP',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 24,
+                    fontSize: 22,
                     fontWeight: FontWeight.w900,
                     color: AppColors.primary,
                     letterSpacing: 1.0,
                   ),
                 ),
                 const Text(
-                  'Khoa Công nghệ Thực phẩm',
+                  'Trường ĐH Công Thương TP.HCM (HUIT)',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 13,
                     color: AppColors.darkSlate,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 36),

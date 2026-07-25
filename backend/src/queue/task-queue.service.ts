@@ -17,37 +17,49 @@ export class TaskQueueService implements OnModuleInit {
     const port = this.configService.get<number>('REDIS_PORT') || 6379;
 
     this.logger.log(`Checking Redis connection at ${host}:${port}...`);
-    
+
     const isRedisReady = await this.testRedisConnection(host, port);
     if (isRedisReady) {
       this.logger.log(`Redis server is online! Initializing BullMQ...`);
       try {
         const connection = { host, port };
-        
+
         // Define queue
         this.queue = new Queue('task-queue', { connection });
-        
+
         // Define worker
-        this.worker = new Worker('task-queue', async (job) => {
-          await this.processJob(job.name, job.data);
-        }, { connection });
+        this.worker = new Worker(
+          'task-queue',
+          async (job) => {
+            await this.processJob(job.name, job.data);
+          },
+          { connection },
+        );
 
         this.worker.on('completed', (job) => {
-          this.logger.log(`Job [${job.id}] of type [${job.name}] completed successfully.`);
+          this.logger.log(
+            `Job [${job.id}] of type [${job.name}] completed successfully.`,
+          );
         });
 
         this.worker.on('failed', (job, err) => {
-          this.logger.warn(`Job [${job?.id}] of type [${job?.name}] failed: ${err.message}`);
+          this.logger.warn(
+            `Job [${job?.id}] of type [${job?.name}] failed: ${err.message}`,
+          );
         });
 
         this.useInMemory = false;
         this.logger.log(`BullMQ initialized successfully.`);
       } catch (err) {
-        this.logger.error(`Failed to initialize BullMQ. Falling back to in-memory queue. Error: ${err.message}`);
+        this.logger.error(
+          `Failed to initialize BullMQ. Falling back to in-memory queue. Error: ${err.message}`,
+        );
         this.useInMemory = true;
       }
     } else {
-      this.logger.warn(`Redis is offline or unreachable. Falling back to In-Memory Task Processor.`);
+      this.logger.warn(
+        `Redis is offline or unreachable. Falling back to In-Memory Task Processor.`,
+      );
       this.useInMemory = true;
     }
   }
@@ -87,20 +99,26 @@ export class TaskQueueService implements OnModuleInit {
         },
       });
     } else {
-      this.logger.log(`Processing in-memory background task immediately: [${name}]`);
+      this.logger.log(
+        `Processing in-memory background task immediately: [${name}]`,
+      );
       setTimeout(async () => {
         try {
           await this.processJob(name, data);
         } catch (err) {
-          this.logger.error(`In-Memory job [${name}] execution failed: ${err.message}`);
+          this.logger.error(
+            `In-Memory job [${name}] execution failed: ${err.message}`,
+          );
         }
       }, 500);
     }
   }
 
   private async processJob(name: string, data: any) {
-    this.logger.log(`Processing task [${name}] with data: ${JSON.stringify(data)}`);
-    
+    this.logger.log(
+      `Processing task [${name}] with data: ${JSON.stringify(data)}`,
+    );
+
     switch (name) {
       case 'send-email':
         await this.handleSendEmail(data);
@@ -116,21 +134,52 @@ export class TaskQueueService implements OnModuleInit {
     }
   }
 
-  private async handleSendEmail(data: { to: string; subject: string; body: string }) {
+  private async handleSendEmail(data: {
+    to: string;
+    subject: string;
+    body: string;
+  }) {
     this.logger.log(`[Email Queue] Sending email to ${data.to}...`);
     await new Promise((r) => setTimeout(r, 1000));
     this.logger.log(`[Email Queue] Email sent successfully to ${data.to}.`);
   }
 
-  private async handleSendReminder(data: { studentId: number; title: string; message: string }) {
-    this.logger.log(`[Reminder Queue] Sending reminder to student ID ${data.studentId}...`);
+  private async handleSendReminder(data: {
+    studentId: number;
+    title: string;
+    message: string;
+  }) {
+    this.logger.log(
+      `[Reminder Queue] Sending reminder to student ID ${data.studentId}...`,
+    );
     await new Promise((r) => setTimeout(r, 1000));
-    this.logger.log(`[Reminder Queue] Reminder sent successfully to student ID ${data.studentId}.`);
+    this.logger.log(
+      `[Reminder Queue] Reminder sent successfully to student ID ${data.studentId}.`,
+    );
   }
 
-  private async handleExportFile(data: { type: string; filter: any; outputFileName: string }) {
-    this.logger.log(`[Export Queue] Generating export for ${data.type} with filters...`);
-    await new Promise((r) => setTimeout(r, 2000));
-    this.logger.log(`[Export Queue] File exported successfully: ${data.outputFileName}`);
+  private async handleExportFile(data: {
+    type: string;
+    filter: any;
+    outputFileName: string;
+  }) {
+    this.logger.log(
+      `[Export Queue] Generating export for ${data.type} with filters...`,
+    );
+
+    // Dam bao thu muc uploads/excels ton tai
+    const fs = require('fs');
+    const path = require('path');
+    const dir = path.join(process.cwd(), 'uploads', 'excels');
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    const filePath = path.join(dir, data.outputFileName);
+    // Tao dummy CSV / Excel content cho file xuat
+    const content = `MSSV,HoTen,Lop,TrangThai\n20210001,Nguyen Van A,CNTT1,DaKienTap\n20210002,Tran Thi B,CNTT2,DaKienTap\n`;
+    fs.writeFileSync(filePath, content, 'utf8');
+
+    this.logger.log(`[Export Queue] File exported successfully: ${filePath}`);
   }
 }

@@ -15,7 +15,10 @@ import { RolesGuard } from './guards/roles.guard';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET', 'default_secret_key_123456'),
+        secret: configService.get<string>(
+          'JWT_SECRET',
+          'default_secret_key_123456',
+        ),
         signOptions: {
           expiresIn: configService.get<any>('JWT_EXPIRES_IN', '24h'),
         },

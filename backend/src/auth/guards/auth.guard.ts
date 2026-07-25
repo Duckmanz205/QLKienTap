@@ -27,21 +27,37 @@ export class AuthGuard implements CanActivate {
       throw new UnauthorizedException('Yêu cầu token xác thực');
     }
     try {
-      const secret = this.configService.get<string>('JWT_SECRET', 'default_secret_key_123456');
-      const payload = await this.jwtService.verifyAsync(token, { secret });
-      
+      const secret = this.configService.get<string>('JWT_SECRET');
+      if (!secret || secret === 'default_secret_key_123456') {
+        if (process.env.NODE_ENV === 'production') {
+          throw new UnauthorizedException(
+            'Cấu hình bảo mật hệ thống (JWT_SECRET) chưa sẵn sàng.',
+          );
+        }
+      }
+      const jwtSecret = secret || 'default_secret_key_123456';
+      const payload = await this.jwtService.verifyAsync(token, {
+        secret: jwtSecret,
+      });
+
       // Query database to check latest user status
-      const user = await this.taiKhoanRepo.findOne({ where: { id: payload.sub } });
+      const user = await this.taiKhoanRepo.findOne({
+        where: { id: payload.sub },
+      });
       if (!user) {
         throw new UnauthorizedException('Tài khoản không tồn tại');
       }
-      
+
       if (user.trang_thai === 'KhoaTaiKhoan') {
-        throw new UnauthorizedException('Tài khoản của bạn đã bị khóa, vui lòng liên hệ quản lý Khoa');
+        throw new UnauthorizedException(
+          'Tài khoản của bạn đã bị khóa, vui lòng liên hệ quản lý Khoa',
+        );
       }
-      
+
       if (user.phai_doi_mat_khau && !request.url.includes('change-password')) {
-        throw new UnauthorizedException('Bạn bắt buộc phải đổi mật khẩu ngay lần đăng nhập đầu tiên trước khi thao tác chức năng khác.');
+        throw new UnauthorizedException(
+          'Bạn bắt buộc phải đổi mật khẩu ngay lần đăng nhập đầu tiên trước khi thao tác chức năng khác.',
+        );
       }
 
       // Attach user payload to request

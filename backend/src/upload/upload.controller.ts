@@ -1,8 +1,17 @@
 import {
-  Controller, Post, Get, Param, Res, Query,
-  UseInterceptors, UploadedFile, ParseFilePipe,
-  MaxFileSizeValidator, FileTypeValidator,
-  BadRequestException, NotFoundException,
+  Controller,
+  Post,
+  Get,
+  Param,
+  Res,
+  Query,
+  UseInterceptors,
+  UploadedFile,
+  ParseFilePipe,
+  MaxFileSizeValidator,
+  FileTypeValidator,
+  BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -10,6 +19,8 @@ import { extname, join } from 'path';
 import { existsSync, mkdirSync, createReadStream } from 'fs';
 import * as crypto from 'crypto';
 import { R2StorageService } from './r2-storage.service';
+import { UseGuards } from '@nestjs/common';
+import { AuthGuard } from '../auth/guards/auth.guard';
 
 const UPLOAD_DIR = './uploads';
 
@@ -41,20 +52,22 @@ export class UploadController {
   //   UPLOAD BÀI THU HOẠCH (UC29)
   // ============================================================
   @Post('report')
-  @UseInterceptors(FileInterceptor('file', {
-    storage: diskStorage({
-      destination: (req: any, file: any, cb: any) => {
-        const dest = `${UPLOAD_DIR}/reports`;
-        if (!existsSync(dest)) mkdirSync(dest, { recursive: true });
-        cb(null, dest);
-      },
-      filename: (req: any, file: any, cb: any) => {
-        const ext = extname(file.originalname).toLowerCase();
-        cb(null, `report-${crypto.randomUUID()}${ext}`);
-      }
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: (req: any, file: any, cb: any) => {
+          const dest = `${UPLOAD_DIR}/reports`;
+          if (!existsSync(dest)) mkdirSync(dest, { recursive: true });
+          cb(null, dest);
+        },
+        filename: (req: any, file: any, cb: any) => {
+          const ext = extname(file.originalname).toLowerCase();
+          cb(null, `report-${crypto.randomUUID()}${ext}`);
+        },
+      }),
+      limits: { fileSize: 5 * 1024 * 1024 },
     }),
-    limits: { fileSize: 5 * 1024 * 1024 }
-  }))
+  )
   async uploadReport(
     @UploadedFile(
       new ParseFilePipe({
@@ -62,8 +75,9 @@ export class UploadController {
           new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }),
           new FileTypeValidator({ fileType: /(pdf|docx|doc)$/i }),
         ],
-      })
-    ) file: any,
+      }),
+    )
+    file: any,
   ) {
     if (!file) throw new BadRequestException('Tệp tải lên không hợp lệ.');
 
@@ -78,7 +92,9 @@ export class UploadController {
         this.r2.PUBLIC_URL_REPORTS,
       );
       // Xóa file local sau khi upload thành công
-      try { require('fs').unlinkSync(file.path); } catch {}
+      try {
+        require('fs').unlinkSync(file.path);
+      } catch {}
       return {
         message: 'Tải lên bài thu hoạch thành công (R2).',
         storage: 'cloudflare-r2',
@@ -102,20 +118,22 @@ export class UploadController {
   //   UPLOAD FILE EXCEL IMPORT (UC7 — Import danh sách SV)
   // ============================================================
   @Post('excel')
-  @UseInterceptors(FileInterceptor('file', {
-    storage: diskStorage({
-      destination: (req: any, file: any, cb: any) => {
-        const dest = `${UPLOAD_DIR}/excels`;
-        if (!existsSync(dest)) mkdirSync(dest, { recursive: true });
-        cb(null, dest);
-      },
-      filename: (req: any, file: any, cb: any) => {
-        const ext = extname(file.originalname).toLowerCase();
-        cb(null, `import-${crypto.randomUUID()}${ext}`);
-      }
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: (req: any, file: any, cb: any) => {
+          const dest = `${UPLOAD_DIR}/excels`;
+          if (!existsSync(dest)) mkdirSync(dest, { recursive: true });
+          cb(null, dest);
+        },
+        filename: (req: any, file: any, cb: any) => {
+          const ext = extname(file.originalname).toLowerCase();
+          cb(null, `import-${crypto.randomUUID()}${ext}`);
+        },
+      }),
+      limits: { fileSize: 5 * 1024 * 1024 },
     }),
-    limits: { fileSize: 5 * 1024 * 1024 }
-  }))
+  )
   async uploadExcel(
     @UploadedFile(
       new ParseFilePipe({
@@ -123,8 +141,9 @@ export class UploadController {
           new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }),
           new FileTypeValidator({ fileType: /(xlsx|xls)$/i }),
         ],
-      })
-    ) file: any,
+      }),
+    )
+    file: any,
   ) {
     if (!file) throw new BadRequestException('Tệp tải lên không hợp lệ.');
 
@@ -143,20 +162,22 @@ export class UploadController {
   //   UPLOAD MINH CHỨNG THANH TOÁN (UC30)
   // ============================================================
   @Post('payment')
-  @UseInterceptors(FileInterceptor('file', {
-    storage: diskStorage({
-      destination: (req: any, file: any, cb: any) => {
-        const dest = `${UPLOAD_DIR}/payments`;
-        if (!existsSync(dest)) mkdirSync(dest, { recursive: true });
-        cb(null, dest);
-      },
-      filename: (req: any, file: any, cb: any) => {
-        const ext = extname(file.originalname).toLowerCase();
-        cb(null, `pay-${crypto.randomUUID()}${ext}`);
-      }
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: (req: any, file: any, cb: any) => {
+          const dest = `${UPLOAD_DIR}/payments`;
+          if (!existsSync(dest)) mkdirSync(dest, { recursive: true });
+          cb(null, dest);
+        },
+        filename: (req: any, file: any, cb: any) => {
+          const ext = extname(file.originalname).toLowerCase();
+          cb(null, `pay-${crypto.randomUUID()}${ext}`);
+        },
+      }),
+      limits: { fileSize: 2 * 1024 * 1024 },
     }),
-    limits: { fileSize: 2 * 1024 * 1024 }
-  }))
+  )
   async uploadPayment(
     @UploadedFile(
       new ParseFilePipe({
@@ -164,8 +185,9 @@ export class UploadController {
           new MaxFileSizeValidator({ maxSize: 2 * 1024 * 1024 }),
           new FileTypeValidator({ fileType: /(jpg|jpeg|png)$/i }),
         ],
-      })
-    ) file: any,
+      }),
+    )
+    file: any,
   ) {
     if (!file) throw new BadRequestException('Tệp tải lên không hợp lệ.');
 
@@ -178,7 +200,9 @@ export class UploadController {
         file.mimetype,
         this.r2.PUBLIC_URL_PAYMENTS,
       );
-      try { require('fs').unlinkSync(file.path); } catch {}
+      try {
+        require('fs').unlinkSync(file.path);
+      } catch {}
       return {
         message: 'Tải lên minh chứng thanh toán thành công (R2).',
         storage: 'cloudflare-r2',
@@ -201,33 +225,43 @@ export class UploadController {
   //   UPLOAD FILE ĐÍNH KÈM (UC6 thông báo, UC16 hủy ĐK, UC32 hoàn phí)
   // ============================================================
   @Post('attachment')
-  @UseInterceptors(FileInterceptor('file', {
-    storage: diskStorage({
-      destination: (req: any, file: any, cb: any) => {
-        const dest = `${UPLOAD_DIR}/attachments`;
-        if (!existsSync(dest)) mkdirSync(dest, { recursive: true });
-        cb(null, dest);
-      },
-      filename: (req: any, file: any, cb: any) => {
-        const ext = extname(file.originalname).toLowerCase();
-        cb(null, `attach-${crypto.randomUUID()}${ext}`);
-      }
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: (req: any, file: any, cb: any) => {
+          const dest = `${UPLOAD_DIR}/attachments`;
+          if (!existsSync(dest)) mkdirSync(dest, { recursive: true });
+          cb(null, dest);
+        },
+        filename: (req: any, file: any, cb: any) => {
+          const ext = extname(file.originalname).toLowerCase();
+          cb(null, `attach-${crypto.randomUUID()}${ext}`);
+        },
+      }),
+      limits: { fileSize: 5 * 1024 * 1024 },
     }),
-    limits: { fileSize: 5 * 1024 * 1024 }
-  }))
+  )
   async uploadAttachment(
     @UploadedFile(
       new ParseFilePipe({
         validators: [
           new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }),
+          new FileTypeValidator({
+            fileType: /(pdf|doc|docx|xlsx|xls|png|jpg|jpeg|zip|rar)$/i,
+          }),
         ],
-      })
-    ) file: any,
+      }),
+    )
+    file: any,
   ) {
     if (!file) throw new BadRequestException('Tệp tải lên không hợp lệ.');
 
     if (this.r2.isReady()) {
-      const key = this.r2.generateKey('attachments', 'general', file.originalname);
+      const key = this.r2.generateKey(
+        'attachments',
+        'general',
+        file.originalname,
+      );
       const result = await this.r2.uploadFile(
         this.r2.BUCKET_ATTACHMENTS,
         key,
@@ -235,7 +269,9 @@ export class UploadController {
         file.mimetype,
         this.r2.PUBLIC_URL_ATTACHMENTS,
       );
-      try { require('fs').unlinkSync(file.path); } catch {}
+      try {
+        require('fs').unlinkSync(file.path);
+      } catch {}
       return {
         message: 'Tải lên file đính kèm thành công (R2).',
         storage: 'cloudflare-r2',
@@ -258,6 +294,7 @@ export class UploadController {
   //   SIGNED URL — Download file private từ R2
   // ============================================================
   @Get('signed-url')
+  @UseGuards(AuthGuard)
   async getSignedUrl(
     @Query('bucket') bucket: string,
     @Query('key') key: string,
@@ -277,6 +314,7 @@ export class UploadController {
   //   SERVE FILE LOCAL (fallback khi không dùng R2)
   // ============================================================
   @Get('file/:type/:filename')
+  @UseGuards(AuthGuard)
   async serveFile(
     @Param('type') type: string,
     @Param('filename') filename: string,
@@ -285,7 +323,13 @@ export class UploadController {
     if (filename.includes('..') || type.includes('..')) {
       throw new BadRequestException('Yêu cầu không hợp lệ.');
     }
-    const safeTypes = ['reports', 'excels', 'payments', 'attachments'];
+    const safeTypes = [
+      'reports',
+      'excels',
+      'payments',
+      'attachments',
+      'templates',
+    ];
     if (!safeTypes.includes(type)) {
       throw new BadRequestException('Loại thư mục không hợp lệ.');
     }
@@ -298,16 +342,23 @@ export class UploadController {
     const ext = extname(filename).toLowerCase();
     let contentType = 'application/octet-stream';
     if (ext === '.pdf') contentType = 'application/pdf';
-    else if (ext === '.xlsx') contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    else if (ext === '.xlsx')
+      contentType =
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
     else if (ext === '.xls') contentType = 'application/vnd.ms-excel';
-    else if (ext === '.docx') contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    else if (ext === '.docx')
+      contentType =
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
     else if (ext === '.doc') contentType = 'application/msword';
     else if (ext === '.png') contentType = 'image/png';
     else if (ext === '.jpg' || ext === '.jpeg') contentType = 'image/jpeg';
 
     res.setHeader('Content-Type', contentType);
     if (['.xlsx', '.xls', '.docx', '.doc'].includes(ext)) {
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${filename}"`,
+      );
     } else {
       res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
     }

@@ -88,7 +88,7 @@ class AppStateProvider extends InheritedWidget {
 
   @override
   bool updateShouldNotify(AppStateProvider oldWidget) {
-    return state != oldWidget.state;
+    return true;
   }
 }
 
@@ -407,7 +407,15 @@ class AppStateProviderState extends State<AppStateContainer> {
     }
   }
 
-  Future<void> uploadReport(String submissionId, String fileName, String fileSize) async {
+  Future<bool> uploadReport(String submissionId, String localPath, String fileName, String fileSize) async {
+    String fileUrl = fileName;
+    try {
+      final uploadRes = await ApiService.uploadFile('upload/report', localPath, 'file');
+      fileUrl = uploadRes['url'] ?? fileName;
+    } catch (e) {
+      print('uploadReport file upload failed: $e. Falling back to filename.');
+    }
+
     setState(() {
       _state.submissions = _state.submissions.map((s) {
         if (s.id == submissionId) {
@@ -425,13 +433,23 @@ class AppStateProviderState extends State<AppStateContainer> {
     try {
       final sId = int.tryParse(_state.studentProfile.studentId.replaceAll(RegExp(r'\D'), '')) ?? 1;
       final regId = int.tryParse(submissionId.replaceAll(RegExp(r'\D'), '')) ?? 1;
-      await ApiService.submitReport(sId, regId, fileName, null);
+      await ApiService.submitReport(sId, regId, fileUrl, null);
+      return true;
     } catch (e) {
       print('uploadReport API call failed: $e');
+      return false;
     }
   }
 
-  Future<void> uploadConfirmationFile(String submissionId, String fileName) async {
+  Future<bool> uploadConfirmationFile(String submissionId, String localPath, String fileName) async {
+    String fileUrl = fileName;
+    try {
+      final uploadRes = await ApiService.uploadFile('upload/report', localPath, 'file');
+      fileUrl = uploadRes['url'] ?? fileName;
+    } catch (e) {
+      print('uploadConfirmationFile file upload failed: $e. Falling back to filename.');
+    }
+
     setState(() {
       _state.submissions = _state.submissions.map((s) {
         if (s.id == submissionId) {
@@ -449,9 +467,11 @@ class AppStateProviderState extends State<AppStateContainer> {
       final sId = int.tryParse(_state.studentProfile.studentId.replaceAll(RegExp(r'\D'), '')) ?? 1;
       final regId = int.tryParse(submissionId.replaceAll(RegExp(r'\D'), '')) ?? 1;
       final sub = _state.submissions.firstWhere((s) => s.id == submissionId);
-      await ApiService.submitReport(sId, regId, sub.fileName ?? 'baocao.pdf', fileName);
+      await ApiService.submitReport(sId, regId, sub.fileName ?? 'baocao.pdf', fileUrl);
+      return true;
     } catch (e) {
       print('uploadConfirmationFile API call failed: $e');
+      return false;
     }
   }
 
@@ -473,7 +493,17 @@ class AppStateProviderState extends State<AppStateContainer> {
     }
   }
 
-  Future<void> addRefund(String invoiceName, String amountText) async {
+  Future<bool> addRefund(String invoiceName, String amountText, {String? localPath, String? fileName}) async {
+    String fileUrl = fileName ?? 'hoadon_daquet.pdf';
+    if (localPath != null) {
+      try {
+        final uploadRes = await ApiService.uploadFile('upload/attachment', localPath, 'file');
+        fileUrl = uploadRes['url'] ?? (fileName ?? 'hoadon_daquet.pdf');
+      } catch (e) {
+        print('addRefund file upload failed: $e. Falling back to default.');
+      }
+    }
+
     setState(() {
       final newRefund = RefundRequest(
         id: 'ref-${DateTime.now().millisecondsSinceEpoch}',
@@ -487,9 +517,11 @@ class AppStateProviderState extends State<AppStateContainer> {
 
     try {
       final invoiceId = Random().nextInt(1000) + 1;
-      await ApiService.requestRefund(invoiceId, 'hoadon_daquet.pdf');
+      await ApiService.requestRefund(invoiceId, fileUrl);
+      return true;
     } catch (e) {
       print('addRefund API call failed: $e');
+      return false;
     }
   }
 

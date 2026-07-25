@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../../core/network/api_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/state/app_state.dart';
 import 'dashboard_sv.dart';
@@ -96,13 +98,26 @@ class _StudentPortalState extends State<StudentPortal> {
                 icon: const Icon(Icons.menu, color: AppColors.primary),
                 onPressed: () => _openMoreScreen('profile'),
               ),
-        title: Text(
-          pageTitle,
-          style: const TextStyle(
-            color: AppColors.primary,
-            fontSize: 16,
-            fontWeight: FontWeight.w900,
-          ),
+        title: Row(
+          children: [
+            Image.asset(
+              'assets/images/huit_logo.png',
+              height: 28,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                pageTitle,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ],
         ),
         actions: [
           Stack(
@@ -319,10 +334,30 @@ class _StudentPortalState extends State<StudentPortal> {
                 if (notif.attachment != null) ...[
                   const SizedBox(height: 8),
                   GestureDetector(
-                    onTap: () {
+                    onTap: () async {
+                      final urlStr = notif.attachment!.startsWith('http')
+                          ? notif.attachment!
+                          : '${ApiService.baseUrl}/upload/file/attachments/${notif.attachment}';
+                      final uri = Uri.parse(urlStr);
+
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Đang tải tệp: ${notif.attachment}...')),
+                        SnackBar(content: Text('Đang tải xuống tệp: ${notif.attachment}...')),
                       );
+
+                      try {
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        } else {
+                          throw 'Không thể khởi chạy đường dẫn';
+                        }
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Lỗi tải xuống tệp: $e'),
+                            backgroundColor: AppColors.danger,
+                          ),
+                        );
+                      }
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),

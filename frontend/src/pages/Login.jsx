@@ -42,13 +42,13 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="mx-auto w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30">
-          <span className="material-symbols-outlined text-white text-3xl">school</span>
+        <div className="flex justify-center mb-5">
+          <img src="/huit-logo.png" alt="Logo HUIT" className="h-20 sm:h-24 w-auto object-contain drop-shadow-lg" />
         </div>
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-white">
+        <h2 className="mt-2 text-center text-3xl font-extrabold text-white tracking-tight">
           Hệ thống Quản lý Kiến tập
         </h2>
-        <p className="mt-2 text-center text-sm text-slate-400">
+        <p className="mt-1.5 text-center text-sm font-medium text-slate-300">
           Khoa Công nghệ Thực phẩm — HUIT
         </p>
       </div>

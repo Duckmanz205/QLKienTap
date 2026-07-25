@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import {
@@ -22,18 +26,27 @@ import {
 export class GiangVienService {
   constructor(
     @InjectRepository(GiangVien) private gvRepo: Repository<GiangVien>,
-    @InjectRepository(PhanCongGVHD) private phanCongRepo: Repository<PhanCongGVHD>,
-    @InjectRepository(ChuyenThamQuan_GiangVienDanDoan) private danDoanRepo: Repository<ChuyenThamQuan_GiangVienDanDoan>,
-    @InjectRepository(ChuyenThamQuan) private chuyenRepo: Repository<ChuyenThamQuan>,
+    @InjectRepository(PhanCongGVHD)
+    private phanCongRepo: Repository<PhanCongGVHD>,
+    @InjectRepository(ChuyenThamQuan_GiangVienDanDoan)
+    private danDoanRepo: Repository<ChuyenThamQuan_GiangVienDanDoan>,
+    @InjectRepository(ChuyenThamQuan)
+    private chuyenRepo: Repository<ChuyenThamQuan>,
     @InjectRepository(PhieuDangKy) private phieuRepo: Repository<PhieuDangKy>,
     @InjectRepository(DiemDanh) private diemDanhRepo: Repository<DiemDanh>,
-    @InjectRepository(DiemPhieuDangKy) private diemPhieuRepo: Repository<DiemPhieuDangKy>,
-    @InjectRepository(NhatKyDiemCong) private diemCongRepo: Repository<NhatKyDiemCong>,
+    @InjectRepository(DiemPhieuDangKy)
+    private diemPhieuRepo: Repository<DiemPhieuDangKy>,
+    @InjectRepository(NhatKyDiemCong)
+    private diemCongRepo: Repository<NhatKyDiemCong>,
     @InjectRepository(BaiThuHoach) private baiThuRepo: Repository<BaiThuHoach>,
-    @InjectRepository(HoiDong_ThanhVien) private hoiDongThanhVienRepo: Repository<HoiDong_ThanhVien>,
-    @InjectRepository(DiemHoiDong_ChiTiet) private diemHoiDongRepo: Repository<DiemHoiDong_ChiTiet>,
-    @InjectRepository(HoiDongChamBaoCao) private hoiDongRepo: Repository<HoiDongChamBaoCao>,
-    @InjectRepository(DanhSachDen) private blacklistRepo: Repository<DanhSachDen>,
+    @InjectRepository(HoiDong_ThanhVien)
+    private hoiDongThanhVienRepo: Repository<HoiDong_ThanhVien>,
+    @InjectRepository(DiemHoiDong_ChiTiet)
+    private diemHoiDongRepo: Repository<DiemHoiDong_ChiTiet>,
+    @InjectRepository(HoiDongChamBaoCao)
+    private hoiDongRepo: Repository<HoiDongChamBaoCao>,
+    @InjectRepository(DanhSachDen)
+    private blacklistRepo: Repository<DanhSachDen>,
   ) {}
 
   // Lay thong tin GV bang TaiKhoan ID
@@ -54,7 +67,7 @@ export class GiangVienService {
         },
       },
     });
-    return assignments.map(a => a.lichKienTapSinhVien);
+    return assignments.map((a) => a.lichKienTapSinhVien);
   }
 
   // Danh sach chuyến dan doan cua giang vien
@@ -68,7 +81,7 @@ export class GiangVienService {
         },
       },
     });
-    return mappings.map(m => ({
+    return mappings.map((m) => ({
       ...m.chuyenThamQuan,
       la_truong_doan: m.la_truong_doan,
     }));
@@ -101,8 +114,16 @@ export class GiangVienService {
       const score = diems.find((d) => d.phieu_dang_ky_id === p.id);
       return {
         ...p,
-        diemDanh: dd ? { id: dd.id, trang_thai: dd.trang_thai, ghi_chu: dd.ghi_chu } : null,
-        diemPhieuDangKy: score ? { id: score.id, diem_chuan_bi: score.diem_chuan_bi, diem_cong: score.diem_cong } : null,
+        diemDanh: dd
+          ? { id: dd.id, trang_thai: dd.trang_thai, ghi_chu: dd.ghi_chu }
+          : null,
+        diemPhieuDangKy: score
+          ? {
+              id: score.id,
+              diem_chuan_bi: score.diem_chuan_bi,
+              diem_cong: score.diem_cong,
+            }
+          : null,
       };
     });
   }
@@ -117,10 +138,14 @@ export class GiangVienService {
     if (!trip) throw new NotFoundException('Không tìm thấy chuyến tham quan');
 
     for (const record of records) {
-      const phieu = await this.phieuRepo.findOne({ where: { id: record.phieuId } });
+      const phieu = await this.phieuRepo.findOne({
+        where: { id: record.phieuId },
+      });
       if (!phieu) continue;
 
-      let dd = await this.diemDanhRepo.findOne({ where: { phieu_dang_ky_id: record.phieuId } });
+      let dd = await this.diemDanhRepo.findOne({
+        where: { phieu_dang_ky_id: record.phieuId },
+      });
       if (!dd) {
         dd = new DiemDanh();
         dd.phieu_dang_ky_id = record.phieuId;
@@ -134,7 +159,10 @@ export class GiangVienService {
       // Dong bo lai trang thai cua phieu dang ky
       if (record.status === 'CoMat') {
         phieu.trang_thai = 'DaThamGia';
-      } else if (record.status === 'Vang' || record.status === 'TuChoiThamGia') {
+      } else if (
+        record.status === 'Vang' ||
+        record.status === 'TuChoiThamGia'
+      ) {
         phieu.trang_thai = 'VangMat';
 
         // Auto put to blacklist with penalty category 'DangKyKhongThamGia' (5 trips demoted priority)
@@ -163,7 +191,9 @@ export class GiangVienService {
     diemChuanBi: number,
     diemCong: number,
   ) {
-    let diem = await this.diemPhieuRepo.findOne({ where: { phieu_dang_ky_id: phieuId } });
+    let diem = await this.diemPhieuRepo.findOne({
+      where: { phieu_dang_ky_id: phieuId },
+    });
     if (!diem) {
       diem = new DiemPhieuDangKy();
       diem.phieu_dang_ky_id = phieuId;
@@ -196,14 +226,18 @@ export class GiangVienService {
     status?: string,
   ) {
     // Tim tat ca sinh vien duoc huong dan
-    const guidedSvIds = (await this.phanCongRepo.find({
-      where: { giang_vien_id: lecturerId, trang_thai: 'DangHoatDong' },
-      relations: { lichKienTapSinhVien: true },
-    })).map(a => a.lichKienTapSinhVien.sinh_vien_id);
+    const guidedSvIds = (
+      await this.phanCongRepo.find({
+        where: { giang_vien_id: lecturerId, trang_thai: 'DangHoatDong' },
+        relations: { lichKienTapSinhVien: true },
+      })
+    ).map((a) => a.lichKienTapSinhVien.sinh_vien_id);
 
-    if (guidedSvIds.length === 0) return { data: [], total: 0, page, limit, totalPages: 0 };
+    if (guidedSvIds.length === 0)
+      return { data: [], total: 0, page, limit, totalPages: 0 };
 
-    const queryBuilder = this.baiThuRepo.createQueryBuilder('baiThu')
+    const queryBuilder = this.baiThuRepo
+      .createQueryBuilder('baiThu')
       .leftJoinAndSelect('baiThu.phieuDangKy', 'phieu')
       .leftJoinAndSelect('phieu.sinhVien', 'sinhVien')
       .leftJoinAndSelect('phieu.chuyenThamQuan', 'chuyen')
@@ -211,14 +245,21 @@ export class GiangVienService {
       .where('phieu.sinh_vien_id IN (:...guidedSvIds)', { guidedSvIds });
 
     if (search) {
-      queryBuilder.andWhere('(sinhVien.ho_ten LIKE :search OR sinhVien.mssv LIKE :search)', { search: `%${search}%` });
+      queryBuilder.andWhere(
+        '(sinhVien.ho_ten LIKE :search OR sinhVien.mssv LIKE :search)',
+        { search: `%${search}%` },
+      );
     }
 
     if (status && status !== 'all') {
       if (status === 'graded') {
-        queryBuilder.andWhere('baiThu.trang_thai = :statusVal', { statusVal: 'DaCham' });
+        queryBuilder.andWhere('baiThu.trang_thai = :statusVal', {
+          statusVal: 'DaCham',
+        });
       } else if (status === 'pending') {
-        queryBuilder.andWhere('baiThu.trang_thai != :statusVal', { statusVal: 'DaCham' });
+        queryBuilder.andWhere('baiThu.trang_thai != :statusVal', {
+          statusVal: 'DaCham',
+        });
       }
     }
 
@@ -241,7 +282,12 @@ export class GiangVienService {
   }
 
   // Cham diem bai thu hoach
-  async gradeReport(lecturerId: number, reportId: number, score: number, comment: string) {
+  async gradeReport(
+    lecturerId: number,
+    reportId: number,
+    score: number,
+    comment: string,
+  ) {
     const report = await this.baiThuRepo.findOne({
       where: { id: reportId },
       relations: { phieuDangKy: true },
@@ -249,7 +295,9 @@ export class GiangVienService {
     if (!report) throw new NotFoundException('Không tìm thấy bài thu hoạch');
 
     const phieuId = report.phieu_dang_ky_id;
-    let diem = await this.diemPhieuRepo.findOne({ where: { phieu_dang_ky_id: phieuId } });
+    let diem = await this.diemPhieuRepo.findOne({
+      where: { phieu_dang_ky_id: phieuId },
+    });
     if (!diem) {
       diem = new DiemPhieuDangKy();
       diem.phieu_dang_ky_id = phieuId;
@@ -305,10 +353,19 @@ export class GiangVienService {
   }
 
   // Nhap diem hoi dong chi tiet
-  async submitBoardScore(lecturerId: number, memberId: number, phieuId: number, score: number) {
-    const member = await this.hoiDongThanhVienRepo.findOne({ where: { id: memberId } });
+  async submitBoardScore(
+    lecturerId: number,
+    memberId: number,
+    phieuId: number,
+    score: number,
+  ) {
+    const member = await this.hoiDongThanhVienRepo.findOne({
+      where: { id: memberId },
+    });
     if (!member || member.giang_vien_id !== lecturerId) {
-      throw new BadRequestException('Giảng viên không phải thành viên hội đồng này');
+      throw new BadRequestException(
+        'Giảng viên không phải thành viên hội đồng này',
+      );
     }
 
     let item = await this.diemHoiDongRepo.findOne({
@@ -334,7 +391,9 @@ export class GiangVienService {
       const sum = allScores.reduce((acc, curr) => acc + Number(curr.diem), 0);
       const avg = sum / allScores.length;
 
-      let diemPhieu = await this.diemPhieuRepo.findOne({ where: { phieu_dang_ky_id: phieuId } });
+      let diemPhieu = await this.diemPhieuRepo.findOne({
+        where: { phieu_dang_ky_id: phieuId },
+      });
       if (!diemPhieu) {
         diemPhieu = new DiemPhieuDangKy();
         diemPhieu.phieu_dang_ky_id = phieuId;
