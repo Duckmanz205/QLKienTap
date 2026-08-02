@@ -43,63 +43,99 @@ import KetQuaKienTap_MaTranDiem_Khoa from './pages/khoa/KetQuaKienTap_MaTranDiem
 import DuyetHoanPhi_Khoa from './pages/khoa/DuyetHoanPhi_Khoa';
 import XemTruocBaoCaoThamQuan_Khoa from './pages/khoa/XemTruocBaoCaoThamQuan_Khoa';
 
+import ProtectedRoute from './components/ProtectedRoute';
+import { getValidSession, getDashboardPathForRole } from './utils/auth';
+
+function LoginGuard() {
+  const session = getValidSession();
+  if (session) {
+    const target = getDashboardPathForRole(session.user.vai_tro);
+    return <Navigate to={target} replace />;
+  }
+  return <Login />;
+}
+
+function RootRedirect() {
+  const session = getValidSession();
+  if (session) {
+    const target = getDashboardPathForRole(session.user.vai_tro);
+    return <Navigate to={target} replace />;
+  }
+  return <Navigate to="/login" replace />;
+}
+
+function NotFoundRedirect() {
+  const session = getValidSession();
+  if (session) {
+    const target = getDashboardPathForRole(session.user.vai_tro);
+    return <Navigate to={target} replace />;
+  }
+  return <Navigate to="/login" replace />;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
         {/* Auth Route */}
-        <Route path="/login" element={<Login />} />
+        <Route path="/login" element={<LoginGuard />} />
+
+        {/* Root path redirect */}
+        <Route path="/" element={<RootRedirect />} />
 
         {/* Unified Application shell layout */}
-        <Route path="/" element={<Layout />}>
-          {/* Default redirect to login or dashboard depending on login check inside Layout */}
-          <Route index element={<Navigate to="/login" replace />} />
-
+        <Route element={<Layout />}>
           {/* Student Portal Routes */}
-          <Route path="sinh-vien" element={<DashBoard_SV />} />
-          <Route path="sinh-vien/register" element={<ChuyenThamQuan_DanhSachDangKy />} />
-          <Route path="sinh-vien/schedule" element={<LichTrinhDoan_SV />} />
-          <Route path="sinh-vien/reports" element={<NopBaiThuHoach_SV />} />
-          <Route path="sinh-vien/payment" element={<ThanhToan_SV />} />
-          <Route path="sinh-vien/refund" element={<HoanPhi_SV />} />
-          <Route path="sinh-vien/grades" element={<KetQua_Diem_SV />} />
-          <Route path="sinh-vien/notifications" element={<ThongBao_SV />} />
+          <Route element={<ProtectedRoute allowedRoles={['SinhVien']} />}>
+            <Route path="sinh-vien" element={<DashBoard_SV />} />
+            <Route path="sinh-vien/register" element={<ChuyenThamQuan_DanhSachDangKy />} />
+            <Route path="sinh-vien/schedule" element={<LichTrinhDoan_SV />} />
+            <Route path="sinh-vien/reports" element={<NopBaiThuHoach_SV />} />
+            <Route path="sinh-vien/payment" element={<ThanhToan_SV />} />
+            <Route path="sinh-vien/refund" element={<HoanPhi_SV />} />
+            <Route path="sinh-vien/grades" element={<KetQua_Diem_SV />} />
+            <Route path="sinh-vien/notifications" element={<ThongBao_SV />} />
+          </Route>
 
           {/* Lecturer Portal Routes */}
-          <Route path="giang-vien" element={<DashBoard_GV />} />
-          <Route path="giang-vien/led-trips" element={<LichDanDoan_GV />} />
-          <Route path="giang-vien/attendance" element={<DiemDanhSV_GV />} />
-          <Route path="giang-vien/preparation" element={<DiemChuanBi_DiemCong_GV />} />
-          <Route path="giang-vien/guided-students" element={<SinhVienHuongDan_GV />} />
-          <Route path="giang-vien/grading" element={<ChamBaiThuHoach_GV />} />
-          <Route path="giang-vien/board" element={<HoiDongChamBaoCao_DSBuoi_GV />} />
-          <Route path="giang-vien/notifications" element={<ThongBao_GV />} />
+          <Route element={<ProtectedRoute allowedRoles={['GiangVien']} />}>
+            <Route path="giang-vien" element={<DashBoard_GV />} />
+            <Route path="giang-vien/led-trips" element={<LichDanDoan_GV />} />
+            <Route path="giang-vien/attendance" element={<DiemDanhSV_GV />} />
+            <Route path="giang-vien/preparation" element={<DiemChuanBi_DiemCong_GV />} />
+            <Route path="giang-vien/guided-students" element={<SinhVienHuongDan_GV />} />
+            <Route path="giang-vien/grading" element={<ChamBaiThuHoach_GV />} />
+            <Route path="giang-vien/board" element={<HoiDongChamBaoCao_DSBuoi_GV />} />
+            <Route path="giang-vien/notifications" element={<ThongBao_GV />} />
+          </Route>
 
           {/* Khoa/Admin Portal Routes */}
-          <Route path="khoa" element={<DashBoard_Khoa />} />
-          <Route path="khoa/schedules" element={<DanhMucNen_ThemMoiHocKy_Khoa />} />
-          <Route path="khoa/students" element={<DanhMuc_SinhVien_Khoa />} />
-          <Route path="khoa/plans" element={<PlanManagement_Khoa />} />
-          <Route path="khoa/registrations" element={<RegistrationManagement_Khoa />} />
-          <Route path="khoa/supervisors" element={<SupervisorAssignment_Khoa />} />
-          <Route path="khoa/leaders" element={<LeaderAssignment_Khoa />} />
-          <Route path="khoa/notifications" element={<ThongBao_Khoa />} />
-          <Route path="khoa/reports" element={<BaoCaoThongKe_Khoa />} />
-          {/* Legacy routes kept for backward compatibility */}
-          <Route path="khoa/lecturers" element={<DanhMuc_GiangVien_Khoa />} />
-          <Route path="khoa/factories" element={<DanhMuc_NhaMay_Khoa />} />
-          <Route path="khoa/trips" element={<ChuyenThamQuan_DSLoc />} />
-          <Route path="khoa/boards" element={<HoiDongChamBaoCao_Khoa />} />
-          <Route path="khoa/accounts" element={<TaiKhoanNguoiDung_Khoa />} />
-          <Route path="khoa/fees" element={<QuanLyLePhi_Khoa />} />
-          <Route path="khoa/results" element={<KetQuaKienTap_MaTranDiem_Khoa />} />
-          <Route path="khoa/refund-approval" element={<DuyetHoanPhi_Khoa />} />
-          <Route path="khoa/visit-report" element={<XemTruocBaoCaoThamQuan_Khoa />} />
+          <Route element={<ProtectedRoute allowedRoles={['QuanLyKhoa', 'Khoa']} />}>
+            <Route path="khoa" element={<DashBoard_Khoa />} />
+            <Route path="khoa/schedules" element={<DanhMucNen_ThemMoiHocKy_Khoa />} />
+            <Route path="khoa/students" element={<DanhMuc_SinhVien_Khoa />} />
+            <Route path="khoa/plans" element={<PlanManagement_Khoa />} />
+            <Route path="khoa/registrations" element={<RegistrationManagement_Khoa />} />
+            <Route path="khoa/supervisors" element={<SupervisorAssignment_Khoa />} />
+            <Route path="khoa/leaders" element={<LeaderAssignment_Khoa />} />
+            <Route path="khoa/notifications" element={<ThongBao_Khoa />} />
+            <Route path="khoa/reports" element={<BaoCaoThongKe_Khoa />} />
+            <Route path="khoa/lecturers" element={<DanhMuc_GiangVien_Khoa />} />
+            <Route path="khoa/factories" element={<DanhMuc_NhaMay_Khoa />} />
+            <Route path="khoa/trips" element={<ChuyenThamQuan_DSLoc />} />
+            <Route path="khoa/boards" element={<HoiDongChamBaoCao_Khoa />} />
+            <Route path="khoa/accounts" element={<TaiKhoanNguoiDung_Khoa />} />
+            <Route path="khoa/fees" element={<QuanLyLePhi_Khoa />} />
+            <Route path="khoa/results" element={<KetQuaKienTap_MaTranDiem_Khoa />} />
+            <Route path="khoa/refund-approval" element={<DuyetHoanPhi_Khoa />} />
+            <Route path="khoa/visit-report" element={<XemTruocBaoCaoThamQuan_Khoa />} />
+          </Route>
         </Route>
 
-        {/* Fallback redirect */}
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        {/* Fallback wildcard route */}
+        <Route path="*" element={<NotFoundRedirect />} />
       </Routes>
     </BrowserRouter>
   );
 }
+

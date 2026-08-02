@@ -234,6 +234,8 @@ class AppStateProviderState extends State<AppStateContainer> {
           _state.lecturerStudents = studentsJson.map((s) {
             return LecturerStudent(
               id: s['mssv'] ?? 'SV-MOCK',
+              phieuId: s['phieu_id'] ?? s['phieu_dang_ky_id'] ?? s['id'],
+              reportId: s['report_id'] ?? s['bai_thu_hoach_id'],
               name: s['ho_ten'] ?? 'Sinh viên',
               className: s['lop'] ?? 'N/A',
               company: s['ten_doanh_nghiep'] ?? 'Doanh nghiệp',
@@ -281,11 +283,11 @@ class AppStateProviderState extends State<AppStateContainer> {
     try {
       final res = await ApiService.login(username, password);
       final user = res['user'];
-      final userRole = user['vai_tro'];
-      final details = user['details'];
+      final userRole = user?['vai_tro'];
+      final details = user?['details'];
 
-      setState(() {
-        if (userRole == 'SinhVien') {
+      if (userRole == 'SinhVien') {
+        setState(() {
           _state.currentRole = 'student';
           if (details != null) {
             _state.studentProfile = StudentProfile(
@@ -297,8 +299,14 @@ class AppStateProviderState extends State<AppStateContainer> {
               avatar: details['avatar'] ?? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
             );
           }
-          _fetchStudentDataFromApi(details?['id'] ?? 1);
-        } else if (userRole == 'GiangVien') {
+        });
+        final studentId = (details != null && details['id'] is int) ? details['id'] as int : ApiService.userId;
+        if (studentId != null) {
+          _fetchStudentDataFromApi(studentId);
+        }
+        onSuccess();
+      } else if (userRole == 'GiangVien') {
+        setState(() {
           _state.currentRole = 'lecturer';
           if (details != null) {
             _state.lecturerProfile = LecturerProfile(
@@ -309,22 +317,20 @@ class AppStateProviderState extends State<AppStateContainer> {
               department: details['khoa'] ?? 'Khoa Công nghệ Thực phẩm',
             );
           }
-          _fetchLecturerDataFromApi(details?['id'] ?? 1);
+        });
+        final lecturerId = (details != null && details['id'] is int) ? details['id'] as int : ApiService.userId;
+        if (lecturerId != null) {
+          _fetchLecturerDataFromApi(lecturerId);
         }
-      });
-      onSuccess();
+        onSuccess();
+      } else {
+        onError('Tài khoản không có quyền truy cập ứng dụng di động.');
+      }
     } catch (e) {
-      print('Backend API Login failed: $e. Falling back to local offline mock login.');
-      setState(() {
-        if (username.startsWith('SV') || username == 'student') {
-          _state.currentRole = 'student';
-        } else if (username.startsWith('GV') || username == 'lecturer') {
-          _state.currentRole = 'lecturer';
-        } else {
-          _state.currentRole = 'student';
-        }
-      });
-      onSuccess();
+      final msg = e.toString().replaceAll('Exception: ', '');
+      onError(msg.isNotEmpty
+          ? msg
+          : 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin tài khoản hoặc kết nối mạng.');
     }
   }
 
@@ -341,6 +347,13 @@ class AppStateProviderState extends State<AppStateContainer> {
 
   // Student Operations
   Future<void> registerTrip(String tripId) async {
+    final tId = int.tryParse(tripId);
+    if (tId == null) {
+      throw Exception('Mã chuyến đi không hợp lệ ($tripId).');
+    }
+
+    await ApiService.registerTrip(tId);
+
     setState(() {
       _state.studentTrips = _state.studentTrips.map((t) {
         if (t.id == tripId) {
@@ -366,17 +379,19 @@ class AppStateProviderState extends State<AppStateContainer> {
         _state.payments = [newPayment, ..._state.payments];
       }
     });
-
-    try {
-      final sId = int.tryParse(_state.studentProfile.studentId.replaceAll(RegExp(r'\D'), '')) ?? 1;
-      final tId = int.tryParse(tripId.replaceAll(RegExp(r'\D'), '')) ?? 1;
-      await ApiService.registerTrip(sId, tId);
-    } catch (e) {
-      print('registerTrip API failed: $e. Keep state updated locally.');
-    }
   }
 
-  void cancelTripRegistration(String tripId) {
+  Future<void> cancelTripRegistration(String tripId) async {
+    final regId = int.tryParse(tripId);
+    if (regId == null) {
+      throw Exception('Mã đăng ký không hợp lệ ($tripId).');
+    }
+
+    await ApiService.post('sinh-vien/request-cancel', {
+      'registrationId': regId,
+      'lyDo': 'Hủy qua ứng dụng di động',
+    });
+
     setState(() {
       _state.studentTrips = _state.studentTrips.map((t) {
         if (t.id == tripId) {
@@ -392,29 +407,24 @@ class AppStateProviderState extends State<AppStateContainer> {
         return p;
       }).toList();
     });
-
-    try {
-      final sId = int.tryParse(_state.studentProfile.studentId.replaceAll(RegExp(r'\D'), '')) ?? 1;
-      final regId = int.tryParse(tripId.replaceAll(RegExp(r'\D'), '')) ?? 1;
-      ApiService.post('sinh-vien/request-cancel', {
-        'studentId': sId,
-        'registrationId': regId,
-        'lyDo': 'Hủy qua ứng dụng di động',
-        'fileMinhChung': 'n/a',
-      });
-    } catch (e) {
-      print('cancelTripRegistration API call failed: $e');
-    }
   }
 
   Future<bool> uploadReport(String submissionId, String localPath, String fileName, String fileSize) async {
-    String fileUrl = fileName;
+    final regId = int.tryParse(submissionId);
+    if (regId == null) {
+      throw Exception('Mã bài nộp không hợp lệ ($submissionId).');
+    }
+
+    String fileReference = fileName;
     try {
       final uploadRes = await ApiService.uploadFile('upload/report', localPath, 'file');
-      fileUrl = uploadRes['url'] ?? fileName;
+      fileReference = uploadRes['key'] ?? uploadRes['url'] ?? fileName;
     } catch (e) {
-      print('uploadReport file upload failed: $e. Falling back to filename.');
+      print('uploadReport file upload failed: $e');
+      rethrow;
     }
+
+    await ApiService.submitReport(regId, fileReference, null);
 
     setState(() {
       _state.submissions = _state.submissions.map((s) {
@@ -430,25 +440,26 @@ class AppStateProviderState extends State<AppStateContainer> {
       }).toList();
     });
 
-    try {
-      final sId = int.tryParse(_state.studentProfile.studentId.replaceAll(RegExp(r'\D'), '')) ?? 1;
-      final regId = int.tryParse(submissionId.replaceAll(RegExp(r'\D'), '')) ?? 1;
-      await ApiService.submitReport(sId, regId, fileUrl, null);
-      return true;
-    } catch (e) {
-      print('uploadReport API call failed: $e');
-      return false;
-    }
+    return true;
   }
 
   Future<bool> uploadConfirmationFile(String submissionId, String localPath, String fileName) async {
-    String fileUrl = fileName;
-    try {
-      final uploadRes = await ApiService.uploadFile('upload/report', localPath, 'file');
-      fileUrl = uploadRes['url'] ?? fileName;
-    } catch (e) {
-      print('uploadConfirmationFile file upload failed: $e. Falling back to filename.');
+    final regId = int.tryParse(submissionId);
+    if (regId == null) {
+      throw Exception('Mã bài nộp không hợp lệ ($submissionId).');
     }
+
+    String fileReference = fileName;
+    try {
+      final uploadRes = await ApiService.uploadFile('upload/payment', localPath, 'file');
+      fileReference = uploadRes['key'] ?? uploadRes['url'] ?? fileName;
+    } catch (e) {
+      print('uploadConfirmationFile file upload failed: $e');
+      rethrow;
+    }
+
+    final sub = _state.submissions.firstWhere((s) => s.id == submissionId);
+    await ApiService.submitReport(regId, sub.fileName ?? 'baocao.pdf', fileReference);
 
     setState(() {
       _state.submissions = _state.submissions.map((s) {
@@ -463,19 +474,17 @@ class AppStateProviderState extends State<AppStateContainer> {
       }).toList();
     });
 
-    try {
-      final sId = int.tryParse(_state.studentProfile.studentId.replaceAll(RegExp(r'\D'), '')) ?? 1;
-      final regId = int.tryParse(submissionId.replaceAll(RegExp(r'\D'), '')) ?? 1;
-      final sub = _state.submissions.firstWhere((s) => s.id == submissionId);
-      await ApiService.submitReport(sId, regId, sub.fileName ?? 'baocao.pdf', fileUrl);
-      return true;
-    } catch (e) {
-      print('uploadConfirmationFile API call failed: $e');
-      return false;
-    }
+    return true;
   }
 
   Future<void> payFee(String paymentId) async {
+    final payId = int.tryParse(paymentId);
+    if (payId == null) {
+      throw Exception('Mã hóa đơn thanh toán không hợp lệ ($paymentId).');
+    }
+
+    await ApiService.payInvoice(payId);
+
     setState(() {
       _state.payments = _state.payments.map((p) {
         if (p.id == paymentId) {
@@ -484,25 +493,21 @@ class AppStateProviderState extends State<AppStateContainer> {
         return p;
       }).toList();
     });
-
-    try {
-      final payId = int.tryParse(paymentId.replaceAll(RegExp(r'\D'), '')) ?? 1;
-      await ApiService.payInvoice(payId);
-    } catch (e) {
-      print('payFee API call failed: $e');
-    }
   }
 
   Future<bool> addRefund(String invoiceName, String amountText, {String? localPath, String? fileName}) async {
-    String fileUrl = fileName ?? 'hoadon_daquet.pdf';
-    if (localPath != null) {
-      try {
-        final uploadRes = await ApiService.uploadFile('upload/attachment', localPath, 'file');
-        fileUrl = uploadRes['url'] ?? (fileName ?? 'hoadon_daquet.pdf');
-      } catch (e) {
-        print('addRefund file upload failed: $e. Falling back to default.');
-      }
+    final invoiceId = int.tryParse(invoiceName.replaceAll(RegExp(r'\D'), ''));
+    if (invoiceId == null) {
+      throw Exception('Không tìm thấy mã hóa đơn cần hoàn phí.');
     }
+
+    String fileReference = fileName ?? 'hoadon_daquet.pdf';
+    if (localPath != null) {
+      final uploadRes = await ApiService.uploadFile('upload/attachment', localPath, 'file');
+      fileReference = uploadRes['key'] ?? uploadRes['url'] ?? fileReference;
+    }
+
+    await ApiService.requestRefund(invoiceId, fileReference);
 
     setState(() {
       final newRefund = RefundRequest(
@@ -515,17 +520,17 @@ class AppStateProviderState extends State<AppStateContainer> {
       _state.refunds = [newRefund, ..._state.refunds];
     });
 
-    try {
-      final invoiceId = Random().nextInt(1000) + 1;
-      await ApiService.requestRefund(invoiceId, fileUrl);
-      return true;
-    } catch (e) {
-      print('addRefund API call failed: $e');
-      return false;
-    }
+    return true;
   }
 
   void markStudentNotificationRead(String id) {
+    final notifId = int.tryParse(id);
+    if (notifId != null) {
+      ApiService.markStudentNotificationRead(notifId).catchError((e) {
+        print('markStudentNotificationRead API call failed: $e');
+      });
+    }
+
     setState(() {
       _state.studentNotifications = _state.studentNotifications.map((n) {
         if (n.id == id) {
@@ -534,14 +539,6 @@ class AppStateProviderState extends State<AppStateContainer> {
         return n;
       }).toList();
     });
-
-    try {
-      final accountId = int.tryParse(_state.studentProfile.studentId.replaceAll(RegExp(r'\D'), '')) ?? 1;
-      final notifId = int.tryParse(id.replaceAll(RegExp(r'\D'), '')) ?? 1;
-      ApiService.markStudentNotificationRead(accountId, notifId);
-    } catch (e) {
-      print('markStudentNotificationRead API call failed: $e');
-    }
   }
 
   void markAllStudentNotificationsRead() {
@@ -554,6 +551,34 @@ class AppStateProviderState extends State<AppStateContainer> {
 
   // Lecturer Operations
   Future<void> updateAttendance(String studentId, String status, {String? reason}) async {
+    final student = _state.lecturerStudents.firstWhere(
+      (s) => s.id == studentId,
+      orElse: () => throw Exception('Không tìm thấy sinh viên $studentId trong danh sách.'),
+    );
+
+    final tId = int.tryParse(student.tourId);
+    if (tId == null) {
+      throw Exception('Mã chuyến tham quan không hợp lệ (${student.tourId}).');
+    }
+
+    final phieuId = student.phieuId ?? int.tryParse(studentId);
+    if (phieuId == null) {
+      throw Exception('Không xác định được mã phiếu đăng ký của sinh viên $studentId.');
+    }
+
+    // Ánh xạ trạng thái điểm danh khớp đúng với DTO backend (CoMat, Vang, TuChoiThamGia)
+    final String backendStatus = status == 'present'
+        ? 'CoMat'
+        : (status == 'absent' ? 'Vang' : 'TuChoiThamGia');
+
+    await ApiService.takeAttendance(tId, [
+      {
+        'phieuId': phieuId,
+        'status': backendStatus,
+        if (reason != null && reason.isNotEmpty) 'note': reason,
+      }
+    ]);
+
     setState(() {
       _state.lecturerStudents = _state.lecturerStudents.map((s) {
         if (s.id == studentId) {
@@ -565,26 +590,39 @@ class AppStateProviderState extends State<AppStateContainer> {
         return s;
       }).toList();
     });
-
-    try {
-      final lId = int.tryParse(_state.lecturerProfile.teacherId.replaceAll(RegExp(r'\D'), '')) ?? 1;
-      final student = _state.lecturerStudents.firstWhere((s) => s.id == studentId);
-      final tId = int.tryParse(student.tourId.replaceAll(RegExp(r'\D'), '')) ?? 1;
-      final phieuId = Random().nextInt(1000) + 1;
-      
-      await ApiService.takeAttendance(lId, tId, [
-        {
-          'phieuId': phieuId,
-          'status': status == 'present' ? 'CoMat' : (status == 'absent' ? 'Vang' : 'Phep'),
-          if (reason != null) 'note': reason,
-        }
-      ]);
-    } catch (e) {
-      print('updateAttendance API call failed: $e');
-    }
   }
 
   Future<void> updateStudentGrade(String studentId, {double? prelimGrade, double? extraGrade, double? gvhdGrade, String? comment, bool? isGraded}) async {
+    final student = _state.lecturerStudents.firstWhere(
+      (s) => s.id == studentId,
+      orElse: () => throw Exception('Không tìm thấy sinh viên $studentId trong danh sách.'),
+    );
+
+    final phieuId = student.phieuId ?? int.tryParse(studentId);
+    if ((prelimGrade != null || extraGrade != null) && phieuId == null) {
+      throw Exception('Không xác định được mã phiếu đăng ký để nhập điểm quá trình.');
+    }
+
+    if (prelimGrade != null || extraGrade != null) {
+      await ApiService.gradePrepAndBonus(
+        phieuId!,
+        prelimGrade ?? student.prelimGrade,
+        extraGrade ?? student.extraGrade,
+      );
+    }
+
+    if (gvhdGrade != null || comment != null) {
+      final reportId = student.reportId ?? phieuId;
+      if (reportId == null) {
+        throw Exception('Không xác định được mã bài thu hoạch để chấm điểm.');
+      }
+      await ApiService.gradeReport(
+        reportId,
+        gvhdGrade ?? student.gvhdGrade,
+        comment ?? student.comment ?? '',
+      );
+    }
+
     setState(() {
       _state.lecturerStudents = _state.lecturerStudents.map((s) {
         if (s.id == studentId) {
@@ -599,33 +637,6 @@ class AppStateProviderState extends State<AppStateContainer> {
         return s;
       }).toList();
     });
-
-    try {
-      final lId = int.tryParse(_state.lecturerProfile.teacherId.replaceAll(RegExp(r'\D'), '')) ?? 1;
-      final student = _state.lecturerStudents.firstWhere((s) => s.id == studentId);
-      final phieuId = Random().nextInt(1000) + 1;
-
-      if (prelimGrade != null || extraGrade != null) {
-        await ApiService.gradePrepAndBonus(
-          lId,
-          phieuId,
-          prelimGrade ?? student.prelimGrade,
-          extraGrade ?? student.extraGrade,
-        );
-      }
-
-      if (gvhdGrade != null || comment != null) {
-        final reportId = Random().nextInt(1000) + 1;
-        await ApiService.gradeReport(
-          lId,
-          reportId,
-          gvhdGrade ?? student.gvhdGrade,
-          comment ?? student.comment ?? '',
-        );
-      }
-    } catch (e) {
-      print('updateStudentGrade API call failed: $e');
-    }
   }
 
   void markLecturerNotificationRead(String id) {

@@ -130,7 +130,6 @@ export default function DiemDanhSV_GV() {
       }));
 
       const res = await giangVienApi.takeAttendance({
-        lecturerId: lecturer.id,
         tripId: Number(selectedTripId),
         records: recordPayload
       });

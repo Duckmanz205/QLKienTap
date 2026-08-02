@@ -127,7 +127,6 @@ export default function DiemChuanBi_DiemCong_GV() {
       const promises = Object.keys(scores).map(phieuId => {
         const studentScore = scores[phieuId];
         return giangVienApi.gradePrepAndBonus({
-          lecturerId: lecturer.id,
           phieuId: Number(phieuId),
           diemChuanBi: studentScore.diemChuanBi,
           diemCong: studentScore.diemCong

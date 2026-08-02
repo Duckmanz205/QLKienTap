@@ -581,6 +581,68 @@ export class SinhVienService {
     return { success: true };
   }
 
+  private sanitizeAndValidateFileRef(
+    fileRef: string,
+    expectedType: 'reports' | 'payments' | 'attachments',
+    accountId: number,
+  ): string {
+    if (!fileRef || typeof fileRef !== 'string') {
+      throw new BadRequestException('File reference không hợp lệ');
+    }
+
+    let cleaned = fileRef.trim();
+
+    // Strip query parameters if present (e.g. signed URL tokens)
+    if (cleaned.includes('?')) {
+      cleaned = cleaned.split('?')[0];
+    }
+
+    // Check if full URL was sent
+    if (cleaned.includes('://')) {
+      try {
+        const parsed = new URL(cleaned);
+        cleaned = parsed.pathname.startsWith('/')
+          ? parsed.pathname.slice(1)
+          : parsed.pathname;
+        if (cleaned.startsWith('api/upload/file/')) {
+          cleaned = cleaned.replace(/^api\/upload\/file\//, '');
+        }
+      } catch {
+        throw new BadRequestException('File reference URL không hợp lệ');
+      }
+    }
+
+    // Path traversal check
+    if (
+      cleaned.includes('..') ||
+      cleaned.includes('\\') ||
+      cleaned.includes('\0')
+    ) {
+      throw new BadRequestException('Path reference không an toàn');
+    }
+
+    // Check key format
+    const keyRegex = new RegExp(
+      `^(?:\\/api\\/upload\\/file\\/)?${expectedType}\\/([a-zA-Z0-9_-]+)\\/.+$`,
+    );
+    const match = cleaned.match(keyRegex);
+
+    if (match) {
+      const ownerId = match[1];
+      if (
+        ownerId !== String(accountId) &&
+        ownerId !== 'sv' &&
+        ownerId !== 'general'
+      ) {
+        throw new BadRequestException(
+          'File reference không thuộc sở hữu của tài khoản hiện tại',
+        );
+      }
+    }
+
+    return cleaned;
+  }
+
   // Sinh vien nop bai thu hoach
   async submitReport(
     studentId: number,
@@ -590,11 +652,27 @@ export class SinhVienService {
   ) {
     const phieu = await this.phieuRepo.findOne({
       where: { id: registrationId, sinh_vien_id: studentId },
-      relations: { chuyenThamQuan: true },
+      relations: { chuyenThamQuan: true, sinhVien: true },
     });
     if (!phieu) throw new NotFoundException('Không tìm thấy phiếu đăng ký');
 
-    if (phieu.chuyenThamQuan.cach_to_chuc === 'TuDo' && !fileXacNhanUrl) {
+    const accountId = phieu.sinhVien?.taikhoan_id || 0;
+    const validBaoCaoRef = this.sanitizeAndValidateFileRef(
+      fileBaoCaoUrl,
+      'reports',
+      accountId,
+    );
+
+    let validXacNhanRef: string | undefined = undefined;
+    if (fileXacNhanUrl) {
+      validXacNhanRef = this.sanitizeAndValidateFileRef(
+        fileXacNhanUrl,
+        'payments',
+        accountId,
+      );
+    }
+
+    if (phieu.chuyenThamQuan.cach_to_chuc === 'TuDo' && !validXacNhanRef) {
       throw new BadRequestException(
         'Chuyến tham quan tự do bắt buộc phải nộp kèm file xác nhận tham quan của doanh nghiệp',
       );
@@ -613,8 +691,8 @@ export class SinhVienService {
 
     const report = new BaiThuHoach();
     report.phieu_dang_ky_id = registrationId;
-    report.file_bao_cao = fileBaoCaoUrl;
-    report.file_xac_nhan_tham_quan = (fileXacNhanUrl || null) as any;
+    report.file_bao_cao = validBaoCaoRef;
+    report.file_xac_nhan_tham_quan = (validXacNhanRef || null) as any;
     report.ngay_nop = now;
 
     if (diffDays > 10) {

@@ -13,6 +13,13 @@ import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser, JwtPayloadUser } from '../auth/decorators/user.decorator';
+import {
+  TakeAttendanceDto,
+  GradePrepBonusDto,
+  GradeReportDto,
+  SubmitBoardScoreDto,
+  GuidedReportsQueryDto,
+} from './dto/giang-vien.dto';
 
 @Controller('giang-vien')
 @UseGuards(AuthGuard, RolesGuard)
@@ -55,18 +62,18 @@ export class GiangVienController {
   }
 
   @Get('trip-registrations/:tripId')
-  async getTripRegistrations(@Param('tripId', ParseIntPipe) tripId: number) {
-    return this.gvService.getTripRegistrations(tripId);
+  async getTripRegistrations(
+    @CurrentUser() user: JwtPayloadUser,
+    @Param('tripId', ParseIntPipe) tripId: number,
+  ) {
+    const gv = await this.gvService.getLecturerByAccountId(user.sub);
+    return this.gvService.getTripRegistrations(gv.id, tripId);
   }
 
   @Post('take-attendance')
   async takeAttendance(
     @CurrentUser() user: JwtPayloadUser,
-    @Body()
-    body: {
-      tripId: number;
-      records: { phieuId: number; status: string; note?: string }[];
-    },
+    @Body() body: TakeAttendanceDto,
   ) {
     const gv = await this.gvService.getLecturerByAccountId(user.sub);
     return this.gvService.takeAttendance(gv.id, body.tripId, body.records);
@@ -75,12 +82,7 @@ export class GiangVienController {
   @Post('grade-prep-bonus')
   async gradePrepAndBonus(
     @CurrentUser() user: JwtPayloadUser,
-    @Body()
-    body: {
-      phieuId: number;
-      diemChuanBi: number;
-      diemCong: number;
-    },
+    @Body() body: GradePrepBonusDto,
   ) {
     const gv = await this.gvService.getLecturerByAccountId(user.sub);
     return this.gvService.gradePrepAndBonus(
@@ -94,55 +96,44 @@ export class GiangVienController {
   @Get('guided-reports')
   async getMyGuidedReports(
     @CurrentUser() user: JwtPayloadUser,
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
-    @Query('search') search?: string,
-    @Query('status') status?: string,
+    @Query() query: GuidedReportsQueryDto,
   ) {
     const gv = await this.gvService.getLecturerByAccountId(user.sub);
     return this.gvService.getGuidedStudentReports(
       gv.id,
-      page ? Number(page) : 1,
-      limit ? Number(limit) : 10,
-      search,
-      status,
+      query.page || 1,
+      query.limit || 10,
+      query.search,
+      query.status,
     );
   }
 
   @Get('guided-reports/:lecturerId')
   async getGuidedReports(
     @CurrentUser() user: JwtPayloadUser,
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
-    @Query('search') search?: string,
-    @Query('status') status?: string,
+    @Query() query: GuidedReportsQueryDto,
   ) {
     const gv = await this.gvService.getLecturerByAccountId(user.sub);
     return this.gvService.getGuidedStudentReports(
       gv.id,
-      page ? Number(page) : 1,
-      limit ? Number(limit) : 10,
-      search,
-      status,
+      query.page || 1,
+      query.limit || 10,
+      query.search,
+      query.status,
     );
   }
 
   @Post('grade-report')
   async gradeReport(
     @CurrentUser() user: JwtPayloadUser,
-    @Body()
-    body: {
-      reportId: number;
-      score: number;
-      comment: string;
-    },
+    @Body() body: GradeReportDto,
   ) {
     const gv = await this.gvService.getLecturerByAccountId(user.sub);
     return this.gvService.gradeReport(
       gv.id,
       body.reportId,
       body.score,
-      body.comment,
+      body.comment || '',
     );
   }
 
@@ -161,12 +152,7 @@ export class GiangVienController {
   @Post('submit-board-score')
   async submitBoardScore(
     @CurrentUser() user: JwtPayloadUser,
-    @Body()
-    body: {
-      memberId: number;
-      phieuId: number;
-      score: number;
-    },
+    @Body() body: SubmitBoardScoreDto,
   ) {
     const gv = await this.gvService.getLecturerByAccountId(user.sub);
     return this.gvService.submitBoardScore(
@@ -177,3 +163,4 @@ export class GiangVienController {
     );
   }
 }
+

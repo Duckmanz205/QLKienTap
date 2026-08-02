@@ -96,7 +96,7 @@ export default function NopBaiThuHoach_SV() {
         }
       });
 
-      const fileBaoCaoUrl = uploadRes.data.url;
+      const fileBaoCaoUrl = uploadRes.data.key || uploadRes.data.url;
       let fileXacNhanUrl = undefined;
 
       // 2. If it's a free proposed trip, prompt for proof image
@@ -129,14 +129,13 @@ export default function NopBaiThuHoach_SV() {
                 'Content-Type': 'multipart/form-data',
               }
             });
-            fileXacNhanUrl = proofRes.data.url;
+            fileXacNhanUrl = proofRes.data.key || proofRes.data.url;
           }
         }
       }
 
       // 3. Submit report to database
       await sinhVienApi.submitReport({
-        studentId: student.id,
         registrationId: reg.id,
         fileBaoCaoUrl,
         fileXacNhanUrl
@@ -181,7 +180,6 @@ export default function NopBaiThuHoach_SV() {
     setError('');
     try {
       await sinhVienApi.selectRepresentativeTrips({
-        studentId: student.id,
         termStudentId: currentGrade.id,
         registrationIds: selectedCouncilReportIds
       });

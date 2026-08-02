@@ -102,8 +102,8 @@ export default function ChamBaiThuHoach_GV() {
     try {
       const res = await giangVienApi.gradeReport({
         reportId: selectedReport.id,
-        diemBaiThuHoach: numScore,
-        nhanXet: comments
+        score: numScore,
+        comment: comments
       });
       setMessage(res.data.message);
       

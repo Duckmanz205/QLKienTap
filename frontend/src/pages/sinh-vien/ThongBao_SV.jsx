@@ -32,7 +32,7 @@ export default function ThongBao_SV() {
       try {
         const userJson = localStorage.getItem('user');
         const { user } = JSON.parse(userJson);
-        await sinhVienApi.markNotificationRead(user.id, item.id);
+        await sinhVienApi.markNotificationRead(item.id);
         fetchNotifications(student.id);
       } catch (err) {
         console.error(err);

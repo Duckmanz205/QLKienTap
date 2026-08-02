@@ -84,7 +84,6 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
 
     try {
       const res = await giangVienApi.submitBoardScore({
-        lecturerId: lecturer.id,
         memberId: activeBoard.memberId,
         phieuId: selectedReg.id,
         score: finalAvg
