@@ -28,6 +28,8 @@ import {
 } from 'lucide-react';
 import { sinhVienApi, authApi } from '../services/api';
 
+import { getValidSession, clearSession } from '../utils/auth';
+
 export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -47,17 +49,17 @@ export default function Layout() {
     }));
   };
 
-  const userJson = localStorage.getItem('user');
+  const session = getValidSession();
   
   useEffect(() => {
-    if (!userJson) {
-      navigate('/login');
+    if (!session) {
+      navigate('/login', { replace: true });
     }
-  }, [userJson, navigate]);
+  }, [session, navigate]);
 
-  if (!userJson) return null;
+  if (!session) return null;
 
-  const { user, token } = JSON.parse(userJson);
+  const { user, token } = session;
   const { vai_tro, ten_dang_nhap, details, phai_doi_mat_khau } = user;
   const fullName = details?.ho_ten || ten_dang_nhap;
 
@@ -72,8 +74,8 @@ export default function Layout() {
   }, [vai_tro, details]);
 
   const handleLogout = () => {
-    localStorage.removeItem('user');
-    navigate('/login');
+    clearSession();
+    navigate('/login', { replace: true });
   };
 
   if (phai_doi_mat_khau) {

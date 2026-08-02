@@ -67,7 +67,7 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
     setMessage('');
     setError('');
     try {
-      const res = await sinhVienApi.registerTrip(student.id, trip.id);
+      const res = await sinhVienApi.registerTrip(trip.id);
       setMessage(res.data.message);
       fetchData(student.id);
       setSubTab('registered');
@@ -88,8 +88,7 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
     setError('');
     try {
       const res = await sinhVienApi.requestCancel({
-        studentId: student.id,
-        phieuId,
+        registrationId: phieuId,
         lyDo
       });
       setMessage(res.data.message);
@@ -110,7 +109,6 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
     setError('');
     try {
       const res = await sinhVienApi.proposeTrip({
-        studentId: student.id,
         nhaMayId: Number(factoryId),
         ngayThamQuan: new Date(ngayThamQuan),
         gioBatDau,

@@ -108,20 +108,24 @@ export default function LichDanDoan_GV() {
   };
 
   const handleSaveAttendance = async () => {
+    if (!selectedTripId || registrations.length === 0) return;
     setMessage('');
     setError('');
     setLoading(true);
     try {
-      // Loop and submit all registrations to backend
-      const promises = registrations.map(reg => {
+      const records = registrations.map(reg => {
         const state = attendanceState[reg.id] || { status: 'CoMat', notes: '' };
-        return giangVienApi.takeAttendance({
-          registrationId: reg.id,
+        return {
+          phieuId: reg.id,
           status: state.status,
-          notes: state.notes
-        });
+          ...(state.notes ? { note: state.notes } : {})
+        };
       });
-      await Promise.all(promises);
+
+      await giangVienApi.takeAttendance({
+        tripId: Number(selectedTripId),
+        records
+      });
       setMessage('Đã lưu bảng điểm danh thành công!');
       if (selectedTripId) {
         fetchRegistrations(Number(selectedTripId));

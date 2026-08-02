@@ -134,6 +134,7 @@ class StudentNotification {
 
 class Submission {
   final String id;
+  final int? registrationId;
   final String tripName;
   final String typeText;
   final String dateText;
@@ -146,6 +147,7 @@ class Submission {
 
   Submission({
     required this.id,
+    this.registrationId,
     required this.tripName,
     required this.typeText,
     required this.dateText,
@@ -158,6 +160,7 @@ class Submission {
   });
 
   Submission copyWith({
+    int? registrationId,
     String? status,
     String? fileName,
     String? fileSize,
@@ -167,6 +170,7 @@ class Submission {
   }) {
     return Submission(
       id: id,
+      registrationId: registrationId ?? this.registrationId,
       tripName: tripName,
       typeText: typeText,
       dateText: dateText,
@@ -234,6 +238,8 @@ class RefundRequest {
 
 class LecturerStudent {
   final String id; // MSSV
+  final int? phieuId; // Mã phiếu đăng ký thực tế từ DB
+  final int? reportId; // Mã bài thu hoạch thực tế từ DB
   final String name;
   final String className;
   final String company;
@@ -253,6 +259,8 @@ class LecturerStudent {
 
   LecturerStudent({
     required this.id,
+    this.phieuId,
+    this.reportId,
     required this.name,
     required this.className,
     required this.company,
@@ -272,6 +280,8 @@ class LecturerStudent {
   });
 
   LecturerStudent copyWith({
+    int? phieuId,
+    int? reportId,
     String? attendanceStatus,
     String? excuseReason,
     double? prelimGrade,
@@ -282,6 +292,8 @@ class LecturerStudent {
   }) {
     return LecturerStudent(
       id: id,
+      phieuId: phieuId ?? this.phieuId,
+      reportId: reportId ?? this.reportId,
       name: name,
       className: className,
       company: company,

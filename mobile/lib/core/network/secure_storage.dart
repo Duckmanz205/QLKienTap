@@ -1,54 +1,38 @@
-import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class SecureStorage {
-  static const String _keyPrefix = 'secure_';
-  // Secret key used for basic XOR encryption of values on disk
-  static const int _xorKey = 0x5A; 
-
-  static String _encrypt(String value) {
-    final bytes = utf8.encode(value);
-    final encryptedBytes = bytes.map((b) => b ^ _xorKey).toList();
-    return base64.encode(encryptedBytes);
-  }
-
-  static String _decrypt(String encryptedBase64) {
-    try {
-      final encryptedBytes = base64.decode(encryptedBase64);
-      final decryptedBytes = encryptedBytes.map((b) => b ^ _xorKey).toList();
-      return utf8.decode(decryptedBytes);
-    } catch (e) {
-      return '';
-    }
-  }
+  static const _storage = FlutterSecureStorage(
+    aOptions: AndroidOptions(
+      encryptedSharedPreferences: true,
+    ),
+  );
 
   static Future<void> write(String key, String value) async {
-    final prefs = await SharedPreferences.getInstance();
-    final encryptedValue = _encrypt(value);
-    await prefs.setString('$_keyPrefix$key', encryptedValue);
+    await _storage.write(key: key, value: value);
   }
 
   static Future<String?> read(String key) async {
-    final prefs = await SharedPreferences.getInstance();
-    final encryptedValue = prefs.getString('$_keyPrefix$key');
-    if (encryptedValue == null || encryptedValue.isEmpty) {
+    try {
+      return await _storage.read(key: key);
+    } catch (e) {
       return null;
     }
-    return _decrypt(encryptedValue);
   }
 
   static Future<void> delete(String key) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('$_keyPrefix$key');
+    try {
+      await _storage.delete(key: key);
+    } catch (e) {
+      // Ignore
+    }
   }
 
   static Future<void> clearAll() async {
-    final prefs = await SharedPreferences.getInstance();
-    final keys = prefs.getKeys();
-    for (String key in keys) {
-      if (key.startsWith(_keyPrefix)) {
-        await prefs.remove(key);
-      }
+    try {
+      await _storage.deleteAll();
+    } catch (e) {
+      // Ignore
     }
   }
 }
+

@@ -124,8 +124,7 @@ export default function SinhVienHuongDan_GV() {
 
     try {
       const res = await giangVienApi.gradePrepAndBonus({
-        lecturerId: lecturer.id,
-        registrationId: Number(selectedTripId),
+        phieuId: Number(selectedTripId),
         diemChuanBi: Number(diemChuanBi),
         diemCong: Number(diemCong)
       });

@@ -1,10 +1,6 @@
-import {
-  Injectable,
-  BadRequestException,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, DataSource } from 'typeorm';
 import {
   GiangVien,
   LichKienTap_SinhVien,
@@ -47,6 +43,7 @@ export class GiangVienService {
     private hoiDongRepo: Repository<HoiDongChamBaoCao>,
     @InjectRepository(DanhSachDen)
     private blacklistRepo: Repository<DanhSachDen>,
+    private dataSource: DataSource,
   ) {}
 
   // Lay thong tin GV bang TaiKhoan ID
@@ -88,7 +85,21 @@ export class GiangVienService {
   }
 
   // Lay danh sach SV trong chuyen tham quan de diem danh/nhap diem
-  async getTripRegistrations(tripId: number) {
+  async getTripRegistrations(lecturerId: number, tripId: number) {
+    const trip = await this.chuyenRepo.findOne({ where: { id: tripId } });
+    if (!trip) {
+      throw new NotFoundException('Không tìm thấy chuyến tham quan');
+    }
+
+    const isLead = await this.danDoanRepo.findOne({
+      where: { chuyen_tham_quan_id: tripId, giang_vien_id: lecturerId },
+    });
+    if (!isLead) {
+      throw new ForbiddenException(
+        'Bạn không được phân công dẫn đoàn cho chuyến tham quan này',
+      );
+    }
+
     const phieus = await this.phieuRepo.find({
       where: {
         chuyen_tham_quan_id: tripId,
@@ -128,60 +139,146 @@ export class GiangVienService {
     });
   }
 
-  // Diem danh sinh vien
+  // Diem danh sinh vien - Atomic Transaction
   async takeAttendance(
     lecturerId: number,
     tripId: number,
     records: { phieuId: number; status: string; note?: string }[],
   ) {
-    const trip = await this.chuyenRepo.findOne({ where: { id: tripId } });
-    if (!trip) throw new NotFoundException('Không tìm thấy chuyến tham quan');
-
-    for (const record of records) {
-      const phieu = await this.phieuRepo.findOne({
-        where: { id: record.phieuId },
-      });
-      if (!phieu) continue;
-
-      let dd = await this.diemDanhRepo.findOne({
-        where: { phieu_dang_ky_id: record.phieuId },
-      });
-      if (!dd) {
-        dd = new DiemDanh();
-        dd.phieu_dang_ky_id = record.phieuId;
-      }
-      dd.trang_thai = record.status; // 'CoMat' | 'Vang' | 'TuChoiThamGia'
-      dd.ghi_chu = (record.note || null) as any;
-      dd.nguoi_diem_danh_id = lecturerId;
-      dd.ngay_diem_danh = new Date();
-      await this.diemDanhRepo.save(dd);
-
-      // Dong bo lai trang thai cua phieu dang ky
-      if (record.status === 'CoMat') {
-        phieu.trang_thai = 'DaThamGia';
-      } else if (
-        record.status === 'Vang' ||
-        record.status === 'TuChoiThamGia'
-      ) {
-        phieu.trang_thai = 'VangMat';
-
-        // Auto put to blacklist with penalty category 'DangKyKhongThamGia' (5 trips demoted priority)
-        const black = new DanhSachDen();
-        black.sinh_vien_id = phieu.sinh_vien_id;
-        black.ly_do = 'DangKyKhongThamGia';
-        black.phieu_dang_ky_id = phieu.id;
-        black.ngay_ghi_nhan = new Date();
-        black.con_hieu_luc = true;
-        await this.blacklistRepo.save(black);
-      }
-      await this.phieuRepo.save(phieu);
+    if (!records || records.length === 0) {
+      throw new BadRequestException('Không có bản ghi điểm danh');
     }
 
-    // Cap nhat chuyen di sang DaDienRa
-    trip.trang_thai = 'DaDienRa';
-    await this.chuyenRepo.save(trip);
+    // 1. Validate trùng lặp phieuId trong payload request
+    const phieuIds = records.map((r) => r.phieuId);
+    const uniquePhieuIds = new Set(phieuIds);
+    if (uniquePhieuIds.size !== phieuIds.length) {
+      throw new BadRequestException(
+        'Danh sách điểm danh chứa phiếu đăng ký trùng lặp',
+      );
+    }
 
-    return { message: 'Ghi nhận điểm danh thành công' };
+    // 2. Validate giá trị trạng thái trước khi thực hiện ghi dữ liệu
+    const VALID_STATUSES = ['CoMat', 'Vang', 'TuChoiThamGia'];
+    for (const record of records) {
+      if (
+        !record.phieuId ||
+        typeof record.phieuId !== 'number' ||
+        record.phieuId < 1
+      ) {
+        throw new BadRequestException('Mã phiếu đăng ký không hợp lệ');
+      }
+      if (!record.status || !VALID_STATUSES.includes(record.status)) {
+        throw new BadRequestException(
+          `Trạng thái điểm danh '${record.status}' không hợp lệ. Chỉ chấp nhận CoMat, Vang, TuChoiThamGia`,
+        );
+      }
+    }
+
+    // 3. Thực hiện toàn bộ logic trong một TypeORM Transaction
+    return await this.dataSource.transaction(async (manager) => {
+      // 3a. Kiểm tra tồn tại của chuyến tham quan trong transaction
+      const trip = await manager.findOne(ChuyenThamQuan, {
+        where: { id: tripId },
+      });
+      if (!trip) throw new NotFoundException('Không tìm thấy chuyến tham quan');
+
+      // 3b. Kiểm tra quyền giảng viên dẫn đoàn trong transaction
+      const isLead = await manager.findOne(ChuyenThamQuan_GiangVienDanDoan, {
+        where: { chuyen_tham_quan_id: tripId, giang_vien_id: lecturerId },
+      });
+      if (!isLead) {
+        throw new ForbiddenException(
+          'Bạn không được phân công dẫn đoàn cho chuyến tham quan này',
+        );
+      }
+
+      // 3c. Preload tất cả phiếu đăng ký theo nhóm & validate mối quan hệ với chuyến đi
+      const phieus = await manager.find(PhieuDangKy, {
+        where: { id: In(Array.from(uniquePhieuIds)) },
+      });
+
+      if (phieus.length !== uniquePhieuIds.size) {
+        throw new NotFoundException('Có phiếu đăng ký không tồn tại');
+      }
+
+      const phieuMap = new Map<number, PhieuDangKy>();
+      for (const phieu of phieus) {
+        if (phieu.chuyen_tham_quan_id !== tripId) {
+          throw new BadRequestException(
+            `Phiếu đăng ký #${phieu.id} không thuộc chuyến tham quan này`,
+          );
+        }
+        phieuMap.set(phieu.id, phieu);
+      }
+
+      // 3d. Preload batch Điểm Danh và Danh Sách Đen còn hiệu lực để xử lý hiệu quả & tránh n+1
+      const existingDiemDanhs = await manager.find(DiemDanh, {
+        where: { phieu_dang_ky_id: In(Array.from(uniquePhieuIds)) },
+      });
+      const diemDanhMap = new Map<number, DiemDanh>();
+      for (const dd of existingDiemDanhs) {
+        diemDanhMap.set(dd.phieu_dang_ky_id, dd);
+      }
+
+      const existingBlacklists = await manager.find(DanhSachDen, {
+        where: {
+          phieu_dang_ky_id: In(Array.from(uniquePhieuIds)),
+          ly_do: 'DangKyKhongThamGia',
+          con_hieu_luc: true,
+        },
+      });
+      const blacklistSet = new Set<number>(
+        existingBlacklists.map((b) => b.phieu_dang_ky_id),
+      );
+
+      // 3e. Cập nhật từng bản ghi điểm danh, trạng thái phiếu & sinh blacklist nếu cần
+      for (const record of records) {
+        const phieu = phieuMap.get(record.phieuId)!;
+
+        let dd = diemDanhMap.get(record.phieuId);
+        if (!dd) {
+          dd = new DiemDanh();
+          dd.phieu_dang_ky_id = record.phieuId;
+        }
+        dd.trang_thai = record.status; // 'CoMat' | 'Vang' | 'TuChoiThamGia'
+        dd.ghi_chu = (record.note || null) as any;
+        dd.nguoi_diem_danh_id = lecturerId;
+        dd.ngay_diem_danh = new Date();
+        await manager.save(DiemDanh, dd);
+
+        // Đồng bộ lại trạng thái của phiếu đăng ký
+        if (record.status === 'CoMat') {
+          phieu.trang_thai = 'DaThamGia';
+        } else if (
+          record.status === 'Vang' ||
+          record.status === 'TuChoiThamGia'
+        ) {
+          phieu.trang_thai = 'VangMat';
+
+          // Chỉ tự động thêm vào blacklist nếu chưa có blacklist DangKyKhongThamGia còn hiệu lực cho phiếu này
+          if (!blacklistSet.has(phieu.id)) {
+            const black = new DanhSachDen();
+            black.sinh_vien_id = phieu.sinh_vien_id;
+            black.ly_do = 'DangKyKhongThamGia';
+            black.phieu_dang_ky_id = phieu.id;
+            black.ngay_ghi_nhan = new Date();
+            black.con_hieu_luc = true;
+            await manager.save(DanhSachDen, black);
+
+            // Đánh dấu đã tồn tại blacklist trong bộ nhớ transaction
+            blacklistSet.add(phieu.id);
+          }
+        }
+        await manager.save(PhieuDangKy, phieu);
+      }
+
+      // 3f. Cập nhật chuyến đi sang trạng thái DaDienRa sau khi toàn bộ bản ghi đã cập nhật xong
+      trip.trang_thai = 'DaDienRa';
+      await manager.save(ChuyenThamQuan, trip);
+
+      return { message: 'Ghi nhận điểm danh thành công' };
+    });
   }
 
   // Nhap diem chuan bi va diem cong
@@ -191,6 +288,43 @@ export class GiangVienService {
     diemChuanBi: number,
     diemCong: number,
   ) {
+    if (
+      typeof diemChuanBi !== 'number' ||
+      !Number.isFinite(diemChuanBi) ||
+      diemChuanBi < 0 ||
+      diemChuanBi > 10
+    ) {
+      throw new BadRequestException(
+        'Điểm chuẩn bị không hợp lệ (phải từ 0 đến 10)',
+      );
+    }
+
+    if (
+      typeof diemCong !== 'number' ||
+      !Number.isFinite(diemCong) ||
+      diemCong < 0 ||
+      diemCong > 1
+    ) {
+      throw new BadRequestException('Điểm cộng không hợp lệ (phải từ 0 đến 1)');
+    }
+
+    const phieu = await this.phieuRepo.findOne({ where: { id: phieuId } });
+    if (!phieu) {
+      throw new NotFoundException('Không tìm thấy phiếu đăng ký');
+    }
+
+    const isLead = await this.danDoanRepo.findOne({
+      where: {
+        chuyen_tham_quan_id: phieu.chuyen_tham_quan_id,
+        giang_vien_id: lecturerId,
+      },
+    });
+    if (!isLead) {
+      throw new ForbiddenException(
+        'Bạn không phải giảng viên dẫn đoàn của chuyến tham quan này',
+      );
+    }
+
     let diem = await this.diemPhieuRepo.findOne({
       where: { phieu_dang_ky_id: phieuId },
     });
@@ -201,7 +335,7 @@ export class GiangVienService {
 
     diem.diem_chuan_bi = diemChuanBi;
     diem.ngay_lam_bai_chuan_bi = new Date();
-    diem.diem_cong = Math.min(1.0, Math.max(0.0, diemCong)); // Gioi han 0.0 den 1.0
+    diem.diem_cong = Math.min(1.0, Math.max(0.0, diemCong));
     await this.diemPhieuRepo.save(diem);
 
     // Ghi nhan lich su nhat ky diem cong neu co diem cong
@@ -288,6 +422,17 @@ export class GiangVienService {
     score: number,
     comment: string,
   ) {
+    if (
+      typeof score !== 'number' ||
+      !Number.isFinite(score) ||
+      score < 0 ||
+      score > 10
+    ) {
+      throw new BadRequestException(
+        'Điểm bài thu hoạch không hợp lệ (phải từ 0 đến 10)',
+      );
+    }
+
     const report = await this.baiThuRepo.findOne({
       where: { id: reportId },
       relations: { phieuDangKy: true },
@@ -295,6 +440,26 @@ export class GiangVienService {
     if (!report) throw new NotFoundException('Không tìm thấy bài thu hoạch');
 
     const phieuId = report.phieu_dang_ky_id;
+    const studentId = report.phieuDangKy.sinh_vien_id;
+
+    // Kiểm tra giảng viên có được phân công GVHD cho sinh viên sở hữu bài thu hoạch này hay không
+    const assignment = await this.phanCongRepo.findOne({
+      where: {
+        giang_vien_id: lecturerId,
+        trang_thai: 'DangHoatDong',
+        lichKienTapSinhVien: {
+          sinh_vien_id: studentId,
+        },
+      },
+      relations: { lichKienTapSinhVien: true },
+    });
+
+    if (!assignment) {
+      throw new ForbiddenException(
+        'Bạn không được phân công hướng dẫn sinh viên sở hữu bài thu hoạch này',
+      );
+    }
+
     let diem = await this.diemPhieuRepo.findOne({
       where: { phieu_dang_ky_id: phieuId },
     });
@@ -359,12 +524,46 @@ export class GiangVienService {
     phieuId: number,
     score: number,
   ) {
+    // Thang điểm 0..10 theo quy chế chấm điểm hội đồng
+    if (
+      typeof score !== 'number' ||
+      !Number.isFinite(score) ||
+      score < 0 ||
+      score > 10
+    ) {
+      throw new BadRequestException(
+        'Điểm hội đồng không hợp lệ (phải từ 0 đến 10)',
+      );
+    }
+
     const member = await this.hoiDongThanhVienRepo.findOne({
       where: { id: memberId },
+      relations: { hoiDong: true },
     });
-    if (!member || member.giang_vien_id !== lecturerId) {
-      throw new BadRequestException(
+    if (!member) {
+      throw new NotFoundException('Không tìm thấy thành viên hội đồng');
+    }
+
+    if (member.giang_vien_id !== lecturerId) {
+      throw new ForbiddenException(
         'Giảng viên không phải thành viên hội đồng này',
+      );
+    }
+
+    const phieu = await this.phieuRepo.findOne({
+      where: { id: phieuId },
+      relations: { chuyenThamQuan: true },
+    });
+    if (!phieu) {
+      throw new NotFoundException('Không tìm thấy phiếu đăng ký');
+    }
+
+    if (
+      phieu.chuyenThamQuan?.lich_kien_tap_id !==
+      member.hoiDong?.lich_kien_tap_id
+    ) {
+      throw new ForbiddenException(
+        'Phiếu đăng ký không thuộc kế hoạch kiến tập của hội đồng này',
       );
     }
 
@@ -405,3 +604,4 @@ export class GiangVienService {
     return { message: 'Ghi nhận điểm hội đồng thành công', score: item };
   }
 }
+

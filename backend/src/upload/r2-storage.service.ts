@@ -102,14 +102,14 @@ export class R2StorageService implements OnModuleInit {
 
   /**
    * Upload file lên R2.
-   * @returns Object chứa key (đường dẫn trên R2) và url (public hoặc signed).
+   * @returns Object chứa key (đường dẫn trên R2) và signed URL có thời hạn.
    */
   async uploadFile(
     bucket: string,
     key: string,
     body: Buffer,
     contentType: string,
-    publicUrlOverride?: string,
+    expiresIn = 3600,
   ): Promise<{ key: string; url: string }> {
     if (!this.isReady()) {
       throw new Error('R2 Storage chưa được cấu hình. Kiểm tra .env');
@@ -126,14 +126,8 @@ export class R2StorageService implements OnModuleInit {
 
     this.logger.log(`📁 Uploaded: ${bucket}/${key} (${contentType})`);
 
-    // Chọn public URL ưu tiên: override từ Controller -> global publicUrl -> signed URL fallback
-    let url: string;
-    const resolvedPublicUrl = publicUrlOverride || this.publicUrl;
-    if (resolvedPublicUrl) {
-      url = `${resolvedPublicUrl}/${key}`;
-    } else {
-      url = await this.getSignedUrl(bucket, key, 7200); // 2 giờ
-    }
+    // Luôn sinh signed URL có thời hạn (3600s), không dùng public URL
+    const url = await this.getSignedUrl(bucket, key, expiresIn);
 
     return { key, url };
   }

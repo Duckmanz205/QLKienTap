@@ -12,6 +12,15 @@ import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser, JwtPayloadUser } from '../auth/decorators/user.decorator';
+import {
+  RegisterTripDto,
+  ProposeTripDto,
+  RequestCancelDto,
+  RequestRefundDto,
+  MarkNotificationReadDto,
+  SubmitReportDto,
+  SelectRepresentativeTripsDto,
+} from './dto/sinh-vien.dto';
 
 @Controller('sinh-vien')
 @UseGuards(AuthGuard, RolesGuard)
@@ -65,7 +74,7 @@ export class SinhVienController {
   @Post('register')
   async registerTrip(
     @CurrentUser() user: JwtPayloadUser,
-    @Body() body: { tripId: number },
+    @Body() body: RegisterTripDto,
   ) {
     const student = await this.svService.getStudentByAccountId(user.sub);
     return this.svService.registerTrip(student.id, body.tripId);
@@ -74,14 +83,7 @@ export class SinhVienController {
   @Post('propose-trip')
   async proposeTrip(
     @CurrentUser() user: JwtPayloadUser,
-    @Body()
-    body: {
-      nhaMayId: number;
-      ngayThamQuan: Date;
-      gioBatDau: string;
-      gioKetThuc: string;
-      hinhThuc: string;
-    },
+    @Body() body: ProposeTripDto,
   ) {
     const student = await this.svService.getStudentByAccountId(user.sub);
     return this.svService.proposeTrip(
@@ -97,19 +99,14 @@ export class SinhVienController {
   @Post('request-cancel')
   async requestCancel(
     @CurrentUser() user: JwtPayloadUser,
-    @Body()
-    body: {
-      registrationId: number;
-      lyDo: string;
-      fileMinhChung: string;
-    },
+    @Body() body: RequestCancelDto,
   ) {
     const student = await this.svService.getStudentByAccountId(user.sub);
     return this.svService.requestCancel(
       student.id,
       body.registrationId,
       body.lyDo,
-      body.fileMinhChung,
+      body.fileMinhChung || '',
     );
   }
 
@@ -137,7 +134,7 @@ export class SinhVienController {
   @Post('request-refund')
   async requestRefund(
     @CurrentUser() user: JwtPayloadUser,
-    @Body() body: { invoiceId: number; fileScanUrl: string },
+    @Body() body: RequestRefundDto,
   ) {
     const student = await this.svService.getStudentByAccountId(user.sub);
     return this.svService.requestRefundForStudent(
@@ -174,7 +171,7 @@ export class SinhVienController {
   @Post('mark-notification-read')
   async markNotificationRead(
     @CurrentUser() user: JwtPayloadUser,
-    @Body() body: { notifId: number },
+    @Body() body: MarkNotificationReadDto,
   ) {
     return this.svService.markNotificationRead(user.sub, body.notifId);
   }
@@ -182,12 +179,7 @@ export class SinhVienController {
   @Post('submit-report')
   async submitReport(
     @CurrentUser() user: JwtPayloadUser,
-    @Body()
-    body: {
-      registrationId: number;
-      fileBaoCaoUrl: string;
-      fileXacNhanUrl?: string;
-    },
+    @Body() body: SubmitReportDto,
   ) {
     const student = await this.svService.getStudentByAccountId(user.sub);
     return this.svService.submitReport(
@@ -201,11 +193,7 @@ export class SinhVienController {
   @Post('select-representative-trips')
   async selectRepresentativeTrips(
     @CurrentUser() user: JwtPayloadUser,
-    @Body()
-    body: {
-      termStudentId: number;
-      registrationIds: number[];
-    },
+    @Body() body: SelectRepresentativeTripsDto,
   ) {
     const student = await this.svService.getStudentByAccountId(user.sub);
     return this.svService.selectRepresentativeTrips(
@@ -227,3 +215,4 @@ export class SinhVienController {
     return this.svService.getStudentGrades(student.id);
   }
 }
+

@@ -10,19 +10,36 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { KhoaService } from './khoa.service';
-import {
-  NamHoc,
-  HocKy,
-  Khoa,
-  NhaMay,
-  DotKienTap,
-  LichKienTap,
-  ChuyenThamQuan,
-} from '../entities/qlkt.entity';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { TaskQueueService } from '../queue/task-queue.service';
+import {
+  CreateYearDto,
+  CreateTermDto,
+  CreateCourseDto,
+  CreateFactoryDto,
+  UpdateFactoryDto,
+  CreateCampaignDto,
+  CreateScheduleDto,
+  ImportStudentsDto,
+  CreateTripDto,
+  ApproveTripDto,
+  ApproveCancelDto,
+  FilterAssignStudentsDto,
+  AssignGvhdDto,
+  AssignGvddDto,
+  CreateBoardDto,
+  AddBoardMemberDto,
+  LockGradesDto,
+  ApproveRefundDto,
+  CreateKhoaNotificationDto,
+  ExportStudentListDto,
+  GetStudentsQueryDto,
+  GetRegistrationsQueryDto,
+  GetRefundRequestsQueryDto,
+  GetEnrollmentsQueryDto,
+} from './dto/khoa.dto';
 
 @Controller('khoa')
 @UseGuards(AuthGuard, RolesGuard)
@@ -39,7 +56,7 @@ export class KhoaController {
   }
 
   @Post('years')
-  async createYear(@Body() body: Partial<NamHoc>) {
+  async createYear(@Body() body: CreateYearDto) {
     return this.khoaService.createYear(body);
   }
 
@@ -49,7 +66,7 @@ export class KhoaController {
   }
 
   @Post('terms')
-  async createTerm(@Body() body: Partial<HocKy>) {
+  async createTerm(@Body() body: CreateTermDto) {
     return this.khoaService.createTerm(body);
   }
 
@@ -59,7 +76,7 @@ export class KhoaController {
   }
 
   @Post('courses')
-  async createCourse(@Body() body: Partial<Khoa>) {
+  async createCourse(@Body() body: CreateCourseDto) {
     return this.khoaService.createCourse(body);
   }
 
@@ -69,14 +86,14 @@ export class KhoaController {
   }
 
   @Post('factories')
-  async createFactory(@Body() body: Partial<NhaMay>) {
+  async createFactory(@Body() body: CreateFactoryDto) {
     return this.khoaService.createFactory(body);
   }
 
   @Put('factories/:id')
   async updateFactory(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: Partial<NhaMay>,
+    @Body() body: UpdateFactoryDto,
   ) {
     return this.khoaService.updateFactory(id, body);
   }
@@ -87,15 +104,11 @@ export class KhoaController {
   }
 
   @Get('students')
-  async getStudents(
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
-    @Query('search') search?: string,
-  ) {
+  async getStudents(@Query() query: GetStudentsQueryDto) {
     return this.khoaService.getStudents(
-      page ? Number(page) : 1,
-      limit ? Number(limit) : 10,
-      search,
+      query.page || 1,
+      query.limit || 10,
+      query.search,
     );
   }
 
@@ -105,7 +118,7 @@ export class KhoaController {
   }
 
   @Post('campaigns')
-  async createCampaign(@Body() body: Partial<DotKienTap>) {
+  async createCampaign(@Body() body: CreateCampaignDto) {
     return this.khoaService.createCampaign(body);
   }
 
@@ -115,12 +128,12 @@ export class KhoaController {
   }
 
   @Post('schedules')
-  async createSchedule(@Body() body: Partial<LichKienTap>) {
+  async createSchedule(@Body() body: CreateScheduleDto) {
     return this.khoaService.createSchedule(body);
   }
 
   @Post('import-students')
-  async importStudents(@Body() body: { lichId: number; studentIds: number[] }) {
+  async importStudents(@Body() body: ImportStudentsDto) {
     return this.khoaService.importStudentsToSchedule(
       body.lichId,
       body.studentIds,
@@ -133,21 +146,12 @@ export class KhoaController {
   }
 
   @Post('trips')
-  async createTrip(@Body() body: Partial<ChuyenThamQuan>) {
+  async createTrip(@Body() body: CreateTripDto) {
     return this.khoaService.createTrip(body);
   }
 
   @Post('approve-trip')
-  async approveTrip(
-    @Body()
-    body: {
-      tripId?: number;
-      approverId?: number;
-      isApproved?: boolean;
-      registrationId?: number;
-      hanhDong?: string;
-    },
-  ) {
+  async approveTrip(@Body() body: ApproveTripDto) {
     if (body.registrationId) {
       const isApproved = body.hanhDong === 'DuyetThanhToan';
       return this.khoaService.approveRegistrationPayment(
@@ -163,14 +167,7 @@ export class KhoaController {
   }
 
   @Post('approve-cancel')
-  async approveCancel(
-    @Body()
-    body: {
-      requestId: number;
-      approverId: number;
-      isApproved: boolean;
-    },
-  ) {
+  async approveCancel(@Body() body: ApproveCancelDto) {
     return this.khoaService.approveCancelRequest(
       body.requestId,
       body.approverId,
@@ -179,14 +176,12 @@ export class KhoaController {
   }
 
   @Post('filter-assign-students')
-  async filterAssignStudents(@Body() body: { tripId: number }) {
+  async filterAssignStudents(@Body() body: FilterAssignStudentsDto) {
     return this.khoaService.filterAndAssignStudents(body.tripId);
   }
 
   @Post('assign-gvhd')
-  async assignGvhd(
-    @Body() body: { lichKienTapSinhVienId: number; lecturerId: number },
-  ) {
+  async assignGvhd(@Body() body: AssignGvhdDto) {
     return this.khoaService.assignLecturerGuide(
       body.lichKienTapSinhVienId,
       body.lecturerId,
@@ -194,9 +189,7 @@ export class KhoaController {
   }
 
   @Post('assign-gvdd')
-  async assignGvdd(
-    @Body() body: { tripId: number; lecturerId: number; laTruongDoan: boolean },
-  ) {
+  async assignGvdd(@Body() body: AssignGvddDto) {
     return this.khoaService.assignTourLeader(
       body.tripId,
       body.lecturerId,
@@ -205,15 +198,7 @@ export class KhoaController {
   }
 
   @Post('create-board')
-  async createBoard(
-    @Body()
-    body: {
-      scheduleId: number;
-      name: string;
-      date: Date;
-      room: string;
-    },
-  ) {
+  async createBoard(@Body() body: CreateBoardDto) {
     return this.khoaService.createBoard(
       body.scheduleId,
       body.name,
@@ -223,9 +208,7 @@ export class KhoaController {
   }
 
   @Post('add-board-member')
-  async addBoardMember(
-    @Body() body: { boardId: number; lecturerId: number; role: string },
-  ) {
+  async addBoardMember(@Body() body: AddBoardMemberDto) {
     return this.khoaService.addBoardMember(
       body.boardId,
       body.lecturerId,
@@ -234,7 +217,7 @@ export class KhoaController {
   }
 
   @Post('lock-grades')
-  async lockGrades(@Body() body: { termStudentId: number; userId: number }) {
+  async lockGrades(@Body() body: LockGradesDto) {
     return this.khoaService.lockAndFinalizeGrades(
       body.termStudentId,
       body.userId,
@@ -259,41 +242,28 @@ export class KhoaController {
   }
 
   @Get('registrations')
-  async getRegistrations(
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
-    @Query('search') search?: string,
-    @Query('status') status?: string,
-    @Query('lichKienTapId') lichKienTapId?: number,
-    @Query('chuyenThamQuanId') chuyenThamQuanId?: number,
-  ) {
+  async getRegistrations(@Query() query: GetRegistrationsQueryDto) {
     return this.khoaService.getRegistrations(
-      page ? Number(page) : 1,
-      limit ? Number(limit) : 10,
-      search,
-      status,
-      lichKienTapId ? Number(lichKienTapId) : undefined,
-      chuyenThamQuanId ? Number(chuyenThamQuanId) : undefined,
+      query.page || 1,
+      query.limit || 10,
+      query.search,
+      query.status,
+      query.lichKienTapId,
+      query.chuyenThamQuanId,
     );
   }
 
   @Get('refund-requests')
-  async getRefundRequests(
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
-    @Query('search') search?: string,
-  ) {
+  async getRefundRequests(@Query() query: GetRefundRequestsQueryDto) {
     return this.khoaService.getRefundRequests(
-      page ? Number(page) : 1,
-      limit ? Number(limit) : 10,
-      search,
+      query.page || 1,
+      query.limit || 10,
+      query.search,
     );
   }
 
   @Post('approve-refund')
-  async approveRefund(
-    @Body() body: { refundId: number; approverId: number; isApproved: boolean },
-  ) {
+  async approveRefund(@Body() body: ApproveRefundDto) {
     return this.khoaService.approveRefund(
       body.refundId,
       body.approverId,
@@ -302,15 +272,11 @@ export class KhoaController {
   }
 
   @Get('enrollments')
-  async getEnrollments(
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
-    @Query('search') search?: string,
-  ) {
+  async getEnrollments(@Query() query: GetEnrollmentsQueryDto) {
     return this.khoaService.getEnrollments(
-      page ? Number(page) : 1,
-      limit ? Number(limit) : 10,
-      search,
+      query.page || 1,
+      query.limit || 10,
+      query.search,
     );
   }
 
@@ -320,20 +286,12 @@ export class KhoaController {
   }
 
   @Post('notifications')
-  async createNotification(
-    @Body()
-    body: {
-      tieu_de: string;
-      noi_dung: string;
-      nguoi_gui_id: number;
-      khoa_id?: number;
-    },
-  ) {
+  async createNotification(@Body() body: CreateKhoaNotificationDto) {
     return this.khoaService.createNotification(body);
   }
 
   @Post('export-student-list')
-  async exportStudentList(@Body() body: { campaignId?: number }) {
+  async exportStudentList(@Body() body: ExportStudentListDto) {
     const fileName = `student_export_${Date.now()}.xlsx`;
 
     // Add job to background queue
@@ -350,3 +308,4 @@ export class KhoaController {
     };
   }
 }
+

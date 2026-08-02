@@ -175,7 +175,7 @@ export class AuthService {
     };
   }
 
-  async updateProfile(userId: number, sdt: string, email: string) {
+  async updateProfile(userId: number, sdt?: string, email?: string) {
     const user = await this.taiKhoanRepo.findOne({ where: { id: userId } });
     if (!user) {
       throw new NotFoundException('Không tìm thấy tài khoản');
@@ -186,8 +186,12 @@ export class AuthService {
         where: { taikhoan_id: userId },
       });
       if (sv) {
-        sv.sdt = sdt;
-        sv.email = email;
+        if (sdt !== undefined && sdt.trim() !== '') {
+          sv.sdt = sdt.trim();
+        }
+        if (email !== undefined && email.trim() !== '') {
+          sv.email = email.trim();
+        }
         await this.sinhVienRepo.save(sv);
       }
     } else if (user.vai_tro === 'GiangVien') {
@@ -195,8 +199,12 @@ export class AuthService {
         where: { taikhoan_id: userId },
       });
       if (gv) {
-        gv.sdt = sdt;
-        gv.email = email;
+        if (sdt !== undefined && sdt.trim() !== '') {
+          gv.sdt = sdt.trim();
+        }
+        if (email !== undefined && email.trim() !== '') {
+          gv.email = email.trim();
+        }
         await this.giangVienRepo.save(gv);
       }
     }

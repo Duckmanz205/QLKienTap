@@ -1,14 +1,15 @@
-import { Controller, Post, Body, Get, Put, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, Get, Put, UseGuards, BadRequestException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuthGuard } from './guards/auth.guard';
 import { CurrentUser, JwtPayloadUser } from './decorators/user.decorator';
+import { LoginDto, ChangePasswordDto, UpdateProfileDto } from './dto/auth.dto';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('login')
-  async login(@Body() body: { ten_dang_nhap: string; mat_khau: string }) {
+  async login(@Body() body: LoginDto) {
     return this.authService.login(body.ten_dang_nhap, body.mat_khau);
   }
 
@@ -16,7 +17,7 @@ export class AuthController {
   @Post('change-password')
   async changePassword(
     @CurrentUser() user: JwtPayloadUser,
-    @Body() body: { oldPass: string; newPass: string },
+    @Body() body: ChangePasswordDto,
   ) {
     return this.authService.changePassword(
       user.sub,
@@ -42,8 +43,11 @@ export class AuthController {
   @Put('profile')
   async updateMyProfile(
     @CurrentUser() user: JwtPayloadUser,
-    @Body() body: { sdt: string; email: string },
+    @Body() body: UpdateProfileDto,
   ) {
+    if (!body.sdt && !body.email) {
+      throw new BadRequestException('Request phải chứa ít nhất sdt hoặc email để cập nhật');
+    }
     return this.authService.updateProfile(user.sub, body.sdt, body.email);
   }
 
@@ -51,9 +55,14 @@ export class AuthController {
   @Put('profile/:userId')
   async updateProfile(
     @CurrentUser() user: JwtPayloadUser,
-    @Body() body: { sdt: string; email: string },
+    @Body() body: UpdateProfileDto,
   ) {
     // Luon cap nhat profile cua user dang dang nhap de chong IDOR
+    if (!body.sdt && !body.email) {
+      throw new BadRequestException('Request phải chứa ít nhất sdt hoặc email để cập nhật');
+    }
     return this.authService.updateProfile(user.sub, body.sdt, body.email);
   }
 }
+
+
