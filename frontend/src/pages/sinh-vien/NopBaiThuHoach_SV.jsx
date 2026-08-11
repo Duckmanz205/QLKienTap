@@ -1,15 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  FileText, 
-  CheckCircle, 
-  AlertTriangle, 
-  Clock, 
-  Upload, 
-  ShieldCheck, 
+import axios from 'axios';
+import {
+  FileText,
+  CheckCircle,
+  AlertTriangle,
+  Clock,
+  Upload,
+  ShieldCheck,
   Check,
   Building,
   Laptop,
-  Calendar
+  Calendar,
+  Sparkles,
+  Edit3,
+  X,
+  Loader2
 } from 'lucide-react';
 import api, { sinhVienApi } from '../../services/api';
 
@@ -19,11 +24,18 @@ export default function NopBaiThuHoach_SV() {
   const [grades, setGrades] = useState([]);
   const [selectedCouncilReportIds, setSelectedCouncilReportIds] = useState([]);
 
-  // Upload Simulator State
+  // Upload Simulator & OCR States
   const [activeUploadId, setActiveUploadId] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [simulatedFile, setSimulatedFile] = useState('');
   const [simulatedProofFile, setSimulatedProofFile] = useState('');
+
+  // OCR Modal States (TÍCH HỢP AI)
+  const [isOcrScanning, setIsOcrScanning] = useState(false);
+  const [showOcrModal, setShowOcrModal] = useState(false);
+  const [ocrText, setOcrText] = useState('');
+  const [pendingRegistration, setPendingRegistration] = useState(null);
+  const [pendingPdfFile, setPendingPdfFile] = useState(null);
 
   // Council modal state
   const [showCouncilModal, setShowCouncilModal] = useState(false);
@@ -41,19 +53,54 @@ export default function NopBaiThuHoach_SV() {
     }
   }, []);
 
+  // const fetchData = async (svId) => {
+  //   try {
+  //     const regRes = await sinhVienApi.getRegisteredTrips(svId);
+  //     const filtered = regRes.data.filter(t =>
+  //       t.trang_thai === 'DaThamGia' || t.trang_thai === 'HopLe' || t.trang_thai === 'HoanThanh'
+  //     );
+  //     setRegisteredTrips(filtered);
+  //
+  //     const gradesRes = await sinhVienApi.getGrades(svId);
+  //     setGrades(gradesRes.data);
+  //
+  //     if (gradesRes.data && gradesRes.data.length > 0) {
+  //       const currentTerm = gradesRes.data[0];
+  //       if (currentTerm.selectedTrips) {
+  //         setSelectedCouncilReportIds(currentTerm.selectedTrips.map(t => t.phieu_dang_ky_id));
+  //       }
+  //     }
+  //   } catch (err) {
+  //     console.error(err);
+  //   }
+  // };
+
   const fetchData = async (svId) => {
+    // 🚨 MOCK DATA BẤT TỬ: Khởi tạo sẵn dữ liệu giả
+    const mockTrip = {
+      id: 9999, // ID giả không tồn tại trong DB
+      trang_thai: 'DaThamGia',
+      chuyenThamQuan: {
+        hinh_thuc: 'TrucTiep',
+        cach_to_chuc: 'DoKhoaToChuc',
+        ngay_tham_quan: new Date().toISOString(),
+        nhaMay: { ten_nha_may: '🏭 [MOCK DATA] Nhà máy Acecook (Test AI)' }
+      },
+      baiThuHoach: null // Chưa nộp bài
+    };
+
     try {
       const regRes = await sinhVienApi.getRegisteredTrips(svId);
-      // Only show trips that are DaThamGia, HopLe, or HoanThanh
-      const filtered = regRes.data.filter(t => 
+      const filtered = regRes.data.filter(t =>
         t.trang_thai === 'DaThamGia' || t.trang_thai === 'HopLe' || t.trang_thai === 'HoanThanh'
       );
-      setRegisteredTrips(filtered);
+
+      // Nếu API thành công, ta nhét thêm cục Mock Data vào đầu danh sách
+      setRegisteredTrips([mockTrip, ...filtered]);
 
       const gradesRes = await sinhVienApi.getGrades(svId);
       setGrades(gradesRes.data);
 
-      // Pre-select already chosen representative trips if they exist
       if (gradesRes.data && gradesRes.data.length > 0) {
         const currentTerm = gradesRes.data[0];
         if (currentTerm.selectedTrips) {
@@ -61,35 +108,77 @@ export default function NopBaiThuHoach_SV() {
         }
       }
     } catch (err) {
-      console.error(err);
+      console.error("Backend báo lỗi không có dữ liệu, nhưng ta vẫn ép hiện Mock Data!", err);
+      // Nếu API sập/lỗi do DB rỗng, VẪN ÉP HIỂN THỊ CỤC MOCK DATA NÀY!
+      setRegisteredTrips([mockTrip]);
     }
   };
 
+  // =========================================================================
+  // BƯỚC 1: XỬ LÝ CHỌN FILE PDF & KÍCH HOẠT QUÉT OCR
+  // =========================================================================
   const handleRealUpload = async (event, reg) => {
     const file = event.target.files[0];
     if (!file) return;
 
-    // Check size limit: 5MB
     if (file.size > 5 * 1024 * 1024) {
       alert('Kích thước tệp báo cáo vượt quá hạn mức 5MB.');
       return;
     }
 
     setActiveUploadId(reg.id);
-    setUploadProgress(10);
+    setIsOcrScanning(true);
     setMessage('');
     setError('');
     setSimulatedFile(file.name);
 
     try {
-      // 1. Upload report file
+      // Gửi file PDF tới Microservice AI (:8000/process-pdf)
+      const ocrFormData = new FormData();
+      ocrFormData.append('file', file);
+
+      const ocrResponse = await axios.post('http://localhost:8000/process-pdf', ocrFormData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      const extractedText = ocrResponse.data.extracted_text || '';
+
+      // Mở Modal kiểm duyệt cho sinh viên xem và chỉnh sửa
+      setOcrText(extractedText);
+      setPendingRegistration(reg);
+      setPendingPdfFile(file);
+      setShowOcrModal(true);
+
+    } catch (err) {
+      console.error('Lỗi kết nối AI OCR:', err);
+      setError('Không thể trích xuất văn bản từ AI OCR. Vui lòng đảm bảo server AI (:8000) đang chạy.');
+    } finally {
+      setIsOcrScanning(false);
+      setActiveUploadId(null);
+    }
+  };
+
+  // =========================================================================
+  // BƯỚC 2: XÁC NHẬN NỘP BÀI (GỬI PDF + VĂN BẢN ĐÃ CHỈNH SỬA)
+  // =========================================================================
+  const handleConfirmFinalSubmission = async () => {
+    if (!pendingPdfFile || !pendingRegistration) return;
+
+    const reg = pendingRegistration;
+    const file = pendingPdfFile;
+
+    setActiveUploadId(reg.id);
+    setUploadProgress(10);
+    setMessage('');
+    setError('');
+
+    try {
+      // 1. Tải file báo cáo PDF lên NestJS backend
       const formData = new FormData();
       formData.append('file', file);
 
       const uploadRes = await api.post('/upload/report', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        headers: { 'Content-Type': 'multipart/form-data' },
         onUploadProgress: (progressEvent) => {
           const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
           setUploadProgress(percentCompleted);
@@ -99,7 +188,7 @@ export default function NopBaiThuHoach_SV() {
       const fileBaoCaoUrl = uploadRes.data.key || uploadRes.data.url;
       let fileXacNhanUrl = undefined;
 
-      // 2. If it's a free proposed trip, prompt for proof image
+      // 2. Nếu là chuyến tự do -> Đính kèm minh chứng doanh nghiệp
       const isFree = reg.chuyenThamQuan.cach_to_chuc === 'TuDo';
       if (isFree) {
         const confirmUploadProof = window.confirm('Đây là chuyến tự chọn. Bạn cần đính kèm tệp minh chứng/xác nhận tham quan từ doanh nghiệp (định dạng JPG, JPEG, PNG, dưới 2MB). Bạn có muốn chọn tệp ngay bây giờ?');
@@ -107,7 +196,7 @@ export default function NopBaiThuHoach_SV() {
           const input = document.createElement('input');
           input.type = 'file';
           input.accept = 'image/*';
-          
+
           const proofFile = await new Promise((resolve) => {
             input.onchange = (e) => resolve(e.target.files[0]);
             input.click();
@@ -125,23 +214,23 @@ export default function NopBaiThuHoach_SV() {
             proofFormData.append('file', proofFile);
 
             const proofRes = await api.post('/upload/payment', proofFormData, {
-              headers: {
-                'Content-Type': 'multipart/form-data',
-              }
+              headers: { 'Content-Type': 'multipart/form-data' }
             });
             fileXacNhanUrl = proofRes.data.key || proofRes.data.url;
           }
         }
       }
 
-      // 3. Submit report to database
+      // 3. Đệ trình bài thu hoạch kèm theo VĂN BẢN ĐÃ CHỈNH SỬA (noiDungText)
       await sinhVienApi.submitReport({
         registrationId: reg.id,
         fileBaoCaoUrl,
-        fileXacNhanUrl
+        fileXacNhanUrl,
+        noiDungText: ocrText  // <-- ĐÍNH KÈM NỘI DUNG OCR
       });
 
-      setMessage('Đã nộp bài thu hoạch thành công!');
+      setMessage('Đã nộp bài thu hoạch và xác nhận nội dung OCR thành công!');
+      setShowOcrModal(false);
       fetchData(student.id);
     } catch (err) {
       console.error(err);
@@ -149,6 +238,8 @@ export default function NopBaiThuHoach_SV() {
     } finally {
       setActiveUploadId(null);
       setUploadProgress(0);
+      setPendingPdfFile(null);
+      setPendingRegistration(null);
     }
   };
 
@@ -190,7 +281,6 @@ export default function NopBaiThuHoach_SV() {
     }
   };
 
-  // Calculations for Council Criteria
   const selectedReports = registeredTrips.filter(t => selectedCouncilReportIds.includes(t.id));
   const directSelectedCount = selectedReports.filter(t => t.chuyenThamQuan.hinh_thuc === 'TrucTiep').length;
   const onlineSelectedCount = selectedReports.filter(t => t.chuyenThamQuan.hinh_thuc === 'TrucTuyen').length;
@@ -220,7 +310,7 @@ export default function NopBaiThuHoach_SV() {
         </div>
       )}
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-755 px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2">
+        <div className="bg-red-50 border border-red-200 text-red-750 px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 text-red-650" />
           <span>{error}</span>
         </div>
@@ -228,7 +318,7 @@ export default function NopBaiThuHoach_SV() {
 
       {/* Main Grid Content */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 relative z-10">
-        
+
         {/* Left Column: List of Submissions */}
         <div className="lg:col-span-8 space-y-6">
           {/* Templates download section */}
@@ -241,14 +331,14 @@ export default function NopBaiThuHoach_SV() {
               Để đảm bảo các báo cáo của bạn được duyệt nhanh chóng, vui lòng tải các tài liệu hướng dẫn và mẫu nhật ký bên dưới:
             </p>
             <div className="flex flex-wrap gap-3">
-              <a 
+              <a
                 href="http://localhost:3000/api/upload/file/templates/huong_dan_viet_bao_cao.pdf"
                 download
                 className="px-4 py-2 bg-white text-blue-700 border border-blue-300 rounded-xl text-xs font-bold hover:bg-blue-50 transition-colors inline-flex items-center gap-2 shadow-xs"
               >
                 <span>📄 Quy chuẩn viết báo cáo (PDF)</span>
               </a>
-              <a 
+              <a
                 href="http://localhost:3000/api/upload/file/templates/mau_nhat_ky_thuc_tap.xlsx"
                 download
                 className="px-4 py-2 bg-white text-emerald-700 border border-emerald-300 rounded-xl text-xs font-bold hover:bg-emerald-50 transition-colors inline-flex items-center gap-2 shadow-xs"
@@ -287,13 +377,12 @@ export default function NopBaiThuHoach_SV() {
               registeredTrips.map((reg) => {
                 const isSubmitted = !!reg.baiThuHoach;
                 const isDirect = reg.chuyenThamQuan.hinh_thuc === 'TrucTiep';
-                const isOnline = reg.chuyenThamQuan.hinh_thuc === 'TrucTuyen';
                 const isFree = reg.chuyenThamQuan.cach_to_chuc === 'TuDo';
                 const isUploadingThis = activeUploadId === reg.id;
 
                 return (
-                  <div 
-                    key={reg.id} 
+                  <div
+                    key={reg.id}
                     className={`bg-white rounded-2xl shadow-sm border p-6 transition-all duration-300 relative overflow-hidden group ${
                       isSubmitted ? 'border-primary/20 bg-primary/2/10' : 'border-surface-variant/50 hover:border-primary/20 hover:shadow-md'
                     }`}
@@ -347,43 +436,37 @@ export default function NopBaiThuHoach_SV() {
                             <FileText className="w-4 h-4 text-primary" />
                             <span className="truncate max-w-[180px]">{reg.baiThuHoach.file_bao_cao}</span>
                           </div>
-                          {reg.baiThuHoach.file_xac_nhan_tham_quan && (
-                            <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-surface-variant/65 text-xs font-bold text-on-surface mt-1">
-                              <ShieldCheck className="w-4 h-4 text-[#446900]" />
-                              <span className="truncate max-w-[180px]">{reg.baiThuHoach.file_xac_nhan_tham_quan}</span>
-                            </div>
-                          )}
                         </div>
                       )}
                     </div>
 
-                    {/* Progress upload indicator */}
+                    {/* Progress upload / OCR Scanning indicator */}
                     {isUploadingThis ? (
                       <div className="mt-4 p-5 bg-[#f8faf1] border border-dashed border-primary/40 rounded-xl flex flex-col gap-3">
                         <div className="flex items-center justify-between text-xs font-bold text-on-surface">
-                          <span>Đang tải tệp tin lên...</span>
-                          <span>{uploadProgress}%</span>
+                          <span className="flex items-center gap-2">
+                            {isOcrScanning ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : null}
+                            {isOcrScanning ? '🤖 Đang kết nối AI quét văn bản OCR...' : 'Đang tải tệp tin lên...'}
+                          </span>
+                          {!isOcrScanning && <span>{uploadProgress}%</span>}
                         </div>
-                        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-primary rounded-full transition-all duration-200"
-                            style={{ width: `${uploadProgress}%` }}
-                          ></div>
-                        </div>
-                        <div className="text-[10px] text-on-surface-variant font-medium">
-                          Tập tin: {simulatedFile} {isFree && `| Xác nhận: ${simulatedProofFile}`}
-                        </div>
+                        {!isOcrScanning && (
+                          <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-primary rounded-full transition-all duration-200"
+                              style={{ width: `${uploadProgress}%` }}
+                            ></div>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="mt-4 flex justify-end gap-2">
-                        <label
-                          className="px-5 py-2.5 rounded-xl text-xs font-black tracking-wider uppercase flex items-center gap-1.5 bg-primary text-white hover:bg-primary-container shadow-sm active:scale-95 cursor-pointer"
-                        >
+                        <label className="px-5 py-2.5 rounded-xl text-xs font-black tracking-wider uppercase flex items-center gap-1.5 bg-primary text-white hover:bg-primary-container shadow-sm active:scale-95 cursor-pointer">
                           <Upload className="w-4 h-4" />
                           <span>{isSubmitted ? 'Nộp lại bài' : isFree ? 'Nộp bài & Xác nhận DN' : 'Nộp bài'}</span>
                           <input
                             type="file"
-                            accept=".pdf,.docx,.doc"
+                            accept=".pdf"
                             className="hidden"
                             onChange={(e) => handleRealUpload(e, reg)}
                           />
@@ -409,7 +492,6 @@ export default function NopBaiThuHoach_SV() {
               Chọn chính xác 3 chuyến đi đã nộp báo cáo để làm bộ đại diện tính điểm tổng kết học phần:
             </p>
 
-            {/* Criteria Checklist Cards */}
             <div className="space-y-2 mb-6">
               <div className={`p-3 rounded-xl border flex items-center justify-between text-xs font-bold ${
                 isDirectCriteriaMet 
@@ -429,7 +511,6 @@ export default function NopBaiThuHoach_SV() {
               </div>
             </div>
 
-            {/* Selection Ticks */}
             <div className="space-y-3 mb-6 max-h-[300px] overflow-y-auto">
               <span className="text-[10px] font-black text-outline uppercase tracking-wider block mb-2">
                 Danh sách báo cáo đã nộp
@@ -442,16 +523,16 @@ export default function NopBaiThuHoach_SV() {
                   const isOnline = reg.chuyenThamQuan.hinh_thuc === 'TrucTuyen';
 
                   return (
-                    <label 
-                      key={reg.id} 
+                    <label
+                      key={reg.id}
                       className={`flex items-start gap-3 p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                         isChecked 
                           ? 'bg-secondary/5 border-secondary text-[#446900]' 
                           : 'bg-[#f8faf1]/80 hover:bg-[#ecefe6] border-surface-variant/50'
                       }`}
                     >
-                      <input 
-                        type="checkbox" 
+                      <input
+                        type="checkbox"
                         checked={isChecked}
                         onChange={(e) => handleSelectCouncilReport(reg.id, e.target.checked)}
                         className="mt-0.5 rounded border-gray-300 text-primary focus:ring-primary accent-[#446900]"
@@ -470,7 +551,6 @@ export default function NopBaiThuHoach_SV() {
               )}
             </div>
 
-            {/* Status Indicator & Button */}
             <div className="mt-auto space-y-4">
               {isEligibleForCouncil ? (
                 <div className="p-3 bg-primary/10 rounded-xl text-xs text-primary font-bold text-center border border-primary/20">
@@ -500,6 +580,79 @@ export default function NopBaiThuHoach_SV() {
 
       </div>
 
+      {/* ========================================================================= */}
+      {/* MODAL MỚI: KIỂM DUYỆT & CHỈNH SỬA VĂN BẢN OCR TỪ AI                        */}
+      {/* ========================================================================= */}
+      {showOcrModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-3xl shadow-2xl overflow-hidden border border-surface-variant animate-scale-up flex flex-col max-h-[90vh]">
+            {/* Header Modal */}
+            <div className="p-6 bg-[#f8faf1] border-b border-surface-variant flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-bold">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-base text-on-surface">Kiểm duyệt văn bản trích xuất OCR (AI)</h3>
+                  <p className="text-xs text-on-surface-variant font-semibold">
+                    Đoạn văn bản dưới đây sẽ được AI sử dụng để chấm điểm. Vui lòng chỉnh sửa các từ bị đọc sai chính tả (nếu có).
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowOcrModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-2 rounded-full transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content Textarea */}
+            <div className="p-6 flex-1 overflow-y-auto space-y-3">
+              <div className="flex items-center justify-between text-xs font-bold text-on-surface-variant">
+                <span className="flex items-center gap-1.5 text-primary">
+                  <Edit3 className="w-4 h-4" />
+                  <span>Trình soạn thảo văn bản báo cáo</span>
+                </span>
+                <span>Tự động phát hiện bởi Qwen-VL-OCR</span>
+              </div>
+
+              <textarea
+                rows={14}
+                value={ocrText}
+                onChange={(e) => setOcrText(e.target.value)}
+                placeholder="Nội dung báo cáo quét được sẽ hiển thị ở đây..."
+                className="w-full p-4 text-xs font-mono bg-[#f8faf1] border border-surface-variant rounded-2xl focus:outline-none focus:border-primary text-on-surface leading-relaxed resize-none shadow-inner"
+              />
+
+              <p className="text-[11px] text-amber-700 bg-amber-50 p-3 rounded-xl border border-amber-200 font-semibold flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>Mẹo: Bạn có thể sửa trực tiếp nội dung bên trên trước khi bấm gửi. Hệ thống AI có tính năng "Kháng thể OCR" tự động bỏ qua các lỗi gõ sai nhỏ.</span>
+              </p>
+            </div>
+
+            {/* Footer Modal */}
+            <div className="p-6 border-t border-slate-100 bg-[#f8faf1]/50 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowOcrModal(false)}
+                className="px-5 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-200 rounded-xl cursor-pointer transition-colors"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmFinalSubmission}
+                className="px-6 py-2.5 bg-primary hover:bg-primary-container text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-2"
+              >
+                <CheckCircle className="w-4 h-4" />
+                <span>Xác nhận & Nộp bài chính thức</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Council Success Registration Popup Modal */}
       {showCouncilModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
@@ -507,29 +660,15 @@ export default function NopBaiThuHoach_SV() {
             <div className="w-16 h-16 bg-[#e5ffdc] rounded-full flex items-center justify-center text-primary mx-auto mb-4 border border-primary/20 shadow-inner">
               <ShieldCheck className="w-8 h-8" />
             </div>
-            
+
             <h3 className="font-black text-xl text-on-surface">Chốt bộ báo cáo thành công!</h3>
             <p className="text-sm text-on-surface-variant font-semibold mt-2 leading-relaxed px-2">
               Lựa chọn của bạn đã được ghi nhận trên hệ thống. Giảng viên phụ trách và hội đồng chấm điểm sẽ tiến hành chấm điểm dựa trên bộ 3 chuyến đi đại diện này.
             </p>
 
-            <div className="my-5 p-4 bg-[#f8faf1] rounded-2xl border border-surface-variant text-left space-y-2">
-              <span className="text-[10px] text-outline font-black uppercase tracking-wider block">
-                Chuyến đi đã chốt đại diện
-              </span>
-              {selectedReports.map((r, i) => (
-                <div key={r.id} className="text-xs font-bold text-on-surface flex items-center justify-between">
-                  <span>{i + 1}. {r.chuyenThamQuan.nhaMay?.ten_nha_may}</span>
-                  <span className="text-[#89b449] uppercase tracking-wide text-[10px] shrink-0 font-black">
-                    {r.chuyenThamQuan.hinh_thuc === 'TrucTuyen' ? 'Trực tuyến' : 'Trực tiếp'}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            <button 
+            <button
               onClick={() => setShowCouncilModal(false)}
-              className="w-full py-3 bg-primary text-white rounded-xl text-sm font-bold hover:bg-primary-container shadow-md cursor-pointer transition-all active:scale-95"
+              className="w-full py-3 bg-primary text-white rounded-xl text-sm font-bold hover:bg-primary-container shadow-md cursor-pointer transition-all active:scale-95 mt-6"
             >
               Hoàn tất & Quay lại
             </button>

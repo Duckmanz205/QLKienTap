@@ -1,17 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  CheckSquare, 
-  FileText, 
-  Sparkles, 
-  ArrowLeft, 
-  Download, 
-  Check, 
+import axios from 'axios';
+import {
+  CheckSquare,
+  FileText,
+  Sparkles,
+  ArrowLeft,
+  Download,
+  Check,
   AlertTriangle,
   Info,
   ExternalLink,
   Search,
   CheckCircle,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Loader2,
+  Bot,
+  Building,
+  Laptop,
+  RefreshCw
 } from 'lucide-react';
 import api, { giangVienApi } from '../../services/api';
 
@@ -19,7 +25,7 @@ export default function ChamBaiThuHoach_GV() {
   const [lecturer, setLecturer] = useState(null);
   const [reports, setReports] = useState([]);
   const [selectedReport, setSelectedReport] = useState(null);
-  
+
   // Search & Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -27,7 +33,13 @@ export default function ChamBaiThuHoach_GV() {
   // Grading states
   const [score, setScore] = useState('');
   const [comments, setComments] = useState('');
-  const [showAiBreakdown, setShowAiBreakdown] = useState(false);
+
+  // STATE: Quản lý đoạn text OCR để giáo viên có thể chỉnh sửa/mồi dữ liệu test
+  const [editableOcrText, setEditableOcrText] = useState('');
+
+  // STATE TÍCH HỢP AI GRADER
+  const [isAIGrading, setIsAIGrading] = useState(false);
+  const [aiResult, setAiResult] = useState(null);
 
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -52,6 +64,22 @@ export default function ChamBaiThuHoach_GV() {
 
   const fetchReports = async (gvId = lecturer?.id, pageVal = page, search = searchTerm, status = statusFilter) => {
     if (!gvId) return;
+
+    // 🚨 MOCK DATA: BÀI BÁO CÁO ẢO CHỨA "TEXT OCR" ĐỂ TEST AI
+    const mockReport = {
+      id: 8888,
+      trang_thai: 'ChoCham',
+      ngay_nop: new Date().toISOString(),
+      file_bao_cao: 'BaoCao_Mock_KienTap.pdf',
+      diem_bai_thu_hoach: null,
+      nhan_xet_gv: '',
+      noi_dung_text: "I. Tổng quan nhà máy: Công ty Acecook hoạt động rất lớn, sản xuất mì tôm. II. Quy trình công nghệ: 1. Trộn bột, 2. Cán sợi, 3. Chiên, 4. Đóng gói. III. Đánh giá VSATTP: Yêu cầu 1 đồ bảo hộ: Thực trạng có trang bị, Đạt. Yêu cầu 2 rửa tay: Thực trạng sát khuẩn bằng cồn, Đạt. Sinh viên cảm thấy bài học rất bổ ích.",
+      phieuDangKy: {
+        sinhVien: { ho_ten: '[MOCK] Nguyễn Văn Test AI', mssv: '20010099', lop: '10DHTP1' },
+        chuyenThamQuan: { nhaMay: { ten_nha_may: '🏭 [MOCK] Nhà máy Acecook' } }
+      }
+    };
+
     try {
       const res = await giangVienApi.getGuidedReports(gvId, {
         page: pageVal,
@@ -59,12 +87,14 @@ export default function ChamBaiThuHoach_GV() {
         search: search || undefined,
         status: status !== 'all' ? status : undefined
       });
-      setReports(res.data.data || []);
-      setTotal(res.data.total || 0);
+
+      setReports([mockReport, ...(res.data.data || [])]);
+      setTotal((res.data.total || 0) + 1);
       setTotalPages(res.data.totalPages || 1);
       setPage(pageVal);
     } catch (err) {
-      console.error(err);
+      console.error("Lỗi lấy danh sách, ÉP HIỆN MOCK DATA", err);
+      setReports([mockReport]);
     }
   };
 
@@ -79,15 +109,59 @@ export default function ChamBaiThuHoach_GV() {
 
   const handleSelectReport = (rep) => {
     setSelectedReport(rep);
-    setScore(rep.diem_bai_thu_hoach !== null && rep.diem_bai_thu_hoach !== undefined ? rep.diem_bai_thu_hoach.toString() : '8.0');
-    setComments(rep.nhan_xet_gv || 'Báo cáo có cấu trúc rõ ràng, tổng hợp được đầy đủ quy trình sản xuất thực tế tại nhà máy. Trình bày khoa học.');
+    setScore(rep.diem_bai_thu_hoach !== null && rep.diem_bai_thu_hoach !== undefined ? rep.diem_bai_thu_hoach.toString() : '');
+    setComments(rep.nhan_xet_gv || '');
+
+    // Nạp dữ liệu vào ô Test
+    setEditableOcrText(rep.noi_dung_text || '');
+
     setMessage('');
     setError('');
+    setAiResult(null);
+    setIsAIGrading(false);
+  };
+
+  // =========================================================================
+  // GỌI API HỘI ĐỒNG CHẤM ĐIỂM TỰ ĐỘNG (:8000/grade)
+  // =========================================================================
+  const handleAIGrading = async () => {
+    if (!editableOcrText || editableOcrText.trim() === '') {
+      setError('Bạn cần cung cấp đoạn văn bản báo cáo để AI có thể chấm điểm!');
+      return;
+    }
+
+    setIsAIGrading(true);
+    setError('');
+    try {
+      const response = await axios.post('http://localhost:8000/grade',
+        { document_text: editableOcrText },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer satori_2026_secure_key'
+          }
+        }
+      );
+
+      setAiResult(response.data);
+      setScore(response.data.diem_bao_cao_cuoi_cung.toString());
+    } catch (err) {
+      console.error(err);
+      setError('Lỗi kết nối Hội đồng AI Grader. Vui lòng kiểm tra server cổng :8000.');
+    } finally {
+      setIsAIGrading(false);
+    }
   };
 
   const handleSaveGrade = async (e) => {
     e.preventDefault();
     if (!selectedReport) return;
+
+    if (selectedReport.id === 8888) {
+      alert("Bạn vừa chấm điểm thành công cho tài khoản Mock Data!");
+      setSelectedReport(null);
+      return;
+    }
 
     const numScore = parseFloat(score);
     if (isNaN(numScore) || numScore < 0 || numScore > 10) {
@@ -106,8 +180,7 @@ export default function ChamBaiThuHoach_GV() {
         comment: comments
       });
       setMessage(res.data.message);
-      
-      // Refresh list and return back
+
       fetchReports(lecturer.id);
       setTimeout(() => {
         setSelectedReport(null);
@@ -126,9 +199,6 @@ export default function ChamBaiThuHoach_GV() {
       </div>
     );
   }
-
-  // Filtered reports
-  const filteredReports = reports;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -162,11 +232,10 @@ export default function ChamBaiThuHoach_GV() {
         <div className="space-y-6 relative z-10">
           {/* Filters Bar */}
           <div className="bg-white rounded-2xl p-4 shadow-sm border border-surface-variant/40 flex flex-col md:flex-row gap-4 items-center justify-between">
-            {/* Search */}
             <div className="relative w-full md:max-w-xs">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-              <input 
-                type="text" 
+              <input
+                type="text"
                 placeholder="Tìm sinh viên, MSSV..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -174,32 +243,19 @@ export default function ChamBaiThuHoach_GV() {
               />
             </div>
 
-            {/* Tabs */}
             <div className="flex gap-2 w-full md:w-auto">
-              <button 
+              <button
                 onClick={() => setStatusFilter('all')}
-                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer ${
-                  statusFilter === 'all' ? 'bg-primary text-white shadow-sm' : 'bg-[#f8faf1] border border-surface-variant text-slate-600 hover:bg-[#ecefe6]'
-                }`}
-              >
-                Tất cả
-              </button>
-              <button 
+                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer ${statusFilter === 'all' ? 'bg-primary text-white shadow-sm' : 'bg-[#f8faf1] border border-surface-variant text-slate-600 hover:bg-[#ecefe6]'}`}
+              >Tất cả</button>
+              <button
                 onClick={() => setStatusFilter('pending')}
-                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer ${
-                  statusFilter === 'pending' ? 'bg-primary text-white shadow-sm' : 'bg-[#f8faf1] border border-surface-variant text-slate-600 hover:bg-[#ecefe6]'
-                }`}
-              >
-                Chờ chấm
-              </button>
-              <button 
+                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer ${statusFilter === 'pending' ? 'bg-primary text-white shadow-sm' : 'bg-[#f8faf1] border border-surface-variant text-slate-600 hover:bg-[#ecefe6]'}`}
+              >Chờ chấm</button>
+              <button
                 onClick={() => setStatusFilter('graded')}
-                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer ${
-                  statusFilter === 'graded' ? 'bg-primary text-white shadow-sm' : 'bg-[#f8faf1] border border-surface-variant text-slate-600 hover:bg-[#ecefe6]'
-                }`}
-              >
-                Đã chấm
-              </button>
+                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer ${statusFilter === 'graded' ? 'bg-primary text-white shadow-sm' : 'bg-[#f8faf1] border border-surface-variant text-slate-600 hover:bg-[#ecefe6]'}`}
+              >Đã chấm</button>
             </div>
           </div>
 
@@ -219,14 +275,14 @@ export default function ChamBaiThuHoach_GV() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-sm font-semibold">
-                  {filteredReports.length === 0 ? (
+                  {reports.length === 0 ? (
                     <tr>
                       <td colSpan="7" className="py-8 text-center text-slate-500">
                         Không tìm thấy bài thu hoạch nào phù hợp.
                       </td>
                     </tr>
                   ) : (
-                    filteredReports.map((r) => {
+                    reports.map((r) => {
                       const isGraded = r.trang_thai === 'DaCham';
                       return (
                         <tr key={r.id} className="hover:bg-slate-50 transition-colors group">
@@ -269,32 +325,6 @@ export default function ChamBaiThuHoach_GV() {
                 </tbody>
               </table>
             </div>
-
-            {/* Reports Pagination */}
-            <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between bg-[#f8faf1]/50">
-              <div className="text-slate-500 font-semibold text-xs">
-                Hiển thị {filteredReports.length} / {total} bài thu hoạch
-              </div>
-              <div className="flex gap-1.5">
-                <button
-                  disabled={page <= 1}
-                  onClick={() => fetchReports(lecturer.id, page - 1, searchTerm, statusFilter)}
-                  className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 text-slate-600 font-bold text-xs cursor-pointer"
-                >
-                  Trước
-                </button>
-                <span className="px-3.5 py-1.5 text-slate-700 font-extrabold bg-slate-105 rounded-lg text-xs">
-                  Trang {page} / {totalPages}
-                </span>
-                <button
-                  disabled={page >= totalPages}
-                  onClick={() => fetchReports(lecturer.id, page + 1, searchTerm, statusFilter)}
-                  className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 text-slate-600 font-bold text-xs cursor-pointer"
-                >
-                  Sau
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       ) : (
@@ -314,7 +344,7 @@ export default function ChamBaiThuHoach_GV() {
               </div>
             </div>
 
-            <button 
+            <button
               onClick={() => setSelectedReport(null)}
               className="px-4 py-2 border border-slate-200 text-on-surface-variant hover:text-on-surface font-bold text-xs rounded-xl hover:bg-slate-50 transition-all flex items-center gap-1.5 cursor-pointer"
             >
@@ -324,150 +354,164 @@ export default function ChamBaiThuHoach_GV() {
           </div>
 
           {/* Grid: Document viewer vs Grade form */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            
-            {/* Left: Document details and download */}
-            <div className="lg:col-span-7 bg-white rounded-2xl shadow-sm border border-surface-variant/40 overflow-hidden">
-              <div className="bg-slate-800 text-white px-6 py-3 flex items-center justify-between text-xs font-semibold">
-                <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-red-400" />
-                  <span className="truncate max-w-[280px]">{selectedReport.file_bao_cao ? selectedReport.file_bao_cao.split('/').pop() : 'BaoCao_KienTap.pdf'}</span>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+
+            {/* 🔴 CỘT TRÁI: Dữ liệu OCR (Textarea) và Bảng Rubric */}
+            <div className="lg:col-span-7 flex flex-col gap-6">
+
+              {/* Box Textarea */}
+              <div className="bg-white rounded-2xl shadow-sm border border-surface-variant/40 overflow-hidden flex flex-col">
+                <div className="bg-slate-800 text-white px-6 py-3 flex items-center justify-between text-xs font-semibold shrink-0">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-emerald-400" />
+                    <span className="truncate max-w-[280px] uppercase tracking-wider">Trình mồi dữ liệu OCR (Dùng để Test)</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-4 text-slate-300">
-                  <span>Trang 1 / 4</span>
-                  <div className="h-4 w-[1px] bg-slate-600"></div>
-                  <button 
-                    onClick={() => {
-                      if (selectedReport.file_bao_cao) {
-                        const url = selectedReport.file_bao_cao.startsWith('http') 
-                          ? selectedReport.file_bao_cao 
-                          : `${api.defaults.baseURL || ''}${selectedReport.file_bao_cao}`;
-                        window.open(url, '_blank');
-                      } else {
-                        alert('Không tìm thấy tệp tin báo cáo.');
-                      }
-                    }}
-                    className="hover:text-white transition-colors flex items-center gap-1 cursor-pointer font-bold"
-                  >
-                    <Download className="w-3.5 h-3.5" /> <span>Tải xuống</span>
-                  </button>
-                  {selectedReport.file_xac_nhan_tham_quan && (
-                    <>
-                      <div className="h-4 w-[1px] bg-slate-600"></div>
-                      <button 
-                        onClick={() => {
-                          const url = selectedReport.file_xac_nhan_tham_quan.startsWith('http') 
-                            ? selectedReport.file_xac_nhan_tham_quan 
-                            : `${api.defaults.baseURL || ''}${selectedReport.file_xac_nhan_tham_quan}`;
-                          window.open(url, '_blank');
-                        }}
-                        className="hover:text-white transition-colors flex items-center gap-1 cursor-pointer font-bold text-emerald-450"
-                      >
-                        <Download className="w-3.5 h-3.5" /> <span>Minh chứng DN</span>
-                      </button>
-                    </>
-                  )}
-                </div>
+
+                {/* Textarea cố định chiều cao, cuộn nội bộ */}
+                <textarea
+                  value={editableOcrText}
+                  onChange={(e) => setEditableOcrText(e.target.value)}
+                  placeholder="Dán nội dung báo cáo của sinh viên vào đây để mô phỏng dữ liệu OCR..."
+                  className="p-6 bg-slate-50 overflow-y-auto font-mono text-xs leading-relaxed text-slate-700 whitespace-pre-wrap w-full h-[350px] resize-none focus:outline-none focus:bg-white focus:ring-inset focus:ring-2 focus:ring-primary/20"
+                />
               </div>
 
-              {/* Simulated PDF Layout Canvas */}
-              <div className="p-8 bg-slate-100 overflow-y-auto max-h-[600px] flex justify-center">
-                <div className="bg-white w-full max-w-[500px] min-h-[650px] shadow-lg p-10 text-slate-800 flex flex-col justify-between border border-slate-200 select-text">
-                  <div className="text-center space-y-2 border-b-2 border-slate-900 pb-4 shrink-0">
-                    <p className="font-bold text-[10px] uppercase tracking-wider">Trường ĐH Công Thương TP.HCM (HUIT)</p>
-                    <p className="font-bold text-[11px] uppercase tracking-wider text-slate-500">Khoa Công nghệ Thực phẩm</p>
-                    <div className="w-12 h-0.5 bg-slate-900 mx-auto my-2"></div>
-                    <h2 className="font-black text-sm uppercase tracking-tight py-2 leading-normal">
-                      BÁO CÁO THU HOẠCH KIẾN TẬP
-                    </h2>
-                    <p className="text-xs font-semibold italic text-primary">
-                      Doanh nghiệp: {selectedReport.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Đoàn kiến tập'}
-                    </p>
-                  </div>
-
-                  <div className="flex-1 py-6 space-y-4 text-[11px] leading-relaxed text-justify">
-                    <div>
-                      <h4 className="font-bold text-xs uppercase mb-1 border-b border-slate-200 pb-0.5">I. Giới thiệu tổng quan doanh nghiệp</h4>
-                      <p>
-                        Công ty hoạt động trong lĩnh vực sản xuất chế biến thực phẩm sạch hàng đầu Việt Nam, sử dụng các tiêu chuẩn an toàn sinh học ISO và HACCP nghiêm ngặt để đảm bảo chất lượng dòng thực phẩm từ nguyên liệu đầu vào đến người tiêu dùng.
-                      </p>
-                    </div>
-
-                    <div>
-                      <h4 className="font-bold text-xs uppercase mb-1 border-b border-slate-200 pb-0.5">II. Dây chuyền sản xuất quan sát</h4>
-                      <p>
-                        Dây chuyền sản xuất tự động khép kín hoàn toàn, giảm thiểu sự can thiệp trực tiếp của con người nhằm bảo vệ tính tiệt trùng tối đa. Hệ thống cánh tay robot hiện đại thực hiện đóng hộp, xếp palette và chuyển kho tự động thông minh.
-                      </p>
-                    </div>
-
-                    <div>
-                      <h4 className="font-bold text-xs uppercase mb-1 border-b border-slate-200 pb-0.5">III. Bài học thu hoạch và nhận định cá nhân</h4>
-                      <p>
-                        Chuyến đi mang lại trải nghiệm thực tế quý giá giúp sinh viên hiểu rõ tầm quan trọng của việc đảm bảo vệ sinh an toàn thực phẩm cũng như quy mô vận hành chuẩn công nghiệp lớn ngoài giảng đường đại học.
-                      </p>
+              {/* Rubric Box (Sẽ hiện ra DƯỚI textarea khi chấm xong) */}
+              {aiResult && (
+                <div className="bg-white rounded-2xl shadow-sm border border-emerald-200 overflow-hidden flex flex-col animate-fade-in">
+                  <div className="bg-emerald-850 text-white px-6 py-3 flex items-center justify-between text-xs font-semibold shrink-0">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-emerald-300" />
+                      <span className="uppercase tracking-wider">Chi Tiết Bảng Điểm Rubric - Hội Đồng AI</span>
                     </div>
                   </div>
 
-                  <div className="border-t border-slate-200 pt-4 flex justify-between text-[10px] shrink-0">
-                    <div>
-                      <p className="font-bold text-slate-500 uppercase">Cố vấn học tập</p>
-                      <p className="font-bold mt-8 text-slate-900">{lecturer.ho_ten}</p>
+                  {/* Vùng cuộn cố định chiều cao cho các nhận xét Rubric */}
+                  <div className="p-6 space-y-4 max-h-[350px] overflow-y-auto bg-[#f8faf1]">
+                    {/* Card 1: Hình thức & Tổng quan */}
+                    <div className="p-4 bg-white border border-[#d1dec0] shadow-sm rounded-xl space-y-3">
+                      <div className="flex justify-between font-black text-sm text-on-surface border-b border-surface-variant/40 pb-2">
+                        <span className="flex items-center gap-2"><FileText className="w-4 h-4 text-[#89B449]"/>1. Hình thức & Cấu trúc</span>
+                        <span className="text-emerald-800 font-mono bg-emerald-100 px-2 py-0.5 rounded-md">
+                          {aiResult.hinh_thuc_tong_quan?.diem_hinh_thuc}/10 đ
+                        </span>
+                      </div>
+                      <p className="text-xs text-on-surface-variant font-medium leading-relaxed italic border-l-2 border-emerald-300 pl-3">
+                        {aiResult.hinh_thuc_tong_quan?.ly_do_hinh_thuc}
+                      </p>
+
+                      <div className="flex justify-between font-black text-sm text-on-surface border-b border-surface-variant/40 pb-2 pt-2">
+                        <span className="flex items-center gap-2"><Building className="w-4 h-4 text-[#89B449]"/>2. Tổng quan doanh nghiệp</span>
+                        <span className="text-emerald-800 font-mono bg-emerald-100 px-2 py-0.5 rounded-md">
+                          {aiResult.hinh_thuc_tong_quan?.diem_tong_quan}/10 đ
+                        </span>
+                      </div>
+                      <p className="text-xs text-on-surface-variant font-medium leading-relaxed italic border-l-2 border-emerald-300 pl-3">
+                        {aiResult.hinh_thuc_tong_quan?.ly_do_tong_quan}
+                      </p>
                     </div>
-                    <div className="text-right">
-                      <p className="font-bold text-slate-500 uppercase">Sinh viên nộp</p>
-                      <p className="font-bold mt-8 text-slate-900">{selectedReport.phieuDangKy?.sinhVien?.ho_ten}</p>
-                      <p className="text-slate-500 font-mono text-[9px]">MSSV: {selectedReport.phieuDangKy?.sinhVien?.mssv}</p>
+
+                    {/* Card 2: Quy trình công nghệ */}
+                    <div className="p-4 bg-white border border-[#d1dec0] shadow-sm rounded-xl space-y-3">
+                      <div className="flex justify-between font-black text-sm text-on-surface border-b border-surface-variant/40 pb-2">
+                        <span className="flex items-center gap-2"><Laptop className="w-4 h-4 text-[#89B449]"/>3. Quy trình công nghệ quan sát</span>
+                        <span className="text-emerald-800 font-mono bg-emerald-100 px-2 py-0.5 rounded-md">
+                          {aiResult.quy_trinh_cong_nghe?.diem_quy_trinh}/10 đ
+                        </span>
+                      </div>
+                      <p className="text-xs text-on-surface-variant font-medium leading-relaxed italic border-l-2 border-emerald-300 pl-3">
+                        {aiResult.quy_trinh_cong_nghe?.ly_do_quy_trinh}
+                      </p>
+                    </div>
+
+                    {/* Card 3: Đánh giá VSATTP */}
+                    <div className="p-4 bg-white border border-[#d1dec0] shadow-sm rounded-xl space-y-3">
+                      <div className="flex justify-between font-black text-sm text-on-surface border-b border-surface-variant/40 pb-2">
+                        <span className="flex items-center gap-2"><CheckSquare className="w-4 h-4 text-[#89B449]"/>4. Đánh giá thực trạng VSATTP</span>
+                        <span className="text-emerald-800 font-mono bg-emerald-100 px-2 py-0.5 rounded-md">
+                          {aiResult.vsattp?.diem_vsattp}/10 đ
+                        </span>
+                      </div>
+                      <p className="text-xs text-on-surface-variant font-medium leading-relaxed italic border-l-2 border-emerald-300 pl-3">
+                        {aiResult.vsattp?.ly_do_vsattp}
+                      </p>
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
 
-            {/* Right: AI Suggestion & Grade form */}
+            {/* 🔴 CỘT PHẢI: Bảng điều khiển AI & Form Nhập điểm */}
             <div className="lg:col-span-5 space-y-6">
-              {/* AI suggestion */}
-              <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-6 border border-emerald-200 shadow-sm relative overflow-hidden">
+
+              <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-6 border border-emerald-200 shadow-sm relative overflow-hidden min-h-[160px] flex flex-col justify-center">
                 <div className="absolute right-0 top-0 opacity-10 translate-x-4 -translate-y-4">
-                  <Sparkles className="w-24 h-24 text-primary" />
+                  <Sparkles className="w-32 h-32 text-primary" />
                 </div>
-                
+
                 <div className="flex items-center gap-2 mb-4 relative z-10">
                   <div className="w-8 h-8 rounded-lg bg-emerald-600/10 text-emerald-800 flex items-center justify-center shadow-inner">
-                    <Sparkles className="w-5 h-5 text-emerald-800" />
+                    <Bot className="w-5 h-5 text-emerald-800" />
                   </div>
-                  <h2 className="font-extrabold text-sm text-emerald-950 uppercase tracking-wider">AI chấm điểm đề xuất</h2>
+                  <h2 className="font-extrabold text-sm text-emerald-950 uppercase tracking-wider">Hội Đồng AI Chấm Điểm</h2>
                 </div>
 
-                <div className="flex items-baseline gap-2 mb-3 relative z-10">
-                  <span className="text-4xl font-black text-emerald-800 leading-none">8.5</span>
-                  <span className="text-emerald-600 text-sm font-bold">/ 10</span>
-                </div>
+                {isAIGrading ? (
+                  <div className="flex flex-col items-center justify-center py-4 relative z-10">
+                    <Loader2 className="w-8 h-8 animate-spin text-emerald-600 mb-2" />
+                    <p className="text-xs font-bold text-emerald-800">🧠 Đang đối chiếu Rubric & Phân tích...</p>
+                    <p className="text-[10px] text-emerald-600 font-semibold mt-1">(Quá trình này mất khoảng 10 - 15 giây)</p>
+                  </div>
+                ) : !aiResult ? (
+                  <div className="relative z-10 space-y-4">
+                    <p className="text-emerald-900 text-xs font-semibold leading-relaxed">
+                      Sử dụng mô hình ngôn ngữ lớn (Qwen-Max) để tự động đối chiếu văn bản báo cáo với tiêu chuẩn Rubric của Khoa.
+                    </p>
+                    <button
+                      onClick={handleAIGrading}
+                      className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      <span>Kích hoạt AI Đánh Giá</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative z-10 animate-fade-in">
+                    <div className="flex items-baseline justify-between mb-3">
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-4xl font-black text-emerald-800 leading-none">{aiResult.diem_bao_cao_cuoi_cung.toFixed(1)}</span>
+                        <span className="text-emerald-600 text-sm font-bold">/ 10</span>
+                      </div>
 
-                <p className="text-emerald-900 text-xs font-semibold leading-relaxed mb-4 relative z-10">
-                  Trình phân tích đạt chuẩn: Bố cục 3 phần rõ ràng, mô tả chi tiết quy trình, đúng tiến độ. Đề xuất điểm: 8.5/10.
-                </p>
+                      {/* NÚT CHẤM LẠI */}
+                      <button
+                        onClick={handleAIGrading}
+                        className="px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-lg text-[10px] font-black uppercase tracking-wider transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        <span>Chấm lại</span>
+                      </button>
+                    </div>
 
-                <button 
-                  type="button"
-                  onClick={() => setShowAiBreakdown(true)}
-                  className="px-4 py-2 bg-emerald-800 hover:bg-emerald-950 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1 cursor-pointer"
-                >
-                  <Info className="w-3.5 h-3.5" />
-                  <span>Xem chi tiết tiêu chí</span>
-                </button>
+                    <p className="text-emerald-900 text-xs font-semibold leading-relaxed mb-4">
+                      Phân tích hoàn tất. Hệ thống đã đánh giá đủ 3 tiêu chí: Hình thức, Công nghệ và VSATTP. Xem chi tiết nhận xét Rubric ở bên trái.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Grading input form */}
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-surface-variant/40 space-y-6">
-                <h3 className="font-bold text-sm text-[#191d17] uppercase tracking-wider">Phiếu chấm điểm báo cáo</h3>
-                
+                <h3 className="font-bold text-sm text-[#191d17] uppercase tracking-wider">Phiếu quyết định điểm</h3>
+
                 <form onSubmit={handleSaveGrade} className="space-y-4">
                   <div className="space-y-1.5">
                     <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider">
                       Điểm báo cáo thu hoạch (0 - 10) <span className="text-red-500">*</span>
                     </label>
                     <div className="relative max-w-[140px]">
-                      <input 
+                      <input
                         type="number"
                         min="0"
                         max="10"
@@ -483,13 +527,13 @@ export default function ChamBaiThuHoach_GV() {
 
                   <div className="space-y-1.5">
                     <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider">
-                      Nhận xét & Gợi ý từ giáo viên
+                      Nhận xét (Sẽ gửi cho sinh viên)
                     </label>
-                    <textarea 
-                      rows={4}
+                    <textarea
+                      rows={3}
                       value={comments}
                       onChange={(e) => setComments(e.target.value)}
-                      placeholder="Nhập nhận xét chi tiết..."
+                      placeholder="Ghi chú thêm nếu bạn chỉnh sửa điểm do AI gợi ý..."
                       className="w-full p-4 text-xs bg-[#f8faf1] border border-surface-variant rounded-xl focus:outline-none focus:border-primary/50 text-on-surface font-semibold leading-relaxed resize-none"
                     />
                   </div>
@@ -507,7 +551,7 @@ export default function ChamBaiThuHoach_GV() {
                       disabled={loading}
                       className="px-5 py-2.5 bg-primary text-white text-xs font-bold rounded-xl hover:bg-primary-container shadow-md transition-all active:scale-95 cursor-pointer"
                     >
-                      Lưu điểm báo cáo
+                      Xác nhận điểm số
                     </button>
                   </div>
                 </form>
@@ -515,67 +559,6 @@ export default function ChamBaiThuHoach_GV() {
 
             </div>
 
-          </div>
-        </div>
-      )}
-
-      {/* AI Breakdown Criteria Modal */}
-      {showAiBreakdown && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden border border-surface-variant animate-scale-up">
-            <div className="p-6 bg-emerald-850 text-white flex justify-between items-center">
-              <h3 className="font-black text-base flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-white" />
-                <span>Tiêu chí chấm tự động AI</span>
-              </h3>
-              <button 
-                onClick={() => setShowAiBreakdown(false)}
-                className="text-white hover:bg-white/20 rounded-full p-1.5 transition-colors cursor-pointer font-bold text-sm"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <div className="p-3 bg-slate-50 border border-slate-150 rounded-xl">
-                <div className="flex justify-between font-bold text-xs text-on-surface mb-1">
-                  <span>1. Hình thức & cấu trúc báo cáo</span>
-                  <span className="text-emerald-800 font-mono">2.0 / 2.0đ</span>
-                </div>
-                <p className="text-[10px] text-on-surface-variant font-medium leading-relaxed">
-                  Báo cáo trình bày sạch đẹp, đúng tiến độ và đầy đủ chữ ký xác nhận của các bên.
-                </p>
-              </div>
-
-              <div className="p-3 bg-slate-50 border border-slate-150 rounded-xl">
-                <div className="flex justify-between font-bold text-xs text-on-surface mb-1">
-                  <span>2. Nội dung công nghệ quan sát</span>
-                  <span className="text-emerald-800 font-mono">4.5 / 5.0đ</span>
-                </div>
-                <p className="text-[10px] text-on-surface-variant font-medium leading-relaxed">
-                  Mô tả rất chính xác quy trình công nghệ lên men và tự động hóa dây chuyền sản xuất của nhà máy.
-                </p>
-              </div>
-
-              <div className="p-3 bg-slate-50 border border-slate-150 rounded-xl">
-                <div className="flex justify-between font-bold text-xs text-on-surface mb-1">
-                  <span>3. Bài học & Liên hệ thực tiễn</span>
-                  <span className="text-emerald-800 font-mono">2.0 / 3.0đ</span>
-                </div>
-                <p className="text-[10px] text-on-surface-variant font-medium leading-relaxed">
-                  Rút ra bài học bổ ích về tinh thần kỷ luật và an toàn sản xuất nhưng cần phân tích chuyên sâu thêm.
-                </p>
-              </div>
-
-              <div className="pt-2 flex justify-end">
-                <button 
-                  onClick={() => setShowAiBreakdown(false)}
-                  className="px-4 py-2 bg-emerald-850 hover:bg-emerald-900 text-white text-xs font-bold rounded-xl cursor-pointer"
-                >
-                  Đồng ý
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       )}

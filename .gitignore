@@ -75,6 +75,13 @@ ai-service/models/*.onnx
 ai-service/data/*.csv
 ai-service/data/*.json
 
+# Bỏ qua môi trường ảo của Python
+ai-service/.venv/
+ai-service/venv/
+
+# Bỏ qua file cấu hình biến môi trường (Chứa API Key)
+ai-service/.env
+
 # ====================================
 # Flutter / Mobile
 # ====================================

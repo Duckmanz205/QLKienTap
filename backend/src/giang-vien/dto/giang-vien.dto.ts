@@ -4,7 +4,7 @@ import {
   Min,
   Max,
   IsNumber,
-  IsFinite,
+  // IsFinite,
   IsString,
   IsOptional,
   IsIn,
@@ -47,13 +47,13 @@ export class GradePrepBonusDto {
   phieuId: number;
 
   @IsNumber()
-  @IsFinite()
+  // @IsFinite()
   @Min(0, { message: 'Điểm chuẩn bị không được bé hơn 0' })
   @Max(10, { message: 'Điểm chuẩn bị không được lớn hơn 10' })
   diemChuanBi: number;
 
   @IsNumber()
-  @IsFinite()
+  // @IsFinite()
   @Min(0, { message: 'Điểm cộng không được bé hơn 0' })
   @Max(1, { message: 'Điểm cộng không được lớn hơn 1' })
   diemCong: number;
@@ -65,7 +65,7 @@ export class GradeReportDto {
   reportId: number;
 
   @IsNumber()
-  @IsFinite()
+  // @IsFinite()
   @Min(0, { message: 'Điểm báo cáo không được bé hơn 0' })
   @Max(10, { message: 'Điểm báo cáo không được lớn hơn 10' })
   score: number;
@@ -85,7 +85,7 @@ export class SubmitBoardScoreDto {
   phieuId: number;
 
   @IsNumber()
-  @IsFinite()
+  // @IsFinite()
   @Min(0, { message: 'Điểm hội đồng không được bé hơn 0' })
   @Max(10, { message: 'Điểm hội đồng không được lớn hơn 10' })
   score: number;

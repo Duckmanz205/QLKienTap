@@ -525,7 +525,8 @@ export class UploadController {
   //   SERVE FILE LOCAL (fallback khi không dùng R2)
   //   Bảo vệ theo ownership tương đương signed-url
   // ============================================================
-  @Get('file/:type/:param1/:param2?')
+  // @Get('file/:type/:param1/:param2?')
+  @Get(['file/:type/:param1', 'file/:type/:param1/:param2'])
   async serveFile(
     @Param('type') type: string,
     @Param('param1') param1: string,
