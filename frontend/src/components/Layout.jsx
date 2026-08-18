@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Link, NavLink, useNavigate, Outlet, useLocation } from 'react-router-dom';
-import { 
-  Home, 
-  Compass, 
-  Calendar, 
-  UploadCloud, 
-  GraduationCap, 
-  CreditCard, 
-  RotateCcw, 
-  Bell, 
-  LogOut, 
+import {
+  Home,
+  Compass,
+  Calendar,
+  UploadCloud,
+  GraduationCap,
+  CreditCard,
+  RotateCcw,
+  Bell,
+  LogOut,
   BookOpen,
   ChevronRight,
   ChevronDown,
@@ -50,7 +50,7 @@ export default function Layout() {
   };
 
   const session = getValidSession();
-  
+
   useEffect(() => {
     if (!session) {
       navigate('/login', { replace: true });
@@ -80,7 +80,7 @@ export default function Layout() {
 
   if (phai_doi_mat_khau) {
     return (
-      <ForceChangePasswordView 
+      <ForceChangePasswordView
         user={user}
         onPasswordChanged={(updatedUser) => {
           localStorage.setItem('user', JSON.stringify({ user: updatedUser, token }));
@@ -147,12 +147,15 @@ export default function Layout() {
       <div className="min-h-screen bg-[#f8faf1] flex font-sans">
         {/* Sidebar */}
         <aside className="fixed left-0 top-0 h-screen w-[260px] bg-[#407F3E] text-white z-50 flex flex-col shadow-xl border-r border-[#2c6b2d]/10">
-          <div className="p-5 flex flex-col gap-1.5 items-center border-b border-white/10 bg-[#2c6b2d]/15">
-            <div className="text-center">
-              <span className="font-extrabold text-[16px] leading-tight text-white uppercase tracking-wider block">
+          <div className="flex flex-col border-b border-white/10 bg-[#2c6b2d]/15">
+            <div className="h-16 flex items-center justify-center px-4">
+              <img src="/huit-logo.png" alt="Logo HUIT" className="w-44 max-w-full h-auto object-contain brightness-0 invert opacity-95 shrink-0" />
+            </div>
+            <div className="pb-3.5 px-4 flex flex-col items-center text-center gap-0.5">
+              <span className="font-extrabold text-[15px] leading-tight text-white uppercase tracking-wider block">
                 Quản lý kiến tập
               </span>
-              <span className="text-[11px] text-[#e5ffdc]/80 font-semibold tracking-widest block uppercase mt-0.5">
+              <span className="text-[10px] text-[#e5ffdc]/70 font-semibold tracking-widest block uppercase">
                 HUIT — Khoa CNTP
               </span>
             </div>
@@ -173,11 +176,10 @@ export default function Layout() {
                       <Link
                         key={item.to}
                         to={item.to}
-                        className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${
-                          isActive
-                            ? 'bg-white text-[#407F3E] shadow-md font-bold scale-[1.02]'
-                            : 'text-white/80 hover:bg-[#89B449]/25 hover:text-white'
-                        }`}
+                        className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${isActive
+                          ? 'bg-white text-[#407F3E] shadow-md font-bold scale-[1.02]'
+                          : 'text-white/80 hover:bg-[#89B449]/25 hover:text-white'
+                          }`}
                       >
                         <div className="flex items-center gap-3">
                           <Icon className="w-[18px] h-[18px]" />
@@ -206,7 +208,7 @@ export default function Layout() {
                 <span className="text-[#e5ffdc]/60 text-xs">Sinh viên</span>
               </div>
             </div>
-            <button 
+            <button
               onClick={handleLogout}
               className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 text-red-300 hover:bg-red-500 hover:text-white transition-all text-sm font-bold border border-red-500/20 cursor-pointer"
             >
@@ -220,21 +222,17 @@ export default function Layout() {
         <div className="flex-1 flex flex-col pl-[260px] min-w-0">
           {/* Header */}
           <header className="fixed top-0 left-[260px] right-0 h-16 bg-white border-b border-surface-variant/60 z-40 flex items-center justify-between px-6 shadow-sm">
-            <div className="flex items-center gap-4 min-w-0">
-              <img src="/huit-logo.png" alt="HUIT Logo" className="h-11 md:h-[46px] w-auto object-contain shrink-0 py-0.5" />
-              <div className="h-6 w-[1px] bg-slate-200 shrink-0"></div>
-              <div className="flex items-center gap-2 text-on-surface-variant font-medium text-sm truncate">
-                <Link to="/sinh-vien" className="hover:text-primary transition-colors flex items-center gap-1 font-semibold shrink-0">
-                  <Home className="w-4 h-4" />
-                  <span>IMS Portal</span>
-                </Link>
-                <ChevronRight className="w-3 h-3 text-outline/50 shrink-0" />
-                <span className="text-on-surface font-semibold truncate">{getActiveViewLabel()}</span>
-              </div>
+            <div className="flex items-center gap-2 text-on-surface-variant font-medium text-sm truncate">
+              <Link to="/sinh-vien" className="hover:text-primary transition-colors flex items-center gap-2 font-semibold shrink-0">
+                <Home className="w-4 h-4" />
+                <span>IMS Portal</span>
+              </Link>
+              <ChevronRight className="w-3 h-3 text-outline/50 shrink-0" />
+              <span className="text-on-surface font-semibold truncate">{getActiveViewLabel()}</span>
             </div>
 
             <div className="flex items-center gap-6">
-              <Link 
+              <Link
                 to="/sinh-vien/notifications"
                 className="relative p-2 text-on-surface-variant hover:bg-[#ecefe6] hover:text-primary rounded-full transition-all"
                 title="Thông báo"
@@ -283,12 +281,15 @@ export default function Layout() {
       <div className="min-h-screen bg-[#f8faf1] flex font-sans">
         {/* Sidebar */}
         <aside className="fixed left-0 top-0 h-screen w-[260px] bg-[#407F3E] text-white z-50 flex flex-col shadow-xl border-r border-[#2c6b2d]/10">
-          <div className="p-5 flex flex-col gap-1.5 items-center border-b border-white/10 bg-[#2c6b2d]/15">
-            <div className="text-center">
-              <span className="font-extrabold text-[16px] leading-tight text-white uppercase tracking-wider block">
+          <div className="flex flex-col border-b border-white/10 bg-[#2c6b2d]/15">
+            <div className="h-16 flex items-center justify-center px-4">
+              <img src="/huit-logo.png" alt="Logo HUIT" className="w-44 max-w-full h-auto object-contain brightness-0 invert opacity-95 shrink-0" />
+            </div>
+            <div className="pb-3.5 px-4 flex flex-col items-center text-center gap-0.5">
+              <span className="font-extrabold text-[15px] leading-tight text-white uppercase tracking-wider block">
                 Quản lý kiến tập
               </span>
-              <span className="text-[11px] text-[#e5ffdc]/80 font-semibold tracking-widest block uppercase mt-0.5">
+              <span className="text-[10px] text-[#e5ffdc]/70 font-semibold tracking-widest block uppercase">
                 HUIT — Giảng viên
               </span>
             </div>
@@ -309,11 +310,10 @@ export default function Layout() {
                       <Link
                         key={item.to}
                         to={item.to}
-                        className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${
-                          isActive
-                            ? 'bg-white text-[#407F3E] shadow-md font-bold scale-[1.02]'
-                            : 'text-white/80 hover:bg-[#89B449]/25 hover:text-white'
-                        }`}
+                        className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${isActive
+                          ? 'bg-white text-[#407F3E] shadow-md font-bold scale-[1.02]'
+                          : 'text-white/80 hover:bg-[#89B449]/25 hover:text-white'
+                          }`}
                       >
                         <div className="flex items-center gap-3">
                           <Icon className="w-[18px] h-[18px]" />
@@ -337,7 +337,7 @@ export default function Layout() {
                 <span className="text-[#e5ffdc]/60 text-xs">Giảng viên</span>
               </div>
             </div>
-            <button 
+            <button
               onClick={handleLogout}
               className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 text-red-300 hover:bg-red-500 hover:text-white transition-all text-sm font-bold border border-red-500/20 cursor-pointer"
             >
@@ -351,21 +351,17 @@ export default function Layout() {
         <div className="flex-1 flex flex-col pl-[260px] min-w-0">
           {/* Header */}
           <header className="fixed top-0 left-[260px] right-0 h-16 bg-white border-b border-surface-variant/60 z-40 flex items-center justify-between px-6 shadow-sm">
-            <div className="flex items-center gap-4 min-w-0">
-              <img src="/huit-logo.png" alt="HUIT Logo" className="h-11 md:h-[46px] w-auto object-contain shrink-0 py-0.5" />
-              <div className="h-6 w-[1px] bg-slate-200 shrink-0"></div>
-              <div className="flex items-center gap-2 text-on-surface-variant font-medium text-sm truncate">
-                <Link to="/giang-vien" className="hover:text-primary transition-colors flex items-center gap-1 font-semibold shrink-0">
-                  <Home className="w-4 h-4" />
-                  <span>IMS Portal</span>
-                </Link>
-                <ChevronRight className="w-3 h-3 text-outline/50 shrink-0" />
-                <span className="text-on-surface font-semibold truncate">{getActiveViewLabel()}</span>
-              </div>
+            <div className="flex items-center gap-2 text-on-surface-variant font-medium text-sm truncate">
+              <Link to="/giang-vien" className="hover:text-primary transition-colors flex items-center gap-2 font-semibold shrink-0">
+                <Home className="w-4 h-4" />
+                <span>IMS Portal</span>
+              </Link>
+              <ChevronRight className="w-3 h-3 text-outline/50 shrink-0" />
+              <span className="text-on-surface font-semibold truncate">{getActiveViewLabel()}</span>
             </div>
 
             <div className="flex items-center gap-6">
-              <Link 
+              <Link
                 to="/giang-vien/notifications"
                 className="relative p-2 text-on-surface-variant hover:bg-[#ecefe6] hover:text-primary rounded-full transition-all"
                 title="Thông báo"
@@ -437,12 +433,15 @@ export default function Layout() {
     <div className="min-h-screen bg-[#E7E0C4]/30 flex font-sans">
       {/* Sidebar */}
       <aside className="fixed left-0 top-0 h-screen w-[264px] bg-[#407F3E] text-white z-50 flex flex-col shadow-xl border-r border-[#2c6b2d]/10">
-        <div className="p-5 flex flex-col gap-1.5 items-center border-b border-white/10 bg-white/5">
-          <div className="text-center">
-            <span className="font-extrabold text-[16px] leading-tight text-white uppercase tracking-wider block">
+        <div className="flex flex-col border-b border-white/10 bg-white/5">
+          <div className="h-16 flex items-center justify-center px-4">
+            <img src="/huit-logo.png" alt="Logo HUIT" className="w-44 max-w-full h-auto object-contain brightness-0 invert opacity-95 shrink-0" />
+          </div>
+          <div className="pb-3.5 px-4 flex flex-col items-center text-center gap-0.5">
+            <span className="font-extrabold text-[15px] leading-tight text-white uppercase tracking-wider block">
               Quản lý kiến tập
             </span>
-            <span className="text-[11px] text-[#e5ffdc]/80 font-semibold tracking-widest block uppercase mt-0.5">
+            <span className="text-[10px] text-[#e5ffdc]/70 font-semibold tracking-widest block uppercase">
               HUIT — Quản lý Khoa
             </span>
           </div>
@@ -458,11 +457,10 @@ export default function Layout() {
               return (
                 <Link
                   to={homeItem.to}
-                  className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${
-                    isActive
-                      ? 'bg-white text-[#407F3E] shadow-md font-bold scale-[1.02]'
-                      : 'text-white hover:bg-[#89B449]/20 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${isActive
+                    ? 'bg-white text-[#407F3E] shadow-md font-bold scale-[1.02]'
+                    : 'text-white hover:bg-[#89B449]/20 hover:text-white'
+                    }`}
                 >
                   <div className="flex items-center gap-3">
                     <Icon className="w-[18px] h-[18px]" />
@@ -502,11 +500,10 @@ export default function Layout() {
                         <Link
                           key={item.to + '-' + item.label}
                           to={item.to}
-                          className={`w-full flex items-center justify-between px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${
-                            isActive
-                              ? 'bg-white text-[#407F3E] shadow-md font-bold scale-[1.02]'
-                              : 'text-white/80 hover:bg-[#89B449]/20 hover:text-white'
-                          }`}
+                          className={`w-full flex items-center justify-between px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${isActive
+                            ? 'bg-white text-[#407F3E] shadow-md font-bold scale-[1.02]'
+                            : 'text-white/80 hover:bg-[#89B449]/20 hover:text-white'
+                            }`}
                         >
                           <div className="flex items-center gap-3">
                             <Icon className="w-[18px] h-[18px]" />
@@ -532,11 +529,10 @@ export default function Layout() {
                   <Link
                     key={item.to + '-' + item.label}
                     to={item.to}
-                    className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${
-                      isActive
-                        ? 'bg-white text-[#407F3E] shadow-md font-bold scale-[1.02]'
-                        : 'text-white hover:bg-[#89B449]/20 hover:text-white'
-                    }`}
+                    className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${isActive
+                      ? 'bg-white text-[#407F3E] shadow-md font-bold scale-[1.02]'
+                      : 'text-white hover:bg-[#89B449]/20 hover:text-white'
+                      }`}
                   >
                     <div className="flex items-center gap-3">
                       <Icon className="w-[18px] h-[18px]" />
@@ -563,7 +559,7 @@ export default function Layout() {
               <span className="text-[#e5ffdc]/60 text-xs">Quản lý Khoa</span>
             </div>
           </div>
-          <button 
+          <button
             onClick={handleLogout}
             className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 text-red-300 hover:bg-red-500 hover:text-white transition-all text-sm font-bold border border-red-500/20 cursor-pointer"
           >
@@ -577,21 +573,17 @@ export default function Layout() {
       <div className="flex-1 flex flex-col pl-[264px] min-w-0">
         {/* Header */}
         <header className="fixed top-0 left-[264px] right-0 h-16 bg-white border-b border-[#E7E0C4] z-40 flex items-center justify-between px-6 shadow-sm">
-          <div className="flex items-center gap-4 min-w-0">
-            <img src="/huit-logo.png" alt="HUIT Logo" className="h-11 md:h-[46px] w-auto object-contain shrink-0 py-0.5" />
-            <div className="h-6 w-[1px] bg-slate-200 shrink-0"></div>
-            <div className="flex items-center gap-2 text-slate-600 font-medium text-sm truncate">
-              <Link to="/khoa" className="hover:text-[#407F3E] transition-colors flex items-center gap-1 font-semibold shrink-0">
-                <Home className="w-4 h-4" />
-                <span>IMS Portal</span>
-              </Link>
-              <ChevronRight className="w-3 h-3 text-slate-400 shrink-0" />
-              <span className="text-slate-800 font-semibold truncate">{getActiveViewLabel()}</span>
-            </div>
+          <div className="flex items-center gap-2 text-slate-600 font-medium text-sm truncate">
+            <Link to="/khoa" className="hover:text-[#407F3E] transition-colors flex items-center gap-2 font-semibold shrink-0">
+              <Home className="w-4 h-4" />
+              <span>IMS Portal</span>
+            </Link>
+            <ChevronRight className="w-3 h-3 text-slate-400 shrink-0" />
+            <span className="text-slate-800 font-semibold truncate">{getActiveViewLabel()}</span>
           </div>
 
           <div className="flex items-center gap-6">
-            <Link 
+            <Link
               to="/khoa/notifications"
               className="relative p-2 text-slate-600 hover:bg-[#E7E0C4]/30 hover:text-[#407F3E] rounded-full transition-all"
               title="Thông báo"
@@ -661,7 +653,7 @@ function ForceChangePasswordView({ user, onPasswordChanged, onLogout }) {
   return (
     <div className="min-h-screen bg-[#f8faf1] flex flex-col justify-center items-center py-12 px-4 sm:px-6 lg:px-8 font-sans">
       <div className="max-w-md w-full bg-white rounded-3xl shadow-xl border border-slate-100 p-6 md:p-8 space-y-6">
-        
+
         {/* Header */}
         <div className="text-center">
           <div className="mx-auto w-14 h-14 bg-[#e5ffdc] text-[#407F3E] rounded-2xl flex items-center justify-center shadow-inner mb-4">
