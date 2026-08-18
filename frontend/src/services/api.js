@@ -28,8 +28,8 @@ const resolveApiBaseUrl = (rawUrl) => {
     return trimmed.endsWith('/') ? trimmed.slice(0, -1) : trimmed;
   }
 
-  // Development fallback: http://localhost:3001/api
-  const devUrl = trimmed || 'http://localhost:3001/api';
+  // Development fallback: http://localhost:3000/api
+  const devUrl = trimmed || 'http://localhost:3000/api';
   return devUrl.endsWith('/') ? devUrl.slice(0, -1) : devUrl;
 };
 

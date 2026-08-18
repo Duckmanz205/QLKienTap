@@ -65,13 +65,13 @@ export default function Layout() {
 
   // Poll notifications for student count badge
   useEffect(() => {
-    if (vai_tro === 'SinhVien' && details?.id) {
+    if (vai_tro === 'SinhVien' && details?.id && !phai_doi_mat_khau) {
       sinhVienApi.getNotifications(details.id).then(res => {
         const unread = res.data.filter(n => !n.da_doc).length;
         setUnreadNotificationsCount(unread);
       }).catch(err => console.error(err));
     }
-  }, [vai_tro, details]);
+  }, [vai_tro, details, phai_doi_mat_khau]);
 
   const handleLogout = () => {
     clearSession();
