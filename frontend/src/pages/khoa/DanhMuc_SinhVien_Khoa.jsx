@@ -18,7 +18,7 @@ export default function DanhMuc_SinhVien_Khoa() {
   
   // Pagination States
   const [page, setPage] = useState(1);
-  const [limit] = useState(15);
+  const [limit, setLimit] = useState(15);
   const [totalPages, setTotalPages] = useState(1);
   const [totalStudents, setTotalStudents] = useState(0);
 
@@ -26,9 +26,9 @@ export default function DanhMuc_SinhVien_Khoa() {
     fetchData(1);
   }, []);
 
-  const fetchData = async (targetPage = page) => {
+  const fetchData = async (targetPage = page, targetLimit = limit) => {
     try {
-      const svRes = await khoaApi.getStudents({ page: targetPage, limit, search: searchTerm });
+      const svRes = await khoaApi.getStudents({ page: targetPage, limit: targetLimit, search: searchTerm });
       setStudents(svRes.data.data || []);
       setTotalStudents(svRes.data.total || 0);
       setTotalPages(svRes.data.totalPages || 1);
@@ -229,11 +229,33 @@ export default function DanhMuc_SinhVien_Khoa() {
         </div>
         
         {/* Pagination Footer */}
-        <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex items-center justify-between">
-          <span className="text-sm text-slate-500 font-medium">
-            Hiển thị {filteredStudents.length} / {totalStudents} sinh viên
-          </span>
+        <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
+            <span>Hiển thị</span>
+            <select 
+              value={limit}
+              onChange={(e) => {
+                const newLimit = Number(e.target.value);
+                setLimit(newLimit);
+                fetchData(1, newLimit);
+              }}
+              className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
+            >
+              <option value={15}>15</option>
+              <option value={30}>30</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <span>/ {totalStudents} sinh viên</span>
+          </div>
           <div className="flex items-center gap-1.5">
+            <button 
+              disabled={page <= 1}
+              onClick={() => fetchData(1)}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Trang đầu
+            </button>
             <button 
               disabled={page <= 1}
               onClick={() => fetchData(page - 1)}
@@ -241,22 +263,24 @@ export default function DanhMuc_SinhVien_Khoa() {
             >
               Trước
             </button>
-            <button className="px-3.5 py-1.5 rounded-lg bg-[#407F3E] text-white text-sm font-bold shadow-sm cursor-default">
-              {page}
-            </button>
-            <span className="text-slate-400 text-sm px-1 font-bold">...</span>
-            <button 
-              onClick={() => fetchData(totalPages)}
-              className="px-3.5 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 text-sm font-semibold transition-colors cursor-pointer"
-            >
-              {totalPages}
-            </button>
+            
+            <span className="px-4 py-1.5 rounded-lg bg-[#407F3E] text-white text-sm font-bold shadow-sm cursor-default mx-1">
+              Trang {page} / {totalPages}
+            </span>
+            
             <button 
               disabled={page >= totalPages}
               onClick={() => fetchData(page + 1)}
               className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
             >
               Sau
+            </button>
+            <button 
+              disabled={page >= totalPages}
+              onClick={() => fetchData(totalPages)}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Trang cuối
             </button>
           </div>
         </div>
