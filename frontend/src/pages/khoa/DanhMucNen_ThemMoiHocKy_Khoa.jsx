@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import { khoaApi } from '../../services/api';
 
 export default function DanhMucNen_ThemMoiHocKy_Khoa() {
@@ -7,6 +8,7 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
   const [campaigns, setCampaigns] = useState([]);
   const [schedules, setSchedules] = useState([]);
   const [students, setStudents] = useState([]);
+  const [courses, setCourses] = useState([]);
 
   // Form states
   const [tenNamHoc, setTenNamHoc] = useState('');
@@ -52,6 +54,7 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
       const c = await khoaApi.getCampaigns(); setCampaigns(c.data);
       const s = await khoaApi.getSchedules(); setSchedules(s.data);
       const sv = await khoaApi.getStudents({ limit: 1000 }); setStudents(sv.data.data || []);
+      const co = await khoaApi.getCourses(); setCourses(co.data);
     } catch (err) {
       console.error(err);
     }
@@ -116,7 +119,10 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
       setScheduleRegBD(''); setScheduleRegKT(''); setScheduleBD(''); setScheduleKT('');
       setScheduleReportLimit(''); setScheduleScoreLimit('');
       fetchData();
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error(err);
+      setError(err.response?.data?.message || 'Tạo lịch kiến tập lớp thất bại');
+    }
   };
 
   const handleToggleStudentSelect = (id) => {
@@ -125,6 +131,59 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
     } else {
       setSelectedStudentIds([...selectedStudentIds, id]);
     }
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const bstr = evt.target.result;
+      const wb = XLSX.read(bstr, { type: 'binary' });
+      const wsname = wb.SheetNames[0];
+      const ws = wb.Sheets[wsname];
+      const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
+      
+      if (data.length < 2) {
+        alert("File excel không hợp lệ hoặc trống");
+        return;
+      }
+      
+      const headerRow = data[0];
+      const mssvIndex = headerRow.findIndex(h => {
+        if (!h) return false;
+        const str = String(h).toLowerCase();
+        return str.includes('mssv') || str.includes('mã sinh viên') || str.includes('ma sinh vien') || str.includes('mã sv') || str.includes('masv');
+      });
+
+      if (mssvIndex === -1) {
+        alert("Không tìm thấy cột 'MSSV' hoặc 'Mã sinh viên' trong file Excel (dòng đầu tiên).");
+        return;
+      }
+
+      const extractedMssvList = [];
+      for (let i = 1; i < data.length; i++) {
+        const row = data[i];
+        if (row[mssvIndex]) {
+          extractedMssvList.push(String(row[mssvIndex]).trim());
+        }
+      }
+
+      const matchedIds = students
+        .filter(s => extractedMssvList.includes(String(s.mssv)))
+        .map(s => s.id);
+
+      setSelectedStudentIds(matchedIds);
+      
+      if (matchedIds.length === 0) {
+        alert(`Đã đọc ${extractedMssvList.length} MSSV từ file nhưng không có sinh viên nào khớp với hệ thống.`);
+      } else if (matchedIds.length < extractedMssvList.length) {
+        alert(`Tìm thấy ${matchedIds.length}/${extractedMssvList.length} sinh viên khớp. (Một số MSSV trong file không tồn tại trên hệ thống)`);
+      }
+    };
+    reader.readAsBinaryString(file);
+    e.target.value = null; // reset input
   };
 
   const executeImport = async () => {
@@ -289,7 +348,7 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
                 <label className="block font-medium text-slate-700">Ngành áp dụng</label>
                 <select required value={scheduleCourseId} onChange={e => setScheduleCourseId(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-slate-300 bg-white">
                   <option value="">-- Chọn ngành --</option>
-                  {students.map(s => s.khoa).filter((v, i, a) => a.findIndex(t => t.id === v.id) === i).map(k => (
+                  {courses.map(k => (
                     <option key={k.id} value={k.id}>{k.ten_khoa}</option>
                   ))}
                 </select>
@@ -338,7 +397,17 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
             <button onClick={() => setActiveImportScheduleId(null)} className="text-slate-400 hover:text-slate-600">Quay lại</button>
           </div>
 
-          <div className="space-y-3 max-h-[300px] overflow-y-auto">
+          <div className="bg-slate-50 border border-slate-200 p-4 rounded-lg flex items-center justify-between">
+            <div className="text-slate-600">
+              <span className="font-semibold block mb-1">Tải lên file Excel</span>
+              <span>File cần có dòng tiêu đề (header) chứa cột có tên "MSSV" hoặc "Mã sinh viên".</span>
+            </div>
+            <div>
+              <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} className="text-slate-600" />
+            </div>
+          </div>
+
+          <div className="space-y-3 max-h-[300px] overflow-y-auto mt-4">
             {students.map(s => {
               const isSelected = selectedStudentIds.includes(s.id);
               return (

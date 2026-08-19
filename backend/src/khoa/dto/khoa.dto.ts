@@ -18,7 +18,7 @@ export class CreateYearDto {
   @IsString()
   @IsNotEmpty({ message: 'Tên năm học không được để trống' })
   @Length(1, 50)
-  nam_hoc: string;
+  ten_nam_hoc: string;
 
   @IsOptional()
   @Type(() => Date)
@@ -126,6 +126,10 @@ export class CreateCampaignDto {
 
   @IsInt()
   @Min(1)
+  nam_hoc_id: number;
+
+  @IsInt()
+  @Min(1)
   hoc_ky_id: number;
 
   @IsOptional()
@@ -140,7 +144,7 @@ export class CreateCampaignDto {
 
   @IsOptional()
   @IsString()
-  @IsIn(['Draft', 'Publish', 'Finished'])
+  @IsIn(['Nhap', 'DangTrienKhai', 'DaKetThuc', 'DaKhoa', 'DaHuy'])
   trang_thai?: string;
 }
 
@@ -152,6 +156,21 @@ export class CreateScheduleDto {
   @IsInt()
   @Min(1)
   dot_kien_tap_id: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  khoa_id?: number;
+
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  tg_mo_dang_ky_tu?: Date;
+
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  tg_mo_dang_ky_den?: Date;
 
   @IsOptional()
   @Type(() => Date)
