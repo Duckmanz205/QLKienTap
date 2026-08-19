@@ -1,348 +1,221 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
-  Users, 
-  Award, 
-  Check, 
-  AlertTriangle,
-  Info,
-  Calendar,
-  Building,
-  GraduationCap
+  Search, ChevronDown, Check, Eye, Edit3, X, FileText
 } from 'lucide-react';
-import { giangVienApi, sinhVienApi } from '../../services/api';
+import { useNavigate } from 'react-router-dom';
 
 export default function SinhVienHuongDan_GV() {
-  const [lecturer, setLecturer] = useState(null);
-  const [students, setStudents] = useState([]);
-  const [selectedStudent, setSelectedStudent] = useState(null);
-  const [studentTrips, setStudentTrips] = useState([]);
-  const [selectedTripId, setSelectedTripId] = useState('');
+  const navigate = useNavigate();
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   
-  // Grading form state
-  const [diemChuanBi, setDiemChuanBi] = useState('');
-  const [diemCong, setDiemCong] = useState(0.0);
+  // Mock Data
+  const semesters = [
+    { id: 1, name: 'Học kỳ 1 - 2026-2027 (Đang diễn ra)' },
+    { id: 2, name: 'Học kỳ 2 - 2025-2026' }
+  ];
+  const [selectedSemester, setSelectedSemester] = useState(semesters[0]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState(null);
 
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    const userJson = localStorage.getItem('user');
-    if (userJson) {
-      const { user } = JSON.parse(userJson);
-      giangVienApi.getProfile(user.id).then(res => {
-        setLecturer(res.data);
-        fetchStudents(res.data.id);
-      }).catch(err => console.error(err));
+  const students = [
+    { 
+      id: 101, 
+      mssv: '2022220001', 
+      name: 'Nguyễn Văn An', 
+      lop: '12DHTH01',
+      soChuyenHT: 3, 
+      soChuyenYC: 3, 
+      baiChoCham: 0,
+      avatar: 'https://ui-avatars.com/api/?name=Nguyen+Van+An&background=f1f5f9&color=475569' 
+    },
+    { 
+      id: 102, 
+      mssv: '2022220002', 
+      name: 'Trần Thị Bình', 
+      lop: '12DHTH02',
+      soChuyenHT: 2, 
+      soChuyenYC: 3, 
+      baiChoCham: 2,
+      avatar: 'https://ui-avatars.com/api/?name=Tran+Thi+Binh&background=f1f5f9&color=475569' 
+    },
+    { 
+      id: 103, 
+      mssv: '2022220003', 
+      name: 'Lê Hoàng Cường', 
+      lop: '12DHTH01',
+      soChuyenHT: 3, 
+      soChuyenYC: 3, 
+      baiChoCham: 1,
+      avatar: 'https://ui-avatars.com/api/?name=Le+Hoang+Cuong&background=f1f5f9&color=475569' 
+    },
+    { 
+      id: 104, 
+      mssv: '2022220004', 
+      name: 'Phạm Duy Khang', 
+      lop: '12DHTH03',
+      soChuyenHT: 1, 
+      soChuyenYC: 3, 
+      baiChoCham: 0,
+      avatar: 'https://ui-avatars.com/api/?name=Pham+Duy+Khang&background=f1f5f9&color=475569' 
+    },
+    { 
+      id: 105, 
+      mssv: '2022220005', 
+      name: 'Vũ Quốc Huy', 
+      lop: '12DHTH02',
+      soChuyenHT: 3, 
+      soChuyenYC: 3, 
+      baiChoCham: 3,
+      avatar: 'https://ui-avatars.com/api/?name=Vu+Quoc+Huy&background=f1f5f9&color=475569' 
     }
-  }, []);
+  ];
 
-  const fetchStudents = async (gvId) => {
-    try {
-      const res = await giangVienApi.getGuidedStudents(gvId);
-      setStudents(res.data);
-      if (res.data.length > 0) {
-        handleSelectStudent(res.data[0]);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleSelectStudent = async (termStudent) => {
-    setSelectedStudent(termStudent);
-    setStudentTrips([]);
-    setSelectedTripId('');
-    setDiemChuanBi('');
-    setDiemCong(0.0);
-    setMessage('');
-    setError('');
-
-    try {
-      const res = await sinhVienApi.getRegisteredTrips(termStudent.sinh_vien_id);
-      // Filter only approved/participated trips
-      const validTrips = res.data.filter(t => 
-        t.trang_thai === 'HopLe' || t.trang_thai === 'DaThamGia' || t.trang_thai === 'HoanThanh'
-      );
-      setStudentTrips(validTrips);
-
-      if (validTrips.length > 0) {
-        const firstTrip = validTrips[0];
-        setSelectedTripId(firstTrip.id.toString());
-        
-        // Fetch grade details if available
-        const gradesRes = await sinhVienApi.getGrades(termStudent.sinh_vien_id);
-        const activeTermGrades = gradesRes.data.find(g => g.lich_kien_tap_id === termStudent.lich_kien_tap_id);
-        if (activeTermGrades && activeTermGrades.selectedTrips) {
-          const matchedTripGrade = activeTermGrades.selectedTrips.find(tg => tg.phieu_dang_ky_id === firstTrip.id);
-          if (matchedTripGrade) {
-            setDiemChuanBi(matchedTripGrade.diem_chuan_bi?.toString() || '');
-            setDiemCong(Number(matchedTripGrade.diem_cong || 0.0));
-          }
-        }
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleTripChange = async (tripIdStr) => {
-    setSelectedTripId(tripIdStr);
-    setMessage('');
-    setError('');
-    const matchedTrip = studentTrips.find(t => t.id === Number(tripIdStr));
-    if (!matchedTrip) return;
-
-    try {
-      const gradesRes = await sinhVienApi.getGrades(selectedStudent.sinh_vien_id);
-      const activeTermGrades = gradesRes.data.find(g => g.lich_kien_tap_id === selectedStudent.lich_kien_tap_id);
-      if (activeTermGrades && activeTermGrades.selectedTrips) {
-        const matchedTripGrade = activeTermGrades.selectedTrips.find(tg => tg.phieu_dang_ky_id === matchedTrip.id);
-        if (matchedTripGrade) {
-          setDiemChuanBi(matchedTripGrade.diem_chuan_bi?.toString() || '');
-          setDiemCong(Number(matchedTripGrade.diem_cong || 0.0));
-        } else {
-          setDiemChuanBi('');
-          setDiemCong(0.0);
-        }
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleSaveGrades = async (e) => {
-    e.preventDefault();
-    if (!selectedTripId) {
-      alert('Vui lòng chọn chuyến đi kiến tập.');
-      return;
-    }
-
-    setMessage('');
-    setError('');
-    setLoading(true);
-
-    try {
-      const res = await giangVienApi.gradePrepAndBonus({
-        phieuId: Number(selectedTripId),
-        diemChuanBi: Number(diemChuanBi),
-        diemCong: Number(diemCong)
-      });
-      setMessage(res.data.message);
-      // Reload student details to fetch fresh grades
-      handleSelectStudent(selectedStudent);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Lỗi khi nhập điểm quá trình.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (!lecturer) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px] text-slate-500 font-semibold">
-        Đang tải danh sách sinh viên hướng dẫn...
-      </div>
-    );
-  }
+  const filteredStudents = students.filter(s => 
+    s.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    s.mssv.includes(searchQuery)
+  );
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Title */}
-      <div>
-        <h1 className="text-3xl font-black text-on-surface tracking-tight">Sinh viên hướng dẫn</h1>
-        <p className="text-sm text-on-surface-variant font-medium mt-1">
-          Theo dõi danh sách sinh viên bạn được phân công hướng dẫn và nhập điểm chuẩn bị, điểm cộng quá trình.
-        </p>
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300 relative" onClick={() => setIsDropdownOpen(false)}>
+      
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-slate-800">Sinh viên hướng dẫn</h1>
       </div>
 
-      {/* Guide Banner */}
-      <div className="bg-gradient-to-r from-emerald-500/10 to-teal-500/5 border border-emerald-500/10 rounded-2xl p-5 flex items-start gap-4 relative z-10">
-        <Info className="w-6 h-6 text-primary shrink-0 mt-0.5" />
-        <div className="space-y-1">
-          <h3 className="font-bold text-sm text-primary">Quy định tính điểm quá trình</h3>
-          <p className="text-xs text-on-surface-variant font-semibold leading-relaxed">
-            - <strong>Điểm chuẩn bị (Tác phong/Chuẩn bị slide):</strong> Chấm theo thang điểm 10.0 cho sự tìm hiểu thông tin doanh nghiệp trước chuyến đi.
-            <br />- <strong>Điểm cộng xây dựng bài:</strong> Hỗ trợ cộng điểm trực tiếp (+0.0, +0.5, +1.0) cho các sinh viên tích cực đóng góp ý kiến hoặc hỗ trợ trưởng đoàn.
-          </p>
-        </div>
-      </div>
-
-      {/* Messages */}
-      {message && (
-        <div className="bg-[#e5ffdc] border border-primary/20 text-[#476d01] px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2">
-          <Check className="w-4 h-4" />
-          <span>{message}</span>
-        </div>
-      )}
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-750 px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-red-650" />
-          <span>{error}</span>
-        </div>
-      )}
-
-      {/* Main Layout Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 relative z-10">
+      {/* Filter Bar */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         
-        {/* Left Column: Student List Table */}
-        <div className="lg:col-span-7 bg-white rounded-2xl border border-surface-variant/40 shadow-sm overflow-hidden">
-          <div className="p-4 bg-[#f8faf1] border-b border-surface-variant/40 flex items-center justify-between">
-            <span className="text-xs font-bold text-primary flex items-center gap-1.5">
-              <Users className="w-4.5 h-4.5" />
-              <span>Bảng danh sách hướng dẫn ({students.length} sinh viên)</span>
-            </span>
+        {/* Semester Selector */}
+        <div className="relative w-full md:w-[350px]">
+          <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Lịch kiến tập</label>
+          <div 
+            onClick={(e) => { e.stopPropagation(); setIsDropdownOpen(!isDropdownOpen); }}
+            className={`w-full px-4 py-2.5 bg-white border rounded-xl text-sm flex justify-between items-center cursor-pointer transition-all shadow-sm ${isDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+          >
+            <span className="font-bold text-slate-800 truncate pr-2">{selectedSemester.name}</span>
+            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
           </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[500px]">
-              <thead>
-                <tr className="bg-slate-50 text-on-surface-variant font-bold text-xs uppercase tracking-wider border-b border-slate-100">
-                  <th className="py-4 px-6">Sinh viên</th>
-                  <th className="py-4 px-6">MSSV / Lớp</th>
-                  <th className="py-4 px-6">Đợt học tập</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-sm font-semibold">
-                {students.length === 0 ? (
-                  <tr>
-                    <td colSpan="3" className="py-8 text-center text-slate-500">
-                      Bạn chưa được phân công hướng dẫn sinh viên nào.
-                    </td>
-                  </tr>
-                ) : (
-                  students.map((termSv) => {
-                    const isSelected = selectedStudent?.id === termSv.id;
-                    return (
-                      <tr 
-                        key={termSv.id}
-                        onClick={() => handleSelectStudent(termSv)}
-                        className={`cursor-pointer transition-colors ${
-                          isSelected ? 'bg-primary/5 hover:bg-primary/10' : 'hover:bg-slate-50'
-                        }`}
-                      >
-                        <td className="py-4 px-6">
-                          <span className={`font-bold ${isSelected ? 'text-primary' : 'text-on-surface'}`}>
-                            {termSv.sinhVien?.ho_ten}
-                          </span>
-                        </td>
-                        <td className="py-4 px-6 text-on-surface-variant">
-                          <span className="font-mono text-xs">{termSv.sinhVien?.mssv}</span>
-                          <span className="text-slate-300 mx-1">|</span>
-                          <span>{termSv.sinhVien?.lop}</span>
-                        </td>
-                        <td className="py-4 px-6 text-on-surface-variant font-medium text-xs">
-                          {termSv.lichKienTap?.ten_lich}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Right Column: Grading Form Widget */}
-        <div className="lg:col-span-5 bg-white rounded-2xl border border-surface-variant/40 shadow-sm p-6 flex flex-col justify-between">
-          {selectedStudent ? (
-            <form onSubmit={handleSaveGrades} className="space-y-6">
-              <div>
-                <h3 className="font-black text-lg text-on-surface">Nhập điểm quá trình</h3>
-                <p className="text-xs text-on-surface-variant font-semibold mt-0.5">
-                  Nhập điểm cho sinh viên: <span className="text-primary font-bold">{selectedStudent.sinhVien?.ho_ten}</span>
-                </p>
-              </div>
-
-              {/* Trip Selector Dropdown */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-on-surface uppercase tracking-wider block">
-                  Chọn chuyến kiến tập liên quan <span className="text-red-500">*</span>
-                </label>
-                {studentTrips.length === 0 ? (
-                  <p className="text-xs text-[#ba1a1a] font-bold">
-                    Sinh viên này chưa tham gia chuyến đi nào được duyệt.
-                  </p>
-                ) : (
-                  <select
-                    value={selectedTripId}
-                    onChange={(e) => handleTripChange(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-[#f8faf1] border border-surface-variant rounded-xl text-sm focus:border-primary focus:outline-none"
-                    required
-                  >
-                    {studentTrips.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.chuyenThamQuan?.nhaMay?.ten_nha_may} ({new Date(t.chuyenThamQuan?.ngay_tham_quan).toLocaleDateString('vi-VN')})
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-
-              {/* Preparatory Grade Input */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-on-surface uppercase tracking-wider block">
-                  Điểm chuẩn bị (Slide/Nghiên cứu) (0 - 10)
-                </label>
-                <input 
-                  type="number"
-                  min="0"
-                  max="10"
-                  step="0.1"
-                  value={diemChuanBi}
-                  onChange={(e) => setDiemChuanBi(e.target.value)}
-                  placeholder="Ví dụ: 8.5"
-                  disabled={studentTrips.length === 0}
-                  className="w-full px-4 py-2.5 bg-[#f8faf1] border border-surface-variant rounded-xl text-sm focus:border-primary focus:outline-none font-bold text-primary"
-                />
-              </div>
-
-              {/* Bonus Grade buttons selector */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-on-surface uppercase tracking-wider block">
-                  Điểm cộng phát biểu / Đóng góp ý kiến
-                </label>
-                <div className="flex items-center gap-2">
-                  {[0.0, 0.5, 1.0].map((val) => {
-                    const isActive = Number(diemCong) === val;
-                    return (
-                      <button
-                        type="button"
-                        key={val}
-                        disabled={studentTrips.length === 0}
-                        onClick={() => setDiemCong(val)}
-                        className={`flex-1 py-2 px-3 rounded-xl text-xs font-black border transition-all cursor-pointer ${
-                          isActive
-                            ? 'bg-secondary text-white border-secondary shadow-sm scale-102'
-                            : 'bg-[#f8faf1] border-slate-205 text-slate-500 hover:bg-[#ecefe6]'
-                        }`}
-                      >
-                        {val > 0 ? `+${val.toFixed(1)}` : '0.0'}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-slate-100 flex justify-end">
-                <button
-                  type="submit"
-                  disabled={loading || studentTrips.length === 0}
-                  className="px-6 py-2.5 bg-primary text-white font-bold text-sm rounded-xl hover:bg-primary-container shadow-md transition-all active:scale-95 disabled:bg-gray-300 disabled:cursor-not-allowed cursor-pointer"
+          {isDropdownOpen && (
+            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-50 py-1 overflow-hidden animate-in slide-in-from-top-1">
+              {semesters.map(sem => (
+                <div 
+                  key={sem.id}
+                  onClick={() => { setSelectedSemester(sem); setIsDropdownOpen(false); }}
+                  className={`px-4 py-3 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                    selectedSemester.id === sem.id ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50 font-medium'
+                  }`}
                 >
-                  Lưu điểm quá trình
-                </button>
-              </div>
-            </form>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-12 text-slate-400 font-semibold text-sm">
-              <GraduationCap className="w-12 h-12 text-slate-300 mb-2" />
-              <span>Chọn một sinh viên bên danh sách để nhập điểm</span>
+                  <span className="truncate pr-2">{sem.name}</span>
+                  {selectedSemester.id === sem.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                </div>
+              ))}
             </div>
           )}
         </div>
 
+        {/* Search */}
+        <div className="w-full md:w-[300px] mt-0 md:mt-5 relative">
+          <input 
+            type="text" 
+            placeholder="Tìm theo MSSV/họ tên..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-800 font-medium shadow-sm"
+          />
+          <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+        </div>
       </div>
+
+      {/* Main Table */}
+      <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-hidden">
+        <div className="overflow-x-auto min-h-[400px]">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-[#E7E0C4] text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
+                <th className="p-4 pl-6 w-12 text-center">Ảnh</th>
+                <th className="p-4 min-w-[120px]">MSSV</th>
+                <th className="p-4 min-w-[200px]">Họ tên</th>
+                <th className="p-4 min-w-[120px]">Lớp</th>
+                <th className="p-4 text-center min-w-[160px]">Số chuyến hoàn thành</th>
+                <th className="p-4 text-center min-w-[200px]">Bài thu hoạch chờ chấm</th>
+                <th className="p-4 pr-6 text-right min-w-[150px]">Hành động</th>
+              </tr>
+            </thead>
+            <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
+              {filteredStudents.length === 0 ? (
+                <tr>
+                  <td colSpan="7" className="p-8 text-center text-slate-500 font-medium italic">
+                    Không tìm thấy sinh viên nào.
+                  </td>
+                </tr>
+              ) : (
+                filteredStudents.map(student => {
+                  const isTripsDone = student.soChuyenHT >= student.soChuyenYC;
+                  const hasPendingReports = student.baiChoCham > 0;
+
+                  return (
+                    <tr key={student.id} className="hover:bg-slate-50 transition-colors group">
+                      
+                      <td className="p-4 pl-6 text-center">
+                        <div className="w-8 h-8 rounded-full border border-slate-200 overflow-hidden mx-auto shrink-0">
+                          <img src={student.avatar} alt={student.name} className="w-full h-full object-cover" />
+                        </div>
+                      </td>
+                      
+                      <td className="p-4 font-mono font-bold text-slate-600">{student.mssv}</td>
+                      <td className="p-4 font-bold text-slate-800">{student.name}</td>
+                      <td className="p-4 font-medium text-slate-500">{student.lop}</td>
+                      
+                      {/* Số chuyến hoàn thành */}
+                      <td className="p-4 text-center">
+                        <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-bold shadow-sm border ${
+                          isTripsDone 
+                            ? 'bg-[#89B449] text-white border-[#89B449]/20' 
+                            : 'bg-[#DBD468] text-slate-800 border-[#DBD468]/20'
+                        }`}>
+                          {student.soChuyenHT} / {student.soChuyenYC}
+                        </span>
+                      </td>
+
+                      {/* Bài thu hoạch chờ chấm */}
+                      <td className="p-4 text-center">
+                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold shadow-sm border ${
+                          hasPendingReports 
+                            ? 'bg-[#DBD468] text-slate-800 border-[#DBD468]/20' 
+                            : 'bg-[#89B449] text-white border-[#89B449]/20'
+                        }`}>
+                          {hasPendingReports ? (
+                            <>
+                              <div className="w-1.5 h-1.5 rounded-full bg-slate-800 animate-pulse"></div>
+                              Còn {student.baiChoCham} bài
+                            </>
+                          ) : (
+                            'Đã chấm đủ'
+                          )}
+                        </span>
+                      </td>
+
+                      {/* Hành động */}
+                      <td className="p-4 pr-6 text-right">
+                        <button 
+                          onClick={() => navigate('/giang-vien/grading')}
+                          className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-lg text-xs font-bold transition-colors shadow-sm cursor-pointer"
+                        >
+                          {hasPendingReports ? <Edit3 className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          Xem & chấm
+                        </button>
+                      </td>
+
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
   );
 }
