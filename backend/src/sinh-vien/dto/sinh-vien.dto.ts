@@ -103,4 +103,3 @@ export class SelectRepresentativeTripsDto {
   @Min(1, { each: true })
   registrationIds: number[];
 }
-

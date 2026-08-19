@@ -113,6 +113,7 @@ export const khoaApi = {
   updateFactory: (id, data) => api.put(`/khoa/factories/${id}`, data),
   getLecturers: () => api.get('/khoa/lecturers'),
   getStudents: (params) => api.get('/khoa/students', { params }),
+  createStudent: (data) => api.post('/khoa/students', data),
   getCampaigns: () => api.get('/khoa/campaigns'),
   createCampaign: (data) => api.post('/khoa/campaigns', data),
   getSchedules: () => api.get('/khoa/schedules'),

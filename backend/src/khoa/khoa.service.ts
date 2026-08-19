@@ -11,6 +11,7 @@ import {
   DataSource,
   EntityManager,
 } from 'typeorm';
+import * as bcrypt from 'bcryptjs';
 import { TaskQueueService } from '../queue/task-queue.service';
 import {
   NamHoc,
@@ -162,6 +163,61 @@ export class KhoaService {
       limit,
       totalPages: Math.ceil(total / limit),
     };
+  }
+
+  async createStudent(data: any) {
+    return this.dataSource.transaction(async (manager: EntityManager) => {
+      // 1. Kiểm tra MSSV (tên đăng nhập) đã tồn tại chưa
+      const existUser = await manager.findOne(TaiKhoan, {
+        where: { ten_dang_nhap: data.mssv },
+      });
+      if (existUser) {
+        throw new BadRequestException(
+          'Mã số sinh viên (tên đăng nhập) đã tồn tại',
+        );
+      }
+
+      // 2. Tạo tài khoản
+      const salt = await bcrypt.genSalt(10);
+      const hashPassword = await bcrypt.hash(data.mssv, salt);
+
+      const newAccount = new TaiKhoan();
+      newAccount.ten_dang_nhap = data.mssv;
+      newAccount.mat_khau_hash = hashPassword;
+      newAccount.vai_tro = 'SinhVien';
+      newAccount.phai_doi_mat_khau = true; // Yêu cầu đổi mật khẩu ở lần đăng nhập đầu tiên
+      newAccount.trang_thai = 'HoatDong';
+
+      const savedAccount = await manager.save(TaiKhoan, newAccount);
+
+      // 3. Tạo thông tin sinh viên
+      const newStudent = new SinhVien();
+      newStudent.mssv = data.mssv;
+      newStudent.ho_ten = data.ho_ten;
+      newStudent.email = data.email || `${data.mssv}@huit.edu.vn`;
+      newStudent.sdt = data.sdt || '';
+      newStudent.ten_lop = data.ten_lop || '';
+      newStudent.taikhoan_id = savedAccount.id;
+
+      if (data.khoa_id) {
+        newStudent.khoa_id = data.khoa_id;
+      } else {
+        const khoa = await manager.findOne(Khoa, { where: {} });
+        if (khoa) {
+          newStudent.khoa_id = khoa.id;
+        } else {
+          // If absolutely no Khoa exists, we can't create a student safely.
+          throw new BadRequestException('Hệ thống chưa có Khoa nào để gán cho sinh viên');
+        }
+      }
+
+      const savedStudent = await manager.save(SinhVien, newStudent);
+
+      return {
+        message: 'Thêm sinh viên và tạo tài khoản thành công',
+        sinhVien: savedStudent,
+      };
+    });
   }
 
   // -------------------------------------------------------------
@@ -695,7 +751,8 @@ export class KhoaService {
       await manager.save(ChuyenThamQuan, trip);
 
       return {
-        message: 'Đã hoàn tất lọc danh sách tự động theo thứ tự ưu tiên và phát hành hóa đơn lệ phí',
+        message:
+          'Đã hoàn tất lọc danh sách tự động theo thứ tự ưu tiên và phát hành hóa đơn lệ phí',
         accepted: count,
         rejected: sortedList.length - count,
       };

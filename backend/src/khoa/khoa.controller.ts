@@ -39,6 +39,7 @@ import {
   GetRegistrationsQueryDto,
   GetRefundRequestsQueryDto,
   GetEnrollmentsQueryDto,
+  CreateStudentDto,
 } from './dto/khoa.dto';
 
 @Controller('khoa')
@@ -110,6 +111,11 @@ export class KhoaController {
       query.limit || 10,
       query.search,
     );
+  }
+
+  @Post('students')
+  async createStudent(@Body() body: CreateStudentDto) {
+    return this.khoaService.createStudent(body);
   }
 
   @Get('campaigns')
@@ -308,4 +314,3 @@ export class KhoaController {
     };
   }
 }
-

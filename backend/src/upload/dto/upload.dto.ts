@@ -22,4 +22,3 @@ export class ServeFileParamDto {
   @IsNotEmpty({ message: 'Tên file không được để trống' })
   filename: string;
 }
-

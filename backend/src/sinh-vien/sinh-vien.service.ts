@@ -220,10 +220,16 @@ export class SinhVienService {
 
       // Kiem tra khung gio dang ky (neu duoc thiet lap)
       const now = new Date();
-      if (trip.thoi_gian_mo_dang_ky && now < new Date(trip.thoi_gian_mo_dang_ky)) {
+      if (
+        trip.thoi_gian_mo_dang_ky &&
+        now < new Date(trip.thoi_gian_mo_dang_ky)
+      ) {
         throw new BadRequestException('Chuyến đi chưa đến giờ mở đăng ký');
       }
-      if (trip.thoi_gian_dong_dang_ky && now > new Date(trip.thoi_gian_dong_dang_ky)) {
+      if (
+        trip.thoi_gian_dong_dang_ky &&
+        now > new Date(trip.thoi_gian_dong_dang_ky)
+      ) {
         throw new BadRequestException('Chuyến đi đã hết thời gian đăng ký');
       }
 
@@ -275,7 +281,8 @@ export class SinhVienService {
       const savedPhieu = await manager.save(PhieuDangKy, newPhieu);
 
       return {
-        message: 'Đã ghi nhận yêu cầu đăng ký thành công. Vui lòng chờ Khoa chốt danh sách sau khi kết thúc đợt đăng ký.',
+        message:
+          'Đã ghi nhận yêu cầu đăng ký thành công. Vui lòng chờ Khoa chốt danh sách sau khi kết thúc đợt đăng ký.',
         phieu: savedPhieu,
       };
     });

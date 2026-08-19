@@ -572,7 +572,12 @@ export class UploadController {
     }
 
     if (type === 'templates') {
-      const templatePath = join(process.cwd(), 'uploads', 'templates', filename);
+      const templatePath = join(
+        process.cwd(),
+        'uploads',
+        'templates',
+        filename,
+      );
       if (!existsSync(templatePath)) {
         throw new NotFoundException('Tệp không tồn tại.');
       }
@@ -635,7 +640,3 @@ export class UploadController {
     return this.sendLocalFile(res, filePath, filename);
   }
 }
-
-
-
-

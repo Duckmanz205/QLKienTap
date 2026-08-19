@@ -637,7 +637,7 @@ function ForceChangePasswordView({ user, onPasswordChanged, onLogout }) {
     setLoading(true);
 
     try {
-      await authApi.changePassword(user.id, oldPass, newPass);
+      await authApi.changePassword(oldPass, newPass);
       setSuccess(true);
       setTimeout(() => {
         onPasswordChanged({ ...user, phai_doi_mat_khau: false });

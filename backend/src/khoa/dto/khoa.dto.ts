@@ -492,3 +492,28 @@ export class GetEnrollmentsQueryDto {
   search?: string;
 }
 
+export class CreateStudentDto {
+  @IsString()
+  @IsNotEmpty({ message: 'MSSV không được để trống' })
+  mssv: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Họ tên không được để trống' })
+  ho_ten: string;
+
+  @IsOptional()
+  @IsString()
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  sdt?: string;
+
+  @IsOptional()
+  @IsString()
+  ten_lop?: string;
+
+  @IsOptional()
+  @IsInt()
+  khoa_id?: number;
+}

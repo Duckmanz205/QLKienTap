@@ -19,6 +19,8 @@ export default function DanhMuc_SinhVien_Khoa() {
   const [schedules, setSchedules] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterClass, setFilterClass] = useState('All');
+  const [isClassDropdownOpen, setIsClassDropdownOpen] = useState(false);
+  const [classSearchTerm, setClassSearchTerm] = useState('');
   
   // Pagination States
   const [page, setPage] = useState(1);
@@ -31,6 +33,8 @@ export default function DanhMuc_SinhVien_Khoa() {
   const [wizardStep, setWizardStep] = useState(1);
   const [selectedPlanId, setSelectedPlanId] = useState('');
   const [targetClass, setTargetClass] = useState('14DHTP1');
+  const [isPlanDropdownOpen, setIsPlanDropdownOpen] = useState(false);
+  const [planSearchTerm, setPlanSearchTerm] = useState('');
   const [dragActive, setDragActive] = useState(false);
   const [previewStudents, setPreviewStudents] = useState([]);
   const [fileName, setFileName] = useState('');
@@ -153,28 +157,27 @@ export default function DanhMuc_SinhVien_Khoa() {
     }
   };
 
-  const handleSingleSubmit = (e) => {
+  const handleSingleSubmit = async (e) => {
     e.preventDefault();
-    setMessage('Thêm thông tin sinh viên thành công (Dữ liệu cục bộ)');
-    setShowSingleModal(false);
-    // Add to local state list
-    setStudents([
-      ...students,
-      {
-        id: Date.now(),
+    try {
+      await khoaApi.createStudent({
         mssv: newMssv,
         ho_ten: newName,
         email: newEmail || `${newMssv}@huit.edu.vn`,
-        sdt: newPhone || '0900000000',
+        sdt: newPhone || '',
         ten_lop: newClass,
-        hoc_lai: false,
-        khoa: students[0]?.khoa || { ten_khoa: 'Công nghệ Thực phẩm' }
-      }
-    ]);
-    setNewMssv('');
-    setNewName('');
-    setNewEmail('');
-    setNewPhone('');
+      });
+      setMessage('Thêm thông tin sinh viên và tạo tài khoản thành công');
+      setShowSingleModal(false);
+      setNewMssv('');
+      setNewName('');
+      setNewEmail('');
+      setNewPhone('');
+      setNewClass('14DHTP1');
+      fetchData(1);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Có lỗi xảy ra khi thêm sinh viên');
+    }
   };
 
   return (
@@ -204,6 +207,12 @@ export default function DanhMuc_SinhVien_Khoa() {
       {message && (
         <div className="bg-green-50 border border-green-500 text-green-700 px-4 py-2.5 rounded-lg font-medium flex items-center gap-2">
           <Check size={14} /> {message}
+        </div>
+      )}
+      
+      {error && (
+        <div className="bg-rose-50 border border-rose-500 text-rose-700 px-4 py-2.5 rounded-lg font-medium flex items-center gap-2">
+          <AlertCircle size={14} /> {error}
         </div>
       )}
 
@@ -265,16 +274,64 @@ export default function DanhMuc_SinhVien_Khoa() {
         </div>
         <div className="flex items-center gap-3 self-end md:self-auto">
           <span className="text-slate-500 font-semibold">Lọc Lớp:</span>
-          <select 
-            value={filterClass} 
-            onChange={(e) => setFilterClass(e.target.value)}
-            className="border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white text-slate-600 focus:outline-none"
-          >
-            <option value="All">Tất cả lớp</option>
-            {uniqueClasses.map(c => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
+          <div className="relative">
+            <button
+              onClick={() => setIsClassDropdownOpen(!isClassDropdownOpen)}
+              className="border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-600 focus:outline-none min-w-[140px] text-left flex justify-between items-center"
+            >
+              <span className="truncate">{filterClass === 'All' ? 'Tất cả lớp' : filterClass}</span>
+              <ChevronRight size={14} className={`transform transition-transform ${isClassDropdownOpen ? 'rotate-90' : ''}`} />
+            </button>
+            
+            {isClassDropdownOpen && (
+              <>
+                <div 
+                  className="fixed inset-0 z-10" 
+                  onClick={() => setIsClassDropdownOpen(false)}
+                />
+                <div className="absolute right-0 mt-1 w-64 bg-white border border-slate-200 rounded-lg shadow-xl z-20 py-1">
+                  <div className="px-2 pb-2 pt-1 border-b border-slate-100">
+                    <input
+                      type="text"
+                      autoFocus
+                      placeholder="Tìm kiếm lớp..."
+                      value={classSearchTerm}
+                      onChange={(e) => setClassSearchTerm(e.target.value)}
+                      className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <div className="max-h-60 overflow-y-auto">
+                    <button
+                      onClick={() => {
+                        setFilterClass('All');
+                        setIsClassDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-50 ${filterClass === 'All' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-700'}`}
+                    >
+                      Tất cả lớp
+                    </button>
+                    {uniqueClasses
+                      .filter(c => c.toLowerCase().includes(classSearchTerm.toLowerCase()))
+                      .map(c => (
+                        <button
+                          key={c}
+                          onClick={() => {
+                            setFilterClass(c);
+                            setIsClassDropdownOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-50 ${filterClass === c ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-700'}`}
+                        >
+                          {c}
+                        </button>
+                      ))}
+                    {uniqueClasses.filter(c => c.toLowerCase().includes(classSearchTerm.toLowerCase())).length === 0 && (
+                      <div className="px-3 py-2 text-sm text-slate-400 text-center">Không tìm thấy lớp</div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -326,7 +383,14 @@ export default function DanhMuc_SinhVien_Khoa() {
           <div className="text-slate-500 font-semibold">
             Hiển thị {filteredStudents.length} / {totalStudents} sinh viên
           </div>
-          <div className="flex gap-1.5">
+          <div className="flex gap-1.5 items-center">
+            <button
+              disabled={page <= 1}
+              onClick={() => fetchData(1)}
+              className="px-2.5 py-1 bg-white border border-slate-250 rounded hover:bg-slate-50 disabled:opacity-50 text-slate-600 font-semibold"
+            >
+              Đầu trang
+            </button>
             <button
               disabled={page <= 1}
               onClick={() => fetchData(page - 1)}
@@ -343,6 +407,13 @@ export default function DanhMuc_SinhVien_Khoa() {
               className="px-2.5 py-1 bg-white border border-slate-250 rounded hover:bg-slate-50 disabled:opacity-50 text-slate-600 font-semibold"
             >
               Sau
+            </button>
+            <button
+              disabled={page >= totalPages}
+              onClick={() => fetchData(totalPages)}
+              className="px-2.5 py-1 bg-white border border-slate-250 rounded hover:bg-slate-50 disabled:opacity-50 text-slate-600 font-semibold"
+            >
+              Cuối trang
             </button>
           </div>
         </div>
@@ -388,15 +459,57 @@ export default function DanhMuc_SinhVien_Khoa() {
                   </div>
                   <div>
                     <label className="block font-semibold text-slate-600 mb-1">Chọn lịch kiến tập áp dụng</label>
-                    <select 
-                      value={selectedPlanId}
-                      onChange={(e) => setSelectedPlanId(e.target.value)}
-                      className="w-full border border-slate-200 rounded-lg p-2 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
-                    >
-                      {schedules.map(p => (
-                        <option key={p.id} value={p.id}>{p.ten_lich}</option>
-                      ))}
-                    </select>
+                    <div className="relative">
+                      <button
+                        onClick={() => setIsPlanDropdownOpen(!isPlanDropdownOpen)}
+                        className="w-full border border-slate-200 rounded-lg p-2 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-left flex justify-between items-center"
+                      >
+                        <span className="truncate">
+                          {schedules.find(p => String(p.id) === String(selectedPlanId))?.ten_lich || 'Chọn lịch kiến tập'}
+                        </span>
+                        <ChevronRight size={14} className={`transform transition-transform ${isPlanDropdownOpen ? 'rotate-90' : ''}`} />
+                      </button>
+                      
+                      {isPlanDropdownOpen && (
+                        <>
+                          <div 
+                            className="fixed inset-0 z-10" 
+                            onClick={() => setIsPlanDropdownOpen(false)}
+                          />
+                          <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl z-20 py-1">
+                            <div className="px-2 pb-2 pt-1 border-b border-slate-100">
+                              <input
+                                type="text"
+                                autoFocus
+                                placeholder="Tìm kiếm lịch..."
+                                value={planSearchTerm}
+                                onChange={(e) => setPlanSearchTerm(e.target.value)}
+                                className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                              />
+                            </div>
+                            <div className="max-h-60 overflow-y-auto">
+                              {schedules
+                                .filter(p => p.ten_lich.toLowerCase().includes(planSearchTerm.toLowerCase()))
+                                .map(p => (
+                                  <button
+                                    key={p.id}
+                                    onClick={() => {
+                                      setSelectedPlanId(String(p.id));
+                                      setIsPlanDropdownOpen(false);
+                                    }}
+                                    className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-50 ${String(selectedPlanId) === String(p.id) ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-700'}`}
+                                  >
+                                    {p.ten_lich}
+                                  </button>
+                                ))}
+                              {schedules.filter(p => p.ten_lich.toLowerCase().includes(planSearchTerm.toLowerCase())).length === 0 && (
+                                <div className="px-3 py-2 text-sm text-slate-400 text-center">Không tìm thấy lịch</div>
+                              )}
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </div>
 
                   <div>
