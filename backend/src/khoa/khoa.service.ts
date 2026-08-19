@@ -571,13 +571,7 @@ export class KhoaService {
         req.phieuDangKy.trang_thai = 'DaHuy';
         await manager.save(PhieuDangKy, req.phieuDangKy);
 
-        const hd = await manager.findOne(HoaDonLePhi, {
-          where: { phieu_dang_ky_id: req.phieu_dang_ky_id },
-        });
-        if (hd && hd.trang_thai === 'DaDongDungHan') {
-          hd.trang_thai = 'DaHoanPhi';
-          await manager.save(HoaDonLePhi, hd);
-        }
+
       } else {
         req.phieuDangKy.trang_thai = 'DaHuy';
         await manager.save(PhieuDangKy, req.phieuDangKy);
@@ -644,12 +638,14 @@ export class KhoaService {
         continue;
       }
 
-      const finishedCount = await this.phieuRepo.count({
-        where: {
-          sinh_vien_id: p.sinh_vien_id,
-          trang_thai: In(['HoanThanh', 'DaThamGia', 'HopLe']),
-        },
-      });
+      const finishedCountResult = await this.phieuRepo
+        .createQueryBuilder('phieu')
+        .leftJoin('phieu.chuyenThamQuan', 'chuyen')
+        .where('phieu.sinh_vien_id = :svId', { svId: p.sinh_vien_id })
+        .andWhere('phieu.trang_thai IN (:...statuses)', { statuses: ['HoanThanh', 'DaThamGia', 'HopLe'] })
+        .select('COUNT(DISTINCT chuyen.nha_may_id)', 'count')
+        .getRawOne();
+      const finishedCount = parseInt(finishedCountResult.count, 10) || 0;
       if (finishedCount >= 3) {
         p.trang_thai = 'BiLoai';
         await this.phieuRepo.save(p);

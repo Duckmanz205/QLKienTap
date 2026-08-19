@@ -333,6 +333,9 @@ export class GiangVienService {
     let diem = await this.diemPhieuRepo.findOne({
       where: { phieu_dang_ky_id: phieuId },
     });
+    if (diem && diem.da_khoa) {
+      throw new BadRequestException('Điểm của phiếu đăng ký này đã được khóa, không thể chỉnh sửa');
+    }
     if (!diem) {
       diem = new DiemPhieuDangKy();
       diem.phieu_dang_ky_id = phieuId;
@@ -468,6 +471,9 @@ export class GiangVienService {
     let diem = await this.diemPhieuRepo.findOne({
       where: { phieu_dang_ky_id: phieuId },
     });
+    if (diem && diem.da_khoa) {
+      throw new BadRequestException('Điểm của phiếu đăng ký này đã được khóa, không thể chỉnh sửa');
+    }
     if (!diem) {
       diem = new DiemPhieuDangKy();
       diem.phieu_dang_ky_id = phieuId;
@@ -570,6 +576,13 @@ export class GiangVienService {
       throw new ForbiddenException(
         'Phiếu đăng ký không thuộc kế hoạch kiến tập của hội đồng này',
       );
+    }
+
+    const diemPhieuCheck = await this.diemPhieuRepo.findOne({
+      where: { phieu_dang_ky_id: phieuId },
+    });
+    if (diemPhieuCheck && diemPhieuCheck.da_khoa) {
+      throw new BadRequestException('Điểm của phiếu đăng ký này đã được khóa, không thể chỉnh sửa');
     }
 
     let item = await this.diemHoiDongRepo.findOne({

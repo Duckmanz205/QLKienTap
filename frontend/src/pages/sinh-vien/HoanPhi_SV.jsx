@@ -140,7 +140,7 @@ export default function HoanPhi_SV() {
   // Invoices eligible for refund: paid, and not already requested
   const existingRefundInvoiceIds = refundRequests.map(r => r.hoa_don_id);
   const eligibleInvoices = invoices.filter(i => 
-    i.trang_thai === 'DaDongDungHan' && !existingRefundInvoiceIds.includes(i.id)
+    i.trang_thai === 'ViPham' && !existingRefundInvoiceIds.includes(i.id)
   );
 
   return (
@@ -156,7 +156,7 @@ export default function HoanPhi_SV() {
         <button 
           onClick={() => {
             if (eligibleInvoices.length === 0) {
-              alert('Bạn không có hóa đơn nào đủ điều kiện (đã thanh toán thành công và chưa tạo đơn hoàn phí).');
+              alert('Bạn không có hóa đơn nào đủ điều kiện (trạng thái ViPham và chưa tạo đơn hoàn phí).');
               return;
             }
             setShowRefundModal(true);

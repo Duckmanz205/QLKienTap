@@ -741,7 +741,7 @@ export class DiemPhieuDangKy {
   ngay_lam_bai_chuan_bi: Date;
 
   @Column({ type: 'decimal', precision: 4, scale: 2, nullable: true })
-  diem_bai_thu_hoach_ai: number;
+  diem_bai_thu_hoach_ai: number | null;
 
   @Column({ type: 'decimal', precision: 4, scale: 2, nullable: true })
   diem_bai_thu_hoach: number;
