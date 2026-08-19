@@ -215,4 +215,3 @@ export class SinhVienController {
     return this.svService.getStudentGrades(student.id);
   }
 }
-

@@ -1,333 +1,183 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
-  Award, 
-  Search, 
-  Plus, 
-  Info, 
-  Save, 
-  AlertCircle, 
-  CheckCircle2, 
-  Download,
-  Check
+  Info, ChevronDown, Check, Save, Plus, Minus
 } from 'lucide-react';
-import { giangVienApi } from '../../services/api';
 
 export default function DiemChuanBi_DiemCong_GV() {
-  const [lecturer, setLecturer] = useState(null);
-  const [trips, setTrips] = useState([]);
-  const [selectedTripId, setSelectedTripId] = useState('');
-  const [students, setStudents] = useState([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  
+  // Mock Trips
+  const trips = [
+    { id: 1, name: 'Nhà máy Yakult HCM (10/09/2026)' },
+    { id: 2, name: 'Vinamilk Bình Dương (05/09/2026)' }
+  ];
+  const [selectedTrip, setSelectedTrip] = useState(trips[0]);
 
-  // Local state to keep track of score inputs before saving
-  // Key: phieuId, Value: { diemChuanBi: number, diemCong: number }
-  const [scores, setScores] = useState({});
+  // Mock Students
+  const initialStudents = [
+    { id: 101, mssv: '2022220001', name: 'Nguyễn Văn An', diemChuanBi: '', diemCong: 0.0, ghiChu: '' },
+    { id: 102, mssv: '2022220002', name: 'Trần Thị Bình', diemChuanBi: '8.5', diemCong: 0.5, ghiChu: 'Hỏi đáp tích cực' },
+    { id: 103, mssv: '2022220003', name: 'Lê Hoàng Cường', diemChuanBi: '7.0', diemCong: 1.0, ghiChu: 'Nhóm trưởng xuất sắc' },
+    { id: 104, mssv: '2022220004', name: 'Phạm Duy Khang', diemChuanBi: '9.0', diemCong: 0.0, ghiChu: '' },
+    { id: 105, mssv: '2022220005', name: 'Vũ Quốc Huy', diemChuanBi: '', diemCong: 0.0, ghiChu: '' },
+  ];
+  const [students, setStudents] = useState(initialStudents);
 
-  useEffect(() => {
-    const userJson = localStorage.getItem('user');
-    if (userJson) {
-      const { user } = JSON.parse(userJson);
-      giangVienApi.getProfile(user.id).then(res => {
-        setLecturer(res.data);
-        fetchTrips(res.data.id);
-      }).catch(err => console.error(err));
-    }
-  }, []);
-
-  const fetchTrips = async (gvId) => {
-    try {
-      const res = await giangVienApi.getLedTrips(gvId);
-      setTrips(res.data);
-      if (res.data.length > 0) {
-        setSelectedTripId(res.data[0].id.toString());
+  const handleScoreChange = (id, field, value) => {
+    setStudents(prev => prev.map(s => {
+      if (s.id === id) {
+        return { ...s, [field]: value };
       }
-    } catch (err) {
-      console.error('Error fetching led trips:', err);
-    }
-  };
-
-  useEffect(() => {
-    if (selectedTripId) {
-      fetchRegistrations(Number(selectedTripId));
-    } else {
-      setStudents([]);
-      setScores({});
-    }
-  }, [selectedTripId]);
-
-  const fetchRegistrations = async (tripId) => {
-    setLoading(true);
-    setError('');
-    setMessage('');
-    try {
-      const res = await giangVienApi.getTripRegistrations(tripId);
-      setStudents(res.data);
-      
-      const initialScores = {};
-      res.data.forEach(item => {
-        initialScores[item.id] = {
-          diemChuanBi: item.diemPhieuDangKy?.diem_chuan_bi !== null && item.diemPhieuDangKy?.diem_chuan_bi !== undefined
-            ? Number(item.diemPhieuDangKy.diem_chuan_bi)
-            : 0,
-          diemCong: item.diemPhieuDangKy?.diem_cong !== null && item.diemPhieuDangKy?.diem_cong !== undefined
-            ? Number(item.diemPhieuDangKy.diem_cong)
-            : 0
-        };
-      });
-      setScores(initialScores);
-    } catch (err) {
-      setError('Không thể tải danh sách sinh viên.');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handlePrepScoreChange = (phieuId, val) => {
-    let num = parseFloat(val);
-    if (isNaN(num)) num = 0;
-    if (num < 0) num = 0;
-    if (num > 10) num = 10;
-
-    setScores(prev => ({
-      ...prev,
-      [phieuId]: {
-        ...prev[phieuId],
-        diemChuanBi: num
-      }
+      return s;
     }));
   };
 
-  const incrementBonus = (phieuId) => {
-    const currentBonus = scores[phieuId]?.diemCong || 0;
-    let newBonus = currentBonus + 0.5;
-    if (newBonus > 1.0) {
-      newBonus = 0; // Cycle back to 0 if they click past 1.0
-    }
-
-    setScores(prev => ({
-      ...prev,
-      [phieuId]: {
-        ...prev[phieuId],
-        diemCong: newBonus
+  const handleBonusChange = (id, delta) => {
+    setStudents(prev => prev.map(s => {
+      if (s.id === id) {
+        let newBonus = s.diemCong + delta;
+        if (newBonus > 1.0) newBonus = 1.0;
+        if (newBonus < 0) newBonus = 0;
+        return { ...s, diemCong: newBonus };
       }
+      return s;
     }));
   };
-
-  const handleSaveScores = async () => {
-    if (!selectedTripId || students.length === 0) return;
-    setLoading(true);
-    setError('');
-    setMessage('');
-
-    try {
-      const promises = Object.keys(scores).map(phieuId => {
-        const studentScore = scores[phieuId];
-        return giangVienApi.gradePrepAndBonus({
-          phieuId: Number(phieuId),
-          diemChuanBi: studentScore.diemChuanBi,
-          diemCong: studentScore.diemCong
-        });
-      });
-
-      await Promise.all(promises);
-      setMessage('Lưu điểm chuẩn bị và điểm cộng thành công!');
-      fetchRegistrations(Number(selectedTripId));
-    } catch (err) {
-      setError(err.response?.data?.message || 'Có lỗi xảy ra trong quá trình lưu điểm số.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (!lecturer) {
-    return (
-      <div className="flex items-center justify-center min-h-[450px] text-slate-500 font-semibold">
-        Đang tải dữ liệu giảng viên...
-      </div>
-    );
-  }
-
-  const filteredStudents = students.filter(item => {
-    const name = item.sinhVien?.ho_ten || '';
-    const mssv = item.sinhVien?.mssv || '';
-    return name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-           mssv.toLowerCase().includes(searchQuery.toLowerCase());
-  });
 
   return (
-    <div className="space-y-6 animate-fade-in pb-16">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mt-2">
-        <div>
-          <h1 className="text-3xl font-black text-on-surface tracking-tight font-headline-lg flex items-center gap-3">
-            <Award className="w-8 h-8 text-primary" />
-            <span>Điểm chuẩn bị &amp; Điểm cộng</span>
-          </h1>
-          <p className="text-sm text-on-surface-variant font-medium mt-1">
-            Quản lý và cập nhật điểm số chuẩn bị trước chuyến đi, cùng với điểm thưởng chuyên cần của sinh viên.
-          </p>
-        </div>
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300 relative" onClick={() => setIsDropdownOpen(false)}>
+      
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-slate-800">Điểm chuẩn bị & điểm cộng</h1>
+      </div>
 
-        {/* Selector */}
-        <div className="w-full md:w-96 space-y-1.5">
-          <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider block">
-            Chọn chuyến kiến tập
-          </label>
-          <select
-            value={selectedTripId}
-            onChange={(e) => setSelectedTripId(e.target.value)}
-            className="w-full px-4 py-2.5 bg-white border border-surface-variant rounded-xl text-sm focus:border-primary focus:outline-none font-semibold shadow-sm"
+      {/* Top Bar: Dropdown */}
+      <div className="mb-6">
+        <div className="relative w-full md:w-[400px]">
+          <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Chọn chuyến tham quan</label>
+          <div 
+            onClick={(e) => { e.stopPropagation(); setIsDropdownOpen(!isDropdownOpen); }}
+            className={`w-full px-4 py-2.5 bg-white border rounded-xl text-sm flex justify-between items-center cursor-pointer transition-all shadow-sm ${isDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
           >
-            {trips.map(t => (
-              <option key={t.id} value={t.id}>
-                {t.nhaMay?.ten_nha_may} - {new Date(t.ngay_khoi_hanh).toLocaleDateString('vi-VN')}
-              </option>
-            ))}
-          </select>
+            <span className="font-bold text-slate-800 truncate pr-2">{selectedTrip.name}</span>
+            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+          </div>
+          {isDropdownOpen && (
+            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-50 py-1 overflow-hidden animate-in slide-in-from-top-1">
+              {trips.map(trip => (
+                <div 
+                  key={trip.id}
+                  onClick={() => { setSelectedTrip(trip); setIsDropdownOpen(false); }}
+                  className={`px-4 py-3 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                    selectedTrip.id === trip.id ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50 font-medium'
+                  }`}
+                >
+                  <span className="truncate pr-2">{trip.name}</span>
+                  {selectedTrip.id === trip.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
       {/* Info Banner */}
-      <div className="bg-[#f8faf1] border border-surface-variant/60 rounded-2xl p-5 shadow-sm flex items-start gap-4">
-        <div className="bg-primary-container/10 p-2.5 rounded-xl text-primary shrink-0">
-          <Info className="w-5 h-5" />
-        </div>
-        <div className="space-y-1">
-          <h3 className="text-sm font-bold text-on-surface uppercase tracking-wide">Lưu ý về quy chế điểm số</h3>
-          <p className="text-xs text-on-surface-variant font-medium leading-relaxed">
-            Điểm chuẩn bị lấy từ bài kiểm tra trắc nghiệm trước chuyến đi (thang điểm 10). Điểm cộng tối đa là 1.0 điểm 
-            (mỗi lượt ghi nhận tăng 0.5 điểm) dành cho sinh viên phát biểu tích cực hoặc đạt thứ hạng xuất sắc.
-          </p>
-        </div>
+      <div className="bg-[#E7E0C4] rounded-xl p-4 flex items-start gap-3 shadow-sm border border-[#E7E0C4]/50 mb-8">
+        <Info className="w-5 h-5 text-[#407F3E] shrink-0 mt-0.5" />
+        <p className="text-sm font-medium text-slate-700 leading-relaxed">
+          <strong className="text-slate-800">Lưu ý:</strong> Điểm chuẩn bị lấy từ bài kiểm tra tổ chức ngoài hệ thống (Google Form/Kahoot...). 
+          Với chuyến tự do, đây là bài do GVHD tổ chức riêng. Điểm cộng tối đa là 1.0 điểm/chuyến.
+        </p>
       </div>
 
-      {/* Messages */}
-      {message && (
-        <div className="bg-[#e5ffdc] border border-primary/20 text-[#476d01] px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4" />
-          <span>{message}</span>
-        </div>
-      )}
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-750 px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-red-650" />
-          <span>{error}</span>
-        </div>
-      )}
-
-      {/* Table Card */}
-      <div className="bg-white rounded-2xl border border-surface-variant/40 shadow-sm overflow-hidden relative z-10">
-        {/* Controls */}
-        <div className="p-4 border-b border-slate-100 bg-[#f8faf1]/30 flex justify-between items-center">
-          <div className="relative w-64">
-            <Search className="w-4 h-4 text-outline absolute left-3 top-1/2 -translate-y-1/2" />
-            <input 
-              type="text"
-              placeholder="Tìm sinh viên..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-[#f8faf1] border border-surface-variant rounded-xl text-xs focus:border-primary focus:outline-none font-bold"
-            />
-          </div>
-        </div>
-
-        {/* Data Table */}
-        <div className="overflow-x-auto">
+      {/* Main Table */}
+      <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-visible pb-24 md:pb-0">
+        <div className="overflow-x-auto min-h-[400px]">
           <table className="w-full text-left border-collapse min-w-[700px]">
             <thead>
-              <tr className="bg-[#f8faf1] text-on-surface-variant font-bold text-xs uppercase tracking-wider border-b border-surface-variant">
-                <th className="py-4 px-6 pl-8 w-36">MSSV</th>
-                <th className="py-4 px-6 w-64">Họ Tên</th>
-                <th className="py-4 px-6 w-44">Điểm Chuẩn Bị (0 - 10)</th>
-                <th className="py-4 px-6 w-56">Điểm Cộng (Max 1.0)</th>
+              <tr className="bg-[#E7E0C4] text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
+                <th className="p-4 pl-6 min-w-[120px]">MSSV</th>
+                <th className="p-4 min-w-[200px]">Họ tên</th>
+                <th className="p-4 text-center min-w-[150px]">Điểm chuẩn bị<br/><span className="text-[10px] text-slate-500 font-medium normal-case">(Hệ số 10)</span></th>
+                <th className="p-4 text-center min-w-[180px]">Điểm cộng</th>
+                <th className="p-4 pr-6 min-w-[200px]">Ghi chú</th>
               </tr>
             </thead>
-            <tbody className="text-sm font-semibold divide-y divide-slate-100">
-              {loading ? (
-                <tr>
-                  <td colSpan="4" className="py-12 text-center text-slate-500 font-medium">
-                    Đang đồng bộ dữ liệu điểm số...
+            <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
+              {students.map(student => (
+                <tr key={student.id} className="hover:bg-slate-50 transition-colors group">
+                  
+                  <td className="p-4 pl-6 font-mono font-bold text-slate-600">{student.mssv}</td>
+                  
+                  <td className="p-4 font-bold text-slate-800">{student.name}</td>
+                  
+                  <td className="p-4">
+                    <div className="flex justify-center">
+                      <input 
+                        type="number" 
+                        min="0" max="10" step="0.1"
+                        value={student.diemChuanBi}
+                        onChange={(e) => handleScoreChange(student.id, 'diemChuanBi', e.target.value)}
+                        placeholder="--"
+                        className="w-20 px-3 py-2 text-center bg-white border border-[#E7E0C4] rounded-lg text-sm font-bold text-[#407F3E] focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all placeholder-slate-300"
+                      />
+                    </div>
                   </td>
-                </tr>
-              ) : filteredStudents.length === 0 ? (
-                <tr>
-                  <td colSpan="4" className="py-12 text-center text-slate-500">
-                    Không tìm thấy sinh viên nào trong chuyến đi này.
-                  </td>
-                </tr>
-              ) : (
-                filteredStudents.map((item) => {
-                  const studentScore = scores[item.id] || { diemChuanBi: 0, diemCong: 0 };
-                  const initials = item.sinhVien?.ho_ten?.split(' ').slice(-2).map(w => w[0]).join('') || 'SV';
-                  const isMaxBonus = studentScore.diemCong >= 1.0;
-
-                  return (
-                    <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-4 px-6 pl-8 font-mono text-primary font-bold">
-                        {item.sinhVien?.mssv}
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-secondary/10 text-secondary flex items-center justify-center font-bold text-xs uppercase">
-                            {initials}
-                          </div>
-                          <span className="font-bold text-on-surface">{item.sinhVien?.ho_ten}</span>
-                        </div>
-                      </td>
-                      <td className="py-4 px-6">
-                        <input
-                          type="number"
-                          min="0"
-                          max="10"
-                          step="0.1"
-                          value={studentScore.diemChuanBi}
-                          onChange={(e) => handlePrepScoreChange(item.id, e.target.value)}
-                          className="w-24 px-3 py-2 bg-[#f8faf1] rounded-xl border border-surface-variant focus:border-primary focus:outline-none text-center font-bold text-primary"
-                        />
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="flex items-center gap-3 bg-[#f8faf1] p-1.5 rounded-xl border border-surface-variant w-fit">
-                          <button
-                            type="button"
-                            onClick={() => incrementBonus(item.id)}
-                            className={`px-3 py-1 text-xs font-bold rounded-lg transition-all flex items-center gap-1 active:scale-95 cursor-pointer ${
-                              isMaxBonus 
-                                ? 'bg-slate-200 text-slate-500 border border-slate-350 cursor-not-allowed'
-                                : 'bg-white text-primary border border-primary hover:bg-primary/5'
-                            }`}
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                            <span>0.5</span>
-                          </button>
-                          <span className={`text-xs font-bold min-w-[70px] text-center ${isMaxBonus ? 'text-primary' : 'text-slate-500'}`}>
-                            {studentScore.diemCong.toFixed(1)} / 1.0
+                  
+                  <td className="p-4">
+                    <div className="flex flex-col items-center justify-center gap-1.5">
+                      <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
+                        <button 
+                          onClick={() => handleBonusChange(student.id, -0.5)}
+                          disabled={student.diemCong <= 0}
+                          className="w-6 h-6 flex items-center justify-center rounded bg-white border border-slate-200 text-slate-500 hover:text-slate-800 hover:border-slate-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        >
+                          <Minus className="w-3.5 h-3.5" />
+                        </button>
+                        
+                        <div className="w-16 text-center font-bold text-xs">
+                          <span className={student.diemCong > 0 ? "text-[#89B449]" : "text-slate-500"}>
+                            {student.diemCong > 0 ? `+${student.diemCong.toFixed(1)}` : '0.0'}
                           </span>
                         </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
+                        
+                        <button 
+                          onClick={() => handleBonusChange(student.id, 0.5)}
+                          disabled={student.diemCong >= 1.0}
+                          className="w-6 h-6 flex items-center justify-center rounded bg-white border border-slate-200 text-slate-700 hover:text-[#407F3E] hover:border-[#407F3E] hover:bg-[#407F3E]/5 disabled:opacity-30 disabled:cursor-not-allowed transition-colors font-bold text-xs group"
+                        >
+                          <Plus className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
+                        </button>
+                      </div>
+                      <span className="text-[10px] font-medium text-slate-400">Tối đa 1.0 đ</span>
+                    </div>
+                  </td>
+                  
+                  <td className="p-4 pr-6">
+                    <input 
+                      type="text" 
+                      value={student.ghiChu}
+                      onChange={(e) => handleScoreChange(student.id, 'ghiChu', e.target.value)}
+                      placeholder="Ghi chú (tùy chọn)..."
+                      className="w-full px-3 py-2 bg-transparent border-b border-transparent hover:border-[#E7E0C4] focus:bg-white focus:border-[#E7E0C4] focus:outline-none focus:ring-1 focus:ring-[#E7E0C4] rounded-none focus:rounded-md text-xs text-slate-700 placeholder-slate-300 transition-all"
+                    />
+                  </td>
+
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
       </div>
 
       {/* Floating Save Button */}
-      <div className="flex justify-end pt-2">
-        <button
-          onClick={handleSaveScores}
-          disabled={loading || students.length === 0}
-          className="px-6 py-3 bg-primary hover:bg-primary-container text-white font-bold rounded-2xl shadow-lg hover:shadow-xl transition-all flex items-center gap-2 active:scale-95 cursor-pointer disabled:opacity-50"
-        >
+      <div className="fixed bottom-6 right-6 z-40 animate-in slide-in-from-bottom-6 duration-500 delay-300">
+        <button className="flex items-center gap-2 px-8 py-3.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-2xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all cursor-pointer font-bold text-sm tracking-wide">
           <Save className="w-5 h-5" />
-          <span>Lưu điểm số</span>
+          Lưu điểm
         </button>
       </div>
+
     </div>
   );
 }

@@ -1,113 +1,253 @@
 import React, { useState, useEffect } from 'react';
-import { khoaApi } from '../../services/api';
 import { 
-  Users, 
-  Check, 
-  X, 
-  Search, 
-  ShieldCheck, 
-  Briefcase,
-  Mail,
-  Phone
+  Upload, Plus, Search, ChevronDown, Check,
+  Edit2, Key, Trash2
 } from 'lucide-react';
+import { khoaApi } from '../../services/api';
 
 export default function DanhMuc_GiangVien_Khoa() {
   const [lecturers, setLecturers] = useState([]);
+  
+  // Filter States
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterHoiDong, setFilterHoiDong] = useState('Tất cả');
+  const [isHoiDongDropdownOpen, setIsHoiDongDropdownOpen] = useState(false);
+  
+  // Pagination States
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(15);
 
   useEffect(() => {
-    khoaApi.getLecturers()
-      .then(res => setLecturers(res.data))
-      .catch(err => console.error(err));
+    setPage(1);
+  }, [searchTerm, filterHoiDong]);
+
+  useEffect(() => {
+    fetchData();
   }, []);
 
-  const filteredLecturers = lecturers.filter(gv => 
-    gv.ho_ten.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    gv.ma_gv.includes(searchTerm)
-  );
+  const fetchData = async () => {
+    try {
+      const res = await khoaApi.getLecturers();
+      setLecturers(res.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const hoiDongOptions = ["Tất cả", "Đủ điều kiện", "Chưa đủ điều kiện"];
+
+  const filteredLecturers = lecturers.filter(gv => {
+    const matchesSearch = gv.ho_ten.toLowerCase().includes(searchTerm.toLowerCase()) || gv.ma_gv.includes(searchTerm);
+    let matchesHoiDong = true;
+    if (filterHoiDong === "Đủ điều kiện") matchesHoiDong = gv.du_dk_hoi_dong === true;
+    if (filterHoiDong === "Chưa đủ điều kiện") matchesHoiDong = gv.du_dk_hoi_dong === false;
+    
+    return matchesSearch && matchesHoiDong;
+  });
+
+  const totalLecturers = filteredLecturers.length;
+  const totalPages = Math.ceil(totalLecturers / limit) || 1;
+  const paginatedLecturers = filteredLecturers.slice((page - 1) * limit, page * limit);
+
+  const toggleHoiDongStatus = async (id, currentStatus) => {
+    // Optimistic UI update or call API (mocked UI change for now)
+    setLecturers(lecturers.map(gv => 
+      gv.id === id ? { ...gv, du_dk_hoi_dong: !currentStatus } : gv
+    ));
+    // TODO: Call API to update status backend
+  };
 
   return (
-    <div className="space-y-6 text-xs">
-      <div>
-        <h2 className="text-xl font-bold text-slate-800">Danh mục Giảng viên</h2>
-        <p className="text-slate-500 text-xs">Xem và điều hành thông tin đội ngũ Giảng viên hướng dẫn & dẫn đoàn thuộc Khoa</p>
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-2 animate-in fade-in duration-300">
+      {/* Header section */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+        <h1 className="text-2xl font-bold text-slate-800">Giảng viên</h1>
+        <div className="flex gap-3">
+          <button className="px-4 py-2 border-2 border-[#407F3E] text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors cursor-pointer">
+            <Upload className="w-4 h-4" />
+            Nhập từ Excel
+          </button>
+          <button className="px-4 py-2 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors shadow-sm cursor-pointer">
+            <Plus className="w-4 h-4" />
+            Thêm giảng viên
+          </button>
+        </div>
       </div>
 
-      {/* Filter and Search Bar */}
-      <div className="bg-white p-4 rounded-xl border border-slate-250 shadow-sm flex items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-md">
-          <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-            <Search size={14} />
-          </span>
+      {/* Filter Bar */}
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-[#E7E0C4] mb-6 flex flex-wrap gap-4 items-center relative z-20">
+        {/* Search Input */}
+        <div className="relative flex-1 min-w-[280px]">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input 
             type="text" 
-            placeholder="Tìm theo Mã giảng viên hoặc Họ tên..." 
+            placeholder="Tìm theo mã GV/họ tên"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-4 py-1.5 border border-slate-200 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all"
           />
         </div>
-        <div className="text-slate-500 font-semibold">
-          Tổng cộng: {filteredLecturers.length} giảng viên
+
+        {/* Đủ điều kiện hội đồng Dropdown */}
+        <div className="relative min-w-[250px]">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-slate-700 whitespace-nowrap">Đủ ĐK hội đồng:</span>
+            <div className="relative w-full">
+              <div 
+                onClick={() => setIsHoiDongDropdownOpen(!isHoiDongDropdownOpen)}
+                className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isHoiDongDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+              >
+                <span className="text-slate-700 font-medium">{filterHoiDong}</span>
+                <ChevronDown className="w-4 h-4 text-slate-400" />
+              </div>
+              {isHoiDongDropdownOpen && (
+                <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1">
+                  {hoiDongOptions.map(opt => (
+                    <div 
+                      key={opt}
+                      onClick={() => { setFilterHoiDong(opt); setIsHoiDongDropdownOpen(false); }}
+                      className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                        (filterHoiDong === opt) 
+                          ? 'bg-[#E7E0C4] text-slate-800 font-bold' 
+                          : 'text-slate-700 hover:bg-[#E7E0C4]/50'
+                      }`}
+                    >
+                      {opt}
+                      {filterHoiDong === opt && <Check className="w-4 h-4 text-[#407F3E]" />}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      {/* Main Table */}
+      <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-hidden relative z-10">
         <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
-              <tr>
-                <th className="p-3 pl-4">Mã GV</th>
-                <th className="p-3">Họ và Tên</th>
-                <th className="p-3">Liên lạc</th>
-                <th className="p-3">Đủ ĐK Hội đồng</th>
-                <th className="p-3 text-right pr-4">Hạn mức Hướng dẫn</th>
+          <table className="w-full text-left border-collapse min-w-[950px]">
+            <thead>
+              <tr className="bg-[#E7E0C4] text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
+                <th className="p-4 w-16 text-center">Ảnh</th>
+                <th className="p-4">Mã GV</th>
+                <th className="p-4">Họ tên</th>
+                <th className="p-4">Email</th>
+                <th className="p-4 text-center">Đủ ĐK hội đồng</th>
+                <th className="p-4 text-center">Số SV tối đa Hướng dẫn</th>
+                <th className="p-4 text-right">Thao tác</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700">
-              {filteredLecturers.length === 0 ? (
+            <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
+              {paginatedLecturers.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="p-12 text-center text-slate-400">Không tìm thấy thông tin giảng viên nào</td>
+                  <td colSpan={7} className="p-8 text-center text-slate-500 font-medium">Không tìm thấy giảng viên nào khớp điều kiện</td>
                 </tr>
               ) : (
-                filteredLecturers.map((gv) => (
-                  <tr key={gv.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="p-3 pl-4 font-mono font-bold text-slate-900">{gv.ma_gv}</td>
-                    <td className="p-3 font-semibold text-slate-800 flex items-center gap-2">
-                      <Briefcase size={14} className="text-slate-400" />
-                      {gv.ho_ten}
-                    </td>
-                    <td className="p-3 space-y-0.5">
-                      <div className="flex items-center gap-1 text-slate-500">
-                        <Mail size={12} />
-                        <span className="font-mono">{gv.email}</span>
+                paginatedLecturers.map(gv => (
+                  <tr key={gv.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="p-4">
+                      <div className="w-8 h-8 rounded-full bg-[#E7E0C4]/50 text-[#407F3E] flex items-center justify-center font-bold text-xs border border-[#407F3E]/20 mx-auto">
+                        {gv.ho_ten ? gv.ho_ten.charAt(0).toUpperCase() : '?'}
                       </div>
-                      {gv.sdt && (
-                        <div className="flex items-center gap-1 text-slate-500">
-                          <Phone size={12} />
-                          <span className="font-mono">{gv.sdt}</span>
-                        </div>
-                      )}
                     </td>
-                    <td className="p-3">
-                      {gv.du_dk_hoi_dong ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
-                          <ShieldCheck size={11} /> Đạt tiêu chuẩn
-                        </span>
+                    <td className="p-4 font-mono font-bold text-slate-800">{gv.ma_gv}</td>
+                    <td className="p-4 font-bold text-[#407F3E]">{gv.ho_ten}</td>
+                    <td className="p-4 text-slate-600">{gv.email}</td>
+                    <td className="p-4 text-center">
+                      <button 
+                        onClick={() => toggleHoiDongStatus(gv.id, gv.du_dk_hoi_dong)}
+                        className={`w-10 h-5.5 rounded-full relative transition-colors cursor-pointer inline-block align-middle ${gv.du_dk_hoi_dong ? 'bg-[#89B449]' : 'bg-slate-300'}`}
+                        title={gv.du_dk_hoi_dong ? "Đủ điều kiện" : "Chưa đủ điều kiện"}
+                      >
+                        <div className={`absolute top-0.5 w-4.5 h-4.5 bg-white rounded-full shadow-sm transition-transform duration-200 ${gv.du_dk_hoi_dong ? 'translate-x-[18px]' : 'translate-x-[2px]'}`}></div>
+                      </button>
+                    </td>
+                    <td className="p-4 text-center">
+                      {gv.so_sv_toi_da_huong_dan ? (
+                        <span className="font-bold text-slate-800 text-sm">{gv.so_sv_toi_da_huong_dan}</span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-500 border border-slate-200">
-                          Chưa đủ điều kiện
-                        </span>
+                        <span className="px-2 py-1 bg-slate-100 text-slate-400 font-medium text-[10px] uppercase tracking-wider rounded-md border border-slate-200">Chưa cấu hình</span>
                       )}
                     </td>
-                    <td className="p-3 text-right pr-4 font-bold text-slate-800">
-                      {gv.so_sv_toi_da_huong_dan ? `${gv.so_sv_toi_da_huong_dan} SV` : 'Không giới hạn'}
+                    <td className="p-4 text-right">
+                      <div className="flex justify-end gap-2 text-slate-400">
+                        <button className="p-1.5 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded transition-colors cursor-pointer" title="Sửa thông tin">
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button className="p-1.5 hover:text-[#89B449] hover:bg-[#89B449]/10 rounded transition-colors cursor-pointer" title="Reset mật khẩu">
+                          <Key className="w-4 h-4" />
+                        </button>
+                        <button 
+                          className="p-1.5 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded transition-colors cursor-pointer" 
+                          title="Xóa giảng viên" 
+                          onClick={() => window.confirm(`Bạn có chắc chắn muốn xóa giảng viên ${gv.ho_ten}?`)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
+        </div>
+        
+        {/* Pagination Footer */}
+        <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
+            <span>Hiển thị</span>
+            <select 
+              value={limit}
+              onChange={(e) => {
+                setLimit(Number(e.target.value));
+                setPage(1);
+              }}
+              className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
+            >
+              <option value={15}>15</option>
+              <option value={30}>30</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <span>/ {totalLecturers} giảng viên</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button 
+              disabled={page <= 1}
+              onClick={() => setPage(1)}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Trang đầu
+            </button>
+            <button 
+              disabled={page <= 1}
+              onClick={() => setPage(p => p - 1)}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Trước
+            </button>
+            
+            <span className="px-4 py-1.5 rounded-lg bg-[#407F3E] text-white text-sm font-bold shadow-sm cursor-default mx-1">
+              Trang {page} / {totalPages}
+            </span>
+            
+            <button 
+              disabled={page >= totalPages}
+              onClick={() => setPage(p => p + 1)}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Sau
+            </button>
+            <button 
+              disabled={page >= totalPages}
+              onClick={() => setPage(totalPages)}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Trang cuối
+            </button>
+          </div>
         </div>
       </div>
     </div>

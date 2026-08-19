@@ -1,311 +1,166 @@
 import React, { useState } from 'react';
-import { CreditCard, Search, Upload, Download, Check, Info, DollarSign, Clock, AlertTriangle, X } from 'lucide-react';
-import api from '../../services/api';
-
-const initialFeeRecords = [
-  { mssv: '2001200123', name: 'Nguyễn Văn Nam', class: '14ĐHTP01', amount: 1500000, payDate: '2026-10-12', payMethod: 'Chuyển khoản', status: 'Đã nộp' },
-  { mssv: '2001200124', name: 'Trần Thị Thu Thủy', class: '14ĐHTP01', amount: 1500000, payDate: '-', payMethod: '-', status: 'Chưa nộp' },
-  { mssv: '2001200125', name: 'Phạm Hữu Đạt', class: '14ĐHTP02', amount: 1500000, payDate: '2026-10-20', payMethod: 'Tiền mặt', status: 'Vi phạm' },
-  { mssv: '2001200126', name: 'Lê Hoài Bảo', class: '14ĐHTP02', amount: 1500000, payDate: '2026-10-14', payMethod: 'Chuyển khoản', status: 'Đã nộp' },
-  { mssv: '2001200127', name: 'Đặng Minh Khang', class: '14ĐHTP03', amount: 1500000, payDate: '-', payMethod: '-', status: 'Hủy chuyến - Chờ hoàn phí' },
-  { mssv: '2001200128', name: 'Vũ Thị Minh Ngọc', class: '14ĐHTP03', amount: 1500000, payDate: '-', payMethod: '-', status: 'Chưa nộp' }
-];
+import { 
+  ChevronDown, Check, ChevronRight, UploadCloud, Search, DollarSign
+} from 'lucide-react';
 
 export default function QuanLyLePhi_Khoa() {
-  const [feeRecords, setFeeRecords] = useState(initialFeeRecords);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [scheduleFilter, setScheduleFilter] = useState('Tất cả');
-  const [statusFilter, setStatusFilter] = useState('Tất cả');
-  const [selectedRecord, setSelectedRecord] = useState(null);
-  const [confirmingRecord, setConfirmingRecord] = useState(null);
-  const [confirmMethod, setConfirmMethod] = useState('Chuyển khoản');
+  // Dropdown States for Filters
+  const [isLichDropdownOpen, setIsLichDropdownOpen] = useState(false);
+  const [selectedLich, setSelectedLich] = useState('');
+  const lichOptions = ["Đợt kiến tập - Học kỳ 1 - 2025-2026", "Đợt kiến tập - Học kỳ 2 - 2024-2025"];
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState('');
+  const statusOptions = ["Tất cả", "Chưa đóng", "Đã đóng đúng hạn", "Vi phạm", "Đã hoàn phí"];
+
+  // Close all dropdowns
+  const closeAllDropdowns = () => {
+    setIsLichDropdownOpen(false);
+    setIsStatusDropdownOpen(false);
   };
 
-  const getStatusBadgeClass = (status) => {
-    if (status === 'Đã nộp') return 'bg-[#89B449] text-white'; // Secondary green
-    if (status === 'Chưa nộp') return 'bg-[#DBD468] text-slate-800'; // Warning yellow
-    if (status === 'Hủy chuyến - Chờ hoàn phí') return 'bg-[#E68A8C] text-white'; // Danger coral
-    if (status === 'Vi phạm') return 'bg-[#E68A8C] text-white'; // Danger coral
-    return 'bg-slate-100 text-slate-600';
+  const handleDropdownClick = (e, setter) => {
+    e.stopPropagation();
+    closeAllDropdowns();
+    setter(true);
   };
 
-  const filteredRecords = feeRecords.filter(rec => {
-    const matchesSearch = rec.name.toLowerCase().includes(searchTerm.toLowerCase()) || rec.mssv.includes(searchTerm);
-    const matchesStatus = statusFilter === 'Tất cả' || 
-      (statusFilter === 'Đã nộp' && rec.status === 'Đã nộp') ||
-      (statusFilter === 'Chưa nộp' && rec.status === 'Chưa nộp') ||
-      (statusFilter === 'Hủy chuyến - Chờ hoàn phí' && rec.status === 'Hủy chuyến - Chờ hoàn phí') ||
-      (statusFilter === 'Vi phạm/Trễ hạn' && rec.status === 'Vi phạm');
-    return matchesSearch && matchesStatus;
-  });
+  // Mock Data
+  const fees = [
+    { id: 1, mssv: '2001215001', ten: 'Nguyễn Văn An', chuyen: 'Vinamilk Bình Dương', soTien: '150,000 VNĐ', noiDung: '2001215001 LPHI TQNM', hanDong: '25/08/2026', ngayDong: '22/08/2026', trangThai: 'Đã đóng đúng hạn' },
+    { id: 2, mssv: '2001215002', ten: 'Trần Thị Bình', chuyen: 'Acecook HCM', soTien: '200,000 VNĐ', noiDung: '2001215002 LPHI', hanDong: '25/08/2026', ngayDong: '--', trangThai: 'Chưa đóng' },
+    { id: 3, mssv: '2001215003', ten: 'Lê Hoàng Cường', chuyen: 'Vinamilk Bình Dương', soTien: '150,000 VNĐ', noiDung: '2001215003 LPHI TQNM', hanDong: '25/08/2026', ngayDong: '28/08/2026', trangThai: 'Vi phạm' },
+    { id: 4, mssv: '2001215004', ten: 'Phạm Duy Khang', chuyen: 'Yakult HCM', soTien: '180,000 VNĐ', noiDung: '2001215004 LPHI TQNM', hanDong: '30/08/2026', ngayDong: '25/08/2026', trangThai: 'Đã đóng đúng hạn' },
+    { id: 5, mssv: '2001215005', ten: 'Vũ Quốc Huy', chuyen: 'CP Group Việt Nam', soTien: '250,000 VNĐ', noiDung: '2001215005 LPHI TQNM', hanDong: '10/09/2026', ngayDong: '05/09/2026', trangThai: 'Đã hoàn phí' },
+  ];
 
-  const handleConfirmPaymentSubmit = (e) => {
-    e.preventDefault();
-    if (!confirmingRecord) return;
-    setFeeRecords(prev => prev.map(rec => {
-      if (rec.mssv === confirmingRecord.mssv) {
-        return {
-          ...rec,
-          status: 'Đã nộp',
-          payDate: new Date().toISOString().split('T')[0],
-          payMethod: confirmMethod
-        };
-      }
-      return rec;
-    }));
-    setConfirmingRecord(null);
-    alert(`Đã xác nhận đóng lệ phí cho sinh viên ${confirmingRecord.name} thành công.`);
-  };
-
-  const handleExcelUploadClick = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.xlsx, .xls';
-    input.onchange = async (e) => {
-      if (e.target.files && e.target.files[0]) {
-        const file = e.target.files[0];
-        if (file.size > 5 * 1024 * 1024) {
-          alert('Kích thước tệp Excel vượt quá hạn mức 5MB.');
-          return;
-        }
-        
-        try {
-          const formData = new FormData();
-          formData.append('file', file);
-          const uploadRes = await api.post('/upload/excel', formData, {
-            headers: {
-              'Content-Type': 'multipart/form-data',
-            }
-          });
-          alert(`Đã nạp file đối soát ${file.name} lên máy chủ thành công. URL: ${uploadRes.data.url}`);
-        } catch (err) {
-          console.error(err);
-          alert(err.response?.data?.message || 'Không thể nạp tệp Excel đối soát.');
-        }
-      }
-    };
-    input.click();
-  };
-
-  const exportReport = () => {
-    let csvContent = '\uFEFF';
-    csvContent += 'MSSV,Họ tên,Lớp,Số tiền,Ngày nộp,Phương thức,Trạng thái\n';
-    feeRecords.forEach(rec => {
-      csvContent += `"${rec.mssv}","${rec.name}","${rec.class}","${rec.amount}","${rec.payDate}","${rec.payMethod}","${rec.status}"\n`;
-    });
-    
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a'); 
-    link.href = url; 
-    link.download = `BaoCaoLePhi_${new Date().toISOString().slice(0,10)}.csv`;
-    document.body.appendChild(link); 
-    link.click(); 
-    document.body.removeChild(link);
+  // Status Badge Helper
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 'Đã đóng đúng hạn':
+        return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#89B449] text-white shadow-sm border border-[#89B449]/20">{status}</span>;
+      case 'Chưa đóng':
+        return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#DBD468] text-slate-800 shadow-sm border border-[#DBD468]/20">{status}</span>;
+      case 'Vi phạm':
+        return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#E68A8C] text-white shadow-sm border border-[#E68A8C]/20">{status}</span>;
+      case 'Đã hoàn phí':
+        return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200">{status}</span>;
+      default:
+        return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200">{status}</span>;
+    }
   };
 
   return (
-    <div className="flex flex-col gap-6 font-sans">
-      {/* Page Title & Top-Right Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-slate-800 tracking-tight">
-            Quản lý lệ phí
-          </h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            Theo dõi, nhập tệp đối soát ngân hàng và xác nhận thu lệ phí tham quan của sinh viên.
-          </p>
-        </div>
-        <div className="flex items-center gap-2 self-start sm:self-center">
-          <button
-            onClick={handleExcelUploadClick}
-            className="flex items-center gap-2 px-4 py-2 bg-[#407F3E] hover:bg-[#407F3E]/95 text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
-          >
-            <Upload className="w-4 h-4" />
-            <span>Nhập Excel đối soát</span>
-          </button>
-          <button
-            onClick={exportReport}
-            className="flex items-center gap-2 px-4 py-2 border border-[#407F3E] text-[#407F3E] hover:bg-[#407F3E]/5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-sm bg-white"
-          >
-            <Download className="w-4 h-4" />
-            <span>Kết xuất báo cáo</span>
-          </button>
-        </div>
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300 relative" onClick={closeAllDropdowns}>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+        <h1 className="text-2xl font-bold text-slate-800">Quản lý lệ phí</h1>
+        <button className="px-5 py-2.5 border border-[#407F3E] text-[#407F3E] hover:bg-[#407F3E]/10 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer">
+          <UploadCloud className="w-4 h-4" />
+          Tải danh sách đã đóng phí
+        </button>
       </div>
 
-      {/* Stats Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        {/* Card 1: Tổng dự kiến */}
-        <div className="bg-white p-5 rounded-2xl border border-[#E7E0C4] shadow-sm flex flex-col justify-between hover:shadow-md transition-all">
-          <div className="flex justify-between items-start">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tổng thu dự kiến</span>
-            <div className="p-2 bg-slate-50 text-slate-650 rounded-lg"><DollarSign className="w-4 h-4" /></div>
+      {/* Filter Bar */}
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-[#E7E0C4] flex items-center gap-4 relative z-20 mb-6">
+        {/* Lịch Dropdown */}
+        <div className="relative min-w-[300px]">
+          <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Lịch kiến tập</label>
+          <div 
+            onClick={(e) => handleDropdownClick(e, setIsLichDropdownOpen)}
+            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isLichDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+          >
+            <span className={`truncate pr-2 font-medium ${selectedLich ? 'text-slate-700' : 'text-slate-400'}`}>{selectedLich || 'Chọn lịch kiến tập'}</span>
+            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
           </div>
-          <div className="mt-4">
-            <h3 className="text-2xl font-black text-slate-800 font-mono">{formatCurrency(feeRecords.length * 1500000)}</h3>
-            <p className="text-xs text-slate-400 font-semibold mt-1">{feeRecords.length} sinh viên đăng ký</p>
-          </div>
-        </div>
-
-        {/* Card 2: Đã thu */}
-        <div className="bg-[#407F3E]/5 border border-[#407F3E]/20 rounded-2xl p-5 shadow-sm flex flex-col justify-between hover:shadow-md transition-all">
-          <div className="flex justify-between items-start">
-            <span className="text-[10px] font-bold text-[#407F3E] uppercase tracking-wider">Lệ phí đã thu</span>
-            <div className="p-2 bg-[#407F3E]/10 text-[#407F3E] rounded-lg"><Check className="w-4 h-4" /></div>
-          </div>
-          <div className="mt-4">
-            <h3 className="text-2xl font-black text-[#407F3E] font-mono">
-              {formatCurrency(feeRecords.filter(r => r.status === 'Đã nộp').length * 1500000)}
-            </h3>
-            <p className="text-xs text-[#407F3E] font-bold mt-1">
-              {feeRecords.filter(r => r.status === 'Đã nộp').length} SV đã đóng đúng hạn
-            </p>
-          </div>
-        </div>
-
-        {/* Card 3: Chưa nộp */}
-        <div className="bg-[#DBD468]/5 border border-[#DBD468]/20 rounded-2xl p-5 shadow-sm flex flex-col justify-between hover:shadow-md transition-all">
-          <div className="flex justify-between items-start">
-            <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">Chưa đóng</span>
-            <div className="p-2 bg-[#DBD468]/10 text-amber-600 rounded-lg"><Clock className="w-4 h-4" /></div>
-          </div>
-          <div className="mt-4">
-            <h3 className="text-2xl font-black text-amber-800 font-mono">
-              {formatCurrency(feeRecords.filter(r => r.status === 'Chưa nộp').length * 1500000)}
-            </h3>
-            <p className="text-xs text-slate-500 font-bold mt-1">
-              {feeRecords.filter(r => r.status === 'Chưa nộp').length} sinh viên chờ xác nhận
-            </p>
-          </div>
-        </div>
-
-        {/* Card 4: Chờ hoàn / Vi phạm */}
-        <div className="bg-[#E68A8C]/5 border border-[#E68A8C]/20 rounded-2xl p-5 shadow-sm flex flex-col justify-between hover:shadow-md transition-all">
-          <div className="flex justify-between items-start">
-            <span className="text-[10px] font-bold text-red-650 uppercase tracking-wider">Chờ hoàn / Vi phạm</span>
-            <div className="p-2 bg-[#E68A8C]/10 text-red-500 rounded-lg"><AlertTriangle className="w-4 h-4" /></div>
-          </div>
-          <div className="mt-4">
-            <h3 className="text-2xl font-black text-red-650 font-mono">
-              {formatCurrency(feeRecords.filter(r => r.status === 'Hủy chuyến - Chờ hoàn phí' || r.status === 'Vi phạm').length * 1500000)}
-            </h3>
-            <p className="text-xs text-slate-550 font-bold mt-1">
-              {feeRecords.filter(r => r.status === 'Hủy chuyến - Chờ hoàn phí' || r.status === 'Vi phạm').length} sinh viên vi phạm / hủy chuyến
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Filter Card */}
-      <div className="bg-white rounded-2xl border border-[#E7E0C4] p-5 shadow-sm">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-          {/* Lịch kiến tập */}
-          <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">
-              Lịch kiến tập
-            </label>
-            <select
-              value={scheduleFilter}
-              onChange={e => setScheduleFilter(e.target.value)}
-              className="w-full bg-[#E7E0C4]/10 border border-[#E7E0C4] rounded-xl px-4 py-2.5 text-sm text-slate-700 font-bold hover:bg-[#E7E0C4]/20 transition-all cursor-pointer outline-none focus:ring-2 focus:ring-[#407F3E]/20"
-            >
-              <option value="Tất cả">Tất cả lịch kiến tập</option>
-              <option value="Lịch kiến tập HK1 2026-2027">Lịch kiến tập HK1 2026-2027</option>
-            </select>
-          </div>
-
-          {/* Trạng thái nộp */}
-          <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">
-              Trạng thái nộp
-            </label>
-            <select
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
-              className="w-full bg-[#E7E0C4]/10 border border-[#E7E0C4] rounded-xl px-4 py-2.5 text-sm text-slate-700 font-bold hover:bg-[#E7E0C4]/20 transition-all cursor-pointer outline-none focus:ring-2 focus:ring-[#407F3E]/20"
-            >
-              <option value="Tất cả">Tất cả trạng thái</option>
-              <option value="Đã nộp">Đã nộp</option>
-              <option value="Chưa nộp">Chưa nộp</option>
-              <option value="Hủy chuyến - Chờ hoàn phí">Hủy chuyến - Chờ hoàn phí</option>
-              <option value="Vi phạm/Trễ hạn">Vi phạm/Trễ hạn</option>
-            </select>
-          </div>
-
-          {/* Tìm sinh viên */}
-          <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">
-              Tìm sinh viên
-            </label>
-            <div className="relative flex items-center bg-[#E7E0C4]/10 rounded-xl border border-[#E7E0C4] focus-within:ring-2 focus-within:ring-[#407F3E]/20 transition-all">
-              <Search className="absolute left-4 text-slate-400 w-4 h-4" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                placeholder="Tìm sinh viên..."
-                className="w-full bg-transparent text-sm text-slate-800 pl-11 pr-4 py-2.5 outline-none placeholder:text-slate-400 font-semibold"
-              />
+          {isLichDropdownOpen && (
+            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1">
+              {lichOptions.map(opt => (
+                <div 
+                  key={opt}
+                  onClick={() => { setSelectedLich(opt); setIsLichDropdownOpen(false); }}
+                  className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                    selectedLich === opt ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                  }`}
+                >
+                  <span className="truncate pr-2">{opt}</span>
+                  {selectedLich === opt && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                </div>
+              ))}
             </div>
+          )}
+        </div>
+
+        {/* Trạng thái Dropdown */}
+        <div className="relative min-w-[200px]">
+          <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Trạng thái</label>
+          <div 
+            onClick={(e) => handleDropdownClick(e, setIsStatusDropdownOpen)}
+            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isStatusDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+          >
+            <span className={`truncate pr-2 font-medium ${selectedStatus ? 'text-slate-700' : 'text-slate-400'}`}>{selectedStatus || 'Tất cả'}</span>
+            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
           </div>
+          {isStatusDropdownOpen && (
+            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1">
+              {statusOptions.map(opt => (
+                <div 
+                  key={opt}
+                  onClick={() => { setSelectedStatus(opt); setIsStatusDropdownOpen(false); }}
+                  className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                    selectedStatus === opt ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                  }`}
+                >
+                  <span className="truncate pr-2">{opt}</span>
+                  {selectedStatus === opt && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Main Table Card */}
-      <div className="bg-white rounded-2xl border border-[#E7E0C4] shadow-sm overflow-hidden">
+      {/* Main Table */}
+      <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-visible relative z-10">
         <div className="overflow-x-auto">
-          <table className="w-full text-left whitespace-nowrap">
-            <thead className="bg-[#E7E0C4] text-slate-700 font-bold text-[11px] uppercase tracking-wider border-b border-[#E7E0C4]">
-              <tr>
-                <th className="px-6 py-4 font-bold border-r border-[#E7E0C4]/40">MSSV</th>
-                <th className="px-6 py-4 font-bold border-r border-[#E7E0C4]/40">Họ tên</th>
-                <th className="px-6 py-4 font-bold border-r border-[#E7E0C4]/40">Lớp</th>
-                <th className="px-6 py-4 font-bold border-r border-[#E7E0C4]/40">Số tiền nộp</th>
-                <th className="px-6 py-4 font-bold border-r border-[#E7E0C4]/40">Ngày nộp</th>
-                <th className="px-6 py-4 font-bold border-r border-[#E7E0C4]/40">Hình thức</th>
-                <th className="px-6 py-4 font-bold">Trạng thái</th>
-                <th className="px-6 py-4 font-bold text-center">Thao tác</th>
+          <table className="w-full text-left border-collapse min-w-[1100px]">
+            <thead>
+              <tr className="bg-[#E7E0C4] text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
+                <th className="p-4 pl-6">MSSV</th>
+                <th className="p-4">Họ tên</th>
+                <th className="p-4">Chuyến tham quan</th>
+                <th className="p-4">Số tiền</th>
+                <th className="p-4 text-center">Nội dung chuyển khoản</th>
+                <th className="p-4">Hạn đóng</th>
+                <th className="p-4">Ngày đóng thực tế</th>
+                <th className="p-4 text-center">Trạng thái</th>
+                <th className="p-4 text-right pr-6 w-16">Thao tác</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#E7E0C4]/40 text-slate-800 font-medium">
-              {filteredRecords.map((rec) => (
-                <tr key={rec.mssv} className="hover:bg-[#E7E0C4]/10 transition-colors duration-200">
-                  <td className="px-6 py-4 font-bold font-mono text-[#407F3E] border-r border-[#E7E0C4]/40">{rec.mssv}</td>
-                  <td className="px-6 py-4 font-bold text-slate-700 border-r border-[#E7E0C4]/40">{rec.name}</td>
-                  <td className="px-6 py-4 text-slate-500 border-r border-[#E7E0C4]/40">{rec.class}</td>
-                  <td className="px-6 py-4 font-bold font-mono text-slate-700 border-r border-[#E7E0C4]/40">{formatCurrency(rec.amount)}</td>
-                  <td className="px-6 py-4 text-xs font-mono font-bold text-slate-500 border-r border-[#E7E0C4]/40">{rec.payDate}</td>
-                  <td className="px-6 py-4 text-xs font-semibold text-slate-500 border-r border-[#E7E0C4]/40">{rec.payMethod}</td>
-                  <td className="px-6 py-4">
-                    <span className={`inline-block px-3 py-0.5 rounded-full text-[10px] font-bold shadow-sm ${getStatusBadgeClass(rec.status)}`}>
-                      {rec.status}
+            <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
+              {fees.map(f => (
+                <tr key={f.id} className="hover:bg-slate-50 transition-colors">
+                  <td className="p-4 pl-6 font-mono font-bold text-[#407F3E]">{f.mssv}</td>
+                  <td className="p-4 font-bold text-slate-800">{f.ten}</td>
+                  <td className="p-4 font-medium text-slate-600">{f.chuyen}</td>
+                  <td className="p-4 font-bold text-[#89B449]">{f.soTien}</td>
+                  <td className="p-4 text-center">
+                    <span className="inline-block px-3 py-1.5 bg-[#E7E0C4]/50 rounded-lg border border-[#E7E0C4] font-mono text-[11px] font-bold text-slate-700 shadow-sm">
+                      {f.noiDung}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-center">
-                    <div className="flex items-center justify-center gap-3">
-                      {/* Confirm payment */}
-                      {rec.status !== 'Đã nộp' && rec.status !== 'Hủy chuyến - Chờ hoàn phí' && (
-                        <button
-                          onClick={() => setConfirmingRecord(rec)}
-                          className="p-1.5 text-[#89B449] hover:bg-[#89B449]/10 rounded-xl transition-all cursor-pointer"
-                          title="Xác nhận nộp"
-                        >
-                          <Check className="w-5 h-5 font-black" />
-                        </button>
-                      )}
-                      {/* Details */}
-                      <button
-                        onClick={() => setSelectedRecord(rec)}
-                        className="p-1.5 text-slate-400 hover:text-[#407F3E] hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
-                        title="Chi tiết"
-                      >
-                        <Info className="w-4.5 h-4.5" />
-                      </button>
-                    </div>
+                  <td className="p-4 font-medium text-slate-500">{f.hanDong}</td>
+                  <td className="p-4 font-medium text-slate-700">{f.ngayDong}</td>
+                  <td className="p-4 text-center">
+                    {getStatusBadge(f.trangThai)}
+                  </td>
+                  <td className="p-4 text-right pr-6">
+                    <button 
+                      className="p-1.5 text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer" 
+                      title="Xem chi tiết"
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -313,114 +168,6 @@ export default function QuanLyLePhi_Khoa() {
           </table>
         </div>
       </div>
-
-      {/* Record detail dialog */}
-      {selectedRecord && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden flex flex-col">
-            <div className="p-6 border-b border-[#E7E0C4] bg-[#E7E0C4]/30 flex items-center justify-between">
-              <h3 className="font-extrabold text-slate-850 text-base uppercase tracking-wider flex items-center gap-1.5">
-                <CreditCard className="w-5 h-5 text-[#407F3E]" />
-                <span>Chi tiết lệ phí sinh viên</span>
-              </h3>
-              <button 
-                onClick={() => setSelectedRecord(null)} 
-                className="text-slate-450 hover:text-slate-700 text-2xl font-bold cursor-pointer"
-              >
-                &times;
-              </button>
-            </div>
-            <div className="p-6 space-y-4 text-sm font-semibold text-slate-650">
-              <div className="flex justify-between py-1.5 border-b border-slate-100">
-                <span className="text-slate-400">Sinh viên:</span>
-                <span className="font-bold text-slate-800">{selectedRecord.name} ({selectedRecord.mssv})</span>
-              </div>
-              <div className="flex justify-between py-1.5 border-b border-slate-100">
-                <span className="text-slate-400">Lớp hành chính:</span>
-                <span className="text-slate-800">{selectedRecord.class}</span>
-              </div>
-              <div className="flex justify-between py-1.5 border-b border-slate-100">
-                <span className="text-slate-400">Lệ phí phải nộp:</span>
-                <span className="font-bold text-[#407F3E] font-mono">{formatCurrency(selectedRecord.amount)}</span>
-              </div>
-              <div className="flex justify-between py-1.5 border-b border-slate-100">
-                <span className="text-slate-400">Ngày nộp tiền:</span>
-                <span className="font-mono text-slate-800">{selectedRecord.payDate}</span>
-              </div>
-              <div className="flex justify-between py-1.5 border-b border-slate-100">
-                <span className="text-slate-400">Hình thức nộp:</span>
-                <span className="text-slate-800">{selectedRecord.payMethod}</span>
-              </div>
-              <div className="flex justify-between py-1.5">
-                <span className="text-slate-400">Trạng thái:</span>
-                <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${getStatusBadgeClass(selectedRecord.status)}`}>
-                  {selectedRecord.status}
-                </span>
-              </div>
-            </div>
-            <div className="p-4 bg-slate-50 border-t border-[#E7E0C4] flex justify-end">
-              <button 
-                onClick={() => setSelectedRecord(null)} 
-                className="px-5 py-2 bg-slate-700 hover:bg-slate-800 text-white font-bold rounded-xl text-xs cursor-pointer"
-              >
-                Đóng
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Cash/Wire Confirm Modal */}
-      {confirmingRecord && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden flex flex-col">
-            <div className="p-6 border-b border-[#E7E0C4] bg-white flex items-center justify-between">
-              <h3 className="font-bold text-slate-805 text-base uppercase tracking-wider flex items-center gap-1.5">
-                <span>Xác nhận nộp lệ phí</span>
-              </h3>
-              <button 
-                onClick={() => setConfirmingRecord(null)} 
-                className="text-slate-450 hover:text-slate-750 text-2xl font-bold cursor-pointer"
-              >
-                &times;
-              </button>
-            </div>
-            <form onSubmit={handleConfirmPaymentSubmit} className="p-6 space-y-4 font-semibold text-sm">
-              <p className="text-slate-600 leading-relaxed">
-                Bạn đang thực hiện xác nhận đóng tiền học phần kiến tập cho sinh viên <strong className="text-slate-800">{confirmingRecord.name} ({confirmingRecord.mssv})</strong>.
-              </p>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                  Hình thức thanh toán
-                </label>
-                <select
-                  value={confirmMethod}
-                  onChange={e => setConfirmMethod(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-[#E7E0C4] bg-slate-50 rounded-xl text-xs font-bold outline-none cursor-pointer"
-                >
-                  <option value="Chuyển khoản">Chuyển khoản ngân hàng</option>
-                  <option value="Tiền mặt">Tiền mặt tại văn phòng khoa</option>
-                </select>
-              </div>
-              <div className="pt-4 flex justify-end gap-3 border-t border-[#E7E0C4]">
-                <button 
-                  type="button" 
-                  onClick={() => setConfirmingRecord(null)} 
-                  className="px-5 py-2.5 border border-[#E7E0C4] rounded-xl text-slate-650 text-xs font-bold hover:bg-slate-50 cursor-pointer"
-                >
-                  Hủy
-                </button>
-                <button 
-                  type="submit" 
-                  className="px-5 py-2.5 bg-[#407F3E] hover:bg-[#407F3E]/95 text-white rounded-xl text-xs font-bold shadow-md cursor-pointer"
-                >
-                  Xác nhận đóng
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

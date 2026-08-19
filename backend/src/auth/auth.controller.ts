@@ -1,4 +1,12 @@
-import { Controller, Post, Body, Get, Put, UseGuards, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Put,
+  UseGuards,
+  BadRequestException,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuthGuard } from './guards/auth.guard';
 import { CurrentUser, JwtPayloadUser } from './decorators/user.decorator';
@@ -46,7 +54,9 @@ export class AuthController {
     @Body() body: UpdateProfileDto,
   ) {
     if (!body.sdt && !body.email) {
-      throw new BadRequestException('Request phải chứa ít nhất sdt hoặc email để cập nhật');
+      throw new BadRequestException(
+        'Request phải chứa ít nhất sdt hoặc email để cập nhật',
+      );
     }
     return this.authService.updateProfile(user.sub, body.sdt, body.email);
   }
@@ -59,10 +69,10 @@ export class AuthController {
   ) {
     // Luon cap nhat profile cua user dang dang nhap de chong IDOR
     if (!body.sdt && !body.email) {
-      throw new BadRequestException('Request phải chứa ít nhất sdt hoặc email để cập nhật');
+      throw new BadRequestException(
+        'Request phải chứa ít nhất sdt hoặc email để cập nhật',
+      );
     }
     return this.authService.updateProfile(user.sub, body.sdt, body.email);
   }
 }
-
-

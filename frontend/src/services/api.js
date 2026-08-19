@@ -28,8 +28,8 @@ const resolveApiBaseUrl = (rawUrl) => {
     return trimmed.endsWith('/') ? trimmed.slice(0, -1) : trimmed;
   }
 
-  // Development fallback: http://localhost:3001/api
-  const devUrl = trimmed || 'http://localhost:3001/api';
+  // Development fallback: http://localhost:3000/api
+  const devUrl = trimmed || 'http://localhost:3000/api';
   return devUrl.endsWith('/') ? devUrl.slice(0, -1) : devUrl;
 };
 
@@ -113,6 +113,7 @@ export const khoaApi = {
   updateFactory: (id, data) => api.put(`/khoa/factories/${id}`, data),
   getLecturers: () => api.get('/khoa/lecturers'),
   getStudents: (params) => api.get('/khoa/students', { params }),
+  createStudent: (data) => api.post('/khoa/students', data),
   getCampaigns: () => api.get('/khoa/campaigns'),
   createCampaign: (data) => api.post('/khoa/campaigns', data),
   getSchedules: () => api.get('/khoa/schedules'),

@@ -43,4 +43,3 @@ export class UpdateProfileDto {
   @IsNotEmpty({ message: 'Email không được là chuỗi rỗng' })
   email?: string;
 }
-

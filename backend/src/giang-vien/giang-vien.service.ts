@@ -1,4 +1,9 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, DataSource } from 'typeorm';
 import {
@@ -328,6 +333,9 @@ export class GiangVienService {
     let diem = await this.diemPhieuRepo.findOne({
       where: { phieu_dang_ky_id: phieuId },
     });
+    if (diem && diem.da_khoa) {
+      throw new BadRequestException('Điểm của phiếu đăng ký này đã được khóa, không thể chỉnh sửa');
+    }
     if (!diem) {
       diem = new DiemPhieuDangKy();
       diem.phieu_dang_ky_id = phieuId;
@@ -463,6 +471,9 @@ export class GiangVienService {
     let diem = await this.diemPhieuRepo.findOne({
       where: { phieu_dang_ky_id: phieuId },
     });
+    if (diem && diem.da_khoa) {
+      throw new BadRequestException('Điểm của phiếu đăng ký này đã được khóa, không thể chỉnh sửa');
+    }
     if (!diem) {
       diem = new DiemPhieuDangKy();
       diem.phieu_dang_ky_id = phieuId;
@@ -567,6 +578,13 @@ export class GiangVienService {
       );
     }
 
+    const diemPhieuCheck = await this.diemPhieuRepo.findOne({
+      where: { phieu_dang_ky_id: phieuId },
+    });
+    if (diemPhieuCheck && diemPhieuCheck.da_khoa) {
+      throw new BadRequestException('Điểm của phiếu đăng ký này đã được khóa, không thể chỉnh sửa');
+    }
+
     let item = await this.diemHoiDongRepo.findOne({
       where: { phieu_dang_ky_id: phieuId, hoi_dong_thanhvien_id: memberId },
     });
@@ -604,4 +622,3 @@ export class GiangVienService {
     return { message: 'Ghi nhận điểm hội đồng thành công', score: item };
   }
 }
-

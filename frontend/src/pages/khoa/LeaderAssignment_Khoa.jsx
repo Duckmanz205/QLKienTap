@@ -1,271 +1,280 @@
-import React, { useState, useEffect } from 'react';
-import { khoaApi } from '../../services/api';
-import { UserCheck, Search, CheckCircle2, AlertCircle, RefreshCw, Star } from 'lucide-react';
+import React, { useState } from 'react';
+import { 
+  ChevronDown, Check, Search, MapPin, 
+  UserCircle, UserPlus, Calendar, Clock
+} from 'lucide-react';
 
 export default function LeaderAssignment_Khoa() {
-  const [trips, setTrips] = useState([]);
-  const [lecturers, setLecturers] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
+  // Dropdown States for Filters
+  const [isLichDropdownOpen, setIsLichDropdownOpen] = useState(false);
+  const [selectedLich, setSelectedLich] = useState('');
+  const lichOptions = ["Đợt kiến tập - Học kỳ 1 - 2025-2026", "Đợt kiến tập - Học kỳ 2 - 2024-2025"];
 
-  // Assignment fields
-  const [activeTripId, setActiveTripId] = useState(null);
-  const [selectedLecturerId, setSelectedLecturerId] = useState('');
-  const [laTruongDoan, setLaTruongDoan] = useState(true);
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState('');
+  const statusOptions = ["Tất cả", "Đã phân công", "Chờ phân công"];
 
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  // Specific inline dropdown state
+  const [openDropdownId, setOpenDropdownId] = useState(1); // Keep row 1 open to match mockup requirement
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const tripRes = await khoaApi.getTrips();
-      setTrips(tripRes.data);
-
-      const lecRes = await khoaApi.getLecturers();
-      setLecturers(lecRes.data);
-    } catch (err) {
-      console.error(err);
-      setError('Lỗi tải danh sách chuyến đi hoặc giảng viên.');
-    } finally {
-      setLoading(false);
-    }
+  // Close all dropdowns
+  const closeAllDropdowns = () => {
+    setIsLichDropdownOpen(false);
+    setIsStatusDropdownOpen(false);
+    setOpenDropdownId(null);
   };
 
-  const handleAssignLeader = async (e) => {
-    e.preventDefault();
-    if (!selectedLecturerId) {
-      alert('Vui lòng chọn giảng viên.');
-      return;
-    }
-    try {
-      setError('');
-      setMessage('');
-      await khoaApi.assignGvdd({
-        tripId: Number(activeTripId),
-        lecturerId: Number(selectedLecturerId),
-        laTruongDoan: laTruongDoan,
-      });
-      setMessage('Phân công Giảng viên dẫn đoàn thành công.');
-      setActiveTripId(null);
-      setSelectedLecturerId('');
-      fetchData();
-    } catch (err) {
-      console.error(err);
-      setError('Không thể phân công giảng viên dẫn đoàn.');
-    }
+  const handleDropdownClick = (e, setter) => {
+    e.stopPropagation();
+    closeAllDropdowns();
+    setter(true);
   };
 
-  const filteredTrips = trips.filter(t => 
-    t.nhaMay?.ten_nha_may.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    t.lichKienTap?.ten_lich.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const toggleInlineDropdown = (e, id) => {
+    e.stopPropagation();
+    if (openDropdownId === id) {
+      setOpenDropdownId(null);
+    } else {
+      closeAllDropdowns();
+      setOpenDropdownId(id);
+    }
+  }
+
+  // Mock Data
+  const trips = [
+    { 
+      id: 1, 
+      nhaMay: 'Vinamilk Bình Dương', 
+      ngay: '25/08/2026', 
+      gio: '07:30 - 11:30', 
+      hinhThuc: 'Trực tiếp', 
+      toChuc: 'Do khoa tổ chức', 
+      gv: null 
+    },
+    { 
+      id: 2, 
+      nhaMay: 'Acecook HCM', 
+      ngay: '26/08/2026', 
+      gio: '13:00 - 16:30', 
+      hinhThuc: 'Trực tiếp', 
+      toChuc: 'Do khoa tổ chức', 
+      gv: 'Lê Minh Tuấn' 
+    },
+    { 
+      id: 3, 
+      nhaMay: 'CP Group Việt Nam', 
+      ngay: '30/08/2026', 
+      gio: '08:00 - 16:00', 
+      hinhThuc: 'Trực tiếp', 
+      toChuc: 'Tự do', 
+      gv: 'Nguyễn Văn A' 
+    },
+    { 
+      id: 4, 
+      nhaMay: 'Nutifood Bình Dương', 
+      ngay: '05/09/2026', 
+      gio: '08:00 - 11:30', 
+      hinhThuc: 'Trực tuyến', 
+      toChuc: 'Do khoa tổ chức', 
+      gv: null 
+    },
+  ];
+
+  const gvOptions = [
+    { id: 1, name: 'Phạm Thị D', status: 'free' },
+    { id: 2, name: 'Hoàng Văn E', status: 'conflict' },
+    { id: 3, name: 'Vũ Thị F', status: 'free' },
+  ];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-          <UserCheck className="text-primary w-6 h-6" />
-          Phân công Giảng viên Dẫn đoàn (GVDD)
-        </h2>
-        <p className="text-slate-500 text-sm">Chỉ định trưởng đoàn và phó đoàn phụ trách đưa đón, quản lý sinh viên tại thực địa</p>
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300 relative" onClick={closeAllDropdowns}>
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-slate-800">Phân công GV dẫn đoàn</h1>
       </div>
 
-      {message && (
-        <div className="bg-emerald-50 border border-emerald-500/30 text-emerald-800 px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-          {message}
-        </div>
-      )}
-
-      {error && (
-        <div className="bg-rose-50 border border-rose-500/30 text-rose-800 px-4 py-3 rounded-xl text-sm font-semibold">
-          {error}
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Assignment panel */}
-        <div className="bg-white p-6 rounded-2xl border border-primary/10 shadow-sm space-y-4 lg:col-span-1 h-fit">
-          <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-            <UserCheck className="text-primary w-5 h-5" />
-            <h3 className="text-sm font-bold text-slate-800">Cấu hình dẫn đoàn</h3>
+      {/* Filter Bar */}
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-[#E7E0C4] flex items-center gap-4 relative z-20 mb-6">
+        {/* Lịch Dropdown */}
+        <div className="relative min-w-[300px]">
+          <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Lịch kiến tập</label>
+          <div 
+            onClick={(e) => handleDropdownClick(e, setIsLichDropdownOpen)}
+            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isLichDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+          >
+            <span className={`truncate pr-2 font-medium ${selectedLich ? 'text-slate-700' : 'text-slate-400'}`}>{selectedLich || 'Chọn lịch kiến tập'}</span>
+            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
           </div>
-          {activeTripId ? (
-            <form onSubmit={handleAssignLeader} className="space-y-4 text-xs font-semibold text-slate-700">
-              <div className="p-3 bg-[#f8faf1] rounded-xl border border-primary/10">
-                <span className="text-[10px] text-slate-400 block uppercase">Chuyến đi đã chọn</span>
-                <span className="font-bold text-slate-800 block mt-0.5">
-                  {trips.find(x => x.id === activeTripId)?.nhaMay?.ten_nha_may}
-                </span>
-                <span className="text-[10px] text-slate-500 block mt-1 font-medium">
-                  Khởi hành: {new Date(trips.find(x => x.id === activeTripId)?.ngay_tham_quan).toLocaleDateString('vi-VN')}
-                </span>
-              </div>
-
-              <div>
-                <label className="block mb-1">Chọn giảng viên dẫn đoàn</label>
-                <select
-                  required
-                  value={selectedLecturerId}
-                  onChange={e => setSelectedLecturerId(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-primary font-medium"
+          {isLichDropdownOpen && (
+            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1">
+              {lichOptions.map(opt => (
+                <div 
+                  key={opt}
+                  onClick={() => { setSelectedLich(opt); setIsLichDropdownOpen(false); }}
+                  className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                    selectedLich === opt ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                  }`}
                 >
-                  <option value="">-- Chọn giảng viên --</option>
-                  {lecturers.map(l => (
-                    <option key={l.id} value={l.id}>{l.ho_ten} ({l.ma_gv})</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="block mb-1">Vai trò trong chuyến đi</label>
-                <div className="flex gap-4 font-semibold text-slate-700">
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="role"
-                      checked={laTruongDoan === true}
-                      onChange={() => setLaTruongDoan(true)}
-                      className="text-primary focus:ring-primary"
-                    />
-                    Trưởng đoàn
-                  </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="role"
-                      checked={laTruongDoan === false}
-                      onChange={() => setLaTruongDoan(false)}
-                      className="text-primary focus:ring-primary"
-                    />
-                    Phó đoàn / Giám sát
-                  </label>
+                  <span className="truncate pr-2">{opt}</span>
+                  {selectedLich === opt && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
                 </div>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  type="submit"
-                  className="flex-1 bg-primary hover:bg-[#2c6b2d] text-white py-2.5 rounded-xl font-bold transition-all shadow-sm cursor-pointer"
-                >
-                  Xác nhận Phân công
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTripId(null)}
-                  className="px-4 py-2.5 rounded-xl border border-slate-250 hover:bg-slate-50 text-slate-600 font-bold transition-all cursor-pointer"
-                >
-                  Hủy
-                </button>
-              </div>
-            </form>
-          ) : (
-            <div className="text-center py-8 text-slate-400 font-medium">
-              Vui lòng chọn một chuyến đi từ danh sách bên cạnh để bắt đầu phân công.
+              ))}
             </div>
           )}
         </div>
 
-        {/* Trips list */}
-        <div className="bg-white p-6 rounded-2xl border border-primary/10 shadow-sm lg:col-span-2 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-3">
-            <h3 className="text-sm font-bold text-slate-800">
-              Danh sách các Chuyến kiến tập
-            </h3>
-            <div className="relative w-full sm:w-64">
-              <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Tìm tên nhà máy hoặc đợt..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-4 py-1.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-primary font-semibold"
-              />
+        {/* Trạng thái Dropdown */}
+        <div className="relative min-w-[200px]">
+          <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Trạng thái phân công</label>
+          <div 
+            onClick={(e) => handleDropdownClick(e, setIsStatusDropdownOpen)}
+            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isStatusDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+          >
+            <span className={`truncate pr-2 font-medium ${selectedStatus ? 'text-slate-700' : 'text-slate-400'}`}>{selectedStatus || 'Tất cả'}</span>
+            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+          </div>
+          {isStatusDropdownOpen && (
+            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1">
+              {statusOptions.map(opt => (
+                <div 
+                  key={opt}
+                  onClick={() => { setSelectedStatus(opt); setIsStatusDropdownOpen(false); }}
+                  className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                    selectedStatus === opt ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                  }`}
+                >
+                  <span className="truncate pr-2">{opt}</span>
+                  {selectedStatus === opt && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                </div>
+              ))}
             </div>
-          </div>
+          )}
+        </div>
+      </div>
 
-          <div className="overflow-x-auto">
-            {loading ? (
-              <div className="text-center py-12 text-slate-400 font-semibold flex items-center justify-center gap-2">
-                <RefreshCw className="animate-spin w-5 h-5 text-primary" />
-                Đang tải danh sách chuyến...
-              </div>
-            ) : (
-              <table className="min-w-full divide-y divide-slate-100 text-xs">
-                <thead>
-                  <tr className="bg-[#f8faf1] text-slate-700 font-bold text-left">
-                    <th className="px-4 py-3 rounded-l-xl">Doanh nghiệp / Địa điểm</th>
-                    <th className="px-4 py-3">Ngày đi</th>
-                    <th className="px-4 py-3">Danh sách GVDD hiện tại</th>
-                    <th className="px-4 py-3 rounded-r-xl text-center">Hành động</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-650 font-semibold">
-                  {filteredTrips.map(t => {
-                    const leaders = t.giaoVienDanDoan || [];
-                    return (
-                      <tr key={t.id} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="px-4 py-3.5">
-                          <div className="font-bold text-slate-800">{t.nhaMay?.ten_nha_may}</div>
-                          <div className="text-[10px] text-slate-400">{t.lichKienTap?.ten_lich}</div>
-                        </td>
-                        <td className="px-4 py-3.5">
-                          {new Date(t.ngay_tham_quan).toLocaleDateString('vi-VN')}
-                          <div className="text-[10px] text-slate-400 font-mono">{t.gio_bat_dau} - {t.gio_ket_thuc}</div>
-                        </td>
-                        <td className="px-4 py-3.5">
-                          <div className="flex flex-col gap-1">
-                            {leaders.map(l => (
-                              <div key={l.id} className="flex items-center gap-1">
-                                {l.la_truong_doan ? (
-                                  <span className="bg-amber-100 text-amber-700 border border-amber-200 text-[9px] px-1 py-0.5 rounded font-bold flex items-center gap-0.5">
-                                    <Star className="w-2.5 h-2.5 fill-amber-500 text-amber-500" /> Trưởng đoàn
-                                  </span>
-                                ) : (
-                                  <span className="bg-slate-100 text-slate-600 border border-slate-200 text-[9px] px-1 py-0.5 rounded font-bold">
-                                    Phó đoàn
-                                  </span>
-                                )}
-                                <span className="font-bold text-slate-850">{l.giangVien?.ho_ten}</span>
-                              </div>
-                            ))}
-                            {leaders.length === 0 && (
-                              <span className="text-rose-500 italic font-semibold flex items-center gap-0.5">
-                                <AlertCircle className="w-3.5 h-3.5" /> Chưa phân công
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3.5 text-center">
-                          <button
-                            onClick={() => {
-                              setActiveTripId(t.id);
-                              setSelectedLecturerId('');
-                            }}
-                            className="bg-primary hover:bg-[#2c6b2d] text-white px-3 py-1.5 rounded-lg font-bold transition-all shadow-sm cursor-pointer"
+      {/* Main Table */}
+      <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-visible relative z-10">
+        <div className="overflow-visible">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-[#E7E0C4] text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
+                <th className="p-4 pl-6">Chuyến tham quan</th>
+                <th className="p-4 text-center">Hình thức</th>
+                <th className="p-4 text-center">Cách tổ chức</th>
+                <th className="p-4">GV dẫn đoàn hiện tại</th>
+                <th className="p-4 text-right pr-6 w-[200px]">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
+              {trips.map(t => (
+                <tr key={t.id} className="hover:bg-slate-50 transition-colors">
+                  <td className="p-4 pl-6">
+                    <div className="font-bold text-slate-800 flex items-center gap-1.5 mb-1">
+                      <MapPin className="w-4 h-4 text-[#407F3E]" />
+                      {t.nhaMay}
+                    </div>
+                    <div className="text-xs font-medium text-slate-500 flex items-center gap-3">
+                      <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> {t.ngay}</span>
+                      <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {t.gio}</span>
+                    </div>
+                  </td>
+                  <td className="p-4 text-center">
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-bold border ${
+                      t.hinhThuc === 'Trực tiếp' ? 'bg-[#89B449]/10 text-[#407F3E] border-[#89B449]/20' : 'bg-slate-100 text-slate-600 border-slate-200'
+                    }`}>
+                      {t.hinhThuc}
+                    </span>
+                  </td>
+                  <td className="p-4 text-center">
+                    <span className={`inline-flex items-center px-2 py-1 rounded text-[10px] font-bold border ${
+                      t.toChuc === 'Do khoa tổ chức' ? 'bg-[#407F3E]/10 text-[#407F3E] border-[#407F3E]/20' : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                    }`}>
+                      {t.toChuc}
+                    </span>
+                  </td>
+                  <td className="p-4">
+                    {t.toChuc === 'Do khoa tổ chức' ? (
+                      t.gv ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#E7E0C4]/40 text-slate-700 border border-[#E7E0C4]">
+                          <UserCircle className="w-4 h-4 text-[#407F3E]" />
+                          {t.gv}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold bg-slate-100 text-slate-400 border border-slate-200">
+                          Chưa phân công
+                        </span>
+                      )
+                    ) : (
+                      <div className="flex flex-col items-start gap-1">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#E7E0C4]/40 text-slate-700 border border-[#E7E0C4]">
+                          <UserCircle className="w-4 h-4 text-[#407F3E]" />
+                          {t.gv}
+                        </span>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-teal-50 text-teal-700 border border-teal-200">
+                          Tự động (GVHD)
+                        </span>
+                      </div>
+                    )}
+                  </td>
+                  <td className="p-4 text-right pr-6 relative">
+                    {t.toChuc === 'Do khoa tổ chức' && (
+                      <>
+                        <button 
+                          onClick={(e) => toggleInlineDropdown(e, t.id)}
+                          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center justify-end gap-2 ml-auto ${
+                            openDropdownId === t.id 
+                              ? 'bg-[#407F3E] text-white shadow-sm' 
+                              : 'bg-slate-50 border border-slate-200 text-[#407F3E] hover:bg-[#407F3E]/10'
+                          }`}
+                        >
+                          <UserPlus className="w-3.5 h-3.5" />
+                          Phân công
+                        </button>
+
+                        {/* Inline Dropdown */}
+                        {openDropdownId === t.id && (
+                          <div 
+                            className="absolute top-full right-6 mt-1 w-[240px] bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-50 overflow-hidden animate-in zoom-in-95 origin-top-right text-left"
+                            onClick={(e) => e.stopPropagation()}
                           >
-                            Phân công GVDD
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {filteredTrips.length === 0 && (
-                    <tr>
-                      <td colSpan="4" className="text-center py-8 text-slate-400 font-medium">
-                        Không tìm thấy chuyến đi nào
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            )}
-          </div>
+                            <div className="p-2 border-b border-[#E7E0C4] bg-slate-50">
+                              <div className="relative">
+                                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                                <input 
+                                  type="text" 
+                                  placeholder="Tìm kiếm Giảng viên..." 
+                                  className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E]"
+                                />
+                              </div>
+                            </div>
+                            <div className="max-h-[200px] overflow-y-auto py-1">
+                              {gvOptions.map(gv => (
+                                <div 
+                                  key={gv.id}
+                                  className="px-4 py-2.5 text-sm flex items-center justify-between transition-colors cursor-pointer hover:bg-[#E7E0C4]/30"
+                                >
+                                  <div className="flex items-center gap-2 truncate">
+                                    <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white bg-[#407F3E]">
+                                      {gv.name.charAt(0)}
+                                    </div>
+                                    <span className="font-bold text-slate-800">{gv.name}</span>
+                                  </div>
+                                  <div 
+                                    className={`w-2.5 h-2.5 rounded-full shadow-sm ${gv.status === 'free' ? 'bg-[#89B449]' : 'bg-[#E68A8C]'}`}
+                                    title={gv.status === 'free' ? 'Khả dụng' : 'Trùng lịch'}
+                                  ></div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

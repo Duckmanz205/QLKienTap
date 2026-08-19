@@ -1,231 +1,215 @@
-import React, { useState, useEffect } from 'react';
-import { khoaApi } from '../../services/api';
-import { GraduationCap, Search, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
+import React, { useState } from 'react';
+import { 
+  ChevronDown, Check, Info, Search, ChevronRight, UserCircle, UserPlus
+} from 'lucide-react';
 
 export default function SupervisorAssignment_Khoa() {
-  const [enrollments, setEnrollments] = useState([]);
-  const [lecturers, setLecturers] = useState([]);
-  const [schedules, setSchedules] = useState([]);
+  // Dropdown States for Filters
+  const [isLichDropdownOpen, setIsLichDropdownOpen] = useState(false);
+  const [selectedLich, setSelectedLich] = useState('');
+  const lichOptions = ["Đợt kiến tập - Học kỳ 1 - 2025-2026", "Đợt kiến tập - Học kỳ 2 - 2024-2025"];
 
-  // Filter states
-  const [selectedPlanId, setSelectedPlanId] = useState('All');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterClass, setFilterClass] = useState('All');
+  const [selectAll, setSelectAll] = useState(false);
+  
+  // Specific inline dropdown state
+  const [openDropdownId, setOpenDropdownId] = useState(2); // Keep row 2 open to match mockup requirement
 
-  // Assign dropdown state
-  const [selectedLecturerId, setSelectedLecturerId] = useState({});
-
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const enRes = await khoaApi.getEnrollments();
-      setEnrollments(enRes.data);
-
-      const lecRes = await khoaApi.getLecturers();
-      setLecturers(lecRes.data);
-
-      const schRes = await khoaApi.getSchedules();
-      setSchedules(schRes.data);
-
-      // Initialize selected lecturers
-      const initialSelected = {};
-      enRes.data.forEach(en => {
-        // If they already have an advisor, store it
-        if (en.sinhVien?.details?.giang_vien_huong_dan_id) {
-          initialSelected[en.id] = String(en.sinhVien.details.giang_vien_huong_dan_id);
-        }
-      });
-      setSelectedLecturerId(initialSelected);
-    } catch (err) {
-      console.error(err);
-      setError('Lỗi tải cơ sở dữ liệu phân công.');
-    } finally {
-      setLoading(false);
-    }
+  // Close all dropdowns
+  const closeAllDropdowns = () => {
+    setIsLichDropdownOpen(false);
+    setOpenDropdownId(null);
   };
 
-  const handleAssign = async (enrollmentId) => {
-    const lecturerId = selectedLecturerId[enrollmentId];
-    if (!lecturerId) {
-      alert('Vui lòng chọn giảng viên trước khi phân công.');
-      return;
-    }
-    try {
-      setError('');
-      setMessage('');
-      await khoaApi.assignGvhd({
-        lichKienTapSinhVienId: enrollmentId,
-        lecturerId: Number(lecturerId),
-      });
-      setMessage('Phân công Giảng viên hướng dẫn thành công.');
-      fetchData();
-    } catch (err) {
-      console.error(err);
-      setError('Lỗi trong quá trình phân công giảng viên hướng dẫn.');
-    }
+  const handleDropdownClick = (e, setter) => {
+    e.stopPropagation();
+    closeAllDropdowns();
+    setter(true);
   };
 
-  // Unique classes for filtering
-  const uniqueClasses = Array.from(new Set(enrollments.map(e => e.sinhVien?.ten_lop).filter(Boolean)));
+  const toggleInlineDropdown = (e, id) => {
+    e.stopPropagation();
+    if (openDropdownId === id) {
+      setOpenDropdownId(null);
+    } else {
+      setIsLichDropdownOpen(false);
+      setOpenDropdownId(id);
+    }
+  }
 
-  const filteredEnrollments = enrollments.filter(e => {
-    const matchesPlan = selectedPlanId === 'All' || String(e.lich_kien_tap_id) === selectedPlanId;
-    const matchesClass = filterClass === 'All' || e.sinhVien?.ten_lop === filterClass;
-    const matchesSearch = e.sinhVien?.ho_ten.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          e.sinhVien?.mssv.includes(searchQuery);
-    return matchesPlan && matchesClass && matchesSearch;
-  });
+  // Mock Data
+  const listSv = [
+    { id: 1, mssv: '2001215001', ten: 'Nguyễn Văn An', lop: '14DHTP1', gvhd: 'Lê Minh Tuấn', checked: false },
+    { id: 2, mssv: '2001215002', ten: 'Trần Thị Bình', lop: '14DHTP1', gvhd: null, checked: selectAll },
+    { id: 3, mssv: '2001215003', ten: 'Lê Hoàng Cường', lop: '14DHTP2', gvhd: null, checked: selectAll },
+    { id: 4, mssv: '2001215004', ten: 'Phạm Duy Khang', lop: '14DHTP2', gvhd: 'Đỗ Minh Phương', checked: false },
+    { id: 5, mssv: '2001215005', ten: 'Vũ Quốc Huy', lop: '14DHTP3', gvhd: null, checked: selectAll },
+  ];
+
+  const gvOptions = [
+    { id: 1, name: 'Nguyễn Văn A', load: '12/15 SV', full: false },
+    { id: 2, name: 'Trần Thị B', load: '8/15 SV', full: false },
+    { id: 3, name: 'Lê Văn C', load: '15/15 SV - đầy', full: true },
+  ];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-          <GraduationCap className="text-primary w-6 h-6" />
-          Phân công Giảng viên Hướng dẫn (GVHD)
-        </h2>
-        <p className="text-slate-500 text-sm">Giao việc hướng dẫn học phần báo cáo kiến tập cho giảng viên cơ hữu theo từng sinh viên</p>
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300 relative" onClick={closeAllDropdowns}>
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-slate-800">Phân công GVHD</h1>
       </div>
 
-      {message && (
-        <div className="bg-emerald-50 border border-emerald-500/30 text-emerald-800 px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-          {message}
-        </div>
-      )}
-
-      {error && (
-        <div className="bg-rose-50 border border-rose-500/30 text-rose-800 px-4 py-3 rounded-xl text-sm font-semibold">
-          {error}
-        </div>
-      )}
-
-      <div className="bg-white p-6 rounded-2xl border border-primary/10 shadow-sm space-y-4">
-        {/* Filters bar */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs font-semibold text-slate-700">
-          <div>
-            <label className="block mb-1">Lọc đợt kiến tập</label>
-            <select
-              value={selectedPlanId}
-              onChange={e => setSelectedPlanId(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-primary font-medium"
-            >
-              <option value="All">Tất cả đợt</option>
-              {schedules.map(sch => (
-                <option key={sch.id} value={sch.id}>{sch.ten_lich}</option>
+      {/* Filter Bar */}
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-[#E7E0C4] flex items-center gap-4 relative z-20 mb-6">
+        {/* Lịch Dropdown */}
+        <div className="relative min-w-[350px]">
+          <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Lịch kiến tập</label>
+          <div 
+            onClick={(e) => handleDropdownClick(e, setIsLichDropdownOpen)}
+            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isLichDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+          >
+            <span className={`truncate pr-2 font-medium ${selectedLich ? 'text-slate-700' : 'text-slate-400'}`}>{selectedLich || 'Chọn lịch kiến tập'}</span>
+            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+          </div>
+          {isLichDropdownOpen && (
+            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1">
+              {lichOptions.map(opt => (
+                <div 
+                  key={opt}
+                  onClick={() => { setSelectedLich(opt); setIsLichDropdownOpen(false); }}
+                  className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                    selectedLich === opt ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                  }`}
+                >
+                  <span className="truncate pr-2">{opt}</span>
+                  {selectedLich === opt && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                </div>
               ))}
-            </select>
-          </div>
-          <div>
-            <label className="block mb-1">Lọc lớp</label>
-            <select
-              value={filterClass}
-              onChange={e => setFilterClass(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-primary font-medium"
-            >
-              <option value="All">Tất cả các lớp</option>
-              {uniqueClasses.map(cls => (
-                <option key={cls} value={cls}>{cls}</option>
-              ))}
-            </select>
-          </div>
-          <div className="md:col-span-2">
-            <label className="block mb-1">Tìm kiếm sinh viên</label>
-            <div className="relative">
-              <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Tên hoặc mã số sinh viên..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-primary font-medium"
-              />
             </div>
-          </div>
-        </div>
-
-        {/* Table */}
-        <div className="overflow-x-auto pt-2">
-          {loading ? (
-            <div className="text-center py-12 text-slate-400 font-semibold flex items-center justify-center gap-2">
-              <RefreshCw className="animate-spin w-5 h-5 text-primary" />
-              Đang kết nối cơ sở dữ liệu...
-            </div>
-          ) : (
-            <table className="min-w-full divide-y divide-slate-100 text-xs">
-              <thead>
-                <tr className="bg-[#f8faf1] text-slate-700 font-bold text-left">
-                  <th className="px-4 py-3 rounded-l-xl">Sinh viên</th>
-                  <th className="px-4 py-3">Lớp học</th>
-                  <th className="px-4 py-3">Đợt tham gia</th>
-                  <th className="px-4 py-3">Giảng viên hướng dẫn hiện tại</th>
-                  <th className="px-4 py-3 rounded-r-xl text-center">Thay đổi phân công</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-650 font-semibold">
-                {filteredEnrollments.map(e => {
-                  const currentAdvisorName = e.sinhVien?.details?.giangVienHuongDan?.ho_ten || 'Chưa phân công';
-                  return (
-                    <tr key={e.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="px-4 py-3.5">
-                        <div className="font-bold text-slate-800">{e.sinhVien?.ho_ten}</div>
-                        <div className="text-[10px] text-slate-400">MSSV: {e.sinhVien?.mssv}</div>
-                      </td>
-                      <td className="px-4 py-3.5">{e.sinhVien?.ten_lop}</td>
-                      <td className="px-4 py-3.5">{e.lichKienTap?.ten_lich}</td>
-                      <td className="px-4 py-3.5 text-slate-700">
-                        {currentAdvisorName === 'Chưa phân công' ? (
-                          <span className="text-rose-500 font-bold flex items-center gap-1">
-                            <AlertCircle className="w-3.5 h-3.5" />
-                            {currentAdvisorName}
-                          </span>
-                        ) : (
-                          <span className="text-emerald-600 font-bold">
-                            {currentAdvisorName}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3.5 text-center flex justify-center gap-2">
-                        <select
-                          value={selectedLecturerId[e.id] || ''}
-                          onChange={ev => setSelectedLecturerId({
-                            ...selectedLecturerId,
-                            [e.id]: ev.target.value
-                          })}
-                          className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-[11px] focus:outline-none focus:border-primary font-medium"
-                        >
-                          <option value="">-- Chọn giảng viên --</option>
-                          {lecturers.map(l => (
-                            <option key={l.id} value={l.id}>{l.ho_ten} ({l.ma_gv})</option>
-                          ))}
-                        </select>
-                        <button
-                          onClick={() => handleAssign(e.id)}
-                          className="bg-primary hover:bg-[#2c6b2d] text-white px-3 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer shadow-sm"
-                        >
-                          Phân công
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-                {filteredEnrollments.length === 0 && (
-                  <tr>
-                    <td colSpan="5" className="text-center py-8 text-slate-400 font-medium">
-                      Không tìm thấy sinh viên nào
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
           )}
+        </div>
+      </div>
+
+      {/* Bulk Action Bar */}
+      <div className="bg-[#E7E0C4]/50 border border-[#E7E0C4] rounded-t-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-2 pl-2">
+          <input 
+            type="checkbox" 
+            className="w-4 h-4 text-[#407F3E] border-slate-300 rounded focus:ring-[#407F3E] cursor-pointer"
+            checked={selectAll}
+            onChange={() => setSelectAll(!selectAll)}
+          />
+          <span className="text-sm font-bold text-slate-700">Chọn tất cả</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 text-slate-500">
+            <Info className="w-4 h-4" />
+            <span className="text-[11px] font-medium">Chờ khoa cấu hình số lượng SV tối đa/GV</span>
+          </div>
+          <button 
+            disabled
+            className="px-4 py-2 bg-slate-100 text-slate-400 border border-slate-200 rounded-lg text-sm font-bold flex items-center gap-2 cursor-not-allowed"
+          >
+            Phân công tự động
+          </button>
+        </div>
+      </div>
+
+      {/* Main Table */}
+      <div className="bg-white rounded-b-xl shadow-sm border border-[#E7E0C4] border-t-0 overflow-visible relative z-10">
+        <div className="overflow-visible">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-[#E7E0C4] text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
+                <th className="p-4 pl-5 w-12"></th>
+                <th className="p-4">MSSV</th>
+                <th className="p-4">Họ tên</th>
+                <th className="p-4">Lớp</th>
+                <th className="p-4">GVHD hiện tại</th>
+                <th className="p-4 text-right pr-6 w-[250px]">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
+              {listSv.map(sv => (
+                <tr key={sv.id} className={`hover:bg-slate-50 transition-colors ${sv.checked ? 'bg-[#89B449]/5' : ''}`}>
+                  <td className="p-4 pl-5">
+                    <input 
+                      type="checkbox" 
+                      className="w-4 h-4 text-[#407F3E] border-slate-300 rounded focus:ring-[#407F3E] cursor-pointer" 
+                      checked={sv.checked} 
+                      readOnly 
+                    />
+                  </td>
+                  <td className={`p-4 font-mono font-bold ${sv.checked ? 'text-[#407F3E]' : 'text-slate-500'}`}>{sv.mssv}</td>
+                  <td className="p-4 font-bold text-slate-800">{sv.ten}</td>
+                  <td className="p-4 font-medium text-slate-600">{sv.lop}</td>
+                  <td className="p-4">
+                    {sv.gvhd ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#E7E0C4]/40 text-slate-700 border border-[#E7E0C4]">
+                        <UserCircle className="w-4 h-4 text-[#407F3E]" />
+                        {sv.gvhd}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold bg-slate-100 text-slate-400 border border-slate-200">
+                        Chưa phân công
+                      </span>
+                    )}
+                  </td>
+                  <td className="p-4 text-right pr-6 relative">
+                    <button 
+                      onClick={(e) => toggleInlineDropdown(e, sv.id)}
+                      className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center justify-end gap-2 ml-auto ${
+                        openDropdownId === sv.id 
+                          ? 'bg-[#407F3E] text-white shadow-sm' 
+                          : 'bg-slate-50 border border-slate-200 text-[#407F3E] hover:bg-[#407F3E]/10'
+                      }`}
+                    >
+                      <UserPlus className="w-3.5 h-3.5" />
+                      Phân công
+                    </button>
+
+                    {/* Inline Dropdown */}
+                    {openDropdownId === sv.id && (
+                      <div 
+                        className="absolute top-full right-6 mt-1 w-[260px] bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-50 overflow-hidden animate-in zoom-in-95 origin-top-right text-left"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="p-2 border-b border-[#E7E0C4] bg-slate-50">
+                          <div className="relative">
+                            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                            <input 
+                              type="text" 
+                              placeholder="Tìm kiếm GVHD..." 
+                              className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E]"
+                            />
+                          </div>
+                        </div>
+                        <div className="max-h-[200px] overflow-y-auto py-1">
+                          {gvOptions.map(gv => (
+                            <div 
+                              key={gv.id}
+                              className={`px-3 py-2 text-xs flex items-center justify-between transition-colors ${
+                                gv.full 
+                                  ? 'opacity-50 cursor-not-allowed bg-slate-50' 
+                                  : 'cursor-pointer hover:bg-[#E7E0C4]/30'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2 truncate">
+                                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white ${gv.full ? 'bg-slate-300' : 'bg-[#407F3E]'}`}>
+                                  {gv.name.charAt(0)}
+                                </div>
+                                <span className={`font-bold ${gv.full ? 'text-slate-500' : 'text-slate-800'}`}>{gv.name}</span>
+                              </div>
+                              <span className={`font-medium ${gv.full ? 'text-slate-400' : 'text-slate-500'}`}>{gv.load}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

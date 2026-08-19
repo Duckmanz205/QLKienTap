@@ -220,10 +220,16 @@ export class SinhVienService {
 
       // Kiem tra khung gio dang ky (neu duoc thiet lap)
       const now = new Date();
-      if (trip.thoi_gian_mo_dang_ky && now < new Date(trip.thoi_gian_mo_dang_ky)) {
+      if (
+        trip.thoi_gian_mo_dang_ky &&
+        now < new Date(trip.thoi_gian_mo_dang_ky)
+      ) {
         throw new BadRequestException('Chuyến đi chưa đến giờ mở đăng ký');
       }
-      if (trip.thoi_gian_dong_dang_ky && now > new Date(trip.thoi_gian_dong_dang_ky)) {
+      if (
+        trip.thoi_gian_dong_dang_ky &&
+        now > new Date(trip.thoi_gian_dong_dang_ky)
+      ) {
         throw new BadRequestException('Chuyến đi đã hết thời gian đăng ký');
       }
 
@@ -275,7 +281,8 @@ export class SinhVienService {
       const savedPhieu = await manager.save(PhieuDangKy, newPhieu);
 
       return {
-        message: 'Đã ghi nhận yêu cầu đăng ký thành công. Vui lòng chờ Khoa chốt danh sách sau khi kết thúc đợt đăng ký.',
+        message:
+          'Đã ghi nhận yêu cầu đăng ký thành công. Vui lòng chờ Khoa chốt danh sách sau khi kết thúc đợt đăng ký.',
         phieu: savedPhieu,
       };
     });
@@ -498,9 +505,9 @@ export class SinhVienService {
         'Bạn không có quyền yêu cầu hoàn phí cho hóa đơn của người khác',
       );
     }
-    if (hd.trang_thai !== 'DaDongDungHan') {
+    if (hd.trang_thai !== 'ViPham') {
       throw new BadRequestException(
-        'Hóa đơn chưa thanh toán hoặc vi phạm, không thể xin hoàn',
+        'Xin hoàn phí chỉ áp dụng cho hóa đơn vi phạm (trễ hạn/sai nội dung)',
       );
     }
 
@@ -678,6 +685,17 @@ export class SinhVienService {
       );
     }
 
+    if (phieu.chuyenThamQuan.cach_to_chuc === 'DoKhoaToChuc') {
+      const dd = await this.dataSource.manager.findOne('DiemDanh', {
+        where: { phieu_dang_ky_id: registrationId },
+      });
+      if (!dd || (dd as any).trang_thai !== 'CoMat') {
+        throw new BadRequestException(
+          'Bạn chưa được điểm danh Có mặt cho chuyến tham quan này nên chưa thể nộp bài thu hoạch',
+        );
+      }
+    }
+
     const tripDate = new Date(phieu.chuyenThamQuan.ngay_tham_quan);
     const now = new Date();
     const diffTime = now.getTime() - tripDate.getTime();
@@ -710,7 +728,7 @@ export class SinhVienService {
       diem = new DiemPhieuDangKy();
       diem.phieu_dang_ky_id = registrationId;
     }
-    diem.diem_bai_thu_hoach_ai = Number((7.0 + Math.random() * 2.0).toFixed(2));
+    diem.diem_bai_thu_hoach_ai = null;
     await this.diemPhieuRepo.save(diem);
 
     return { message: 'Nộp bài thu hoạch thành công', report };
@@ -737,6 +755,13 @@ export class SinhVienService {
     if (phieus.length !== 3) {
       throw new BadRequestException(
         'Danh sách chuyến chọn không hợp lệ hoặc không thuộc quyền sở hữu của bạn.',
+      );
+    }
+
+    const nhaMayIds = new Set(phieus.map((p) => p.chuyenThamQuan.nha_may_id));
+    if (nhaMayIds.size !== 3) {
+      throw new BadRequestException(
+        'Bộ chuyến báo cáo phải thuộc 3 nhà máy khác nhau',
       );
     }
 
@@ -768,6 +793,16 @@ export class SinhVienService {
     }
 
     // Xoa bo cu neu co
+    const lichKienTapId = phieus[0].chuyenThamQuan.lich_kien_tap_id;
+    const countBoard = await this.dataSource.manager.count('HoiDongChamBaoCao', {
+      where: { lich_kien_tap_id: lichKienTapId },
+    });
+    if (countBoard > 0) {
+      throw new BadRequestException(
+        'Không thể thay đổi bộ chuyến báo cáo sau khi Khoa đã lên lịch buổi báo cáo Hội đồng',
+      );
+    }
+
     const currentBo = await this.boChuyenRepo.findOne({
       where: { lich_kien_tap_sinh_vien_id: termStudentId },
     });

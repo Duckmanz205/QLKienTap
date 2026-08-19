@@ -1,45 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import { Edit2, Plus, Calendar, Trash2, X, ChevronDown, Check } from 'lucide-react';
 import { khoaApi } from '../../services/api';
 
 export default function DanhMucNen_ThemMoiHocKy_Khoa() {
+  const [activeTab, setActiveTab] = useState('nam-hoc');
   const [years, setYears] = useState([]);
   const [terms, setTerms] = useState([]);
-  const [campaigns, setCampaigns] = useState([]);
-  const [schedules, setSchedules] = useState([]);
-  const [students, setStudents] = useState([]);
+  const [courses, setCourses] = useState([]);
 
-  // Form states
-  const [tenNamHoc, setTenNamHoc] = useState('');
-  const [ngayBDNamHoc, setNgayBDNamHoc] = useState('');
-  const [ngayKTNamHoc, setNgayKTNamHoc] = useState('');
-
-  const [namHocId, setNamHocId] = useState('');
-  const [tenHocKy, setTenHocKy] = useState('');
-  const [ngayBDHocKy, setNgayBDHocKy] = useState('');
-  const [ngayKTHocKy, setNgayKTHocKy] = useState('');
-
-  const [campaignName, setCampaignName] = useState('');
-  const [campaignYearId, setCampaignYearId] = useState('');
-  const [campaignTermId, setCampaignTermId] = useState('');
-  const [campaignBD, setCampaignBD] = useState('');
-  const [campaignKT, setCampaignKT] = useState('');
-
-  const [scheduleName, setScheduleName] = useState('');
-  const [scheduleCampaignId, setScheduleCampaignId] = useState('');
-  const [scheduleCourseId, setScheduleCourseId] = useState('');
-  const [scheduleRegBD, setScheduleRegBD] = useState('');
-  const [scheduleRegKT, setScheduleRegKT] = useState('');
-  const [scheduleBD, setScheduleBD] = useState('');
-  const [scheduleKT, setScheduleKT] = useState('');
-  const [scheduleReportLimit, setScheduleReportLimit] = useState('');
-  const [scheduleScoreLimit, setScheduleScoreLimit] = useState('');
-
-  // Import cohort state
-  const [activeImportScheduleId, setActiveImportScheduleId] = useState(null);
-  const [selectedStudentIds, setSelectedStudentIds] = useState([]);
-
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
+  // Mockup modal state for prompt requirement
+  const [showModal, setShowModal] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -47,365 +18,224 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
 
   const fetchData = async () => {
     try {
-      const y = await khoaApi.getYears(); setYears(y.data);
-      const t = await khoaApi.getTerms(); setTerms(t.data);
-      const c = await khoaApi.getCampaigns(); setCampaigns(c.data);
-      const s = await khoaApi.getSchedules(); setSchedules(s.data);
-      const sv = await khoaApi.getStudents({ limit: 1000 }); setStudents(sv.data.data || []);
+      const [y, t, c] = await Promise.all([
+        khoaApi.getYears(),
+        khoaApi.getTerms(),
+        khoaApi.getCourses()
+      ]);
+      setYears(y.data);
+      setTerms(t.data);
+      setCourses(c.data);
     } catch (err) {
       console.error(err);
     }
   };
 
-  const handleCreateYear = async (e) => {
-    e.preventDefault();
-    setMessage('');
-    try {
-      await khoaApi.createYear({ ten_nam_hoc: tenNamHoc, ngay_bat_dau: ngayBDNamHoc, ngay_ket_thuc: ngayKTNamHoc });
-      setMessage('Tạo năm học thành công');
-      setTenNamHoc(''); setNgayBDNamHoc(''); setNgayKTNamHoc('');
-      fetchData();
-    } catch (err) { console.error(err); }
-  };
-
-  const handleCreateTerm = async (e) => {
-    e.preventDefault();
-    setMessage('');
-    try {
-      await khoaApi.createTerm({ nam_hoc_id: Number(namHocId), ten_hoc_ky: tenHocKy, ngay_bat_dau: ngayBDHocKy, ngay_ket_thuc: ngayKTHocKy });
-      setMessage('Tạo học kỳ thành công');
-      setNamHocId(''); setTenHocKy(''); setNgayBDHocKy(''); setNgayKTHocKy('');
-      fetchData();
-    } catch (err) { console.error(err); }
-  };
-
-  const handleCreateCampaign = async (e) => {
-    e.preventDefault();
-    setMessage('');
-    try {
-      await khoaApi.createCampaign({
-        ten_dot: campaignName,
-        nam_hoc_id: Number(campaignYearId),
-        hoc_ky_id: Number(campaignTermId),
-        ngay_bat_dau: campaignBD,
-        ngay_ket_thuc: campaignKT,
-      });
-      setMessage('Tạo đợt kiến tập thành công');
-      setCampaignName(''); setCampaignYearId(''); setCampaignTermId(''); setCampaignBD(''); setCampaignKT('');
-      fetchData();
-    } catch (err) { console.error(err); }
-  };
-
-  const handleCreateSchedule = async (e) => {
-    e.preventDefault();
-    setMessage('');
-    try {
-      await khoaApi.createSchedule({
-        ten_lich: scheduleName,
-        dot_kien_tap_id: Number(scheduleCampaignId),
-        khoa_id: Number(scheduleCourseId),
-        tg_mo_dang_ky_tu: scheduleRegBD,
-        tg_mo_dang_ky_den: scheduleRegKT,
-        tg_dien_ra_tu: scheduleBD,
-        tg_dien_ra_den: scheduleKT,
-        han_chot_nop_bao_cao: scheduleReportLimit,
-        han_chot_diem: scheduleScoreLimit,
-      });
-      setMessage('Tạo lịch kiến tập lớp thành công');
-      setScheduleName(''); setScheduleCampaignId(''); setScheduleCourseId('');
-      setScheduleRegBD(''); setScheduleRegKT(''); setScheduleBD(''); setScheduleKT('');
-      setScheduleReportLimit(''); setScheduleScoreLimit('');
-      fetchData();
-    } catch (err) { console.error(err); }
-  };
-
-  const handleToggleStudentSelect = (id) => {
-    if (selectedStudentIds.includes(id)) {
-      setSelectedStudentIds(selectedStudentIds.filter(x => x !== id));
-    } else {
-      setSelectedStudentIds([...selectedStudentIds, id]);
-    }
-  };
-
-  const executeImport = async () => {
-    setMessage('');
-    setError('');
-    if (selectedStudentIds.length === 0) {
-      alert('Vui lòng chọn ít nhất một sinh viên.');
-      return;
-    }
-    try {
-      await khoaApi.importStudents({
-        lichId: activeImportScheduleId,
-        studentIds: selectedStudentIds,
-      });
-      setMessage('Nhập danh sách sinh viên vào lịch kiến tập thành công');
-      setActiveImportScheduleId(null);
-      setSelectedStudentIds([]);
-      fetchData();
-    } catch (err) {
-      setError(err.response?.data?.message || 'Nhập danh sách sinh viên thất bại');
-    }
-  };
-
   return (
-    <div className="space-y-8">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-800">Cấu hình kế hoạch & Đợt kiến tập</h2>
-        <p className="text-slate-500 text-sm">Thiết lập danh mục năm học, học kỳ, mở các đợt kiến tập và lập lịch trình thời gian chi tiết cho từng lớp sinh viên</p>
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-2">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-slate-800">Danh mục nền</h1>
+        <p className="text-sm text-slate-500 mt-1">Quản lý các danh mục cơ sở của hệ thống</p>
       </div>
 
-      {message && (
-        <div className="bg-green-50 border border-green-500 text-green-700 px-4 py-3 rounded-lg text-sm font-medium">
-          {message}
-        </div>
-      )}
-      {error && (
-        <div className="bg-red-50 border border-red-500 text-red-700 px-4 py-3 rounded-lg text-sm font-medium">
-          {error}
-        </div>
-      )}
+      <div className="flex gap-8 border-b border-[#E7E0C4] mb-6 relative">
+        <button 
+          onClick={() => setActiveTab('nam-hoc')}
+          className={`pb-3 font-semibold text-sm transition-colors relative cursor-pointer ${activeTab === 'nam-hoc' ? 'text-[#89B449]' : 'text-slate-500 hover:text-slate-800'}`}
+        >
+          Năm học
+          {activeTab === 'nam-hoc' && <div className="absolute bottom-0 left-0 w-full h-[2px] bg-[#89B449]"></div>}
+        </button>
+        <button 
+          onClick={() => setActiveTab('hoc-ky')}
+          className={`pb-3 font-semibold text-sm transition-colors relative cursor-pointer ${activeTab === 'hoc-ky' ? 'text-[#89B449]' : 'text-slate-500 hover:text-slate-800'}`}
+        >
+          Học kỳ
+          {activeTab === 'hoc-ky' && <div className="absolute bottom-0 left-0 w-full h-[2px] bg-[#89B449]"></div>}
+        </button>
+        <button 
+          onClick={() => setActiveTab('khoa')}
+          className={`pb-3 font-semibold text-sm transition-colors relative cursor-pointer ${activeTab === 'khoa' ? 'text-[#89B449]' : 'text-slate-500 hover:text-slate-800'}`}
+        >
+          Khóa
+          {activeTab === 'khoa' && <div className="absolute bottom-0 left-0 w-full h-[2px] bg-[#89B449]"></div>}
+        </button>
 
-      {/* Forms Section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-xs">
-        {/* Create Year */}
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
-          <h3 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">Tạo năm học mới</h3>
-          <form onSubmit={handleCreateYear} className="space-y-4">
-            <div>
-              <label className="block font-medium text-slate-700">Tên năm học</label>
-              <input
-                type="text" required value={tenNamHoc} onChange={e => setTenNamHoc(e.target.value)} placeholder="Ví dụ: 2024-2025"
-                className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block font-medium text-slate-700">Ngày bắt đầu</label>
-                <input
-                  type="date" required value={ngayBDNamHoc} onChange={e => setNgayBDNamHoc(e.target.value)}
-                  className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm"
-                />
-              </div>
-              <div>
-                <label className="block font-medium text-slate-700">Ngày kết thúc</label>
-                <input
-                  type="date" required value={ngayKTNamHoc} onChange={e => setNgayKTNamHoc(e.target.value)}
-                  className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm"
-                />
-              </div>
-            </div>
-            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded font-semibold transition-colors">Tạo năm học</button>
-          </form>
-        </div>
-
-        {/* Create Term */}
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
-          <h3 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">Tạo học kỳ mới</h3>
-          <form onSubmit={handleCreateTerm} className="space-y-4">
-            <div>
-              <label className="block font-medium text-slate-700">Chọn năm học</label>
-              <select required value={namHocId} onChange={e => setNamHocId(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md bg-white">
-                <option value="">-- Chọn năm học --</option>
-                {years.map(y => <option key={y.id} value={y.id}>{y.ten_nam_hoc}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block font-medium text-slate-700">Tên học kỳ</label>
-              <input
-                type="text" required value={tenHocKy} onChange={e => setTenHocKy(e.target.value)} placeholder="Ví dụ: Học kỳ 1"
-                className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block font-medium text-slate-700">Ngày bắt đầu</label>
-                <input type="date" required value={ngayBDHocKy} onChange={e => setNgayBDHocKy(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-slate-300" />
-              </div>
-              <div>
-                <label className="block font-medium text-slate-700">Ngày kết thúc</label>
-                <input type="date" required value={ngayKTHocKy} onChange={e => setNgayKTHocKy(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-slate-300" />
-              </div>
-            </div>
-            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded font-semibold transition-colors">Tạo học kỳ</button>
-          </form>
-        </div>
-
-        {/* Create Campaign */}
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
-          <h3 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">Thiết lập Đợt kiến tập khoa</h3>
-          <form onSubmit={handleCreateCampaign} className="space-y-4">
-            <div>
-              <label className="block font-medium text-slate-700">Tên đợt kiến tập</label>
-              <input type="text" required value={campaignName} onChange={e => setCampaignName(e.target.value)} placeholder="Ví dụ: Đợt kiến tập Hè 2025" className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md" />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block font-medium text-slate-700">Năm học</label>
-                <select required value={campaignYearId} onChange={e => setCampaignYearId(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-slate-300 bg-white">
-                  <option value="">-- Chọn --</option>
-                  {years.map(y => <option key={y.id} value={y.id}>{y.ten_nam_hoc}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block font-medium text-slate-700">Học kỳ</label>
-                <select required value={campaignTermId} onChange={e => setCampaignTermId(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-slate-300 bg-white">
-                  <option value="">-- Chọn --</option>
-                  {terms.map(t => <option key={t.id} value={t.id}>{t.ten_hoc_ky} ({t.namHoc?.ten_nam_hoc})</option>)}
-                </select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block font-medium text-slate-700">Ngày triển khai</label>
-                <input type="date" required value={campaignBD} onChange={e => setCampaignBD(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-slate-300" />
-              </div>
-              <div>
-                <label className="block font-medium text-slate-700">Ngày kết thúc</label>
-                <input type="date" required value={campaignKT} onChange={e => setCampaignKT(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-slate-300" />
-              </div>
-            </div>
-            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded font-semibold transition-colors">Tạo đợt kiến tập</button>
-          </form>
-        </div>
-
-        {/* Create Schedule (LichKienTap) */}
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
-          <h3 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">Lập lịch kiến tập chi tiết lớp</h3>
-          <form onSubmit={handleCreateSchedule} className="space-y-4">
-            <div>
-              <label className="block font-medium text-slate-700">Tên lịch kiến tập</label>
-              <input type="text" required value={scheduleName} onChange={e => setScheduleName(e.target.value)} placeholder="Ví dụ: Kế hoạch kiến tập ngành Thực phẩm K14" className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md" />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block font-medium text-slate-700">Đợt kiến tập</label>
-                <select required value={scheduleCampaignId} onChange={e => setScheduleCampaignId(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-slate-300 bg-white">
-                  <option value="">-- Chọn đợt --</option>
-                  {campaigns.map(c => <option key={c.id} value={c.id}>{c.ten_dot}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block font-medium text-slate-700">Ngành áp dụng</label>
-                <select required value={scheduleCourseId} onChange={e => setScheduleCourseId(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-slate-300 bg-white">
-                  <option value="">-- Chọn ngành --</option>
-                  {students.map(s => s.khoa).filter((v, i, a) => a.findIndex(t => t.id === v.id) === i).map(k => (
-                    <option key={k.id} value={k.id}>{k.ten_khoa}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block font-medium text-slate-700">Mở đăng ký từ</label>
-                <input type="datetime-local" required value={scheduleRegBD} onChange={e => setScheduleRegBD(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-slate-300" />
-              </div>
-              <div>
-                <label className="block font-medium text-slate-700">Đến ngày</label>
-                <input type="datetime-local" required value={scheduleRegKT} onChange={e => setScheduleRegKT(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-slate-300" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block font-medium text-slate-700">Thời gian diễn ra từ</label>
-                <input type="date" required value={scheduleBD} onChange={e => setScheduleBD(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-slate-300" />
-              </div>
-              <div>
-                <label className="block font-medium text-slate-700">Đến ngày</label>
-                <input type="date" required value={scheduleKT} onChange={e => setScheduleKT(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-slate-300" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block font-medium text-slate-700">Hạn chốt nộp báo cáo</label>
-                <input type="datetime-local" required value={scheduleReportLimit} onChange={e => setScheduleReportLimit(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-slate-300" />
-              </div>
-              <div>
-                <label className="block font-medium text-slate-700">Hạn chốt điểm</label>
-                <input type="datetime-local" required value={scheduleScoreLimit} onChange={e => setScheduleScoreLimit(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-slate-300" />
-              </div>
-            </div>
-            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded font-semibold transition-colors">Tạo kế hoạch chi tiết</button>
-          </form>
+        <div className="absolute right-0 bottom-2">
+           <button 
+             onClick={() => setShowModal(true)}
+             className="bg-[#407F3E] text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 hover:bg-[#407F3E]/90 transition-colors shadow-sm cursor-pointer"
+           >
+             <Plus className="w-4 h-4" />
+             Thêm mới
+           </button>
         </div>
       </div>
 
-      {/* Import Student Cohort Panel */}
-      {activeImportScheduleId && (
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-md space-y-4 text-xs">
-          <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-            <h3 className="text-sm font-bold text-slate-800">Nhập danh sách sinh viên tham gia kiến tập</h3>
-            <button onClick={() => setActiveImportScheduleId(null)} className="text-slate-400 hover:text-slate-600">Quay lại</button>
-          </div>
-
-          <div className="space-y-3 max-h-[300px] overflow-y-auto">
-            {students.map(s => {
-              const isSelected = selectedStudentIds.includes(s.id);
-              return (
-                <div key={s.id} onClick={() => handleToggleStudentSelect(s.id)} className={`p-3 rounded-lg border cursor-pointer flex justify-between items-center transition-all ${
-                  isSelected ? 'border-blue-500 bg-blue-50/30' : 'border-slate-100 hover:bg-slate-50'
-                }`}>
-                  <div>
-                    <span className="font-semibold text-slate-850">{s.ho_ten}</span>
-                    <span className="text-slate-400 ml-2">({s.mssv})</span>
-                    <span className="text-slate-500 ml-4">Lớp: {s.ten_lop}</span>
-                  </div>
-                  <span className={`material-symbols-outlined ${isSelected ? 'text-blue-600' : 'text-slate-300'}`}>
-                    {isSelected ? 'check_box' : 'check_box_outline_blank'}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="flex justify-between items-center border-t border-slate-100 pt-3">
-            <span>Đã chọn: {selectedStudentIds.length} sinh viên</span>
-            <button onClick={executeImport} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-semibold">Nhập sinh viên</button>
-          </div>
-        </div>
-      )}
-
-      {/* Schedules List */}
-      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
-        <h3 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">Danh sách kế hoạch lịch kiến tập chi tiết</h3>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200 text-xs">
-            <thead className="bg-slate-50 text-slate-700 font-semibold text-left">
-              <tr>
-                <th className="px-4 py-2">Tên lịch kiến tập</th>
-                <th className="px-4 py-2">Đợt áp dụng</th>
-                <th className="px-4 py-2">Thời gian đăng ký</th>
-                <th className="px-4 py-2">Thời gian diễn ra</th>
-                <th className="px-4 py-2">Hạn chốt</th>
-                <th className="px-4 py-2 text-right">Nhập SV</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200 text-slate-600">
-              {schedules.map(sch => (
-                <tr key={sch.id} className="hover:bg-slate-55">
-                  <td className="px-4 py-3 font-semibold text-slate-800">{sch.ten_lich}</td>
-                  <td className="px-4 py-3">{sch.dotKienTap?.ten_dot}</td>
-                  <td className="px-4 py-3">
-                    {new Date(sch.tg_mo_dang_ky_tu).toLocaleDateString('vi-VN')} - {new Date(sch.tg_mo_dang_ky_den).toLocaleDateString('vi-VN')}
-                  </td>
-                  <td className="px-4 py-3">
-                    {new Date(sch.tg_dien_ra_tu).toLocaleDateString('vi-VN')} - {new Date(sch.tg_dien_ra_den).toLocaleDateString('vi-VN')}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div>Báo cáo: {new Date(sch.han_chot_nop_bao_cao).toLocaleDateString('vi-VN')}</div>
-                    <div>Điểm: {new Date(sch.han_chot_diem).toLocaleDateString('vi-VN')}</div>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button onClick={() => { setActiveImportScheduleId(sch.id); setSelectedStudentIds([]); }} className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-3 py-1.5 rounded font-semibold transition-colors">
-                      Nhập SV
+      <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-hidden">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-[#E7E0C4]/40 text-slate-700 text-xs font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
+              {activeTab === 'nam-hoc' && (
+                <>
+                  <th className="p-4">Tên năm học</th>
+                  <th className="p-4">Ngày bắt đầu</th>
+                  <th className="p-4">Ngày kết thúc</th>
+                </>
+              )}
+              {activeTab === 'hoc-ky' && (
+                <>
+                  <th className="p-4">Học kỳ</th>
+                  <th className="p-4">Năm học</th>
+                  <th className="p-4">Ngày bắt đầu</th>
+                  <th className="p-4">Ngày kết thúc</th>
+                </>
+              )}
+              {activeTab === 'khoa' && (
+                <>
+                  <th className="p-4">Tên khóa</th>
+                  <th className="p-4">Năm nhập học</th>
+                  <th className="p-4">Số sinh viên</th>
+                </>
+              )}
+              <th className="p-4 text-right">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
+            {activeTab === 'nam-hoc' && years.map(y => (
+              <tr key={y.id} className="hover:bg-slate-50 transition-colors">
+                <td className="p-4 font-semibold">{y.ten_nam_hoc}</td>
+                <td className="p-4 text-slate-600">{new Date(y.ngay_bat_dau).toLocaleDateString('vi-VN')}</td>
+                <td className="p-4 text-slate-600">{new Date(y.ngay_ket_thuc).toLocaleDateString('vi-VN')}</td>
+                <td className="p-4 text-right">
+                  <div className="flex justify-end gap-2 text-slate-400">
+                    <button className="p-1.5 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded transition-colors cursor-pointer" title="Sửa">
+                      <Edit2 className="w-4 h-4" />
                     </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    <button className="p-1.5 cursor-not-allowed opacity-40 hover:bg-transparent text-slate-300" title="Không thể xóa năm học đã có học kỳ">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+
+            {activeTab === 'hoc-ky' && terms.map(t => (
+              <tr key={t.id} className="hover:bg-slate-50 transition-colors">
+                <td className="p-4 font-semibold">{t.ten_hoc_ky}</td>
+                <td className="p-4 text-slate-600">{t.namHoc?.ten_nam_hoc}</td>
+                <td className="p-4 text-slate-600">{new Date(t.ngay_bat_dau).toLocaleDateString('vi-VN')}</td>
+                <td className="p-4 text-slate-600">{new Date(t.ngay_ket_thuc).toLocaleDateString('vi-VN')}</td>
+                <td className="p-4 text-right">
+                  <div className="flex justify-end gap-2 text-slate-400">
+                    <button className="p-1.5 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded transition-colors cursor-pointer" title="Sửa">
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button className="p-1.5 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded transition-colors cursor-pointer" title="Xóa">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+
+            {activeTab === 'khoa' && courses.map(c => (
+              <tr key={c.id} className="hover:bg-slate-50 transition-colors">
+                <td className="p-4 font-semibold">{c.ten_khoa}</td>
+                <td className="p-4 text-slate-600">{c.nam_nhap_hoc}</td>
+                <td className="p-4 text-slate-600">{c.sinhVienCount || 0}</td>
+                <td className="p-4 text-right">
+                  <div className="flex justify-end gap-2 text-slate-400">
+                    <button className="p-1.5 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded transition-colors cursor-pointer" title="Sửa">
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button className="p-1.5 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded transition-colors cursor-pointer" title="Xóa">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
+
+      {/* Mockup Modal for Thêm mới Học kỳ */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white w-[480px] rounded-2xl shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center p-5 border-b border-[#E7E0C4]">
+              <h2 className="text-[#407F3E] font-bold text-lg">Thêm mới Học kỳ</h2>
+              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:bg-slate-100 p-1.5 rounded-full transition-colors cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 flex flex-col gap-5">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                  Tên học kỳ <span className="text-[#E68A8C]">*</span>
+                </label>
+                <input 
+                  type="text" 
+                  placeholder="Học kỳ 1" 
+                  className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all" 
+                />
+              </div>
+
+              <div className="relative">
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                  Năm học <span className="text-[#E68A8C]">*</span>
+                </label>
+                <div 
+                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                  className={`w-full px-4 py-2.5 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+                >
+                  <span className={isDropdownOpen ? 'text-slate-800' : 'text-slate-500'}>Chọn năm học</span>
+                  <ChevronDown className="w-4 h-4 text-slate-400" />
+                </div>
+                
+                {/* Floating Open State Mockup */}
+                {isDropdownOpen && (
+                  <div className="absolute top-[72px] left-0 w-full bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-10 py-1 overflow-hidden">
+                    <div className="px-4 py-2 text-sm text-slate-700 hover:bg-[#E7E0C4]/50 cursor-pointer transition-colors">2023-2024</div>
+                    <div className="px-4 py-2 text-sm text-slate-800 bg-[#E7E0C4] font-medium flex justify-between items-center cursor-pointer transition-colors">
+                      2024-2025
+                      <Check className="w-4 h-4 text-[#407F3E]" />
+                    </div>
+                    <div className="px-4 py-2 text-sm text-slate-700 hover:bg-[#E7E0C4]/50 cursor-pointer transition-colors">2025-2026</div>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Ngày bắt đầu</label>
+                <div className="relative">
+                  <input type="text" placeholder="dd/mm/yyyy" className="w-full pl-4 pr-10 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all" />
+                  <Calendar className="w-4 h-4 text-slate-400 absolute right-3 top-3" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Ngày kết thúc</label>
+                <div className="relative">
+                  <input type="text" placeholder="dd/mm/yyyy" className="w-full pl-4 pr-10 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all" />
+                  <Calendar className="w-4 h-4 text-slate-400 absolute right-3 top-3" />
+                </div>
+              </div>
+            </div>
+
+            <div className="p-5 border-t border-[#E7E0C4] flex justify-end gap-3 bg-slate-50/50 rounded-b-2xl">
+              <button onClick={() => setShowModal(false)} className="px-5 py-2.5 rounded-lg text-sm font-semibold text-slate-600 border border-[#E7E0C4] hover:bg-slate-100 transition-colors cursor-pointer">
+                Hủy
+              </button>
+              <button className="px-6 py-2.5 rounded-lg text-sm font-semibold text-white bg-[#407F3E] hover:bg-[#407F3E]/90 transition-colors shadow-sm cursor-pointer">
+                Lưu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

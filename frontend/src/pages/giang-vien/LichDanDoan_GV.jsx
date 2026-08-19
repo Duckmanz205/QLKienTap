@@ -1,382 +1,212 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
-  Compass, 
-  MapPin, 
-  Calendar, 
-  Clock, 
-  Users, 
-  Check, 
-  Save, 
-  CheckCircle,
-  AlertTriangle,
-  UserCheck
+  Calendar as CalendarIcon, MapPin, Laptop, ChevronLeft, ChevronRight, Eye
 } from 'lucide-react';
-import { giangVienApi } from '../../services/api';
 
 export default function LichDanDoan_GV() {
-  const [lecturer, setLecturer] = useState(null);
-  const [trips, setTrips] = useState([]);
-  const [selectedTripId, setSelectedTripId] = useState('');
-  const [registrations, setRegistrations] = useState([]);
-  const [attendanceState, setAttendanceState] = useState({}); // key: regId, value: { status, notes }
+  const [viewMode, setViewMode] = useState('list'); // 'list' or 'calendar'
 
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    const userJson = localStorage.getItem('user');
-    if (userJson) {
-      const { user } = JSON.parse(userJson);
-      giangVienApi.getProfile(user.id).then(res => {
-        setLecturer(res.data);
-        fetchTrips(res.data.id);
-      }).catch(err => console.error(err));
+  // Mock Data
+  const trips = [
+    {
+      id: 1,
+      nhaMay: 'Nhà máy Yakult HCM',
+      ngayThamQuan: '10/09/2026',
+      gio: '08:00 - 11:30',
+      hinhThuc: 'Trực tiếp',
+      soSvDangKy: '15/15',
+      trangThai: 'Sắp diễn ra' // Warning
+    },
+    {
+      id: 2,
+      nhaMay: 'Vinamilk Bình Dương',
+      ngayThamQuan: '05/09/2026',
+      gio: '13:00 - 16:30',
+      hinhThuc: 'Trực tiếp',
+      soSvDangKy: '12/15',
+      trangThai: 'Đang diễn ra' // Secondary green
+    },
+    {
+      id: 3,
+      nhaMay: 'Acecook Việt Nam',
+      ngayThamQuan: '20/08/2026',
+      gio: '08:00 - 11:30',
+      hinhThuc: 'Trực tuyến',
+      soSvDangKy: '120/150',
+      trangThai: 'Đã hoàn thành' // Muted gray
     }
-  }, []);
+  ];
 
-  const fetchTrips = async (gvId) => {
-    try {
-      const res = await giangVienApi.getLedTrips(gvId);
-      setTrips(res.data);
-      if (res.data.length > 0) {
-        setSelectedTripId(res.data[0].id.toString());
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  useEffect(() => {
-    if (selectedTripId) {
-      fetchRegistrations(Number(selectedTripId));
-    }
-  }, [selectedTripId]);
-
-  const fetchRegistrations = async (tripId) => {
-    setLoading(true);
-    try {
-      const res = await giangVienApi.getTripRegistrations(tripId);
-      setRegistrations(res.data);
-
-      // Initialize local state for attendance status
-      const initial = {};
-      res.data.forEach(reg => {
-        // Map backend state ('HopLe'/'DaThamGia' -> CoMat, 'VangMat' -> Vang, 'BiLoai' -> TuChoiThamGia)
-        let status = 'CoMat';
-        if (reg.trang_thai === 'VangMat') status = 'Vang';
-        else if (reg.trang_thai === 'BiLoai') status = 'TuChoiThamGia';
-
-        initial[reg.id] = {
-          status,
-          notes: reg.ghi_chu_diem_danh || ''
-        };
-      });
-      setAttendanceState(initial);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 'Sắp diễn ra':
+        return <span className="inline-flex items-center px-2.5 py-1 whitespace-nowrap rounded-full text-[11px] font-bold bg-[#DBD468] text-slate-800 shadow-sm border border-[#DBD468]/20">{status}</span>;
+      case 'Đang diễn ra':
+        return <span className="inline-flex items-center px-2.5 py-1 whitespace-nowrap rounded-full text-[11px] font-bold bg-[#89B449] text-white shadow-sm border border-[#89B449]/20">{status}</span>;
+      case 'Đã hoàn thành':
+        return <span className="inline-flex items-center px-2.5 py-1 whitespace-nowrap rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200">{status}</span>;
+      default:
+        return null;
     }
   };
 
-  const handleStatusChange = (regId, status) => {
-    setAttendanceState(prev => ({
-      ...prev,
-      [regId]: { ...prev[regId], status }
-    }));
-  };
+  // Mini-calendar generation logic (mock for UI)
+  const renderMiniCalendar = () => {
+    const days = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+    const dates = [
+      { date: 1, active: false }, { date: 2, active: false }, { date: 3, active: false }, { date: 4, active: false }, { date: 5, active: true, today: true }, { date: 6, active: false }, { date: 7, active: false },
+      { date: 8, active: false }, { date: 9, active: false }, { date: 10, active: true }, { date: 11, active: false }, { date: 12, active: false }, { date: 13, active: false }, { date: 14, active: false },
+    ]; // Partial mock
 
-  const handleNotesChange = (regId, notes) => {
-    setAttendanceState(prev => ({
-      ...prev,
-      [regId]: { ...prev[regId], notes }
-    }));
-  };
-
-  const handleMarkAllPresent = () => {
-    setAttendanceState(prev => {
-      const updated = { ...prev };
-      registrations.forEach(reg => {
-        updated[reg.id] = {
-          ...updated[reg.id],
-          status: 'CoMat'
-        };
-      });
-      return updated;
-    });
-  };
-
-  const handleSaveAttendance = async () => {
-    if (!selectedTripId || registrations.length === 0) return;
-    setMessage('');
-    setError('');
-    setLoading(true);
-    try {
-      const records = registrations.map(reg => {
-        const state = attendanceState[reg.id] || { status: 'CoMat', notes: '' };
-        return {
-          phieuId: reg.id,
-          status: state.status,
-          ...(state.notes ? { note: state.notes } : {})
-        };
-      });
-
-      await giangVienApi.takeAttendance({
-        tripId: Number(selectedTripId),
-        records
-      });
-      setMessage('Đã lưu bảng điểm danh thành công!');
-      if (selectedTripId) {
-        fetchRegistrations(Number(selectedTripId));
-      }
-    } catch (err) {
-      setError(err.response?.data?.message || 'Có lỗi xảy ra khi lưu bảng điểm danh.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (!lecturer) {
     return (
-      <div className="flex items-center justify-center min-h-[400px] text-slate-500 font-semibold">
-        Đang tải thông tin lịch dẫn đoàn...
+      <div className="bg-white/80 rounded-xl p-4 shadow-sm border border-white mt-4">
+        <div className="flex items-center justify-between mb-4 text-slate-800">
+          <button className="p-1 hover:bg-slate-200 rounded-full transition-colors"><ChevronLeft className="w-4 h-4" /></button>
+          <span className="text-sm font-bold">Tháng 9, 2026</span>
+          <button className="p-1 hover:bg-slate-200 rounded-full transition-colors"><ChevronRight className="w-4 h-4" /></button>
+        </div>
+        <div className="grid grid-cols-7 gap-1 text-center mb-2">
+          {days.map(d => <div key={d} className="text-[10px] font-bold text-slate-500">{d}</div>)}
+        </div>
+        <div className="grid grid-cols-7 gap-y-2 text-center text-sm font-medium">
+          {dates.map((d, idx) => (
+            <div key={idx} className="flex items-center justify-center relative h-8">
+              <span className={`w-7 h-7 flex items-center justify-center rounded-full z-10 ${
+                d.today ? 'bg-[#407F3E] text-white font-bold shadow-sm' : 'text-slate-700'
+              }`}>
+                {d.date}
+              </span>
+              {/* Event Dot */}
+              {d.active && !d.today && (
+                <span className="absolute bottom-0.5 w-1 h-1 rounded-full bg-[#DBD468]"></span>
+              )}
+            </div>
+          ))}
+          {/* Pad the rest with empty space */}
+          {Array.from({length: 14}).map((_, i) => (
+            <div key={`pad-${i}`} className="flex items-center justify-center text-slate-300 h-8">{i + 15}</div>
+          ))}
+        </div>
       </div>
     );
-  }
-
-  const activeTrip = trips.find(t => t.id === Number(selectedTripId));
-
-  // Calculations for stats
-  const totalCount = registrations.length;
-  const presentCount = Object.values(attendanceState).filter(v => v.status === 'CoMat').length;
-  const absentCount = Object.values(attendanceState).filter(v => v.status === 'Vang').length;
-  const rejectedCount = Object.values(attendanceState).filter(v => v.status === 'TuChoiThamGia').length;
+  };
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 relative z-10">
-        <div>
-          <h1 className="text-3xl font-black text-on-surface tracking-tight">Lịch trình & Điểm danh</h1>
-          <p className="text-sm text-on-surface-variant font-medium mt-1">
-            Ghi nhận trạng thái tham gia của sinh viên tại các chuyến kiến tập thực địa do bạn dẫn đoàn.
-          </p>
-        </div>
-
-        {/* Trip Picker Dropdown */}
-        {trips.length > 0 && (
-          <div className="flex items-center gap-2 bg-white px-4 py-2.5 rounded-xl shadow-sm border border-slate-200">
-            <Compass className="w-4 h-4 text-primary" />
-            <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Chuyến đi:</span>
-            <select
-              value={selectedTripId}
-              onChange={(e) => setSelectedTripId(e.target.value)}
-              className="text-sm font-bold text-primary focus:outline-none bg-transparent cursor-pointer"
-            >
-              {trips.map(t => (
-                <option key={t.id} value={t.id}>
-                  {t.nhaMay?.ten_nha_may} ({new Date(t.ngay_tham_quan).toLocaleDateString('vi-VN')})
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-      </div>
-
-      {/* Messages */}
-      {message && (
-        <div className="bg-[#e5ffdc] border border-primary/20 text-[#476d01] px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2">
-          <Check className="w-4 h-4" />
-          <span>{message}</span>
-        </div>
-      )}
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-750 px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-red-650" />
-          <span>{error}</span>
-        </div>
-      )}
-
-      {/* Active Trip Info and Stats Banner */}
-      {activeTrip && (
-        <div className="bg-white rounded-2xl shadow-sm border border-surface-variant/40 overflow-hidden grid grid-cols-1 lg:grid-cols-12 relative z-10">
-          {/* Left Info */}
-          <div className="lg:col-span-8 p-6 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-slate-100">
-            <div>
-              <span className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded-full ${
-                activeTrip.trang_thai === 'HoanThanh' 
-                  ? 'bg-green-50 text-green-700' 
-                  : 'bg-blue-50 text-blue-700'
-              }`}>
-                {activeTrip.trang_thai === 'HoanThanh' ? 'Đã hoàn thành' : 'Sắp diễn ra'}
-              </span>
-              <h2 className="text-xl font-extrabold text-on-surface mt-2">{activeTrip.nhaMay?.ten_nha_may}</h2>
-              <p className="text-xs text-on-surface-variant font-semibold mt-1.5 flex items-center gap-1">
-                <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                <span>{activeTrip.nhaMay?.dia_chi}</span>
-              </p>
-            </div>
-
-            <div className="mt-6 flex flex-wrap items-center gap-4 text-xs font-bold text-on-surface-variant">
-              <span className="flex items-center gap-1">
-                <UserCheck className="w-4 h-4 text-slate-400" /> 
-                <span>Dẫn đoàn: {lecturer.ho_ten}</span>
-              </span>
-              <span className="w-1.5 h-1.5 bg-slate-300 rounded-full"></span>
-              <span className="flex items-center gap-1">
-                <Calendar className="w-4 h-4 text-slate-400" /> 
-                <span>{new Date(activeTrip.ngay_tham_quan).toLocaleDateString('vi-VN')}</span>
-              </span>
-              <span className="w-1.5 h-1.5 bg-slate-300 rounded-full"></span>
-              <span className="flex items-center gap-1">
-                <Clock className="w-4 h-4 text-slate-400" /> 
-                <span>{activeTrip.gio_bat_dau.slice(0, 5)} - {activeTrip.gio_ket_thuc.slice(0, 5)}</span>
-              </span>
-            </div>
-          </div>
-
-          {/* Right Stats */}
-          <div className="lg:col-span-4 p-6 bg-[#f8faf1]/40 flex flex-col justify-center">
-            <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-4 text-center lg:text-left">
-              Thống kê điểm danh
-            </p>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="bg-white p-3 rounded-xl border border-slate-150 text-center shadow-xs">
-                <p className="text-[10px] font-bold text-slate-500 uppercase">Có mặt</p>
-                <p className="text-lg font-black text-primary mt-1">{presentCount}</p>
-              </div>
-              <div className="bg-white p-3 rounded-xl border border-slate-150 text-center shadow-xs">
-                <p className="text-[10px] font-bold text-slate-500 uppercase">Vắng</p>
-                <p className="text-lg font-black text-red-650 mt-1">{absentCount}</p>
-              </div>
-              <div className="bg-white p-3 rounded-xl border border-slate-150 text-center shadow-xs">
-                <p className="text-[10px] font-bold text-slate-500 uppercase">Từ chối</p>
-                <p className="text-lg font-black text-amber-600 mt-1">{rejectedCount}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Roster & Grid Attendance */}
-      <div className="bg-white rounded-2xl shadow-sm border border-surface-variant/40 overflow-hidden relative z-10">
-        {/* Table Top Actions */}
-        <div className="p-4 bg-[#f8faf1] border-b border-surface-variant/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <span className="text-xs font-bold text-primary flex items-center gap-1.5">
-            <Users className="w-4 h-4 text-primary" />
-            <span>Danh sách điểm danh ({totalCount} sinh viên)</span>
-          </span>
-
-          <button
-            onClick={handleMarkAllPresent}
-            className="px-4 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-primary font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300">
+      
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+        <h1 className="text-2xl font-bold text-slate-800">Lịch dẫn đoàn</h1>
+        
+        {/* Toggle */}
+        <div className="flex bg-[#E7E0C4]/50 p-1 rounded-lg border border-[#E7E0C4]">
+          <button 
+            onClick={() => setViewMode('list')}
+            className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${
+              viewMode === 'list' ? 'bg-[#407F3E] text-white shadow-sm' : 'text-slate-600 hover:text-slate-800'
+            }`}
           >
-            <span>Đánh dấu tất cả có mặt</span>
+            Danh sách
+          </button>
+          <button 
+            onClick={() => setViewMode('calendar')}
+            className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${
+              viewMode === 'calendar' ? 'bg-[#407F3E] text-white shadow-sm' : 'text-slate-600 hover:text-slate-800'
+            }`}
+          >
+            Lịch
           </button>
         </div>
+      </div>
 
-        {/* Table layout */}
-        <div className="overflow-x-auto">
-          {loading ? (
-            <div className="p-8 text-center text-slate-500 font-semibold">Đang tải danh sách sinh viên...</div>
-          ) : registrations.length === 0 ? (
-            <div className="p-8 text-center text-slate-500 font-semibold">Chưa có sinh viên nào đăng ký chuyến đi này.</div>
-          ) : (
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50 text-on-surface-variant font-bold text-xs uppercase tracking-wider border-b border-slate-100">
-                  <th className="py-4 px-6 w-1/3">Sinh viên</th>
-                  <th className="py-4 px-6 text-center w-1/3">Trạng thái điểm danh</th>
-                  <th className="py-4 px-6 w-1/3">Ghi chú chuyến đi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-sm">
-                {registrations.map((reg) => {
-                  const state = attendanceState[reg.id] || { status: 'CoMat', notes: '' };
-
-                  return (
-                    <tr key={reg.id} className="hover:bg-slate-50/50 transition-colors">
-                      {/* Student Identity */}
-                      <td className="py-4 px-6">
-                        <div>
-                          <p className="font-bold text-on-surface">{reg.sinhVien?.ho_ten}</p>
-                          <p className="text-[11px] font-mono font-bold text-on-surface-variant mt-0.5">
-                            MSSV: {reg.sinhVien?.mssv} | Lớp: {reg.sinhVien?.lop}
-                          </p>
-                        </div>
-                      </td>
-
-                      {/* Attendance Status Picker */}
-                      <td className="py-4 px-6">
-                        <div className="flex items-center justify-center gap-2 max-w-[280px] mx-auto">
-                          {/* Có mặt */}
-                          <button
-                            onClick={() => handleStatusChange(reg.id, 'CoMat')}
-                            className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
-                              state.status === 'CoMat'
-                                ? 'bg-primary border-primary text-white shadow-sm scale-105'
-                                : 'bg-white border-slate-200 text-slate-500 hover:bg-primary/5 hover:text-primary'
-                            }`}
-                          >
-                            Có mặt
-                          </button>
-
-                          {/* Vắng */}
-                          <button
-                            onClick={() => handleStatusChange(reg.id, 'Vang')}
-                            className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
-                              state.status === 'Vang'
-                                ? 'bg-red-600 border-red-600 text-white shadow-sm scale-105'
-                                : 'bg-white border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-650'
-                            }`}
-                          >
-                            Vắng
-                          </button>
-
-                          {/* Từ chối */}
-                          <button
-                            onClick={() => handleStatusChange(reg.id, 'TuChoiThamGia')}
-                            className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
-                              state.status === 'TuChoiThamGia'
-                                ? 'bg-amber-600 border-amber-600 text-white shadow-sm scale-105'
-                                : 'bg-white border-slate-200 text-slate-500 hover:bg-amber-50 hover:text-amber-600'
-                            }`}
-                          >
-                            Từ chối
-                          </button>
-                        </div>
-                      </td>
-
-                      {/* Note input field */}
-                      <td className="py-4 px-6">
-                        <input
-                          type="text"
-                          value={state.notes}
-                          onChange={(e) => handleNotesChange(reg.id, e.target.value)}
-                          placeholder="Nhập lý do vắng, đi trễ, trang phục..."
-                          className="w-full px-3 py-1.5 text-xs bg-slate-50 focus:bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-primary/50 transition-colors font-semibold"
-                        />
-                      </td>
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
+        
+        {/* Main Content: Table View */}
+        <div className="xl:col-span-3 order-2 xl:order-1">
+          {viewMode === 'list' ? (
+            <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-[#E7E0C4] text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
+                      <th className="p-4 pl-6 min-w-[200px]">Nhà máy</th>
+                      <th className="p-4 min-w-[120px]">Ngày tham quan</th>
+                      <th className="p-4 min-w-[120px]">Giờ</th>
+                      <th className="p-4 text-center min-w-[120px]">Hình thức</th>
+                      <th className="p-4 text-center min-w-[120px]">Số SV đăng ký</th>
+                      <th className="p-4 text-center min-w-[150px]">Trạng thái</th>
+                      <th className="p-4 text-right pr-6 min-w-[100px]">Hành động</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                  </thead>
+                  <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
+                    {trips.length === 0 ? (
+                      <tr>
+                        <td colSpan="7" className="p-8 text-center text-slate-500 font-medium italic">
+                          Chưa có lịch dẫn đoàn nào.
+                        </td>
+                      </tr>
+                    ) : (
+                      trips.map(trip => {
+                        const isOnline = trip.hinhThuc === 'Trực tuyến';
+                        return (
+                          <tr key={trip.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="p-4 pl-6 font-bold text-slate-800">{trip.nhaMay}</td>
+                            <td className="p-4 font-medium text-slate-600">{trip.ngayThamQuan}</td>
+                            <td className="p-4 font-medium text-slate-600">{trip.gio}</td>
+                            <td className="p-4 text-center">
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shrink-0 ${
+                                isOnline ? 'bg-slate-100 text-slate-600' : 'bg-[#89B449]/10 text-[#407F3E]'
+                              }`}>
+                                {isOnline ? <Laptop className="w-3 h-3" /> : <MapPin className="w-3 h-3" />}
+                                {trip.hinhThuc}
+                              </span>
+                            </td>
+                            <td className="p-4 text-center">
+                              <span className={`font-bold ${
+                                trip.soSvDangKy.split('/')[0] === trip.soSvDangKy.split('/')[1] 
+                                  ? 'text-[#407F3E]' 
+                                  : 'text-slate-600'
+                              }`}>
+                                {trip.soSvDangKy}
+                              </span>
+                            </td>
+                            <td className="p-4 text-center">
+                              {getStatusBadge(trip.trangThai)}
+                            </td>
+                            <td className="p-4 text-right pr-6">
+                              <button className="text-xs font-bold text-[#407F3E] hover:text-[#407F3E]/80 hover:underline transition-colors cursor-pointer inline-flex items-center gap-1">
+                                <Eye className="w-3.5 h-3.5" /> Chi tiết
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] p-12 flex flex-col items-center justify-center animate-in fade-in slide-in-from-bottom-2 duration-300 min-h-[400px]">
+              <CalendarIcon className="w-16 h-16 text-slate-300 mb-4" />
+              <p className="text-lg font-bold text-slate-700">Chế độ xem lịch lớn (Đang phát triển)</p>
+              <p className="text-sm font-medium text-slate-500 mt-2">Tính năng này sẽ cho phép kéo thả sự kiện.</p>
+            </div>
           )}
         </div>
 
-        {/* Action Save Bar */}
-        <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
-          <button
-            onClick={handleSaveAttendance}
-            disabled={loading || registrations.length === 0}
-            className="px-6 py-2.5 bg-primary hover:bg-primary-container text-white font-bold text-sm rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer disabled:bg-gray-300 disabled:cursor-not-allowed"
-          >
-            <Save className="w-4.5 h-4.5" />
-            <span>Lưu điểm danh chuyến đi</span>
-          </button>
+        {/* Right Side: Mini Calendar */}
+        <div className="xl:col-span-1 order-1 xl:order-2">
+          <div className="bg-[#E7E0C4] rounded-2xl p-6 shadow-md border-2 border-white/50 relative overflow-hidden h-fit">
+            <h2 className="text-lg font-black text-[#407F3E] mb-2">Lịch tuần này</h2>
+            <p className="text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-2 flex items-center gap-1">
+              <div className="w-1.5 h-1.5 rounded-full bg-[#DBD468]"></div> Có chuyến dẫn đoàn
+            </p>
+            
+            {renderMiniCalendar()}
+
+          </div>
         </div>
+
       </div>
     </div>
   );

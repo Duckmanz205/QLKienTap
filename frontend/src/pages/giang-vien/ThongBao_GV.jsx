@@ -1,132 +1,170 @@
-import React, { useState, useEffect } from 'react';
-import { Bell, Search, RefreshCw, MailOpen, Mail } from 'lucide-react';
-import { giangVienApi } from '../../services/api';
+import React, { useState } from 'react';
+import { 
+  Bell, FileText, CheckCircle2, AlertTriangle, 
+  Paperclip, Clock, Trash2, Check
+} from 'lucide-react';
 
 export default function ThongBao_GV() {
-  const [lecturer, setLecturer] = useState(null);
-  const [notifications, setNotifications] = useState([
+  const [activeFilter, setActiveFilter] = useState('all'); // 'all' or 'unread'
+
+  const mockNotifications = [
     {
       id: 1,
-      tieu_de: 'Phân công hội đồng chấm báo cáo kiến tập Học kỳ 1',
-      ngay_gui: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-      da_doc: false,
-      noi_dung: 'Kính gửi quý Thầy/Cô,\n\nKhoa đã hoàn thành phân công hội đồng chấm báo cáo kiến tập cho Học kỳ 1, Năm học 2025-2026. Kính mời quý Thầy/Cô truy cập phân hệ Giảng viên -> Hội đồng chấm báo cáo để kiểm tra danh sách sinh viên và nhập điểm.\n\nTrân trọng cảm ơn.'
+      type: 'warning',
+      title: 'Nhắc nhở: Sinh viên trễ hạn nộp bài',
+      preview: 'Có 3 sinh viên thuộc nhóm hướng dẫn của bạn (Nguyễn Văn An, Lê Hoàng Cường...) vẫn chưa nộp bài báo cáo thu hoạch chuyến đi Yakult HCM. Hạn chót là 12:00 ngày hôm nay.',
+      time: '10 phút trước',
+      isRead: false,
+      hasAttachment: false
     },
     {
       id: 2,
-      tieu_de: 'Thông báo hạn cuối chấm bài thu hoạch kiến tập',
-      ngay_gui: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-      da_doc: false,
-      noi_dung: 'Kính gửi quý Thầy/Cô,\n\nHạn cuối để hoàn thành việc chấm điểm bài thu hoạch kiến tập trên hệ thống là ngày 30/11/2025. Quý Thầy/Cô vui lòng đôn đốc sinh viên nộp bài đúng hạn và tiến hành chấm điểm sớm.\n\nMọi thắc mắc xin vui lòng liên hệ Văn phòng Khoa để được hỗ trợ.'
+      type: 'assignment',
+      title: 'Phân công Hội đồng chấm báo cáo TQNM',
+      preview: 'Bạn đã được phân công tham gia Hội đồng Báo cáo TQNM Nhóm 1. Thời gian: 08:00 ngày 25/09/2026. Địa điểm: B.301. Vui lòng xem quyết định đính kèm.',
+      time: '2 giờ trước',
+      isRead: false,
+      hasAttachment: true,
+      attachmentName: 'QuyetDinh_ThanhLapHoiDong.pdf'
     },
     {
       id: 3,
-      tieu_de: 'Triển khai đợt kiến tập nhà máy Acecook Việt Nam',
-      ngay_gui: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-      da_doc: true,
-      noi_dung: 'Kính gửi quý Thầy/Cô,\n\nKhoa triển khai đợt tham quan kiến tập thực tế tại Nhà máy Acecook Việt Nam cho sinh viên khóa 12. Danh sách phân công giảng viên dẫn đoàn đã được cập nhật. Kính đề nghị quý Thầy/Cô có tên trong danh sách chủ động liên hệ trưởng đoàn để chuẩn bị công tác dẫn đoàn tốt nhất.'
+      type: 'success',
+      title: 'Sinh viên đã nộp bài thu hoạch',
+      preview: 'Sinh viên Trần Thị Bình (2022220002) vừa nộp bài báo cáo thu hoạch. Vui lòng truy cập trang Sinh viên hướng dẫn để xem và chấm điểm.',
+      time: 'Hôm qua',
+      isRead: true,
+      hasAttachment: false
+    },
+    {
+      id: 4,
+      type: 'system',
+      title: 'Kế hoạch tổ chức kiến tập Học kỳ 1 - 2026',
+      preview: 'Khoa CN Thực phẩm thông báo kế hoạch tổ chức chuyến tham quan kiến tập cho học kỳ 1 năm học 2026-2027. Các GV vui lòng đăng ký lịch dẫn đoàn.',
+      time: '3 ngày trước',
+      isRead: true,
+      hasAttachment: true,
+      attachmentName: 'KeHoach_KienTap_HK1.pdf'
     }
-  ]);
-  const [activeNotif, setActiveNotif] = useState(null);
+  ];
 
-  useEffect(() => {
-    const userJson = localStorage.getItem('user');
-    if (userJson) {
-      const { user } = JSON.parse(userJson);
-      giangVienApi.getProfile(user.id).then(res => {
-        setLecturer(res.data);
-      }).catch(err => console.error(err));
+  const filteredNotifications = mockNotifications.filter(
+    n => activeFilter === 'all' || (activeFilter === 'unread' && !n.isRead)
+  );
+
+  const getIcon = (type) => {
+    switch(type) {
+      case 'warning': return <div className="w-10 h-10 rounded-full bg-[#DBD468]/20 text-[#8b8433] flex items-center justify-center shrink-0"><AlertTriangle className="w-5 h-5" /></div>;
+      case 'assignment': return <div className="w-10 h-10 rounded-full bg-[#407F3E]/10 text-[#407F3E] flex items-center justify-center shrink-0"><FileText className="w-5 h-5" /></div>;
+      case 'success': return <div className="w-10 h-10 rounded-full bg-[#89B449]/20 text-[#476d01] flex items-center justify-center shrink-0"><CheckCircle2 className="w-5 h-5" /></div>;
+      default: return <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center shrink-0"><Bell className="w-5 h-5" /></div>;
     }
-    setActiveNotif(notifications[0]);
-  }, []);
-
-  const handleRead = (item) => {
-    setActiveNotif(item);
-    setNotifications(prev => 
-      prev.map(n => n.id === item.id ? { ...n, da_doc: true } : n)
-    );
   };
 
-  if (!lecturer) return <div className="text-slate-600 font-medium">Đang tải dữ liệu...</div>;
-
   return (
-    <div className="space-y-8 animate-fade-in">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-800">Thông báo của Giảng viên</h2>
-        <p className="text-slate-500 text-sm">Xem và theo dõi các thông báo, quyết định phân công từ Khoa</p>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Notifications List */}
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4 lg:col-span-1 h-[600px] overflow-y-auto">
-          <div className="flex justify-between items-center border-b border-slate-100 pb-2">
-            <h3 className="text-sm font-bold text-slate-800">Danh sách thông báo</h3>
-            <span className="bg-red-100 text-red-650 font-bold text-[10px] px-2 py-0.5 rounded-full">
-              {notifications.filter(n => !n.da_doc).length} chưa đọc
-            </span>
-          </div>
-          
-          <div className="space-y-3">
-            {notifications.map(item => (
-              <div
-                key={item.id}
-                onClick={() => handleRead(item)}
-                className={`p-3 rounded-xl border cursor-pointer transition-all ${
-                  activeNotif?.id === item.id 
-                    ? 'border-primary bg-primary/5 shadow-sm' 
-                    : 'border-slate-100 hover:bg-slate-50'
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300">
+      
+      <div className="max-w-4xl mx-auto">
+        {/* Header & Filters */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+          <div className="flex items-center gap-4">
+            <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+              <Bell className="w-6 h-6 text-[#407F3E]" /> Thông báo
+            </h1>
+            
+            {/* Filter Pills */}
+            <div className="flex bg-[#E7E0C4]/50 p-1 rounded-lg border border-[#E7E0C4]">
+              <button 
+                onClick={() => setActiveFilter('all')}
+                className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${
+                  activeFilter === 'all' ? 'bg-[#407F3E] text-white shadow-sm' : 'text-slate-600 hover:text-slate-800'
                 }`}
               >
-                <div className="flex justify-between items-start gap-2">
-                  <div className="flex gap-2">
-                    {item.da_doc ? (
-                      <MailOpen className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                    ) : (
-                      <Mail className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                    )}
-                    <h4 className={`text-xs font-bold ${item.da_doc ? 'text-slate-600' : 'text-slate-900'}`}>
-                      {item.tieu_de}
-                    </h4>
-                  </div>
-                  {!item.da_doc && (
-                    <span className="w-2 h-2 bg-primary rounded-full shrink-0 mt-1"></span>
-                  )}
-                </div>
-                <span className="text-[10px] text-slate-400 block mt-1 pl-6">
-                  {new Date(item.ngay_gui).toLocaleDateString('vi-VN')}
-                </span>
-              </div>
-            ))}
+                Tất cả
+              </button>
+              <button 
+                onClick={() => setActiveFilter('unread')}
+                className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  activeFilter === 'unread' ? 'bg-[#407F3E] text-white shadow-sm' : 'text-slate-600 hover:text-slate-800'
+                }`}
+              >
+                Chưa đọc
+                <span className="w-4 h-4 rounded-full bg-[#DBD468] text-slate-800 text-[9px] flex items-center justify-center">2</span>
+              </button>
+            </div>
           </div>
+
+          <button className="text-xs font-bold text-slate-500 hover:text-[#407F3E] transition-colors flex items-center gap-1">
+            <Check className="w-4 h-4" /> Đánh dấu tất cả đã đọc
+          </button>
         </div>
 
-        {/* Notification Detail */}
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm lg:col-span-2 min-h-[400px]">
-          {activeNotif ? (
-            <div className="space-y-4">
-              <div className="border-b border-slate-100 pb-4 flex justify-between items-start">
-                <div>
-                  <h3 className="text-lg font-bold text-slate-800">{activeNotif.tieu_de}</h3>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Đăng lúc: {new Date(activeNotif.ngay_gui).toLocaleString('vi-VN')}
-                  </p>
-                </div>
-                <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${activeNotif.da_doc ? 'bg-slate-100 text-slate-600' : 'bg-primary/10 text-primary'}`}>
-                  {activeNotif.da_doc ? 'Đã đọc' : 'Mới'}
-                </span>
+        {/* Notifications Feed */}
+        <div className="bg-white rounded-2xl shadow-sm border border-[#E7E0C4] overflow-hidden">
+          {filteredNotifications.length === 0 ? (
+            <div className="p-12 text-center flex flex-col items-center justify-center">
+              <div className="w-16 h-16 bg-[#E7E0C4]/30 rounded-full flex items-center justify-center mb-4">
+                <Bell className="w-8 h-8 text-slate-300" />
               </div>
-              <div className="text-slate-650 text-sm whitespace-pre-line leading-relaxed">
-                {activeNotif.noi_dung}
-              </div>
+              <h3 className="text-slate-700 font-bold">Không có thông báo nào.</h3>
+              <p className="text-sm text-slate-500 mt-1">Bạn đã cập nhật tất cả thông tin mới nhất.</p>
             </div>
           ) : (
-            <div className="h-full flex flex-col items-center justify-center text-slate-400 text-sm py-20">
-              <Bell className="w-10 h-10 mb-2 text-slate-300" />
-              Chọn một thông báo ở danh sách bên trái để đọc chi tiết.
+            <div className="flex flex-col">
+              {filteredNotifications.map((notif, index) => (
+                <div 
+                  key={notif.id} 
+                  className={`p-5 flex gap-4 transition-colors hover:bg-slate-50 group ${
+                    index !== filteredNotifications.length - 1 ? 'border-b border-[#E7E0C4]/60' : ''
+                  } ${!notif.isRead ? 'bg-[#fdfcf8]' : 'opacity-70 hover:opacity-100'}`}
+                >
+                  
+                  {/* Unread Indicator & Icon */}
+                  <div className="relative shrink-0">
+                    {!notif.isRead && (
+                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#DBD468] rounded-full border-2 border-white shadow-sm z-10"></div>
+                    )}
+                    {getIcon(notif.type)}
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-col sm:flex-row justify-between items-start gap-1 mb-1">
+                      <h3 className={`text-sm truncate pr-4 ${!notif.isRead ? 'font-black text-slate-800' : 'font-bold text-slate-700'}`}>
+                        {notif.title}
+                      </h3>
+                      <span className="text-[11px] font-bold text-slate-400 whitespace-nowrap flex items-center gap-1 shrink-0">
+                        <Clock className="w-3 h-3" /> {notif.time}
+                      </span>
+                    </div>
+                    
+                    <p className={`text-xs line-clamp-2 leading-relaxed mb-3 ${!notif.isRead ? 'text-slate-600 font-medium' : 'text-slate-500'}`}>
+                      {notif.preview}
+                    </p>
+
+                    {/* Attachment Chip */}
+                    {notif.hasAttachment && (
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#E7E0C4]/30 hover:bg-[#E7E0C4] border border-[#E7E0C4] rounded-lg cursor-pointer transition-colors w-fit">
+                        <Paperclip className="w-3.5 h-3.5 text-[#407F3E]" />
+                        <span className="text-[11px] font-bold text-slate-700">{notif.attachmentName}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Actions (Hover) */}
+                  <div className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity pl-2">
+                    <button className="p-2 text-slate-300 hover:text-[#E68A8C] hover:bg-red-50 rounded-lg transition-colors cursor-pointer" title="Xóa thông báo">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                </div>
+              ))}
             </div>
           )}
         </div>
       </div>
+
     </div>
   );
 }

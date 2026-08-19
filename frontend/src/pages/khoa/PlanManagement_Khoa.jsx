@@ -1,22 +1,27 @@
 import React, { useState, useEffect } from 'react';
+import { 
+  Plus, ChevronRight, ChevronDown, Check, X
+} from 'lucide-react';
 import { khoaApi } from '../../services/api';
-import { Calendar, PlusCircle, Layers, Folder, Search, FileText } from 'lucide-react';
 
 export default function PlanManagement_Khoa() {
   const [campaigns, setCampaigns] = useState([]);
-  const [years, setYears] = useState([]);
-  const [terms, setTerms] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Form states
+  // Modal Form States
   const [campaignName, setCampaignName] = useState('');
-  const [campaignYearId, setCampaignYearId] = useState('');
-  const [campaignTermId, setCampaignTermId] = useState('');
   const [campaignBD, setCampaignBD] = useState('');
   const [campaignKT, setCampaignKT] = useState('');
+  
+  // Custom Dropdown for Năm học
+  const [selectedYear, setSelectedYear] = useState('');
+  const [isYearDropdownOpen, setIsYearDropdownOpen] = useState(false);
+  const yearOptions = ["2023-2024", "2024-2025", "2025-2026"];
 
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
+  // Custom Dropdown for Học kỳ
+  const [selectedTerm, setSelectedTerm] = useState('');
+  const [isTermDropdownOpen, setIsTermDropdownOpen] = useState(false);
+  const termOptions = ["Học kỳ 1", "Học kỳ 2", "Học kỳ hè"];
 
   useEffect(() => {
     fetchData();
@@ -24,220 +29,263 @@ export default function PlanManagement_Khoa() {
 
   const fetchData = async () => {
     try {
-      const c = await khoaApi.getCampaigns(); setCampaigns(c.data);
-      const y = await khoaApi.getYears(); setYears(y.data);
-      const t = await khoaApi.getTerms(); setTerms(t.data);
-      if (y.data.length > 0) setCampaignYearId(y.data[0].id);
-      if (t.data.length > 0) setCampaignTermId(t.data[0].id);
+      const res = await khoaApi.getCampaigns();
+      setCampaigns(res.data);
     } catch (err) {
       console.error(err);
     }
   };
 
-  const handleCreateCampaign = async (e) => {
-    e.preventDefault();
-    try {
-      setError('');
-      setMessage('');
-      await khoaApi.createCampaign({
-        ten_dot: campaignName,
-        nam_hoc_id: Number(campaignYearId),
-        hoc_ky_id: Number(campaignTermId),
-        tg_bat_dau: campaignBD,
-        tg_ket_thuc: campaignKT,
-      });
-      setMessage('Thêm đợt kiến tập thành công');
-      setCampaignName('');
-      setCampaignBD('');
-      setCampaignKT('');
-      fetchData();
-    } catch (err) {
-      console.error(err);
-      setError('Lỗi khi thêm đợt kiến tập');
+  // Status Badge Helper
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 'Nháp':
+        return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200">Nháp</span>;
+      case 'Đang triển khai':
+        return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#89B449] text-white border border-[#89B449]/20 shadow-sm">Đang triển khai</span>;
+      case 'Đã kết thúc':
+        return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#DBD468] text-slate-800 border border-[#DBD468]/20 shadow-sm">Đã kết thúc</span>;
+      case 'Đã khóa':
+        return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#407F3E] text-white border border-[#407F3E]/20 shadow-sm">Đã khóa</span>;
+      default:
+        return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200">{status}</span>;
     }
   };
 
-  const filteredCampaigns = campaigns.filter(c => 
-    c.ten_dot.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Mock data mapping to fit the columns perfectly
+  const displayData = campaigns.map(c => {
+    // Generate a mock status if none exists
+    const now = new Date();
+    const start = new Date(c.tg_bat_dau);
+    const end = new Date(c.tg_ket_thuc);
+    
+    let mockStatus = 'Nháp';
+    if (now >= start && now <= end) mockStatus = 'Đang triển khai';
+    else if (now > end) mockStatus = 'Đã kết thúc';
+
+    return {
+      id: c.id,
+      ten_dot: c.ten_dot,
+      nam_hoc: c.namHoc?.ten_nam_hoc || '2023-2024',
+      hoc_ky: c.hocKy?.ten_hoc_ky || 'Học kỳ 1',
+      tg_bat_dau: new Date(c.tg_bat_dau).toLocaleDateString('vi-VN'),
+      tg_ket_thuc: new Date(c.tg_ket_thuc).toLocaleDateString('vi-VN'),
+      trang_thai: mockStatus,
+      so_lich_con: Math.floor(Math.random() * 5) + 1 // Mock small number badge
+    };
+  });
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Calendar className="text-primary w-6 h-6" />
-            Quản lý Đợt Kiến tập
-          </h2>
-          <p className="text-slate-500 text-sm">Thiết lập và quản lý các đợt kiến tập doanh nghiệp chính thức của Khoa</p>
-        </div>
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300 relative">
+      {/* Header section */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+        <h1 className="text-2xl font-bold text-slate-800">Đợt kiến tập</h1>
+        <button 
+          onClick={() => setIsModalOpen(true)}
+          className="px-4 py-2 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors shadow-sm cursor-pointer"
+        >
+          <Plus className="w-4 h-4" />
+          Tạo đợt kiến tập
+        </button>
       </div>
 
-      {message && (
-        <div className="bg-emerald-50 border border-emerald-500/30 text-emerald-800 px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          {message}
-        </div>
-      )}
-
-      {error && (
-        <div className="bg-rose-50 border border-rose-500/30 text-rose-800 px-4 py-3 rounded-xl text-sm font-semibold">
-          {error}
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Create Campaign */}
-        <div className="bg-white p-6 rounded-2xl border border-primary/10 shadow-sm space-y-4 lg:col-span-1">
-          <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-            <PlusCircle className="text-primary w-5 h-5" />
-            <h3 className="text-sm font-bold text-slate-800">Thêm đợt kiến tập mới</h3>
-          </div>
-          <form onSubmit={handleCreateCampaign} className="space-y-4 text-xs font-semibold text-slate-700">
-            <div>
-              <label className="block mb-1">Tên đợt kiến tập</label>
-              <input
-                type="text"
-                required
-                value={campaignName}
-                onChange={e => setCampaignName(e.target.value)}
-                placeholder="Ví dụ: Đợt kiến tập hè 2026 - Khoa CNTP"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-primary font-medium"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block mb-1">Năm học</label>
-                <select
-                  value={campaignYearId}
-                  onChange={e => setCampaignYearId(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-primary font-medium"
-                >
-                  {years.map(y => (
-                    <option key={y.id} value={y.id}>{y.ten_nam_hoc}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block mb-1">Học kỳ</label>
-                <select
-                  value={campaignTermId}
-                  onChange={e => setCampaignTermId(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-primary font-medium"
-                >
-                  {terms.map(t => (
-                    <option key={t.id} value={t.id}>{t.ten_hoc_ky}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block mb-1">Ngày bắt đầu</label>
-                <input
-                  type="date"
-                  required
-                  value={campaignBD}
-                  onChange={e => setCampaignBD(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-primary font-medium"
-                />
-              </div>
-              <div>
-                <label className="block mb-1">Ngày kết thúc</label>
-                <input
-                  type="date"
-                  required
-                  value={campaignKT}
-                  onChange={e => setCampaignKT(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-primary font-medium"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full bg-primary hover:bg-[#2c6b2d] text-white py-2.5 rounded-xl font-bold transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer text-sm"
-            >
-              Tạo đợt kiến tập
-            </button>
-          </form>
-        </div>
-
-        {/* Campaign List */}
-        <div className="bg-white p-6 rounded-2xl border border-primary/10 shadow-sm lg:col-span-2 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-3">
-            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-              <Folder className="text-secondary w-5 h-5" />
-              Danh sách đợt kiến tập
-            </h3>
-            <div className="relative w-full sm:w-64">
-              <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Tìm kiếm đợt..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-4 py-1.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-primary font-semibold"
-              />
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-100 text-xs">
-              <thead>
-                <tr className="bg-[#f8faf1] text-slate-700 font-bold text-left">
-                  <th className="px-4 py-3 rounded-l-xl">Tên đợt kiến tập</th>
-                  <th className="px-4 py-3">Năm học - Học kỳ</th>
-                  <th className="px-4 py-3">Thời gian diễn ra</th>
-                  <th className="px-4 py-3 rounded-r-xl text-center">Trạng thái</th>
+      {/* Main Table */}
+      <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse min-w-[900px]">
+            <thead>
+              <tr className="bg-[#E7E0C4] text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
+                <th className="p-4 pl-6">Tên đợt</th>
+                <th className="p-4">Năm học</th>
+                <th className="p-4">Học kỳ</th>
+                <th className="p-4">Ngày bắt đầu</th>
+                <th className="p-4">Ngày kết thúc</th>
+                <th className="p-4 text-center">Trạng thái</th>
+                <th className="p-4 text-center">Số lịch con</th>
+                <th className="p-4 text-right pr-6">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
+              {displayData.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="p-8 text-center text-slate-500 font-medium">Không có đợt kiến tập nào.</td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-650 font-semibold">
-                {filteredCampaigns.map(c => {
-                  const now = new Date();
-                  const start = new Date(c.tg_bat_dau);
-                  const end = new Date(c.tg_ket_thuc);
-                  let status = 'Sắp diễn ra';
-                  let statusClass = 'bg-amber-50 text-amber-700 border-amber-200/50';
-                  if (now >= start && now <= end) {
-                    status = 'Đang diễn ra';
-                    statusClass = 'bg-emerald-50 text-emerald-700 border-emerald-250/50';
-                  } else if (now > end) {
-                    status = 'Đã hoàn thành';
-                    statusClass = 'bg-slate-100 text-slate-600 border-slate-200/50';
-                  }
-
-                  return (
-                    <tr key={c.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="px-4 py-3.5 font-bold text-slate-800">{c.ten_dot}</td>
-                      <td className="px-4 py-3.5">
-                        {c.namHoc?.ten_nam_hoc} - {c.hocKy?.ten_hoc_ky}
-                      </td>
-                      <td className="px-4 py-3.5">
-                        {new Date(c.tg_bat_dau).toLocaleDateString('vi-VN')} - {new Date(c.tg_ket_thuc).toLocaleDateString('vi-VN')}
-                      </td>
-                      <td className="px-4 py-3.5 text-center">
-                        <span className={`px-2.5 py-1 rounded-full border text-[10px] ${statusClass}`}>
-                          {status}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-                {filteredCampaigns.length === 0 && (
-                  <tr>
-                    <td colSpan="4" className="text-center py-8 text-slate-400 font-medium">
-                      Không tìm thấy đợt kiến tập nào
+              ) : (
+                displayData.map(c => (
+                  <tr key={c.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="p-4 pl-6 font-bold text-slate-800">{c.ten_dot}</td>
+                    <td className="p-4 font-medium text-slate-600">{c.nam_hoc}</td>
+                    <td className="p-4 font-medium text-slate-600">{c.hoc_ky}</td>
+                    <td className="p-4 font-medium text-slate-600">{c.tg_bat_dau}</td>
+                    <td className="p-4 font-medium text-slate-600">{c.tg_ket_thuc}</td>
+                    <td className="p-4 text-center">
+                      {getStatusBadge(c.trang_thai)}
+                    </td>
+                    <td className="p-4 text-center">
+                      <span className="inline-flex items-center justify-center w-6 h-6 rounded bg-[#E7E0C4]/50 text-slate-700 font-bold text-xs border border-[#E7E0C4]">
+                        {c.so_lich_con}
+                      </span>
+                    </td>
+                    <td className="p-4 text-right pr-6">
+                      <button 
+                        className="p-1.5 text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer" 
+                        title="Xem chi tiết"
+                      >
+                        <ChevronRight className="w-5 h-5" />
+                      </button>
                     </td>
                   </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
+
+      {/* Modal Mockup - "+ Tạo đợt kiến tập" */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Dimmed Overlay */}
+          <div 
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={() => setIsModalOpen(false)}
+          ></div>
+          
+          {/* Modal Content */}
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl relative z-10 animate-in zoom-in-95 duration-200 overflow-hidden flex flex-col">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-[#E7E0C4] flex items-center justify-between bg-slate-50/50">
+              <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <Plus className="w-5 h-5 text-[#407F3E]" />
+                Tạo đợt kiến tập
+              </h2>
+              <button 
+                onClick={() => setIsModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-5">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Tên đợt</label>
+                <input
+                  type="text"
+                  value={campaignName}
+                  onChange={(e) => setCampaignName(e.target.value)}
+                  placeholder="Đợt kiến tập - Học kỳ 1 - 2025-2026"
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-800 font-medium"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {/* Năm học custom dropdown */}
+                <div className="relative">
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Năm học</label>
+                  <div 
+                    onClick={() => { setIsYearDropdownOpen(!isYearDropdownOpen); setIsTermDropdownOpen(false); }}
+                    className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-sm flex justify-between items-center cursor-pointer transition-all ${isYearDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+                  >
+                    <span className={`font-medium ${selectedYear ? 'text-slate-800' : 'text-slate-400'}`}>
+                      {selectedYear || 'Chọn năm học'}
+                    </span>
+                    <ChevronDown className="w-4 h-4 text-slate-400" />
+                  </div>
+                  {isYearDropdownOpen && (
+                    <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1">
+                      {yearOptions.map(opt => (
+                        <div 
+                          key={opt}
+                          onClick={() => { setSelectedYear(opt); setIsYearDropdownOpen(false); }}
+                          className={`px-4 py-2.5 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                            (selectedYear === opt) 
+                              ? 'bg-[#E7E0C4] text-slate-800 font-bold' 
+                              : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                          }`}
+                        >
+                          {opt}
+                          {selectedYear === opt && <Check className="w-4 h-4 text-[#407F3E]" />}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Học kỳ custom dropdown */}
+                <div className="relative">
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Học kỳ</label>
+                  <div 
+                    onClick={() => { setIsTermDropdownOpen(!isTermDropdownOpen); setIsYearDropdownOpen(false); }}
+                    className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-sm flex justify-between items-center cursor-pointer transition-all ${isTermDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+                  >
+                    <span className={`font-medium ${selectedTerm ? 'text-slate-800' : 'text-slate-400'}`}>
+                      {selectedTerm || 'Chọn học kỳ'}
+                    </span>
+                    <ChevronDown className="w-4 h-4 text-slate-400" />
+                  </div>
+                  {isTermDropdownOpen && (
+                    <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1">
+                      {termOptions.map(opt => (
+                        <div 
+                          key={opt}
+                          onClick={() => { setSelectedTerm(opt); setIsTermDropdownOpen(false); }}
+                          className={`px-4 py-2.5 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                            (selectedTerm === opt) 
+                              ? 'bg-[#E7E0C4] text-slate-800 font-bold' 
+                              : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                          }`}
+                        >
+                          {opt}
+                          {selectedTerm === opt && <Check className="w-4 h-4 text-[#407F3E]" />}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Ngày bắt đầu</label>
+                  <input
+                    type="date"
+                    value={campaignBD}
+                    onChange={(e) => setCampaignBD(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-800 font-medium cursor-pointer"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Ngày kết thúc</label>
+                  <input
+                    type="date"
+                    value={campaignKT}
+                    onChange={(e) => setCampaignKT(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-800 font-medium cursor-pointer"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-[#E7E0C4] bg-slate-50/50 flex items-center justify-end gap-3">
+              <button 
+                onClick={() => setIsModalOpen(false)}
+                className="px-5 py-2.5 border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-bold transition-colors cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button 
+                onClick={() => setIsModalOpen(false)}
+                className="px-5 py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl text-sm font-bold transition-colors shadow-sm cursor-pointer"
+              >
+                Lưu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
