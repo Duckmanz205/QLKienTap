@@ -29,6 +29,7 @@ import DanhMuc_SinhVien_Khoa from './pages/khoa/DanhMuc_SinhVien_Khoa';
 import DanhMuc_GiangVien_Khoa from './pages/khoa/DanhMuc_GiangVien_Khoa';
 import DanhMuc_NhaMay_Khoa from './pages/khoa/DanhMuc_NhaMay_Khoa';
 import DanhMucNen_ThemMoiHocKy_Khoa from './pages/khoa/DanhMucNen_ThemMoiHocKy_Khoa';
+import LichKienTap_Khoa from './pages/khoa/LichKienTap_Khoa';
 import ChuyenThamQuan_DSLoc from './pages/khoa/ChuyenThamQuan_DSLoc';
 import HoiDongChamBaoCao_Khoa from './pages/khoa/HoiDongChamBaoCao_Khoa';
 import PlanManagement_Khoa from './pages/khoa/PlanManagement_Khoa';
@@ -112,7 +113,8 @@ export default function App() {
           {/* Khoa/Admin Portal Routes */}
           <Route element={<ProtectedRoute allowedRoles={['QuanLyKhoa', 'Khoa']} />}>
             <Route path="khoa" element={<DashBoard_Khoa />} />
-            <Route path="khoa/schedules" element={<DanhMucNen_ThemMoiHocKy_Khoa />} />
+            <Route path="khoa/danh-muc-nen" element={<DanhMucNen_ThemMoiHocKy_Khoa />} />
+            <Route path="khoa/lich-kien-tap" element={<LichKienTap_Khoa />} />
             <Route path="khoa/students" element={<DanhMuc_SinhVien_Khoa />} />
             <Route path="khoa/plans" element={<PlanManagement_Khoa />} />
             <Route path="khoa/registrations" element={<RegistrationManagement_Khoa />} />

@@ -103,6 +103,21 @@ export default function RegistrationManagement_Khoa() {
     }
   };
 
+  const handleFilterAssign = async () => {
+    if (selectedTripId === 'All') return;
+    if (!window.confirm('Bạn có chắc chắn muốn chốt danh sách cho chuyến này?\nHành động này sẽ áp dụng ưu tiên 3 tầng, tự động loại các đăng ký không hợp lệ/vượt quá số lượng, phát hành hóa đơn lệ phí và khóa danh sách.')) return;
+    try {
+      setError('');
+      setMessage('');
+      const res = await khoaApi.filterAssignStudents({ tripId: Number(selectedTripId) });
+      setMessage(res.data.message || 'Đã chốt danh sách thành công.');
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      setError(err.response?.data?.message || 'Có lỗi xảy ra khi chốt danh sách.');
+    }
+  };
+
   // Filter registrations
   const filteredRegs = registrations.filter(r => {
     const matchesPlan = selectedPlanId === 'All' || String(r.chuyenThamQuan?.lich_kien_tap_id) === selectedPlanId;
@@ -239,6 +254,21 @@ export default function RegistrationManagement_Khoa() {
               </div>
             </div>
           </div>
+
+          {selectedTripId !== 'All' && (
+            <div className="flex justify-between items-center bg-indigo-50/50 p-4 rounded-xl border border-indigo-100">
+              <span className="text-xs text-indigo-800 font-semibold">
+                Đang chọn chuyến tham quan ID: {selectedTripId}. Hãy sử dụng chức năng tự động để chốt danh sách hợp lệ dựa trên sức chứa và độ ưu tiên 3 tầng.
+              </span>
+              <button 
+                onClick={handleFilterAssign}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-xl text-xs font-bold shadow-sm transition-colors flex items-center gap-2 cursor-pointer"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                Lọc & Chốt danh sách chuyến
+              </button>
+            </div>
+          )}
 
           {/* Table */}
           <div className="overflow-x-auto">

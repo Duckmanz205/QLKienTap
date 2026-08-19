@@ -66,6 +66,17 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
   const handleRegister = async (trip) => {
     setMessage('');
     setError('');
+
+    const currentYear = new Date().getFullYear();
+    const namNhapHoc = student?.khoa?.nam_nhap_hoc || currentYear;
+    const studyYear = currentYear - namNhapHoc + (new Date().getMonth() >= 8 ? 1 : 0); // Academic year logic roughly
+    // Fallback: If strict studyYear < 2, prevent it. (We'll use a simple approximation for frontend)
+    
+    if (student?.khoa?.nam_nhap_hoc && (currentYear - student.khoa.nam_nhap_hoc) < 1) {
+       setError('Chỉ sinh viên từ năm thứ 2 trở lên mới được phép đăng ký kiến tập.');
+       return;
+    }
+
     try {
       const res = await sinhVienApi.registerTrip(trip.id);
       setMessage(res.data.message);
@@ -213,6 +224,9 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                 const isOnline = trip.hinh_thuc === 'TrucTuyen';
                 const isFull = trip.suc_chua !== null && trip.registeredCount >= trip.suc_chua;
                 const slotsRemaining = trip.suc_chua - trip.registeredCount;
+                const currentYear = new Date().getFullYear();
+                const isFirstYear = student?.khoa?.nam_nhap_hoc && (currentYear - student.khoa.nam_nhap_hoc) < 1;
+                const isDisabled = isFull || isFirstYear;
 
                 return (
                   <div 
@@ -275,16 +289,17 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                       </div>
 
                       <button
-                        disabled={isFull}
+                        disabled={isDisabled}
                         onClick={() => handleRegister(trip)}
-                        className={`w-full mt-6 py-3 font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                          isFull 
+                        className={`w-full mt-6 py-3 font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2 ${
+                          isDisabled 
                             ? 'bg-gray-150 text-outline/50 cursor-not-allowed border border-gray-200'
-                            : 'bg-primary-container text-on-primary-container hover:bg-primary shadow-sm active:scale-98'
+                            : 'bg-primary-container text-on-primary-container hover:bg-primary shadow-sm active:scale-98 cursor-pointer'
                         }`}
+                        title={isFirstYear ? 'Chỉ sinh viên từ năm 2 trở lên mới được đăng ký' : ''}
                       >
                         <Compass className="w-4.5 h-4.5" />
-                        <span>Đăng ký ngay</span>
+                        <span>{isFirstYear ? 'Không đủ điều kiện' : 'Đăng ký ngay'}</span>
                       </button>
                     </div>
                   </div>
