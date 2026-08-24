@@ -1,48 +1,65 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   GraduationCap, BookOpen, AlertCircle, CheckCircle2, XCircle
 } from 'lucide-react';
+import { sinhVienApi } from '../../services/api';
 
 export default function KetQua_Diem_SV() {
+  const [student, setStudent] = useState(null);
+  const [termGrade, setTermGrade] = useState(null);
+  const [grades, setGrades] = useState([]);
+
+  useEffect(() => {
+    const userJson = localStorage.getItem('user');
+    if (userJson) {
+      const { user } = JSON.parse(userJson);
+      sinhVienApi.getProfile(user.id).then(res => {
+        setStudent(res.data);
+        fetchGrades(res.data.id);
+      }).catch(err => console.error(err));
+    }
+  }, []);
+
+  const fetchGrades = async (svId) => {
+    try {
+      const res = await sinhVienApi.getGrades(svId);
+      if (res.data && res.data.length > 0) {
+        setTermGrade(res.data[0]);
+        const trips = res.data[0].selectedTrips || [];
+        setGrades(trips);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const calculateTripScore = (trip) => {
+    if (!trip) return 0;
+    const score = (Number(trip.diem_chuan_bi || 0) * 0.3) + 
+                  (Number(trip.diem_bai_thu_hoach || 0) * 0.3) + 
+                  (Number(trip.diem_bao_cao_tqnm || 0) * 0.4) + 
+                  Number(trip.diem_cong || 0);
+    return Math.min(10, score).toFixed(1);
+  };
+
+  let finalScore = 0;
+  if (termGrade?.diem_tong_ket !== null && termGrade?.diem_tong_ket !== undefined) {
+    finalScore = Number(termGrade.diem_tong_ket);
+  } else if (grades.length > 0) {
+    const sum = grades.reduce((acc, t) => acc + Number(calculateTripScore(t)), 0);
+    finalScore = sum / grades.length;
+  }
   
-  // Mock Data
-  const isScoreLocked = true; // Toggle this to false to see the "Đang chờ khóa điểm" state
-  const finalScore = 8.4;
+  const isScoreLocked = termGrade?.diem_tong_ket !== null && termGrade?.diem_tong_ket !== undefined;
   const isPassed = finalScore >= 5.0;
 
-  const tripGrades = [
-    {
-      id: 1,
-      nhaMay: 'Nhà máy Yakult HCM',
-      diemChuanBi: 8.0,
-      diemBaiThuHoach: 8.5,
-      diemBaoCao: 8.0,
-      diemCong: 0.5,
-    },
-    {
-      id: 2,
-      nhaMay: 'Acecook Việt Nam',
-      diemChuanBi: 9.0,
-      diemBaiThuHoach: 7.5,
-      diemBaoCao: 8.5,
-      diemCong: 0.0,
-    },
-    {
-      id: 3,
-      nhaMay: 'Vinamilk Bình Dương',
-      diemChuanBi: 8.5,
-      diemBaiThuHoach: 9.0,
-      diemBaoCao: 9.0,
-      diemCong: 1.0,
-    }
-  ];
-
-  // Logic to calculate individual trip score
-  // Assuming weights: Chuẩn bị (30%), Bài thu hoạch (30%), Báo cáo (40%) + Điểm cộng
-  const calculateTripScore = (trip) => {
-    const score = (trip.diemChuanBi * 0.3) + (trip.diemBaiThuHoach * 0.3) + (trip.diemBaoCao * 0.4) + trip.diemCong;
-    return score > 10 ? 10 : score.toFixed(1);
-  };
+  if (!student) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px] text-slate-500 font-bold">
+        Đang tải dữ liệu điểm...
+      </div>
+    );
+  }
 
   return (
     <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300">
@@ -80,9 +97,16 @@ export default function KetQua_Diem_SV() {
                 </div>
               </>
             ) : (
-              <div className="mt-4 px-5 py-2.5 rounded-full flex items-center gap-2 text-sm font-bold shadow-sm border border-[#DBD468]/30 bg-[#DBD468] text-slate-800">
-                <AlertCircle className="w-5 h-5" />
-                Đang chờ khóa điểm
+              <div className="flex items-center flex-wrap gap-4 mt-2">
+                <span className="text-6xl md:text-7xl font-black text-white leading-none tracking-tighter">
+                  {finalScore.toFixed(1)}
+                </span>
+                <span className="text-white/50 text-3xl font-black mt-4">/10</span>
+                
+                <div className="ml-4 mt-2 px-5 py-2.5 rounded-full flex items-center gap-2 text-sm font-bold shadow-sm border border-[#DBD468]/30 bg-[#DBD468] text-slate-800">
+                  <AlertCircle className="w-5 h-5" />
+                  Đang chờ khóa điểm
+                </div>
               </div>
             )}
           </div>
@@ -119,24 +143,24 @@ export default function KetQua_Diem_SV() {
               </tr>
             </thead>
             <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
-              {tripGrades.map((trip) => {
+              {grades.map((trip) => {
                 const tripScore = calculateTripScore(trip);
                 return (
                   <tr key={trip.id} className="hover:bg-slate-50 transition-colors group">
                     <td className="p-4 pl-6 font-bold text-slate-800">
-                      {trip.nhaMay}
+                      {trip.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Chưa xác định'}
                     </td>
                     <td className="p-4 text-center font-medium">
-                      {trip.diemChuanBi ? trip.diemChuanBi.toFixed(1) : '-'}
+                      {trip.diem_chuan_bi !== null && trip.diem_chuan_bi !== undefined ? Number(trip.diem_chuan_bi).toFixed(1) : '-'}
                     </td>
                     <td className="p-4 text-center font-medium">
-                      {trip.diemBaiThuHoach ? trip.diemBaiThuHoach.toFixed(1) : '-'}
+                      {trip.diem_bai_thu_hoach !== null && trip.diem_bai_thu_hoach !== undefined ? Number(trip.diem_bai_thu_hoach).toFixed(1) : '-'}
                     </td>
                     <td className="p-4 text-center font-medium">
-                      {trip.diemBaoCao ? trip.diemBaoCao.toFixed(1) : '-'}
+                      {trip.diem_bao_cao_tqnm !== null && trip.diem_bao_cao_tqnm !== undefined ? Number(trip.diem_bao_cao_tqnm).toFixed(1) : '-'}
                     </td>
                     <td className="p-4 text-center font-medium text-[#89B449]">
-                      {trip.diemCong > 0 ? `+${trip.diemCong.toFixed(1)}` : '-'}
+                      {trip.diem_cong > 0 ? `+${Number(trip.diem_cong).toFixed(1)}` : (trip.diem_cong === 0 ? '0' : '-')}
                     </td>
                     <td className="p-4 text-center pr-6 bg-slate-50 group-hover:bg-slate-100 transition-colors">
                       <span className="text-xl font-black text-[#407F3E]">
@@ -150,8 +174,8 @@ export default function KetQua_Diem_SV() {
           </table>
         </div>
 
-        {/* Empty State Fallback (Optional, shown if no trips selected yet) */}
-        {tripGrades.length === 0 && (
+        {/* Empty State Fallback */}
+        {grades.length === 0 && (
           <div className="p-10 text-center flex flex-col items-center justify-center bg-slate-50">
             <BookOpen className="w-12 h-12 text-slate-300 mb-3" />
             <p className="text-slate-500 font-bold">Chưa có dữ liệu điểm.</p>

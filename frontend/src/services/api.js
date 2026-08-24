@@ -86,6 +86,7 @@ export const sinhVienApi = {
   submitReport: (data) => api.post('/sinh-vien/submit-report', data),
   selectRepresentativeTrips: (data) => api.post('/sinh-vien/select-representative-trips', data),
   getGrades: (studentId) => api.get(`/sinh-vien/grades/${studentId}`),
+  getDashboardStats: (studentId) => api.get(`/sinh-vien/dashboard-stats/${studentId}`),
 };
 
 export const giangVienApi = {
@@ -99,21 +100,39 @@ export const giangVienApi = {
   gradeReport: (data) => api.post('/giang-vien/grade-report', data),
   getBoardSessions: (lecturerId) => api.get(`/giang-vien/board-sessions/${lecturerId}`),
   submitBoardScore: (data) => api.post('/giang-vien/submit-board-score', data),
+  getNotifications: (lecturerId) => api.get(`/giang-vien/notifications/${lecturerId}`),
+  markNotificationRead: (notifId, accountId) => api.post(`/giang-vien/notifications/${notifId}/read`, { accountId }),
+  markAllNotificationsRead: (lecturerId) => api.post(`/giang-vien/notifications/mark-all-read/${lecturerId}`),
+  getDashboardStats: (lecturerId) => api.get(`/giang-vien/dashboard-stats/${lecturerId}`),
 };
 
 export const khoaApi = {
   getYears: () => api.get('/khoa/years'),
   createYear: (data) => api.post('/khoa/years', data),
+  updateYear: (id, data) => api.put(`/khoa/years/${id}`, data),
+  deleteYear: (id) => api.delete(`/khoa/years/${id}`),
   getTerms: () => api.get('/khoa/terms'),
   createTerm: (data) => api.post('/khoa/terms', data),
+  updateTerm: (id, data) => api.put(`/khoa/terms/${id}`, data),
+  deleteTerm: (id) => api.delete(`/khoa/terms/${id}`),
   getCourses: () => api.get('/khoa/courses'),
   createCourse: (data) => api.post('/khoa/courses', data),
+  updateCourse: (id, data) => api.put(`/khoa/courses/${id}`, data),
+  deleteCourse: (id) => api.delete(`/khoa/courses/${id}`),
   getFactories: () => api.get('/khoa/factories'),
   createFactory: (data) => api.post('/khoa/factories', data),
   updateFactory: (id, data) => api.put(`/khoa/factories/${id}`, data),
   getLecturers: () => api.get('/khoa/lecturers'),
+  createLecturer: (data) => api.post('/khoa/lecturers', data),
+  updateLecturer: (id, data) => api.put(`/khoa/lecturers/${id}`, data),
+  updateLecturerBoardEligibility: (id, duDkHoiDong) => api.patch(`/khoa/lecturers/${id}/board-eligibility`, { du_dk_hoi_dong: duDkHoiDong }),
   getStudents: (params) => api.get('/khoa/students', { params }),
   createStudent: (data) => api.post('/khoa/students', data),
+  updateStudent: (id, data) => api.put(`/khoa/students/${id}`, data),
+  deleteStudent: (id) => api.delete(`/khoa/students/${id}`),
+  getAccounts: (params) => api.get('/khoa/accounts', { params }),
+  toggleAccountLock: (id) => api.post(`/khoa/accounts/${id}/toggle-lock`),
+  resetAccountPassword: (id) => api.post(`/khoa/accounts/${id}/reset-password`),
   getCampaigns: () => api.get('/khoa/campaigns'),
   createCampaign: (data) => api.post('/khoa/campaigns', data),
   getSchedules: () => api.get('/khoa/schedules'),
@@ -138,6 +157,9 @@ export const khoaApi = {
   createNotification: (data) => api.post('/khoa/notifications', data),
   getRetakeReport: () => api.get('/khoa/retake-students-report'),
   getFinalResultsReport: (lichKienTapId) => api.get(`/khoa/final-results-report/${lichKienTapId}`),
+  getVisitedStudentsReport: (params) => api.get('/khoa/report/visited-students', { params }),
+  getNotVisitedStudentsReport: (params) => api.get('/khoa/report/not-visited-students', { params }),
+  getEligibleStudentsReport: (params) => api.get('/khoa/report/eligible-students', { params }),
 };
 
 export default api;

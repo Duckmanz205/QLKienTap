@@ -6,10 +6,23 @@ import { khoaApi } from '../../services/api';
 
 export default function LichKienTap_Khoa() {
   const [schedules, setSchedules] = useState([]);
+  const [campaigns, setCampaigns] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // Detail Modal States
+  const [viewingDetail, setViewingDetail] = useState(null);
+  const [enrollments, setEnrollments] = useState([]);
+  const [isLoadingEnrollments, setIsLoadingEnrollments] = useState(false);
+
+  // Import Modal States
+  const [importingLich, setImportingLich] = useState(null);
+  const [allStudents, setAllStudents] = useState([]);
+  const [selectedStudentIds, setSelectedStudentIds] = useState([]);
+  const [isLoadingStudents, setIsLoadingStudents] = useState(false);
+  const [studentSearchTerm, setStudentSearchTerm] = useState('');
+
   // Filter States
-  const [filterDot, setFilterDot] = useState('Tất cả đợt');
+  const [filterDot, setFilterDot] = useState('');
   const [isDotDropdownOpen, setIsDotDropdownOpen] = useState(false);
 
   useEffect(() => {
@@ -18,14 +31,72 @@ export default function LichKienTap_Khoa() {
 
   const fetchData = async () => {
     try {
-      const res = await khoaApi.getSchedules();
-      setSchedules(res.data);
+      const [schRes, campRes] = await Promise.all([
+        khoaApi.getSchedules(),
+        khoaApi.getCampaigns()
+      ]);
+      setSchedules(schRes.data);
+      setCampaigns(campRes.data);
     } catch (err) {
       console.error(err);
     }
   };
 
-  const dotOptions = ["Tất cả đợt", "Đợt kiến tập - Học kỳ 1 - 2025-2026", "Đợt kiến tập - Học kỳ 2 - 2024-2025"];
+  const handleViewDetail = async (schedule) => {
+    setViewingDetail(schedule);
+    setIsLoadingEnrollments(true);
+    try {
+      const res = await khoaApi.getEnrollments({ lichKienTapId: schedule.id, limit: 1000 });
+      setEnrollments(res.data?.data || res.data || []);
+    } catch (err) {
+      console.error(err);
+      setEnrollments([]);
+    } finally {
+      setIsLoadingEnrollments(false);
+    }
+  };
+
+  const handleOpenImport = async (schedule) => {
+    setImportingLich(schedule);
+    setIsLoadingStudents(true);
+    setSelectedStudentIds([]);
+    setStudentSearchTerm('');
+    try {
+      const res = await khoaApi.getStudents({ limit: 1000 });
+      setAllStudents(res.data?.data || res.data || []);
+    } catch (err) {
+      console.error(err);
+      setAllStudents([]);
+    } finally {
+      setIsLoadingStudents(false);
+    }
+  };
+
+  const handleImportSubmit = async () => {
+    if (selectedStudentIds.length === 0) {
+      alert("Vui lòng chọn ít nhất 1 sinh viên");
+      return;
+    }
+    try {
+      await khoaApi.importStudents({
+        lichId: importingLich.id,
+        studentIds: selectedStudentIds
+      });
+      await fetchData();
+      alert("Tải danh sách SV thành công");
+      setImportingLich(null);
+      setSelectedStudentIds([]);
+    } catch (err) {
+      console.error(err);
+      alert("Lỗi tải danh sách SV");
+    }
+  };
+  
+  const filteredStudents = allStudents.filter(st => {
+    if (!studentSearchTerm) return true;
+    const term = studentSearchTerm.toLowerCase();
+    return st.mssv?.toLowerCase().includes(term) || st.ho_ten?.toLowerCase().includes(term);
+  });
 
   // Status Badge Helper
   const getStatusBadge = (status) => {
@@ -45,10 +116,15 @@ export default function LichKienTap_Khoa() {
     }
   };
 
-  // Mock data mapping to fit the columns perfectly
-  const displayData = schedules.map((s, index) => {
+  const filteredSchedules = schedules.filter(s => {
+    if (filterDot && s.dot_kien_tap_id !== filterDot) return false;
+    return true;
+  });
+
+  const displayData = filteredSchedules.map((s, index) => {
     const statuses = ['Nháp', 'Mở đăng ký', 'Đang diễn ra', 'Đã kết thúc', 'Đã khóa'];
-    const mockStatus = statuses[index % statuses.length];
+    // In real app, calculate status based on dates. Here we mock if status is null.
+    const mockStatus = s.trang_thai || statuses[index % statuses.length];
 
     return {
       id: s.id,
@@ -84,23 +160,34 @@ export default function LichKienTap_Khoa() {
             onClick={() => setIsDotDropdownOpen(!isDotDropdownOpen)}
             className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-sm flex justify-between items-center cursor-pointer transition-all ${isDotDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
           >
-            <span className="text-slate-700 font-medium truncate pr-2">{filterDot}</span>
+            <span className="text-slate-700 font-medium truncate pr-2">
+              {filterDot ? campaigns.find(c => c.id === filterDot)?.ten_dot : 'Tất cả đợt'}
+            </span>
             <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
           </div>
           {isDotDropdownOpen && (
-            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1">
-              {dotOptions.map(opt => (
+            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 max-h-60 overflow-y-auto animate-in slide-in-from-top-1">
+              <div 
+                onClick={() => { setFilterDot(''); setIsDotDropdownOpen(false); }}
+                className={`px-4 py-2.5 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                  !filterDot ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                }`}
+              >
+                <span className="truncate pr-2">Tất cả đợt</span>
+                {!filterDot && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+              </div>
+              {campaigns.map(opt => (
                 <div 
-                  key={opt}
-                  onClick={() => { setFilterDot(opt); setIsDotDropdownOpen(false); }}
+                  key={opt.id}
+                  onClick={() => { setFilterDot(opt.id); setIsDotDropdownOpen(false); }}
                   className={`px-4 py-2.5 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                    (filterDot === opt) 
+                    (filterDot === opt.id) 
                       ? 'bg-[#E7E0C4] text-slate-800 font-bold' 
                       : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
                   }`}
                 >
-                  <span className="truncate pr-2">{opt}</span>
-                  {filterDot === opt && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                  <span className="truncate pr-2">{opt.ten_dot}</span>
+                  {filterDot === opt.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
                 </div>
               ))}
             </div>
@@ -146,12 +233,14 @@ export default function LichKienTap_Khoa() {
                         <button 
                           className="p-1.5 text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer" 
                           title="Tải danh sách SV"
+                          onClick={() => handleOpenImport(s)}
                         >
                           <Upload className="w-4 h-4" />
                         </button>
                         <button 
                           className="p-1.5 text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer" 
                           title="Xem chi tiết"
+                          onClick={() => handleViewDetail(s)}
                         >
                           <ChevronRight className="w-5 h-5" />
                         </button>
@@ -299,6 +388,189 @@ export default function LichKienTap_Khoa() {
                 Tiếp tục
                 <ChevronRight className="w-4 h-4" />
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Detail Modal */}
+      {viewingDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div 
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={(e) => { e.stopPropagation(); setViewingDetail(null); }}
+          ></div>
+          <div 
+            className="bg-white w-full max-w-4xl rounded-2xl shadow-xl relative z-10 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 py-4 border-b border-[#E7E0C4] flex items-center justify-between">
+              <h2 className="text-xl font-bold text-slate-800">
+                Danh sách sinh viên - {viewingDetail.ten_lich}
+              </h2>
+              <button 
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setViewingDetail(null); }}
+                className="p-1.5 text-slate-400 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto flex-1 bg-slate-50">
+              {isLoadingEnrollments ? (
+                <div className="text-center py-8 text-slate-500 font-medium">Đang tải dữ liệu...</div>
+              ) : enrollments.length === 0 ? (
+                <div className="text-center py-8 text-slate-500 font-medium">Chưa có sinh viên nào trong lịch này.</div>
+              ) : (
+                <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-hidden">
+                  <table className="w-full text-left border-collapse min-w-[600px]">
+                    <thead>
+                      <tr className="bg-[#E7E0C4] text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
+                        <th className="p-4 pl-6">MSSV</th>
+                        <th className="p-4">Họ và tên</th>
+                        <th className="p-4">Lớp</th>
+                        <th className="p-4">Ngành</th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
+                      {enrollments.map((en, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                          <td className="p-4 pl-6 font-bold text-[#407F3E]">{en.sinhVien?.mssv}</td>
+                          <td className="p-4 font-bold text-slate-800">{en.sinhVien?.ho_ten}</td>
+                          <td className="p-4 font-medium text-slate-600">{en.sinhVien?.lop}</td>
+                          <td className="p-4 font-medium text-slate-600">{en.sinhVien?.nganh}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import Students Modal */}
+      {importingLich && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div 
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={(e) => { e.stopPropagation(); setImportingLich(null); }}
+          ></div>
+          <div 
+            className="bg-white w-full max-w-4xl rounded-2xl shadow-xl relative z-10 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 py-4 border-b border-[#E7E0C4] flex items-center justify-between">
+              <h2 className="text-xl font-bold text-slate-800">
+                Tải danh sách SV - {importingLich.ten_lich}
+              </h2>
+              <button 
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setImportingLich(null); }}
+                className="p-1.5 text-slate-400 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-6 flex-1 flex flex-col overflow-hidden bg-slate-50">
+              <div className="mb-4">
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm MSSV, Họ tên..."
+                  value={studentSearchTerm}
+                  onChange={e => setStudentSearchTerm(e.target.value)}
+                  className="w-full px-4 py-2 bg-white border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E]"
+                />
+              </div>
+
+              <div className="flex-1 overflow-y-auto bg-white rounded-xl shadow-sm border border-[#E7E0C4]">
+                {isLoadingStudents ? (
+                  <div className="text-center py-8 text-slate-500 font-medium">Đang tải dữ liệu...</div>
+                ) : filteredStudents.length === 0 ? (
+                  <div className="text-center py-8 text-slate-500 font-medium">Không tìm thấy sinh viên nào.</div>
+                ) : (
+                  <table className="w-full text-left border-collapse min-w-[600px]">
+                    <thead className="sticky top-0 bg-[#E7E0C4] z-10 shadow-sm">
+                      <tr className="text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
+                        <th className="p-4 pl-6 w-12 text-center">
+                          <input 
+                            type="checkbox" 
+                            className="w-4 h-4 text-[#407F3E] rounded border-slate-300 focus:ring-[#407F3E]"
+                            checked={filteredStudents.length > 0 && selectedStudentIds.length === filteredStudents.length}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedStudentIds(filteredStudents.map(s => s.id));
+                              } else {
+                                setSelectedStudentIds([]);
+                              }
+                            }}
+                          />
+                        </th>
+                        <th className="p-4">MSSV</th>
+                        <th className="p-4">Họ và tên</th>
+                        <th className="p-4">Lớp</th>
+                        <th className="p-4">Ngành</th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
+                      {filteredStudents.map((st) => {
+                        const isChecked = selectedStudentIds.includes(st.id);
+                        return (
+                          <tr 
+                            key={st.id} 
+                            className="hover:bg-slate-50 transition-colors cursor-pointer"
+                            onClick={() => {
+                              if (isChecked) {
+                                setSelectedStudentIds(selectedStudentIds.filter(id => id !== st.id));
+                              } else {
+                                setSelectedStudentIds([...selectedStudentIds, st.id]);
+                              }
+                            }}
+                          >
+                            <td className="p-4 pl-6 text-center">
+                              <input 
+                                type="checkbox" 
+                                className="w-4 h-4 text-[#407F3E] rounded border-slate-300 focus:ring-[#407F3E]"
+                                checked={isChecked}
+                                readOnly
+                              />
+                            </td>
+                            <td className="p-4 font-bold text-[#407F3E]">{st.mssv}</td>
+                            <td className="p-4 font-bold text-slate-800">{st.ho_ten}</td>
+                            <td className="p-4 font-medium text-slate-600">{st.lop}</td>
+                            <td className="p-4 font-medium text-slate-600">{st.nganh}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-[#E7E0C4] bg-slate-50/50 flex items-center justify-between rounded-b-2xl">
+              <div className="text-sm font-bold text-[#407F3E]">
+                Đã chọn: {selectedStudentIds.length} sinh viên
+              </div>
+              <div className="flex gap-3">
+                <button 
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setImportingLich(null); }}
+                  className="px-5 py-2.5 border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-bold transition-colors cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button 
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); handleImportSubmit(); }}
+                  className="px-6 py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl text-sm font-bold transition-colors shadow-sm cursor-pointer"
+                >
+                  Xác nhận tải
+                </button>
+              </div>
             </div>
           </div>
         </div>

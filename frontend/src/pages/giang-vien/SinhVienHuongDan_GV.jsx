@@ -1,79 +1,90 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Search, ChevronDown, Check, Eye, Edit3, X, FileText
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { giangVienApi } from '../../services/api';
 
 export default function SinhVienHuongDan_GV() {
   const navigate = useNavigate();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Mock Data
+  const [lecturer, setLecturer] = useState(null);
+  const [students, setStudents] = useState([]);
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  // Semesters/Schedules (Mock for now, or extracted from students)
   const semesters = [
-    { id: 1, name: 'Học kỳ 1 - 2026-2027 (Đang diễn ra)' },
-    { id: 2, name: 'Học kỳ 2 - 2025-2026' }
+    { id: 'all', name: 'Tất cả sinh viên' }
   ];
   const [selectedSemester, setSelectedSemester] = useState(semesters[0]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedStudent, setSelectedStudent] = useState(null);
 
-  const students = [
-    { 
-      id: 101, 
-      mssv: '2022220001', 
-      name: 'Nguyễn Văn An', 
-      lop: '12DHTH01',
-      soChuyenHT: 3, 
-      soChuyenYC: 3, 
-      baiChoCham: 0,
-      avatar: 'https://ui-avatars.com/api/?name=Nguyen+Van+An&background=f1f5f9&color=475569' 
-    },
-    { 
-      id: 102, 
-      mssv: '2022220002', 
-      name: 'Trần Thị Bình', 
-      lop: '12DHTH02',
-      soChuyenHT: 2, 
-      soChuyenYC: 3, 
-      baiChoCham: 2,
-      avatar: 'https://ui-avatars.com/api/?name=Tran+Thi+Binh&background=f1f5f9&color=475569' 
-    },
-    { 
-      id: 103, 
-      mssv: '2022220003', 
-      name: 'Lê Hoàng Cường', 
-      lop: '12DHTH01',
-      soChuyenHT: 3, 
-      soChuyenYC: 3, 
-      baiChoCham: 1,
-      avatar: 'https://ui-avatars.com/api/?name=Le+Hoang+Cuong&background=f1f5f9&color=475569' 
-    },
-    { 
-      id: 104, 
-      mssv: '2022220004', 
-      name: 'Phạm Duy Khang', 
-      lop: '12DHTH03',
-      soChuyenHT: 1, 
-      soChuyenYC: 3, 
-      baiChoCham: 0,
-      avatar: 'https://ui-avatars.com/api/?name=Pham+Duy+Khang&background=f1f5f9&color=475569' 
-    },
-    { 
-      id: 105, 
-      mssv: '2022220005', 
-      name: 'Vũ Quốc Huy', 
-      lop: '12DHTH02',
-      soChuyenHT: 3, 
-      soChuyenYC: 3, 
-      baiChoCham: 3,
-      avatar: 'https://ui-avatars.com/api/?name=Vu+Quoc+Huy&background=f1f5f9&color=475569' 
+  useEffect(() => {
+    const userJson = localStorage.getItem('user');
+    if (userJson) {
+      const { user } = JSON.parse(userJson);
+      giangVienApi.getProfile(user.id).then(res => {
+        setLecturer(res.data);
+        fetchData(res.data.id);
+      }).catch(err => console.error(err));
     }
-  ];
+  }, []);
+
+  const fetchData = async (gvId) => {
+    try {
+      setLoading(true);
+      const [studentsRes, reportsRes] = await Promise.all([
+        giangVienApi.getGuidedStudents(gvId),
+        giangVienApi.getGuidedReports(gvId, { limit: 1000 })
+      ]);
+      
+      const stData = studentsRes.data || [];
+      const rpData = reportsRes.data?.data || reportsRes.data || [];
+      
+      setReports(rpData);
+      
+      // Map to UI model
+      const mappedStudents = stData.map(st => {
+        const sv = st.sinhVien || {};
+        
+        // Find reports for this student
+        const studentReports = rpData.filter(r => r.phieuDangKy?.sinhVien?.id === sv.id);
+        const pendingReports = studentReports.filter(r => r.diem_bai_thu_hoach === null);
+        
+        return {
+          id: st.id,
+          mssv: sv.mssv,
+          name: sv.ho_ten,
+          lop: sv.lop || '--',
+          soChuyenHT: studentReports.length, 
+          soChuyenYC: 3, 
+          baiChoCham: pendingReports.length,
+          avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(sv.ho_ten || 'SV')}&background=f1f5f9&color=475569`,
+          rawSv: sv
+        };
+      });
+      
+      // Deduplicate by student ID in case a student is assigned multiple times
+      const uniqueStudentsMap = new Map();
+      mappedStudents.forEach(st => {
+        if (!uniqueStudentsMap.has(st.mssv)) {
+          uniqueStudentsMap.set(st.mssv, st);
+        }
+      });
+      
+      setStudents(Array.from(uniqueStudentsMap.values()));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredStudents = students.filter(s => 
-    s.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    s.mssv.includes(searchQuery)
+    (s.name && s.name.toLowerCase().includes(searchQuery.toLowerCase())) || 
+    (s.mssv && s.mssv.includes(searchQuery))
   );
 
   return (
@@ -137,13 +148,19 @@ export default function SinhVienHuongDan_GV() {
                 <th className="p-4 min-w-[120px]">MSSV</th>
                 <th className="p-4 min-w-[200px]">Họ tên</th>
                 <th className="p-4 min-w-[120px]">Lớp</th>
-                <th className="p-4 text-center min-w-[160px]">Số chuyến hoàn thành</th>
+                <th className="p-4 text-center min-w-[160px]">Số chuyến đã đi</th>
                 <th className="p-4 text-center min-w-[200px]">Bài thu hoạch chờ chấm</th>
                 <th className="p-4 pr-6 text-right min-w-[150px]">Hành động</th>
               </tr>
             </thead>
             <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
-              {filteredStudents.length === 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan="7" className="p-8 text-center text-slate-500 font-medium italic">
+                    Đang tải dữ liệu...
+                  </td>
+                </tr>
+              ) : filteredStudents.length === 0 ? (
                 <tr>
                   <td colSpan="7" className="p-8 text-center text-slate-500 font-medium italic">
                     Không tìm thấy sinh viên nào.
@@ -151,7 +168,6 @@ export default function SinhVienHuongDan_GV() {
                 </tr>
               ) : (
                 filteredStudents.map(student => {
-                  const isTripsDone = student.soChuyenHT >= student.soChuyenYC;
                   const hasPendingReports = student.baiChoCham > 0;
 
                   return (
@@ -170,11 +186,11 @@ export default function SinhVienHuongDan_GV() {
                       {/* Số chuyến hoàn thành */}
                       <td className="p-4 text-center">
                         <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-bold shadow-sm border ${
-                          isTripsDone 
+                          student.soChuyenHT > 0 
                             ? 'bg-[#89B449] text-white border-[#89B449]/20' 
                             : 'bg-[#DBD468] text-slate-800 border-[#DBD468]/20'
                         }`}>
-                          {student.soChuyenHT} / {student.soChuyenYC}
+                          {student.soChuyenHT}
                         </span>
                       </td>
 

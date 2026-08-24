@@ -162,4 +162,24 @@ export class GiangVienController {
       body.score,
     );
   }
+
+  @Get('notifications/:lecturerId')
+  async getNotifications(@Param('lecturerId') lecturerId: number) {
+    return this.gvService.getNotifications(+lecturerId);
+  }
+
+  @Post('notifications/:notifId/read')
+  async markNotificationRead(@Param('notifId') notifId: number, @Body('accountId') accountId: number) {
+    return this.gvService.markNotificationRead(accountId, +notifId);
+  }
+
+  @Post('notifications/mark-all-read/:lecturerId')
+  async markAllNotificationsRead(@Param('lecturerId') lecturerId: number) {
+    return this.gvService.markAllNotificationsRead(+lecturerId);
+  }
+
+  @Get('dashboard-stats/:lecturerId')
+  async getDashboardStats(@Param('lecturerId') lecturerId: number) {
+    return this.gvService.getDashboardStats(+lecturerId);
+  }
 }

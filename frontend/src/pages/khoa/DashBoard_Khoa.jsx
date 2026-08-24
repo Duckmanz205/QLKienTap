@@ -280,7 +280,7 @@ export default function DashBoard_Khoa() {
           <div className="mt-8 pt-4 border-t border-[#E7E0C4] space-y-3">
             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Thao tác nhanh</h4>
             <button 
-              onClick={() => navigate('/khoa/schedules')}
+              onClick={() => navigate('/khoa/lich-kien-tap')}
               className="w-full flex items-center justify-between p-3 rounded-xl bg-[#407F3E]/5 hover:bg-[#407F3E]/10 text-[#407F3E] text-xs font-bold transition-all"
             >
               <span>Tạo lịch kiến tập lớp mới</span>

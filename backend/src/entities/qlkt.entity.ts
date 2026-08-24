@@ -50,6 +50,9 @@ export class Khoa {
   @PrimaryGeneratedColumn()
   id: number;
 
+  @Column({ unique: true, nullable: true })
+  ma_khoa: string;
+
   @Column({ unique: true })
   ten_khoa: string;
 
@@ -513,6 +516,9 @@ export class PhieuDangKy {
 
   @OneToOne(() => HoaDonLePhi, (h) => h.phieuDangKy)
   hoaDon: any;
+
+  @OneToOne(() => DiemDanh, (d) => d.phieuDangKy)
+  diemDanh: any;
 }
 
 @Entity('YeuCauHuyDangKy')

@@ -1,50 +1,38 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   CreditCard, Copy, CheckCircle2, Eye
 } from 'lucide-react';
+import { sinhVienApi } from '../../services/api';
 
 export default function ThanhToan_SV() {
   const navigate = useNavigate();
   const activeTab = 'thanhToan';
 
   const [copiedId, setCopiedId] = useState(null);
+  const [student, setStudent] = useState(null);
+  const [invoices, setInvoices] = useState([]);
+  const [viewingPayment, setViewingPayment] = useState(null);
 
-  // Mock Data
-  const payments = [
-    {
-      id: 1,
-      chuyenThamQuan: 'Nhà máy Yakult HCM',
-      soTien: '150.000 VNĐ',
-      noiDungCK: 'MSSV123456 YAKULT',
-      hanDong: '17/09/2026',
-      trangThai: 'Chưa đóng'
-    },
-    {
-      id: 2,
-      chuyenThamQuan: 'Vinamilk Bình Dương',
-      soTien: '200.000 VNĐ',
-      noiDungCK: 'MSSV123456 VINAMILK',
-      hanDong: '15/08/2026',
-      trangThai: 'Đã đóng đúng hạn'
-    },
-    {
-      id: 3,
-      chuyenThamQuan: 'Acecook Việt Nam',
-      soTien: '150.000 VNĐ',
-      noiDungCK: 'MSSV123456 ACECOOK',
-      hanDong: '01/08/2026',
-      trangThai: 'Vi phạm'
-    },
-    {
-      id: 4,
-      chuyenThamQuan: 'KIDO Group',
-      soTien: '150.000 VNĐ',
-      noiDungCK: 'MSSV123456 KIDO',
-      hanDong: '10/07/2026',
-      trangThai: 'Đã hoàn phí'
+  useEffect(() => {
+    const userJson = localStorage.getItem('user');
+    if (userJson) {
+      const { user } = JSON.parse(userJson);
+      sinhVienApi.getProfile(user.id).then(res => {
+        setStudent(res.data);
+        fetchInvoices(res.data.id);
+      }).catch(err => console.error(err));
     }
-  ];
+  }, []);
+
+  const fetchInvoices = async (svId) => {
+    try {
+      const res = await sinhVienApi.getInvoices(svId);
+      setInvoices(res.data || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const handleCopy = (text, id) => {
     navigator.clipboard.writeText(text);
@@ -52,18 +40,31 @@ export default function ThanhToan_SV() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const getStatusBadge = (status) => {
+  const getStatusText = (status) => {
+    switch (status) {
+      case 'ChuaDong': return 'Chưa đóng';
+      case 'DaDongDungHan': return 'Đã đóng đúng hạn';
+      case 'DaDongTreHan': return 'Đã đóng trễ hạn';
+      case 'ViPham': return 'Vi phạm';
+      case 'DaHoanPhi': return 'Đã hoàn phí';
+      default: return status;
+    }
+  };
+
+  const getStatusBadge = (statusStr) => {
+    const status = getStatusText(statusStr);
     switch (status) {
       case 'Chưa đóng':
         return <span className="inline-flex items-center px-3 py-1 whitespace-nowrap rounded-full text-[11px] font-bold bg-[#DBD468] text-slate-800 shadow-sm border border-[#DBD468]/20">{status}</span>;
       case 'Đã đóng đúng hạn':
+      case 'Đã đóng trễ hạn':
         return <span className="inline-flex items-center px-3 py-1 whitespace-nowrap rounded-full text-[11px] font-bold bg-[#89B449] text-white shadow-sm border border-[#89B449]/20">{status}</span>;
       case 'Vi phạm':
         return <span className="inline-flex items-center px-3 py-1 whitespace-nowrap rounded-full text-[11px] font-bold bg-[#E68A8C] text-white shadow-sm border border-[#E68A8C]/20">{status}</span>;
       case 'Đã hoàn phí':
         return <span className="inline-flex items-center px-3 py-1 whitespace-nowrap rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200">{status}</span>;
       default:
-        return null;
+        return <span className="inline-flex items-center px-3 py-1 whitespace-nowrap rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200">{status}</span>;
     }
   };
 
@@ -122,39 +123,97 @@ export default function ThanhToan_SV() {
               </tr>
             </thead>
             <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
-              {payments.map(payment => (
-                <tr key={payment.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="p-4 pl-6 font-bold text-slate-800">{payment.chuyenThamQuan}</td>
-                  <td className="p-4 font-bold text-[#407F3E]">{payment.soTien}</td>
-                  <td className="p-4">
-                    <div 
-                      onClick={() => handleCopy(payment.noiDungCK, payment.id)}
-                      className="inline-flex items-center gap-2 bg-[#E7E0C4]/50 hover:bg-[#E7E0C4] px-3 py-1.5 rounded-lg border border-[#E7E0C4] cursor-pointer transition-colors group relative"
-                    >
-                      <span className="font-mono font-bold text-xs text-slate-700 tracking-wider select-all">{payment.noiDungCK}</span>
-                      {copiedId === payment.id ? (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-[#407F3E]" />
-                      ) : (
-                        <Copy className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 transition-colors" />
-                      )}
-                    </div>
-                  </td>
-                  <td className="p-4 font-medium text-slate-600">{payment.hanDong}</td>
-                  <td className="p-4 text-center">
-                    {getStatusBadge(payment.trangThai)}
-                  </td>
-                  <td className="p-4 text-right pr-6">
-                    <button className="text-xs font-bold text-[#407F3E] hover:text-[#407F3E]/80 hover:underline transition-colors cursor-pointer inline-flex items-center gap-1">
-                      <Eye className="w-3.5 h-3.5" /> Xem chi tiết
-                    </button>
-                  </td>
+              {invoices.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="p-8 text-center text-slate-500 font-medium">Chưa có hóa đơn thanh toán nào.</td>
                 </tr>
-              ))}
+              ) : (
+                invoices.map(payment => (
+                  <tr key={payment.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="p-4 pl-6 font-bold text-slate-800">
+                      {payment.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Chưa xác định'}
+                    </td>
+                    <td className="p-4 font-bold text-[#407F3E]">
+                      {Number(payment.so_tien).toLocaleString('vi-VN')} VNĐ
+                    </td>
+                    <td className="p-4">
+                      {payment.noi_dung_chuyen_khoan ? (
+                        <div 
+                          onClick={() => handleCopy(payment.noi_dung_chuyen_khoan, payment.id)}
+                          className="inline-flex items-center gap-2 bg-[#E7E0C4]/50 hover:bg-[#E7E0C4] px-3 py-1.5 rounded-lg border border-[#E7E0C4] cursor-pointer transition-colors group relative"
+                        >
+                          <span className="font-mono font-bold text-xs text-slate-700 tracking-wider select-all">{payment.noi_dung_chuyen_khoan}</span>
+                          {copiedId === payment.id ? (
+                            <CheckCircle2 className="w-3.5 h-3.5 text-[#407F3E]" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 transition-colors" />
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 italic font-medium">Chưa có</span>
+                      )}
+                    </td>
+                    <td className="p-4 font-medium text-slate-600">
+                      {payment.han_dong_tien ? new Date(payment.han_dong_tien).toLocaleDateString('vi-VN') : '--'}
+                    </td>
+                    <td className="p-4 text-center">
+                      {getStatusBadge(payment.trang_thai)}
+                    </td>
+                    <td className="p-4 text-right pr-6">
+                      <button 
+                        onClick={() => setViewingPayment(payment)}
+                        className="text-xs font-bold text-[#407F3E] hover:text-[#407F3E]/80 hover:underline transition-colors cursor-pointer inline-flex items-center gap-1"
+                      >
+                        <Eye className="w-3.5 h-3.5" /> Xem chi tiết
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
       </div>
 
+      {/* Modal Xem chi tiết */}
+      {viewingPayment && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-[#E7E0C4] flex items-center justify-between bg-[#E7E0C4]/20">
+              <h2 className="text-lg font-bold text-slate-800">Chi tiết hóa đơn</h2>
+              <button 
+                onClick={() => setViewingPayment(null)}
+                className="text-slate-400 hover:text-slate-600 transition-colors p-1 cursor-pointer"
+              >
+                <span className="font-bold text-xl leading-none">&times;</span>
+              </button>
+            </div>
+            
+            <div className="p-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
+              <div className="space-y-4">
+                {Object.entries(viewingPayment).map(([key, value]) => {
+                  if (typeof value === 'object' && value !== null) return null;
+                  return (
+                    <div key={key} className="flex flex-col border-b border-slate-100 pb-3 last:border-0 last:pb-0">
+                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">{key}</span>
+                      <span className="text-sm font-medium text-slate-800 break-words">{String(value)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            
+            <div className="px-6 py-4 bg-slate-50 border-t border-[#E7E0C4] flex justify-end">
+              <button 
+                onClick={() => setViewingPayment(null)}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg font-bold text-sm transition-colors cursor-pointer"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

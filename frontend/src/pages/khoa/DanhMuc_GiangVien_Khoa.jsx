@@ -1,12 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Upload, Plus, Search, ChevronDown, Check,
-  Edit2, Key, Trash2
+  Edit2, Key, Trash2, X, CloudUpload
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { khoaApi } from '../../services/api';
 
 export default function DanhMuc_GiangVien_Khoa() {
   const [lecturers, setLecturers] = useState([]);
+  const [editingLecturer, setEditingLecturer] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // Import States
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importData, setImportData] = useState([]);
+  const [isImporting, setIsImporting] = useState(false);
+
+  // Form states
+  const [formData, setFormData] = useState({
+    ma_gv: '',
+    ho_ten: '',
+    email: '',
+    sdt: '',
+    so_sv_toi_da_huong_dan: ''
+  });
   
   // Filter States
   const [searchTerm, setSearchTerm] = useState('');
@@ -50,11 +67,125 @@ export default function DanhMuc_GiangVien_Khoa() {
   const paginatedLecturers = filteredLecturers.slice((page - 1) * limit, page * limit);
 
   const toggleHoiDongStatus = async (id, currentStatus) => {
-    // Optimistic UI update or call API (mocked UI change for now)
-    setLecturers(lecturers.map(gv => 
-      gv.id === id ? { ...gv, du_dk_hoi_dong: !currentStatus } : gv
-    ));
-    // TODO: Call API to update status backend
+    try {
+      await khoaApi.updateLecturerBoardEligibility(id, !currentStatus);
+      setLecturers(lecturers.map(gv => 
+        gv.id === id ? { ...gv, du_dk_hoi_dong: !currentStatus } : gv
+      ));
+    } catch (err) {
+      console.error(err);
+      alert('Có lỗi xảy ra khi cập nhật trạng thái');
+    }
+  };
+
+  const handleOpenModal = (lecturer = null) => {
+    if (lecturer) {
+      setEditingLecturer(lecturer);
+      setFormData({
+        ma_gv: lecturer.ma_gv,
+        ho_ten: lecturer.ho_ten,
+        email: lecturer.email || '',
+        sdt: lecturer.sdt || '',
+        so_sv_toi_da_huong_dan: lecturer.so_sv_toi_da_huong_dan || ''
+      });
+    } else {
+      setEditingLecturer(null);
+      setFormData({
+        ma_gv: '',
+        ho_ten: '',
+        email: '',
+        sdt: '',
+        so_sv_toi_da_huong_dan: ''
+      });
+    }
+    setIsModalOpen(true);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const dataToSubmit = {
+        ...formData,
+        so_sv_toi_da_huong_dan: formData.so_sv_toi_da_huong_dan ? parseInt(formData.so_sv_toi_da_huong_dan) : undefined
+      };
+      
+      if (editingLecturer) {
+        await khoaApi.updateLecturer(editingLecturer.id, dataToSubmit);
+        alert('Cập nhật giảng viên thành công');
+      } else {
+        await khoaApi.createLecturer(dataToSubmit);
+        alert('Thêm giảng viên thành công');
+      }
+      setIsModalOpen(false);
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.message || 'Có lỗi xảy ra');
+    }
+  };
+
+  const handleResetPassword = async (gv) => {
+    if (window.confirm(`Bạn có chắc chắn muốn đặt lại mật khẩu cho giảng viên ${gv.ho_ten}?`)) {
+      try {
+        await khoaApi.resetAccountPassword(gv.taikhoan_id);
+        alert('Đặt lại mật khẩu thành công');
+      } catch (err) {
+        console.error(err);
+        alert(err.response?.data?.message || 'Có lỗi xảy ra');
+      }
+    }
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const bstr = evt.target.result;
+      const wb = XLSX.read(bstr, { type: 'binary' });
+      const wsname = wb.SheetNames[0];
+      const ws = wb.Sheets[wsname];
+      const data = XLSX.utils.sheet_to_json(ws);
+      
+      const formattedData = data.map(row => ({
+        ma_gv: String(row['Mã GV'] || row['ma_gv'] || ''),
+        ho_ten: String(row['Họ tên'] || row['ho_ten'] || ''),
+        email: String(row['Email'] || row['email'] || ''),
+        sdt: String(row['SĐT'] || row['sdt'] || ''),
+        so_sv_toi_da_huong_dan: parseInt(row['Số SV hướng dẫn tối đa'] || row['so_sv_toi_da_huong_dan'] || 0)
+      })).filter(r => r.ma_gv && r.ho_ten);
+
+      setImportData(formattedData);
+    };
+    reader.readAsBinaryString(file);
+    e.target.value = ''; // Reset input
+  };
+
+  const handleImportExcel = async () => {
+    if (importData.length === 0) {
+      alert('Không có dữ liệu hợp lệ để import');
+      return;
+    }
+    setIsImporting(true);
+    let successCount = 0;
+    let errorCount = 0;
+    
+    for (const record of importData) {
+      try {
+        await khoaApi.createLecturer(record);
+        successCount++;
+      } catch (err) {
+        console.error(err);
+        errorCount++;
+      }
+    }
+    
+    alert(`Import hoàn tất. Thành công: ${successCount}, Lỗi: ${errorCount}`);
+    setIsImporting(false);
+    setIsImportModalOpen(false);
+    setImportData([]);
+    fetchData();
   };
 
   return (
@@ -63,11 +194,14 @@ export default function DanhMuc_GiangVien_Khoa() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <h1 className="text-2xl font-bold text-slate-800">Giảng viên</h1>
         <div className="flex gap-3">
-          <button className="px-4 py-2 border-2 border-[#407F3E] text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors cursor-pointer">
+          <button 
+            onClick={() => setIsImportModalOpen(true)}
+            className="px-4 py-2 border-2 border-[#407F3E] text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors cursor-pointer"
+          >
             <Upload className="w-4 h-4" />
             Nhập từ Excel
           </button>
-          <button className="px-4 py-2 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors shadow-sm cursor-pointer">
+          <button onClick={() => handleOpenModal()} className="px-4 py-2 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors shadow-sm cursor-pointer">
             <Plus className="w-4 h-4" />
             Thêm giảng viên
           </button>
@@ -172,16 +306,15 @@ export default function DanhMuc_GiangVien_Khoa() {
                     </td>
                     <td className="p-4 text-right">
                       <div className="flex justify-end gap-2 text-slate-400">
-                        <button className="p-1.5 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded transition-colors cursor-pointer" title="Sửa thông tin">
+                        <button onClick={() => handleOpenModal(gv)} className="p-1.5 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded transition-colors cursor-pointer" title="Sửa thông tin">
                           <Edit2 className="w-4 h-4" />
                         </button>
-                        <button className="p-1.5 hover:text-[#89B449] hover:bg-[#89B449]/10 rounded transition-colors cursor-pointer" title="Reset mật khẩu">
+                        <button onClick={() => handleResetPassword(gv)} className="p-1.5 hover:text-[#89B449] hover:bg-[#89B449]/10 rounded transition-colors cursor-pointer" title="Reset mật khẩu">
                           <Key className="w-4 h-4" />
                         </button>
                         <button 
-                          className="p-1.5 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded transition-colors cursor-pointer" 
-                          title="Xóa giảng viên" 
-                          onClick={() => window.confirm(`Bạn có chắc chắn muốn xóa giảng viên ${gv.ho_ten}?`)}
+                          className="p-1.5 text-slate-300 cursor-not-allowed" 
+                          title="Không thể xóa giảng viên từ giao diện này" 
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -250,6 +383,177 @@ export default function DanhMuc_GiangVien_Khoa() {
           </div>
         </div>
       </div>
+
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setIsModalOpen(false)}></div>
+          <form onSubmit={handleSubmit} className="bg-white w-full max-w-lg rounded-2xl shadow-xl relative z-10 animate-in zoom-in-95 duration-200 flex flex-col">
+            <div className="px-6 py-4 border-b border-[#E7E0C4] flex items-center justify-between">
+              <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                {editingLecturer ? <Edit2 className="w-5 h-5 text-[#407F3E]" /> : <Plus className="w-5 h-5 text-[#407F3E]" />}
+                {editingLecturer ? 'Sửa thông tin giảng viên' : 'Thêm giảng viên mới'}
+              </h2>
+              <button type="button" onClick={() => setIsModalOpen(false)} className="p-1.5 text-slate-400 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg transition-colors cursor-pointer">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Mã Giảng Viên</label>
+                <input
+                  type="text"
+                  required
+                  disabled={!!editingLecturer}
+                  value={formData.ma_gv}
+                  onChange={(e) => setFormData({...formData, ma_gv: e.target.value})}
+                  className="w-full px-4 py-2 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] transition-all disabled:opacity-60"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Họ tên</label>
+                <input
+                  type="text"
+                  required
+                  disabled={!!editingLecturer}
+                  value={formData.ho_ten}
+                  onChange={(e) => setFormData({...formData, ho_ten: e.target.value})}
+                  className="w-full px-4 py-2 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] transition-all disabled:opacity-60"
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Email</label>
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({...formData, email: e.target.value})}
+                    className="w-full px-4 py-2 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Số điện thoại</label>
+                  <input
+                    type="text"
+                    value={formData.sdt}
+                    onChange={(e) => setFormData({...formData, sdt: e.target.value})}
+                    className="w-full px-4 py-2 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] transition-all"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Số SV tối đa hướng dẫn</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={formData.so_sv_toi_da_huong_dan}
+                  onChange={(e) => setFormData({...formData, so_sv_toi_da_huong_dan: e.target.value})}
+                  className="w-full px-4 py-2 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] transition-all"
+                />
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-[#E7E0C4] bg-slate-50/50 flex items-center justify-end gap-3 rounded-b-2xl">
+              <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-bold transition-colors cursor-pointer">
+                Hủy
+              </button>
+              <button type="submit" className="px-6 py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl text-sm font-bold transition-colors shadow-sm cursor-pointer">
+                Lưu
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Import Modal */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => !isImporting && setIsImportModalOpen(false)}></div>
+          <div className="bg-white w-full max-w-4xl rounded-2xl shadow-xl relative z-10 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+            <div className="px-6 py-4 border-b border-[#E7E0C4] flex items-center justify-between">
+              <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                <Upload className="w-5 h-5 text-[#407F3E]" />
+                Nhập danh sách giảng viên từ Excel
+              </h2>
+              <button disabled={isImporting} type="button" onClick={() => setIsImportModalOpen(false)} className="p-1.5 text-slate-400 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg transition-colors cursor-pointer disabled:opacity-50">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-6 flex flex-col gap-6 overflow-hidden flex-1 bg-slate-50">
+              <div className="flex gap-4 items-center">
+                <label className="flex-1">
+                  <div className="border-2 border-dashed border-[#E7E0C4] rounded-xl p-8 bg-white flex flex-col items-center justify-center text-center hover:bg-slate-50 hover:border-[#89B449] transition-colors cursor-pointer group">
+                    <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center shadow-sm mb-3 group-hover:scale-110 transition-transform">
+                      <CloudUpload className="w-6 h-6 text-[#89B449]" />
+                    </div>
+                    <p className="text-sm font-semibold text-slate-600 mb-1">
+                      Kéo thả file Excel vào đây, hoặc bấm để chọn file
+                    </p>
+                    <p className="text-xs text-slate-400">Định dạng hỗ trợ: .xlsx, .xls</p>
+                  </div>
+                  <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleFileUpload} disabled={isImporting} />
+                </label>
+              </div>
+
+              {importData.length > 0 && (
+                <div className="flex-1 bg-white border border-[#E7E0C4] rounded-xl shadow-sm overflow-hidden flex flex-col">
+                  <div className="px-4 py-3 bg-slate-50 border-b border-[#E7E0C4] flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">Xem trước dữ liệu ({importData.length} dòng)</span>
+                  </div>
+                  <div className="flex-1 overflow-auto">
+                    <table className="w-full text-left text-sm whitespace-nowrap">
+                      <thead className="sticky top-0 bg-[#E7E0C4] z-10">
+                        <tr className="text-slate-800 font-bold uppercase tracking-wider text-xs">
+                          <th className="px-4 py-3">Mã GV</th>
+                          <th className="px-4 py-3">Họ tên</th>
+                          <th className="px-4 py-3">Email</th>
+                          <th className="px-4 py-3">SĐT</th>
+                          <th className="px-4 py-3">Số SV HD tối đa</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
+                        {importData.map((row, idx) => (
+                          <tr key={idx} className="hover:bg-slate-50">
+                            <td className="px-4 py-2 font-bold text-[#407F3E]">{row.ma_gv}</td>
+                            <td className="px-4 py-2 text-slate-800">{row.ho_ten}</td>
+                            <td className="px-4 py-2">{row.email}</td>
+                            <td className="px-4 py-2">{row.sdt}</td>
+                            <td className="px-4 py-2">{row.so_sv_toi_da_huong_dan}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-[#E7E0C4] bg-slate-50/50 flex items-center justify-end gap-3 rounded-b-2xl">
+              <button disabled={isImporting} type="button" onClick={() => setIsImportModalOpen(false)} className="px-5 py-2.5 border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-bold transition-colors cursor-pointer disabled:opacity-50">
+                Hủy
+              </button>
+              <button 
+                disabled={isImporting || importData.length === 0} 
+                onClick={handleImportExcel} 
+                className="px-6 py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl text-sm font-bold transition-colors shadow-sm cursor-pointer disabled:opacity-50 flex items-center gap-2"
+              >
+                {isImporting ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                    Đang import...
+                  </>
+                ) : (
+                  'Xác nhận Import'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
