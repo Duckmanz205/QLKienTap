@@ -1,23 +1,103 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BarChart3, ArrowLeft, Building2, CheckCircle, Clock, XCircle, FileSpreadsheet, Sparkles, Award } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-
-const initialTripDetails = [
-  { id: 'CTQ-001', name: 'Kiến tập Hệ thống dây chuyền sữa', factory: 'Nhà máy Vinamilk Bình Dương', date: '15/10/2023', registeredCount: 120, actualCount: 118, status: 'Đã hoàn thành' },
-  { id: 'CTQ-002', name: 'Khảo sát Quy trình Đóng gói Mì', factory: 'Acecook Hồ Chí Minh', date: '18/10/2023', registeredCount: 80, actualCount: 80, status: 'Đã hoàn thành' },
-  { id: 'CTQ-003', name: 'Kiến tập Quy trình Lên men & Đóng chai', factory: 'Nhà máy Suntory Pepsico', date: '22/10/2023', registeredCount: 150, actualCount: 142, status: 'Đang diễn ra' },
-  { id: 'CTQ-004', name: 'Tham quan Trung tâm Nghiên cứu Phần mềm', factory: 'FPT Software Campus', date: '25/10/2023', registeredCount: 200, actualCount: '-', status: 'Đang diễn ra' },
-  { id: 'CTQ-005', name: 'Hệ thống phân phối Co.opmart', factory: 'Saigon Co.op', date: '25/10/2023', registeredCount: 60, actualCount: 12, status: 'Đã hủy' }
-];
-
-const factoriesData = [
-  { name: 'Nhà máy CP Việt Nam', count: 120, percentage: 34, color: 'bg-primary' },
-  { name: 'Acecook Hồ Chí Minh', count: 80, percentage: 23, color: 'bg-[#446900]' },
-  { name: 'Nhà máy Ajinomoto', count: 150, percentage: 43, color: 'bg-[#2c6b2d]' }
-];
+import { khoaApi } from '../../services/api';
 
 export default function XemTruocBaoCaoThamQuan_Khoa() {
   const navigate = useNavigate();
+  const [tripsData, setTripsData] = useState([]);
+  const [factoriesData, setFactoriesData] = useState([]);
+  const [stats, setStats] = useState({ totalStudents: 0, totalTrips: 0, completedTrips: 0 });
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const [tripsRes, regsRes] = await Promise.all([
+        khoaApi.getTrips(),
+        khoaApi.getRegistrations({ limit: 10000 })
+      ]);
+
+      const trips = tripsRes.data.data || tripsRes.data || [];
+      const regs = regsRes.data.data || [];
+
+      let tStudents = 0;
+      let cTrips = 0;
+      
+      const tripsMap = {};
+      trips.forEach(t => {
+        const factory = t.nhaMay?.ten_nha_may || 'Chưa rõ';
+        tripsMap[t.id] = {
+          rawId: t.id,
+          id: `CTQ-${String(t.id).padStart(3, '0')}`,
+          name: `Tham quan ${factory}`,
+          factory: factory,
+          date: t.ngay_tham_quan ? new Date(t.ngay_tham_quan).toLocaleDateString('vi-VN') : '-',
+          registeredCount: 0,
+          actualCount: 0,
+          status: (t.trang_thai === 'DaKetThuc' || t.trang_thai === 'DaKhoa' || t.trang_thai === 'DaDienRa') 
+            ? 'Đã hoàn thành' 
+            : (t.trang_thai === 'DangDienRa' ? 'Đang diễn ra' : (t.trang_thai === 'DaHuy' ? 'Đã hủy' : 'Chưa diễn ra')),
+        };
+        if (t.trang_thai === 'DaKetThuc' || t.trang_thai === 'DaKhoa' || t.trang_thai === 'DaDienRa') {
+          cTrips++;
+        }
+      });
+
+      regs.forEach(r => {
+        const tId = r.chuyen_tham_quan_id;
+        if (tripsMap[tId]) {
+          if (['ChoDuyet', 'HopLe', 'DaThamGia', 'HoanThanh'].includes(r.trang_thai)) {
+            tripsMap[tId].registeredCount++;
+          }
+          const isTuDo = r.chuyenThamQuan?.cach_to_chuc === 'TuDo';
+          if (isTuDo) {
+            // Chuyến tự do không có DiemDanh — dùng trạng thái phiếu đăng ký làm căn cứ "đã hoàn thành"
+            if (['DaThamGia', 'HoanThanh'].includes(r.trang_thai)) {
+              tripsMap[tId].actualCount++;
+            }
+          } else {
+            // Chuyến do khoa tổ chức — dùng đúng dữ liệu điểm danh thật, không suy đoán từ hóa đơn
+            if (r.diemDanh?.trang_thai === 'CoMat') {
+              tripsMap[tId].actualCount++;
+            }
+          }
+        }
+      });
+
+      const processedTrips = Object.values(tripsMap);
+      processedTrips.forEach(t => { tStudents += t.actualCount; });
+      setTripsData(processedTrips);
+      setStats({
+        totalStudents: tStudents,
+        totalTrips: processedTrips.length,
+        completedTrips: cTrips
+      });
+
+      const factoryCount = {};
+      regs.forEach(r => {
+        if (['ChoDuyet', 'HopLe', 'DaThamGia', 'HoanThanh'].includes(r.trang_thai)) {
+          const factoryName = r.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Chưa rõ';
+          factoryCount[factoryName] = (factoryCount[factoryName] || 0) + 1;
+        }
+      });
+      const totalRegs = Object.values(factoryCount).reduce((a,b) => a+b, 0);
+      const colors = ['bg-primary', 'bg-[#446900]', 'bg-[#2c6b2d]', 'bg-blue-600', 'bg-amber-500'];
+      const fData = Object.entries(factoryCount).map(([name, count], i) => ({
+        name,
+        count,
+        percentage: totalRegs > 0 ? Math.round((count / totalRegs) * 100) : 0,
+        color: colors[i % colors.length]
+      })).sort((a,b) => b.count - a.count);
+      
+      setFactoriesData(fData);
+
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   const getStatusBadge = (status) => {
     if (status === 'Đã hoàn thành') return 'bg-[#dce8c4] text-[#446900] border border-[#89B449]';
@@ -33,7 +113,7 @@ export default function XemTruocBaoCaoThamQuan_Khoa() {
   const exportExcel = () => {
     let csvContent = '\uFEFF';
     csvContent += 'Mã chuyến,Tên chuyến,Nhà máy,Ngày,Đăng ký,Thực tế,Trạng thái\n';
-    initialTripDetails.forEach(t => {
+    tripsData.forEach(t => {
       csvContent += `"${t.id}","${t.name}","${t.factory}","${t.date}","${t.registeredCount}","${t.actualCount}","${t.status}"\n`;
     });
     
@@ -66,15 +146,15 @@ export default function XemTruocBaoCaoThamQuan_Khoa() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center text-primary"><Award className="w-6 h-6" /></div>
-          <div><p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Tổng SV tham gia</p><h3 className="text-2xl font-black text-slate-800">120 sinh viên</h3></div>
+          <div><p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Tổng SV tham gia (TT)</p><h3 className="text-2xl font-black text-slate-800">{stats.totalStudents} sinh viên</h3></div>
         </div>
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center text-blue-600"><Building2 className="w-6 h-6" /></div>
-          <div><p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Tổng số chuyến đi</p><h3 className="text-2xl font-black text-slate-800">5 chuyến kiến tập</h3></div>
+          <div><p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Tổng số chuyến đi</p><h3 className="text-2xl font-black text-slate-800">{stats.totalTrips} chuyến</h3></div>
         </div>
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center text-green-600"><CheckCircle className="w-6 h-6" /></div>
-          <div><p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Đã hoàn thành</p><h3 className="text-2xl font-black text-slate-800">3 chuyến</h3></div>
+          <div><p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Đã hoàn thành</p><h3 className="text-2xl font-black text-slate-800">{stats.completedTrips} chuyến</h3></div>
         </div>
       </div>
 
@@ -99,8 +179,19 @@ export default function XemTruocBaoCaoThamQuan_Khoa() {
         <div className="bg-[#E7E0C4]/60 border border-slate-200 rounded-2xl p-6 flex flex-col justify-between">
           <div className="space-y-3">
             <div className="flex items-center gap-2"><Sparkles className="w-5 h-5 text-primary" /><h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider">Đánh giá chung</h3></div>
-            <p className="text-xs text-slate-600 leading-relaxed font-semibold">Nhà máy <b>Ajinomoto</b> nhận được sự quan tâm lớn nhất với <b>43%</b> (150 SV).</p>
-            <p className="text-xs text-slate-600 leading-relaxed font-semibold">Chuyến đi <b>Vinamilk Bình Dương</b> đạt tỉ lệ tham gia cao nhất: <b>118/120</b> SV.</p>
+            {factoriesData.length > 0 ? (
+              <p className="text-xs text-slate-600 leading-relaxed font-semibold">Nhà máy <b>{factoriesData[0].name}</b> nhận được sự quan tâm lớn nhất với <b>{factoriesData[0].percentage}%</b> ({factoriesData[0].count} SV).</p>
+            ) : (
+              <p className="text-xs text-slate-600 leading-relaxed font-semibold">Chưa có dữ liệu thống kê nhà máy.</p>
+            )}
+            {tripsData.length > 0 && tripsData.some(t => t.registeredCount > 0) ? (
+              (() => {
+                const maxTrip = [...tripsData].sort((a,b) => (b.actualCount/b.registeredCount || 0) - (a.actualCount/a.registeredCount || 0))[0];
+                return <p className="text-xs text-slate-600 leading-relaxed font-semibold">Chuyến đi <b>{maxTrip.factory}</b> đạt tỉ lệ tham gia cao: <b>{maxTrip.actualCount}/{maxTrip.registeredCount}</b> SV.</p>
+              })()
+            ) : (
+              <p className="text-xs text-slate-600 leading-relaxed font-semibold">Chưa có dữ liệu chuyến đi thực tế.</p>
+            )}
           </div>
           <div className="pt-4 border-t border-slate-300">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Cập nhật lúc: 15/10/2023 - 17:30</span>
@@ -122,8 +213,13 @@ export default function XemTruocBaoCaoThamQuan_Khoa() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-800 text-sm font-semibold">
-              {initialTripDetails.map((trip, idx) => (
-                <tr key={trip.id} className="hover:bg-slate-50/50 transition-colors">
+              {tripsData.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="px-6 py-4 text-center text-slate-400">Không có dữ liệu chuyến tham quan</td>
+                </tr>
+              )}
+              {tripsData.map((trip, idx) => (
+                <tr key={trip.rawId} className="hover:bg-slate-50/50 transition-colors">
                   <td className="px-6 py-4 text-center text-slate-400 font-mono">{String(idx + 1).padStart(2, '0')}</td>
                   <td className="px-6 py-4 font-mono font-bold text-primary">{trip.id}</td>
                   <td className="px-6 py-4 font-bold text-slate-800">{trip.name}</td>

@@ -5,7 +5,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, DataSource } from 'typeorm';
+import { Repository, In, DataSource, IsNull } from 'typeorm';
 import {
   GiangVien,
   LichKienTap_SinhVien,
@@ -21,6 +21,8 @@ import {
   DiemHoiDong_ChiTiet,
   HoiDongChamBaoCao,
   DanhSachDen,
+  ThongBao,
+  ThongBaoDaDoc,
 } from '../entities/qlkt.entity';
 
 @Injectable()
@@ -48,6 +50,8 @@ export class GiangVienService {
     private hoiDongRepo: Repository<HoiDongChamBaoCao>,
     @InjectRepository(DanhSachDen)
     private blacklistRepo: Repository<DanhSachDen>,
+    @InjectRepository(ThongBao) private thongBaoRepo: Repository<ThongBao>,
+    @InjectRepository(ThongBaoDaDoc) private daDocRepo: Repository<ThongBaoDaDoc>,
     private dataSource: DataSource,
   ) {}
 
@@ -620,5 +624,90 @@ export class GiangVienService {
     }
 
     return { message: 'Ghi nhận điểm hội đồng thành công', score: item };
+  }
+
+  async getNotifications(lecturerId: number) {
+    const gv = await this.gvRepo.findOne({ where: { id: lecturerId } });
+    if (!gv) throw new NotFoundException('Không tìm thấy giảng viên');
+
+    const list = await this.thongBaoRepo.find({
+      where: { khoa_id: IsNull() },
+      order: { ngay_gui: 'DESC' },
+    });
+
+    const docIds = (
+      await this.daDocRepo.find({ where: { taikhoan_id: gv.taikhoan_id } })
+    ).map((d) => d.thongbao_id);
+
+    return list.map((item) => ({ ...item, da_doc: docIds.includes(item.id) }));
+  }
+
+  async markNotificationRead(accountId: number, notifId: number) {
+    const exist = await this.daDocRepo.findOne({ where: { taikhoan_id: accountId, thongbao_id: notifId } });
+    if (!exist) {
+      const read = new ThongBaoDaDoc();
+      read.taikhoan_id = accountId;
+      read.thongbao_id = notifId;
+      read.ngay_doc = new Date();
+      await this.daDocRepo.save(read);
+    }
+    return { success: true };
+  }
+
+  async markAllNotificationsRead(lecturerId: number) {
+    const gv = await this.gvRepo.findOne({ where: { id: lecturerId } });
+    if (!gv) throw new NotFoundException('Không tìm thấy giảng viên');
+    const list = await this.getNotifications(lecturerId);
+    const unread = list.filter((n) => !n.da_doc);
+    for (const n of unread) {
+      await this.markNotificationRead(gv.taikhoan_id, n.id);
+    }
+    return { success: true, count: unread.length };
+  }
+
+  // Dashboard Stats
+  async getDashboardStats(lecturerId: number) {
+    const gv = await this.gvRepo.findOne({ where: { id: lecturerId } });
+    if (!gv) throw new NotFoundException('Không tìm thấy giảng viên');
+
+    const now = new Date();
+
+    const doanDangDan = await this.danDoanRepo
+      .createQueryBuilder('danDoan')
+      .leftJoin('danDoan.chuyenThamQuan', 'chuyen')
+      .where('danDoan.giang_vien_id = :lecturerId', { lecturerId })
+      .andWhere('chuyen.ngay_tham_quan >= :now', { now })
+      .getCount();
+
+    const buoiBaoCao = await this.hoiDongThanhVienRepo
+      .createQueryBuilder('thanhVien')
+      .leftJoin('thanhVien.hoiDong', 'hoiDong')
+      .where('thanhVien.giang_vien_id = :lecturerId', { lecturerId })
+      .andWhere('hoiDong.ngay_bao_cao >= :now', { now })
+      .getCount();
+
+    const guidedSvIds = (
+      await this.phanCongRepo.find({
+        where: { giang_vien_id: lecturerId, trang_thai: 'DangHoatDong' },
+        relations: { lichKienTapSinhVien: true },
+      })
+    ).map((a) => a.lichKienTapSinhVien.sinh_vien_id);
+
+    let baiCanCham = 0;
+    if (guidedSvIds.length > 0) {
+      baiCanCham = await this.baiThuRepo
+        .createQueryBuilder('baiThu')
+        .leftJoin('baiThu.phieuDangKy', 'phieu')
+        .leftJoin('phieu.diemPhieuDangKy', 'diem')
+        .where('phieu.sinh_vien_id IN (:...guidedSvIds)', { guidedSvIds })
+        .andWhere('diem.diem_bai_thu_hoach IS NULL')
+        .getCount();
+    }
+
+    const tongSvHuongDan = await this.phanCongRepo.count({
+      where: { giang_vien_id: lecturerId, trang_thai: 'DangHoatDong' },
+    });
+
+    return { doanDangDan, buoiBaoCao, baiCanCham, tongSvHuongDan };
   }
 }

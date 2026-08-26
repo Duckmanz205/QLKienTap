@@ -118,6 +118,55 @@ export class KhoaService {
     return this.khoaRepo.save(data);
   }
 
+  async updateYear(id: number, data: Partial<NamHoc>) {
+    const nh = await this.namHocRepo.findOne({ where: { id } });
+    if (!nh) throw new NotFoundException('Không tìm thấy năm học');
+    Object.assign(nh, data);
+    await this.namHocRepo.save(nh);
+    return { message: 'Cập nhật năm học thành công', data: nh };
+  }
+
+  async deleteYear(id: number) {
+    const count = await this.hocKyRepo.count({ where: { nam_hoc_id: id } });
+    if (count > 0) throw new BadRequestException('Không thể xóa năm học đã có học kỳ được gắn vào');
+    const nh = await this.namHocRepo.findOne({ where: { id } });
+    if (!nh) throw new NotFoundException('Không tìm thấy năm học');
+    await this.namHocRepo.remove(nh);
+    return { message: 'Xóa năm học thành công' };
+  }
+
+  async updateTerm(id: number, data: Partial<HocKy>) {
+    const hk = await this.hocKyRepo.findOne({ where: { id } });
+    if (!hk) throw new NotFoundException('Không tìm thấy học kỳ');
+    Object.assign(hk, data);
+    await this.hocKyRepo.save(hk);
+    return { message: 'Cập nhật học kỳ thành công', data: hk };
+  }
+
+  async deleteTerm(id: number) {
+    const hk = await this.hocKyRepo.findOne({ where: { id } });
+    if (!hk) throw new NotFoundException('Không tìm thấy học kỳ');
+    await this.hocKyRepo.remove(hk);
+    return { message: 'Xóa học kỳ thành công' };
+  }
+
+  async updateCourse(id: number, data: Partial<Khoa>) {
+    const kh = await this.khoaRepo.findOne({ where: { id } });
+    if (!kh) throw new NotFoundException('Không tìm thấy khóa');
+    Object.assign(kh, data);
+    await this.khoaRepo.save(kh);
+    return { message: 'Cập nhật khóa thành công', data: kh };
+  }
+
+  async deleteCourse(id: number) {
+    const count = await this.svRepo.count({ where: { khoa_id: id } });
+    if (count > 0) throw new BadRequestException('Không thể xóa khóa đã có sinh viên nằm trong đó');
+    const kh = await this.khoaRepo.findOne({ where: { id } });
+    if (!kh) throw new NotFoundException('Không tìm thấy khóa');
+    await this.khoaRepo.remove(kh);
+    return { message: 'Xóa khóa thành công' };
+  }
+
   async getFactories() {
     return this.nhaMayRepo.find();
   }
@@ -134,6 +183,54 @@ export class KhoaService {
   // -------------------------------------------------------------
   async getLecturers() {
     return this.gvRepo.find();
+  }
+
+  async updateLecturerBoardEligibility(id: number, duDkHoiDong: boolean) {
+    const gv = await this.gvRepo.findOne({ where: { id } });
+    if (!gv) throw new NotFoundException('Không tìm thấy giảng viên');
+    gv.du_dk_hoi_dong = duDkHoiDong;
+    await this.gvRepo.save(gv);
+    return { message: duDkHoiDong ? 'Đã đánh dấu đủ điều kiện Hội đồng' : 'Đã bỏ đánh dấu đủ điều kiện Hội đồng', data: gv };
+  }
+
+  async createLecturer(data: any) {
+    return this.dataSource.transaction(async (manager: EntityManager) => {
+      const existUser = await manager.findOne(TaiKhoan, { where: { ten_dang_nhap: data.ma_gv } });
+      if (existUser) {
+        throw new BadRequestException('Mã giảng viên (tên đăng nhập) đã tồn tại');
+      }
+      const salt = await bcrypt.genSalt(10);
+      const hashPassword = await bcrypt.hash(data.ma_gv, salt);
+
+      const newAccount = new TaiKhoan();
+      newAccount.ten_dang_nhap = data.ma_gv;
+      newAccount.mat_khau_hash = hashPassword;
+      newAccount.vai_tro = 'GiangVien';
+      newAccount.phai_doi_mat_khau = true;
+      newAccount.trang_thai = 'HoatDong';
+      const savedAccount = await manager.save(TaiKhoan, newAccount);
+
+      const newLecturer = new GiangVien();
+      newLecturer.ma_gv = data.ma_gv;
+      newLecturer.ho_ten = data.ho_ten;
+      newLecturer.email = data.email || '';
+      newLecturer.sdt = data.sdt || '';
+      newLecturer.so_sv_toi_da_huong_dan = data.so_sv_toi_da_huong_dan || null;
+      newLecturer.taikhoan_id = savedAccount.id;
+      const savedLecturer = await manager.save(GiangVien, newLecturer);
+
+      return { message: 'Thêm giảng viên và tạo tài khoản thành công', giangVien: savedLecturer };
+    });
+  }
+
+  async updateLecturer(id: number, data: any) {
+    const gv = await this.gvRepo.findOne({ where: { id } });
+    if (!gv) throw new NotFoundException('Không tìm thấy giảng viên');
+    if (data.email !== undefined) gv.email = data.email;
+    if (data.sdt !== undefined) gv.sdt = data.sdt;
+    if (data.so_sv_toi_da_huong_dan !== undefined) gv.so_sv_toi_da_huong_dan = data.so_sv_toi_da_huong_dan;
+    await this.gvRepo.save(gv);
+    return { message: 'Cập nhật giảng viên thành công', data: gv };
   }
   async getStudents(page: number = 1, limit: number = 10, search?: string) {
     const queryBuilder = this.svRepo
@@ -218,6 +315,79 @@ export class KhoaService {
         sinhVien: savedStudent,
       };
     });
+  }
+
+  async updateStudent(id: number, data: any) {
+    const sv = await this.svRepo.findOne({ where: { id } });
+    if (!sv) throw new NotFoundException('Không tìm thấy sinh viên');
+    if (data.email !== undefined) sv.email = data.email;
+    if (data.sdt !== undefined) sv.sdt = data.sdt;
+    if (data.ten_lop !== undefined) sv.ten_lop = data.ten_lop;
+    await this.svRepo.save(sv);
+    return { message: 'Cập nhật sinh viên thành công', data: sv };
+  }
+
+  async deleteStudent(id: number) {
+    const sv = await this.svRepo.findOne({ where: { id }, relations: { taiKhoan: true } });
+    if (!sv) throw new NotFoundException('Không tìm thấy sinh viên');
+    const hasRegistrations = await this.phieuRepo.count({ where: { sinh_vien_id: id } });
+    if (hasRegistrations > 0) {
+      if (sv.taiKhoan) {
+        sv.taiKhoan.trang_thai = 'KhoaTaiKhoan';
+        await this.taiKhoanRepo.save(sv.taiKhoan);
+      }
+      return { message: 'Sinh viên đã có dữ liệu đăng ký kiến tập nên không thể xóa cứng — đã khóa tài khoản thay thế' };
+    }
+    await this.svRepo.remove(sv);
+    return { message: 'Xóa sinh viên thành công' };
+  }
+
+  async getAccounts(page: number = 1, limit: number = 15, search?: string, vaiTro?: string, trangThai?: string) {
+    const qb = this.taiKhoanRepo
+      .createQueryBuilder('tk')
+      .leftJoin('SinhVien', 'sv', 'sv.taikhoan_id = tk.id')
+      .leftJoin('GiangVien', 'gv', 'gv.taikhoan_id = tk.id')
+      .select([
+        'tk.id AS id',
+        'tk.ten_dang_nhap AS ten_dang_nhap',
+        'tk.vai_tro AS vai_tro',
+        'tk.trang_thai AS trang_thai',
+        'tk.lan_dang_nhap_cuoi AS lan_dang_nhap_cuoi',
+        'COALESCE(sv.ho_ten, gv.ho_ten, tk.ten_dang_nhap) AS ho_ten',
+      ]);
+
+    if (search) {
+      qb.andWhere('(tk.ten_dang_nhap LIKE :s OR sv.ho_ten LIKE :s OR gv.ho_ten LIKE :s)', { s: `%${search}%` });
+    }
+    if (vaiTro) qb.andWhere('tk.vai_tro = :vaiTro', { vaiTro });
+    if (trangThai) qb.andWhere('tk.trang_thai = :trangThai', { trangThai });
+
+    const total = await qb.getCount();
+    const data = await qb
+      .orderBy('tk.ngay_tao', 'DESC')
+      .offset((page - 1) * limit)
+      .limit(limit)
+      .getRawMany();
+
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  async toggleAccountLock(accountId: number) {
+    const tk = await this.taiKhoanRepo.findOne({ where: { id: accountId } });
+    if (!tk) throw new NotFoundException('Không tìm thấy tài khoản');
+    tk.trang_thai = tk.trang_thai === 'HoatDong' ? 'KhoaTaiKhoan' : 'HoatDong';
+    await this.taiKhoanRepo.save(tk);
+    return { message: tk.trang_thai === 'KhoaTaiKhoan' ? 'Đã khóa tài khoản' : 'Đã mở khóa tài khoản', data: tk };
+  }
+
+  async resetAccountPassword(accountId: number) {
+    const tk = await this.taiKhoanRepo.findOne({ where: { id: accountId } });
+    if (!tk) throw new NotFoundException('Không tìm thấy tài khoản');
+    const salt = await bcrypt.genSalt(10);
+    tk.mat_khau_hash = await bcrypt.hash(tk.ten_dang_nhap, salt);
+    tk.phai_doi_mat_khau = true;
+    await this.taiKhoanRepo.save(tk);
+    return { message: `Đã đặt lại mật khẩu về mặc định (trùng tên đăng nhập: ${tk.ten_dang_nhap})` };
   }
 
   // -------------------------------------------------------------
@@ -1092,6 +1262,86 @@ export class KhoaService {
     });
   }
 
+  async getVisitedStudentsReport(lichKienTapId?: number) {
+    const phieus = await this.phieuRepo.find({
+      where: {
+        trang_thai: In(['HoanThanh', 'DaThamGia', 'HopLe']),
+        ...(lichKienTapId ? { chuyenThamQuan: { lich_kien_tap_id: lichKienTapId } } : {}),
+      },
+      relations: {
+        sinhVien: { khoa: true },
+      },
+    });
+
+    const svMap = new Map();
+    phieus.forEach((p) => {
+      if (p.sinhVien) {
+        svMap.set(p.sinhVien.id, p.sinhVien);
+      }
+    });
+    return Array.from(svMap.values());
+  }
+
+  async getNotVisitedStudentsReport(lichKienTapId?: number) {
+    const whereCondition: any = {};
+    if (lichKienTapId) {
+      whereCondition.lich_kien_tap_id = lichKienTapId;
+    }
+    const enrollments = await this.lksvRepo.find({
+      where: whereCondition,
+      relations: {
+        sinhVien: { khoa: true },
+      },
+    });
+
+    const visitedStudents = await this.getVisitedStudentsReport(lichKienTapId);
+    const visitedSet = new Set(visitedStudents.map((sv) => sv.id));
+
+    const notVisited = [];
+    const seen = new Set();
+    for (const en of enrollments) {
+      if (en.sinhVien && !visitedSet.has(en.sinhVien.id) && !seen.has(en.sinhVien.id)) {
+        notVisited.push(en.sinhVien);
+        seen.add(en.sinhVien.id);
+      }
+    }
+    return notVisited;
+  }
+
+  async getEligibleStudentsReport(lichKienTapId?: number) {
+    const phieus = await this.phieuRepo.find({
+      where: {
+        trang_thai: In(['DaThamGia', 'HoanThanh', 'HopLe']),
+        ...(lichKienTapId ? { chuyenThamQuan: { lich_kien_tap_id: lichKienTapId } } : {}),
+      },
+      relations: {
+        chuyenThamQuan: true,
+        sinhVien: { khoa: true },
+      },
+    });
+
+    const svStats = new Map();
+    phieus.forEach((p) => {
+      if (p.sinhVien && p.chuyenThamQuan) {
+        const svId = p.sinhVien.id;
+        if (!svStats.has(svId)) {
+          svStats.set(svId, { sv: p.sinhVien, direct: 0, online: 0 });
+        }
+        const stats = svStats.get(svId);
+        if (p.chuyenThamQuan.hinh_thuc === 'TrucTiep') stats.direct++;
+        if (p.chuyenThamQuan.hinh_thuc === 'TrucTuyen') stats.online++;
+      }
+    });
+
+    const eligible = [];
+    for (const stats of svStats.values()) {
+      if (stats.direct >= 2 && stats.online >= 1) {
+        eligible.push(stats.sv);
+      }
+    }
+    return eligible;
+  }
+
   // Dashboard overview stats
   async getDashboardStats() {
     const studentCount = await this.svRepo.count();
@@ -1135,7 +1385,8 @@ export class KhoaService {
       .leftJoinAndSelect('chuyen.nhaMay', 'nhaMay')
       .leftJoinAndSelect('chuyen.lichKienTap', 'lich')
       .leftJoinAndSelect('phieu.yeuCauHuy', 'yeuCauHuy')
-      .leftJoinAndSelect('phieu.hoaDon', 'hoaDon');
+      .leftJoinAndSelect('phieu.hoaDon', 'hoaDon')
+      .leftJoinAndSelect('phieu.diemDanh', 'diemDanh');
 
     if (search) {
       queryBuilder.andWhere(
@@ -1247,11 +1498,15 @@ export class KhoaService {
   }
 
   // Get student enrollments for advisor assignment with pagination
-  async getEnrollments(page: number = 1, limit: number = 10, search?: string) {
+  async getEnrollments(page: number = 1, limit: number = 10, search?: string, lichKienTapId?: number) {
     const queryBuilder = this.lksvRepo
       .createQueryBuilder('enrollment')
       .leftJoinAndSelect('enrollment.sinhVien', 'sinhVien')
       .leftJoinAndSelect('enrollment.lichKienTap', 'lich');
+
+    if (lichKienTapId) {
+      queryBuilder.andWhere('enrollment.lich_kien_tap_id = :lichKienTapId', { lichKienTapId });
+    }
 
     if (search) {
       queryBuilder.andWhere(

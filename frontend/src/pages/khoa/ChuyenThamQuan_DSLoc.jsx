@@ -1,25 +1,133 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Plus, ChevronDown, Check, X, Calendar, Clock, MapPin, 
-  ChevronRight, Users, CheckCircle2, XCircle
+  ChevronRight, Users, CheckCircle2, XCircle, RefreshCw
 } from 'lucide-react';
+import { khoaApi } from '../../services/api';
+import { getValidSession } from '../../utils/auth';
 
 export default function ChuyenThamQuan_DSLoc() {
   const [activeTab, setActiveTab] = useState('khoa'); // 'khoa' | 'tudo'
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [viewingDetail, setViewingDetail] = useState(null);
 
+  const [tripsKhoa, setTripsKhoa] = useState([]);
+  const [tripsTuDo, setTripsTuDo] = useState([]);
+  const [loading, setLoading] = useState(false);
+  
+  const session = getValidSession();
+  const currentUser = session?.user;
+
+  // Modal Data
+  const [nhaMayOptions, setNhaMayOptions] = useState([]);
+  const [lichOptions, setLichOptions] = useState([]);
+  
   // Dropdown States for Modal
   const [isNhaMayDropdownOpen, setIsNhaMayDropdownOpen] = useState(false);
   const [selectedNhaMay, setSelectedNhaMay] = useState('');
-  const nhaMayOptions = ["Vinamilk", "Acecook", "Nutifood", "Yakult", "Kewpie"];
-
+  
   const [isLichDropdownOpen, setIsLichDropdownOpen] = useState(false);
   const [selectedLich, setSelectedLich] = useState('');
-  const lichOptions = ["Đợt kiến tập - Học kỳ 1 - 2025-2026", "Đợt kiến tập - Học kỳ 2 - 2024-2025"];
 
   const [isHinhThucDropdownOpen, setIsHinhThucDropdownOpen] = useState(false);
   const [selectedHinhThuc, setSelectedHinhThuc] = useState('');
   const hinhThucOptions = ["Trực tiếp", "Trực tuyến"];
+
+  // Form states
+  const [ngay, setNgay] = useState('');
+  const [gioBatDau, setGioBatDau] = useState('');
+  const [gioKetThuc, setGioKetThuc] = useState('');
+  const [sucChua, setSucChua] = useState('');
+
+  useEffect(() => {
+    fetchInitialData();
+    fetchTrips();
+  }, []);
+
+  const fetchInitialData = async () => {
+    try {
+      const [facRes, schRes] = await Promise.all([
+        khoaApi.getFactories(),
+        khoaApi.getSchedules()
+      ]);
+      setNhaMayOptions(facRes.data);
+      setLichOptions(schRes.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchTrips = async () => {
+    setLoading(true);
+    try {
+      const res = await khoaApi.getTrips();
+      const allTrips = res.data || [];
+      setTripsKhoa(allTrips.filter(t => t.kieu_chuyen === 'KHOA_TO_CHUC'));
+      setTripsTuDo(allTrips.filter(t => t.kieu_chuyen === 'TU_DO'));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateTrip = async (e) => {
+    e.preventDefault();
+    if (!selectedNhaMay || !selectedLich || !selectedHinhThuc || !ngay || !gioBatDau || !gioKetThuc || !sucChua) {
+      alert("Vui lòng điền đầy đủ thông tin");
+      return;
+    }
+
+    try {
+      await khoaApi.createTrip({
+        nha_may_id: selectedNhaMay,
+        lich_kien_tap_id: selectedLich,
+        ngay: ngay,
+        gio_bat_dau: gioBatDau,
+        gio_ket_thuc: gioKetThuc,
+        hinh_thuc: selectedHinhThuc === 'Trực tuyến' ? 'ONLINE' : 'OFFLINE',
+        suc_chua: Number(sucChua)
+      });
+      alert('Tạo chuyến tham quan thành công');
+      setIsModalOpen(false);
+      
+      // Reset form
+      setSelectedNhaMay('');
+      setSelectedLich('');
+      setSelectedHinhThuc('');
+      setNgay('');
+      setGioBatDau('');
+      setGioKetThuc('');
+      setSucChua('');
+
+      fetchTrips();
+    } catch (err) {
+      console.error(err);
+      alert('Lỗi tạo chuyến tham quan');
+    }
+  };
+
+  const handleApproveTrip = async (tripId, isApproved) => {
+    if (!currentUser) {
+      alert('Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.');
+      return;
+    }
+    
+    // Nếu từ chối, có thể prompt lý do nếu cần (nhưng backend ko nhận field này nên ta chỉ confirm)
+    if (!isApproved) {
+      const confirmReject = window.confirm('Bạn có chắc chắn muốn từ chối chuyến tham quan này?');
+      if (!confirmReject) return;
+    }
+
+    try {
+      await khoaApi.approveTrip({ tripId, approverId: currentUser.id, isApproved });
+      alert(isApproved ? 'Duyệt chuyến tham quan thành công' : 'Từ chối chuyến tham quan thành công');
+      fetchTrips();
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.message || 'Có lỗi xảy ra khi xử lý yêu cầu');
+    }
+  };
 
   // Close all dropdowns
   const closeAllDropdowns = () => {
@@ -33,21 +141,6 @@ export default function ChuyenThamQuan_DSLoc() {
     closeAllDropdowns();
     setter(true);
   };
-
-  // Mock Data
-  const tripsKhoa = [
-    { id: 1, nhaMay: 'Vinamilk Bình Dương', ngay: '25/08/2026', gio: '07:30 - 11:30', hinhThuc: 'Trực tiếp', used: 12, max: 20, trangThai: 'Mở đăng ký' },
-    { id: 2, nhaMay: 'Yakult Hồ Chí Minh', ngay: '28/08/2026', gio: '13:00 - 16:30', hinhThuc: 'Trực tiếp', used: 40, max: 40, trangThai: 'Đã chốt DS' },
-    { id: 3, nhaMay: 'Nhà máy Ajinomoto', ngay: '05/09/2026', gio: '08:00 - 11:00', hinhThuc: 'Trực tuyến', used: 45, max: 100, trangThai: 'Mở đăng ký' },
-  ];
-
-  const tripsTuDo = [
-    { id: 1, svName: 'Nguyễn Văn An', svMssv: '2001215001', svAvatar: 'https://i.pravatar.cc/150?u=1', nhaMay: 'CP Group Việt Nam', ngay: '30/08/2026', gvhd: 'Lê Minh Tuấn' },
-    { id: 2, svName: 'Trần Thị Hoa', svMssv: '2001215002', svAvatar: 'https://i.pravatar.cc/150?u=2', nhaMay: 'FrieslandCampina Hà Nam', ngay: '02/09/2026', gvhd: null },
-    { id: 3, svName: 'Phạm Duy Khang', svMssv: '2001215003', svAvatar: 'https://i.pravatar.cc/150?u=3', nhaMay: 'Heineken Việt Nam', ngay: '10/09/2026', gvhd: 'Trần Thị Lan' },
-    { id: 4, svName: 'Lê Tiến Dũng', svMssv: '2001215004', svAvatar: 'https://i.pravatar.cc/150?u=4', nhaMay: 'Suntory PepsiCo', ngay: '12/09/2026', gvhd: null },
-    { id: 5, svName: 'Hoàng Quốc Việt', svMssv: '2001215005', svAvatar: 'https://i.pravatar.cc/150?u=5', nhaMay: 'Masan Consumer', ngay: '15/09/2026', gvhd: 'Đỗ Minh Phương' },
-  ];
 
   return (
     <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300 relative" onClick={closeAllDropdowns}>
@@ -77,7 +170,7 @@ export default function ChuyenThamQuan_DSLoc() {
         >
           Chuyến tự do chờ duyệt
           <span className="bg-[#DBD468] text-slate-800 text-[10px] px-1.5 py-0.5 rounded-full font-bold shadow-sm">
-            5
+            {tripsTuDo.length}
           </span>
           {activeTab === 'tudo' && (
             <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[#89B449] rounded-t-full"></div>
@@ -100,64 +193,81 @@ export default function ChuyenThamQuan_DSLoc() {
 
           <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[900px]">
-                <thead>
-                  <tr className="bg-[#E7E0C4] text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
-                    <th className="p-4 pl-6">Nhà máy</th>
-                    <th className="p-4">Ngày tham quan</th>
-                    <th className="p-4">Giờ</th>
-                    <th className="p-4 text-center">Hình thức</th>
-                    <th className="p-4">Sức chứa</th>
-                    <th className="p-4 text-center">Trạng thái</th>
-                    <th className="p-4 text-right pr-6">Thao tác</th>
-                  </tr>
-                </thead>
-                <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
-                  {tripsKhoa.map(t => {
-                    const percent = (t.used / t.max) * 100;
-                    return (
-                      <tr key={t.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="p-4 pl-6 font-bold text-slate-800">{t.nhaMay}</td>
-                        <td className="p-4 font-medium text-slate-600">{t.ngay}</td>
-                        <td className="p-4 font-medium text-slate-600">{t.gio}</td>
-                        <td className="p-4 text-center">
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-bold border ${
-                            t.hinhThuc === 'Trực tiếp' ? 'bg-[#89B449]/10 text-[#407F3E] border-[#89B449]/20' : 'bg-slate-100 text-slate-600 border-slate-200'
-                          }`}>
-                            {t.hinhThuc}
-                          </span>
-                        </td>
-                        <td className="p-4">
-                          <div className="flex items-center justify-between text-xs font-bold mb-1 text-slate-700">
-                            <span>{t.used}/{t.max}</span>
-                          </div>
-                          <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                            <div 
-                              className={`h-full rounded-full transition-all ${percent >= 100 ? 'bg-[#E68A8C]' : 'bg-[#89B449]'}`} 
-                              style={{ width: `${percent}%` }}
-                            ></div>
-                          </div>
-                        </td>
-                        <td className="p-4 text-center">
-                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold shadow-sm border ${
-                            t.trangThai === 'Mở đăng ký' ? 'bg-[#89B449] text-white border-[#89B449]/20' : 'bg-[#407F3E] text-white border-[#407F3E]/20'
-                          }`}>
-                            {t.trangThai}
-                          </span>
-                        </td>
-                        <td className="p-4 text-right pr-6">
-                          <button 
-                            className="p-1.5 text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer" 
-                            title="Chi tiết"
-                          >
-                            <ChevronRight className="w-5 h-5" />
-                          </button>
-                        </td>
+              {loading ? (
+                <div className="text-center py-12 text-slate-400 font-semibold flex items-center justify-center gap-2">
+                  <RefreshCw className="animate-spin w-5 h-5 text-[#407F3E]" />
+                  Đang tải...
+                </div>
+              ) : (
+                <table className="w-full text-left border-collapse min-w-[900px]">
+                  <thead>
+                    <tr className="bg-[#E7E0C4] text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
+                      <th className="p-4 pl-6">Nhà máy</th>
+                      <th className="p-4">Ngày tham quan</th>
+                      <th className="p-4">Giờ</th>
+                      <th className="p-4 text-center">Hình thức</th>
+                      <th className="p-4">Sức chứa</th>
+                      <th className="p-4 text-center">Trạng thái</th>
+                      <th className="p-4 text-right pr-6">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
+                    {tripsKhoa.map(t => {
+                      const used = t.dang_ky_count || 0;
+                      const max = t.suc_chua || 0;
+                      const percent = max > 0 ? (used / max) * 100 : 0;
+                      return (
+                        <tr key={t.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="p-4 pl-6 font-bold text-slate-800">{t.nhaMay?.ten_nha_may || 'N/A'}</td>
+                          <td className="p-4 font-medium text-slate-600">
+                            {new Date(t.ngay).toLocaleDateString('vi-VN')}
+                          </td>
+                          <td className="p-4 font-medium text-slate-600">{t.gio_bat_dau} - {t.gio_ket_thuc}</td>
+                          <td className="p-4 text-center">
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-bold border ${
+                              t.hinh_thuc === 'OFFLINE' ? 'bg-[#89B449]/10 text-[#407F3E] border-[#89B449]/20' : 'bg-slate-100 text-slate-600 border-slate-200'
+                            }`}>
+                              {t.hinh_thuc === 'OFFLINE' ? 'Trực tiếp' : 'Trực tuyến'}
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex items-center justify-between text-xs font-bold mb-1 text-slate-700">
+                              <span>{used}/{max}</span>
+                            </div>
+                            <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                              <div 
+                                className={`h-full rounded-full transition-all ${percent >= 100 ? 'bg-[#E68A8C]' : 'bg-[#89B449]'}`} 
+                                style={{ width: `${percent}%` }}
+                              ></div>
+                            </div>
+                          </td>
+                          <td className="p-4 text-center">
+                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold shadow-sm border ${
+                              t.trang_thai === 'MO_DANG_KY' ? 'bg-[#89B449] text-white border-[#89B449]/20' : 'bg-[#407F3E] text-white border-[#407F3E]/20'
+                            }`}>
+                              {t.trang_thai}
+                            </span>
+                          </td>
+                          <td className="p-4 text-right pr-6">
+                            <button 
+                              className="p-1.5 text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer" 
+                              title="Chi tiết"
+                              onClick={() => setViewingDetail(t)}
+                            >
+                              <ChevronRight className="w-5 h-5" />
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                    {tripsKhoa.length === 0 && (
+                      <tr>
+                        <td colSpan="7" className="text-center py-8 text-slate-500 font-medium">Không tìm thấy chuyến nào</td>
                       </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+                    )}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
         </div>
@@ -174,7 +284,7 @@ export default function ChuyenThamQuan_DSLoc() {
                     <th className="p-4 pl-6">Sinh viên đề xuất</th>
                     <th className="p-4">Nhà máy đề xuất</th>
                     <th className="p-4">Ngày tham quan</th>
-                    <th className="p-4">GVHD hiện tại</th>
+                    <th className="p-4">Trạng thái</th>
                     <th className="p-4 text-right pr-6">Thao tác</th>
                   </tr>
                 </thead>
@@ -183,34 +293,34 @@ export default function ChuyenThamQuan_DSLoc() {
                     <tr key={t.id} className="hover:bg-slate-50 transition-colors">
                       <td className="p-4 pl-6">
                         <div className="flex items-center gap-3">
-                          <img src={t.svAvatar} alt={t.svName} className="w-8 h-8 rounded-full border-2 border-white shadow-sm" />
+                          <div className="w-8 h-8 rounded-full bg-[#E7E0C4] text-[#407F3E] flex items-center justify-center font-bold text-xs shadow-sm">
+                            {t.sinhVien?.ho_ten?.charAt(0) || '?'}
+                          </div>
                           <div>
-                            <div className="font-bold text-slate-800">{t.svName}</div>
-                            <div className="text-xs font-mono text-slate-500">{t.svMssv}</div>
+                            <div className="font-bold text-slate-800">{t.sinhVien?.ho_ten}</div>
+                            <div className="text-xs font-mono text-slate-500">{t.sinhVien?.mssv}</div>
                           </div>
                         </div>
                       </td>
-                      <td className="p-4 font-bold text-slate-800">{t.nhaMay}</td>
-                      <td className="p-4 font-medium text-slate-600">{t.ngay}</td>
+                      <td className="p-4 font-bold text-slate-800">{t.nha_may_tu_do || t.nhaMay?.ten_nha_may}</td>
+                      <td className="p-4 font-medium text-slate-600">
+                        {new Date(t.ngay).toLocaleDateString('vi-VN')}
+                      </td>
                       <td className="p-4">
-                        {t.gvhd ? (
-                          <span className="font-bold text-[#407F3E] flex items-center gap-1.5">
-                            <Users className="w-4 h-4" />
-                            {t.gvhd}
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center px-2 py-1 rounded bg-slate-100 text-slate-500 text-[10px] font-bold border border-slate-200">
-                            Chưa có GVHD
-                          </span>
-                        )}
+                        <span className="inline-flex items-center px-2 py-1 rounded bg-slate-100 text-slate-500 text-[10px] font-bold border border-slate-200">
+                          {t.trang_thai}
+                        </span>
                       </td>
                       <td className="p-4 text-right pr-6">
                         <div className="flex items-center justify-end gap-2">
-                          <button className="px-3 py-1.5 bg-[#89B449] hover:bg-[#89B449]/90 text-white rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center gap-1 cursor-pointer">
+                          <button onClick={() => setViewingDetail(t)} className="p-1.5 text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer" title="Chi tiết">
+                            <ChevronRight className="w-5 h-5" />
+                          </button>
+                          <button onClick={() => handleApproveTrip(t.id, true)} className="px-3 py-1.5 bg-[#89B449] hover:bg-[#89B449]/90 text-white rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center gap-1 cursor-pointer">
                             <CheckCircle2 className="w-4 h-4" />
                             Duyệt
                           </button>
-                          <button className="px-3 py-1.5 border border-[#E68A8C] text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer">
+                          <button onClick={() => handleApproveTrip(t.id, false)} className="px-3 py-1.5 border border-[#E68A8C] text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer">
                             <XCircle className="w-4 h-4" />
                             Từ chối
                           </button>
@@ -218,6 +328,11 @@ export default function ChuyenThamQuan_DSLoc() {
                       </td>
                     </tr>
                   ))}
+                  {tripsTuDo.length === 0 && (
+                    <tr>
+                      <td colSpan="5" className="text-center py-8 text-slate-500 font-medium">Không có đề xuất tự do nào</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -233,9 +348,10 @@ export default function ChuyenThamQuan_DSLoc() {
             onClick={(e) => { e.stopPropagation(); setIsModalOpen(false); }}
           ></div>
           
-          <div 
+          <form 
+            onSubmit={handleCreateTrip}
             className="bg-white w-full max-w-2xl rounded-2xl shadow-xl relative z-10 animate-in zoom-in-95 duration-200 flex flex-col"
-            onClick={(e) => e.stopPropagation()} // Stop click from propagating to overlay
+            onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
             <div className="px-6 py-4 border-b border-[#E7E0C4] flex items-center justify-between">
@@ -244,6 +360,7 @@ export default function ChuyenThamQuan_DSLoc() {
                 Tạo chuyến tham quan
               </h2>
               <button 
+                type="button"
                 onClick={(e) => { e.stopPropagation(); setIsModalOpen(false); }}
                 className="p-1.5 text-slate-400 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg transition-colors cursor-pointer"
               >
@@ -264,22 +381,22 @@ export default function ChuyenThamQuan_DSLoc() {
                     className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-sm flex justify-between items-center cursor-pointer transition-all ${isNhaMayDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
                   >
                     <span className={`font-medium ${selectedNhaMay ? 'text-slate-800' : 'text-slate-400'}`}>
-                      {selectedNhaMay || 'Chọn nhà máy'}
+                      {nhaMayOptions.find(o => o.id === selectedNhaMay)?.ten_nha_may || 'Chọn nhà máy'}
                     </span>
                     <ChevronDown className="w-4 h-4 text-slate-400" />
                   </div>
                   {isNhaMayDropdownOpen && (
-                    <div className="absolute top-[70px] left-0 w-full bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-50 py-1 overflow-hidden animate-in slide-in-from-top-1">
+                    <div className="absolute top-[70px] left-0 w-full bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-50 py-1 overflow-hidden max-h-48 overflow-y-auto animate-in slide-in-from-top-1">
                       {nhaMayOptions.map(opt => (
                         <div 
-                          key={opt}
-                          onClick={(e) => { e.stopPropagation(); setSelectedNhaMay(opt); setIsNhaMayDropdownOpen(false); }}
+                          key={opt.id}
+                          onClick={(e) => { e.stopPropagation(); setSelectedNhaMay(opt.id); setIsNhaMayDropdownOpen(false); }}
                           className={`px-4 py-2.5 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                            selectedNhaMay === opt ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                            selectedNhaMay === opt.id ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
                           }`}
                         >
-                          {opt}
-                          {selectedNhaMay === opt && <Check className="w-4 h-4 text-[#407F3E]" />}
+                          {opt.ten_nha_may}
+                          {selectedNhaMay === opt.id && <Check className="w-4 h-4 text-[#407F3E]" />}
                         </div>
                       ))}
                     </div>
@@ -294,22 +411,22 @@ export default function ChuyenThamQuan_DSLoc() {
                     className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-sm flex justify-between items-center cursor-pointer transition-all ${isLichDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
                   >
                     <span className={`font-medium truncate pr-2 ${selectedLich ? 'text-slate-800' : 'text-slate-400'}`}>
-                      {selectedLich || 'Chọn lịch kiến tập'}
+                      {lichOptions.find(o => o.id === selectedLich)?.ten_lich || 'Chọn lịch kiến tập'}
                     </span>
                     <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
                   </div>
                   {isLichDropdownOpen && (
-                    <div className="absolute top-[70px] left-0 w-full bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-50 py-1 overflow-hidden animate-in slide-in-from-top-1">
+                    <div className="absolute top-[70px] left-0 w-full bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-50 py-1 overflow-hidden max-h-48 overflow-y-auto animate-in slide-in-from-top-1">
                       {lichOptions.map(opt => (
                         <div 
-                          key={opt}
-                          onClick={(e) => { e.stopPropagation(); setSelectedLich(opt); setIsLichDropdownOpen(false); }}
+                          key={opt.id}
+                          onClick={(e) => { e.stopPropagation(); setSelectedLich(opt.id); setIsLichDropdownOpen(false); }}
                           className={`px-4 py-2.5 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                            selectedLich === opt ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                            selectedLich === opt.id ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
                           }`}
                         >
-                          <span className="truncate pr-2">{opt}</span>
-                          {selectedLich === opt && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                          <span className="truncate pr-2">{opt.ten_lich}</span>
+                          {selectedLich === opt.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
                         </div>
                       ))}
                     </div>
@@ -325,6 +442,8 @@ export default function ChuyenThamQuan_DSLoc() {
                     <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
                       type="date"
+                      value={ngay}
+                      onChange={(e) => setNgay(e.target.value)}
                       className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-800 font-medium cursor-pointer"
                     />
                   </div>
@@ -335,6 +454,8 @@ export default function ChuyenThamQuan_DSLoc() {
                     <Clock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
                       type="time"
+                      value={gioBatDau}
+                      onChange={(e) => setGioBatDau(e.target.value)}
                       className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-800 font-medium cursor-pointer"
                     />
                   </div>
@@ -345,6 +466,8 @@ export default function ChuyenThamQuan_DSLoc() {
                     <Clock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
                       type="time"
+                      value={gioKetThuc}
+                      onChange={(e) => setGioKetThuc(e.target.value)}
                       className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-800 font-medium cursor-pointer"
                     />
                   </div>
@@ -390,6 +513,8 @@ export default function ChuyenThamQuan_DSLoc() {
                     <Users className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
                       type="number"
+                      value={sucChua}
+                      onChange={(e) => setSucChua(e.target.value)}
                       placeholder="VD: 40"
                       className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-800 font-bold"
                     />
@@ -402,16 +527,67 @@ export default function ChuyenThamQuan_DSLoc() {
             {/* Footer */}
             <div className="px-6 py-4 border-t border-[#E7E0C4] bg-slate-50/50 flex items-center justify-end gap-3 rounded-b-2xl z-10">
               <button 
+                type="button"
                 onClick={(e) => { e.stopPropagation(); setIsModalOpen(false); }}
                 className="px-5 py-2.5 border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-bold transition-colors cursor-pointer"
               >
                 Hủy
               </button>
               <button 
-                onClick={(e) => { e.stopPropagation(); setIsModalOpen(false); }}
+                type="submit"
                 className="px-6 py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl text-sm font-bold transition-colors shadow-sm cursor-pointer"
               >
                 Lưu
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Modal - Xem chi tiết */}
+      {viewingDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div 
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={(e) => { e.stopPropagation(); setViewingDetail(null); }}
+          ></div>
+          
+          <div 
+            className="bg-white w-full max-w-2xl rounded-2xl shadow-xl relative z-10 animate-in zoom-in-95 duration-200 flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 py-4 border-b border-[#E7E0C4] flex items-center justify-between">
+              <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                Chi tiết
+              </h2>
+              <button 
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setViewingDetail(null); }}
+                className="p-1.5 text-slate-400 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              {Object.entries(viewingDetail).map(([key, value]) => {
+                if (typeof value === 'object' && value !== null) return null;
+                return (
+                  <div key={key} className="flex flex-col border-b border-slate-100 pb-2">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{key}</span>
+                    <span className="text-sm font-medium text-slate-800 break-words">{String(value)}</span>
+                  </div>
+                );
+              })}
+            </div>
+            
+            <div className="px-6 py-4 border-t border-[#E7E0C4] bg-slate-50/50 flex items-center justify-end rounded-b-2xl">
+              <button 
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setViewingDetail(null); }}
+                className="px-6 py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl text-sm font-bold transition-colors shadow-sm cursor-pointer"
+              >
+                Đóng
               </button>
             </div>
           </div>

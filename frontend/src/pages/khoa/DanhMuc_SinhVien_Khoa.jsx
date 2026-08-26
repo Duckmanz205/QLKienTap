@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Upload, Plus, Search, ChevronDown, Check,
-  Edit2, Key, Trash2
+  Edit2, Key, Trash2, X
 } from 'lucide-react';
 import { khoaApi } from '../../services/api';
 
@@ -22,6 +22,15 @@ export default function DanhMuc_SinhVien_Khoa() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalStudents, setTotalStudents] = useState(0);
 
+  // Modal States
+  const [showSingleModal, setShowSingleModal] = useState(false);
+  const [editingStudent, setEditingStudent] = useState(null);
+  const [newMssv, setNewMssv] = useState('');
+  const [newClass, setNewClass] = useState('');
+  const [newName, setNewName] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [newPhone, setNewPhone] = useState('');
+
   useEffect(() => {
     fetchData(1);
   }, []);
@@ -35,6 +44,76 @@ export default function DanhMuc_SinhVien_Khoa() {
       setPage(targetPage);
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleSingleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      if (editingStudent) {
+        await khoaApi.updateStudent(editingStudent.id, {
+          email: newEmail,
+          sdt: newPhone,
+          ten_lop: newClass,
+        });
+        alert('Cập nhật sinh viên thành công');
+      } else {
+        await khoaApi.createStudent({
+          mssv: newMssv,
+          ho_ten: newName,
+          ten_lop: newClass,
+          email: newEmail,
+          sdt: newPhone,
+        });
+        alert('Thêm sinh viên thành công');
+      }
+      setShowSingleModal(false);
+      setEditingStudent(null);
+      setNewMssv('');
+      setNewName('');
+      setNewClass('');
+      setNewEmail('');
+      setNewPhone('');
+      fetchData(1);
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.message || 'Có lỗi xảy ra');
+    }
+  };
+
+  const handleEditClick = (stud) => {
+    setEditingStudent(stud);
+    setNewMssv(stud.mssv);
+    setNewName(stud.ho_ten);
+    setNewClass(stud.ten_lop || '');
+    setNewEmail(stud.email || '');
+    setNewPhone(stud.sdt || '');
+    setShowSingleModal(true);
+  };
+
+  const handleDeleteClick = async (stud) => {
+    if (window.confirm(`Bạn có chắc chắn muốn xóa sinh viên ${stud.ho_ten}?`)) {
+      try {
+        const res = await khoaApi.deleteStudent(stud.id);
+        alert(res.data.message || 'Xóa sinh viên thành công');
+        fetchData();
+      } catch (err) {
+        console.error(err);
+        alert(err.response?.data?.message || 'Có lỗi xảy ra khi xóa sinh viên');
+      }
+    }
+  };
+
+  const handleResetPassword = async (stud) => {
+    if (window.confirm(`Bạn có chắc chắn muốn reset mật khẩu của sinh viên ${stud.ho_ten} về mặc định?`)) {
+      try {
+        const res = await khoaApi.resetAccountPassword(stud.taikhoan_id);
+        alert(res.data.message || 'Đã đặt lại mật khẩu');
+        fetchData();
+      } catch (err) {
+        console.error(err);
+        alert(err.response?.data?.message || 'Có lỗi xảy ra khi reset mật khẩu');
+      }
     }
   };
 
@@ -57,16 +136,30 @@ export default function DanhMuc_SinhVien_Khoa() {
   });
 
   return (
-    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-2 animate-in fade-in duration-300">
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-2 animate-in fade-in duration-300 relative">
       {/* Header section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <h1 className="text-2xl font-bold text-slate-800">Sinh viên</h1>
         <div className="flex gap-3">
-          <button className="px-4 py-2 border-2 border-[#407F3E] text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors cursor-pointer">
+          <button 
+            onClick={() => alert('Tính năng nhập từ Excel đang phát triển')}
+            className="px-4 py-2 border-2 border-[#407F3E] text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors cursor-pointer"
+          >
             <Upload className="w-4 h-4" />
             Nhập từ Excel
           </button>
-          <button className="px-4 py-2 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors shadow-sm cursor-pointer">
+          <button 
+            onClick={() => {
+              setEditingStudent(null);
+              setNewMssv('');
+              setNewName('');
+              setNewClass('');
+              setNewEmail('');
+              setNewPhone('');
+              setShowSingleModal(true);
+            }}
+            className="px-4 py-2 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors shadow-sm cursor-pointer"
+          >
             <Plus className="w-4 h-4" />
             Thêm sinh viên
           </button>
@@ -205,16 +298,24 @@ export default function DanhMuc_SinhVien_Khoa() {
                       </td>
                       <td className="p-4 text-right">
                         <div className="flex justify-end gap-2 text-slate-400">
-                          <button className="p-1.5 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded transition-colors cursor-pointer" title="Sửa thông tin">
+                          <button 
+                            className="p-1.5 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded transition-colors cursor-pointer" 
+                            title="Sửa thông tin"
+                            onClick={() => handleEditClick(stud)}
+                          >
                             <Edit2 className="w-4 h-4" />
                           </button>
-                          <button className="p-1.5 hover:text-[#89B449] hover:bg-[#89B449]/10 rounded transition-colors cursor-pointer" title="Reset mật khẩu">
+                          <button 
+                            className="p-1.5 hover:text-[#89B449] hover:bg-[#89B449]/10 rounded transition-colors cursor-pointer" 
+                            title="Reset mật khẩu"
+                            onClick={() => handleResetPassword(stud)}
+                          >
                             <Key className="w-4 h-4" />
                           </button>
                           <button 
                             className="p-1.5 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded transition-colors cursor-pointer" 
                             title="Xóa sinh viên" 
-                            onClick={() => window.confirm(`Bạn có chắc chắn muốn xóa sinh viên ${stud.ho_ten}?`)}
+                            onClick={() => handleDeleteClick(stud)}
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -285,6 +386,103 @@ export default function DanhMuc_SinhVien_Khoa() {
           </div>
         </div>
       </div>
+
+      {/* Single Student Modal */}
+      {showSingleModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-xl border border-[#E7E0C4] max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <h4 className="font-bold text-slate-800 text-lg">
+                {editingStudent ? "Sửa thông tin sinh viên" : "Thêm sinh viên mới"}
+              </h4>
+              <button 
+                onClick={() => setShowSingleModal(false)} 
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-200 text-slate-500 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSingleSubmit} className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1.5">Mã số SV (MSSV) <span className="text-red-500">*</span></label>
+                  <input 
+                    type="text" 
+                    required
+                    disabled={!!editingStudent}
+                    placeholder="20032119" 
+                    value={newMssv}
+                    onChange={(e) => setNewMssv(e.target.value)}
+                    className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] text-sm transition-all font-mono disabled:bg-slate-100 disabled:text-slate-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1.5">Mã Lớp <span className="text-red-500">*</span></label>
+                  <input 
+                    type="text" 
+                    required
+                    placeholder="14DHTP1" 
+                    value={newClass}
+                    onChange={(e) => setNewClass(e.target.value)}
+                    className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] text-sm transition-all"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1.5">Họ và Tên <span className="text-red-500">*</span></label>
+                <input 
+                  type="text" 
+                  required
+                  disabled={!!editingStudent}
+                  placeholder="Ví dụ: Nguyễn Văn Hải" 
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] text-sm transition-all disabled:bg-slate-100 disabled:text-slate-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1.5">Email</label>
+                <input 
+                  type="email" 
+                  placeholder="20032119@huit.edu.vn" 
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] text-sm transition-all font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1.5">Số điện thoại</label>
+                <input 
+                  type="text" 
+                  placeholder="0912345678" 
+                  value={newPhone}
+                  onChange={(e) => setNewPhone(e.target.value)}
+                  className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] text-sm transition-all font-mono"
+                />
+              </div>
+
+              <div className="pt-4 flex gap-3">
+                <button 
+                  type="button" 
+                  onClick={() => setShowSingleModal(false)}
+                  className="flex-1 px-4 py-2.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg text-sm font-bold transition-colors cursor-pointer"
+                >
+                  Hủy bỏ
+                </button>
+                <button 
+                  type="submit" 
+                  className="flex-1 px-4 py-2.5 bg-[#407F3E] hover:bg-[#407F3E]/90 text-white rounded-lg text-sm font-bold transition-colors cursor-pointer"
+                >
+                  {editingStudent ? "Lưu thay đổi" : "Thêm sinh viên"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

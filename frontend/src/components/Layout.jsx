@@ -35,6 +35,7 @@ export default function Layout() {
   const location = useLocation();
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState({
     'DANH MỤC HỆ THỐNG': true,
     'KẾ HOẠCH KIẾN TẬP': true,
@@ -426,6 +427,7 @@ export default function Layout() {
     { to: '/khoa/plans', label: 'Đợt kiến tập', icon: Calendar, category: 'KẾ HOẠCH KIẾN TẬP' },
     { to: '/khoa/lich-kien-tap', label: 'Lịch kiến tập', icon: Layers, category: 'KẾ HOẠCH KIẾN TẬP' },
     { to: '/khoa/trips', label: 'Chuyến tham quan', icon: Compass, category: 'KẾ HOẠCH KIẾN TẬP' },
+    { to: '/khoa/visit-report', label: 'Báo cáo tham quan', icon: Eye, category: 'KẾ HOẠCH KIẾN TẬP' },
     // ĐĂNG KÝ & PHÂN CÔNG
     { to: '/khoa/registrations', label: 'Quản lý đăng ký', icon: FileCheck, category: 'ĐĂNG KÝ & PHÂN CÔNG' },
     { to: '/khoa/supervisors', label: 'Phân công GVHD', icon: GraduationCap, category: 'ĐĂNG KÝ & PHÂN CÔNG' },
@@ -605,24 +607,47 @@ export default function Layout() {
           </div>
 
           <div className="flex items-center gap-4">
-            <button className="relative p-2 text-slate-600 hover:text-[#407F3E] transition-colors cursor-pointer">
+            <Link to="/khoa/notifications" className="relative p-2 text-slate-600 hover:text-[#407F3E] transition-colors cursor-pointer">
               <Bell className="w-5 h-5" />
               <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-[#DBD468] rounded-full border-2 border-white"></span>
-            </button>
+            </Link>
 
             <div className="w-px h-6 bg-[#E7E0C4]"></div>
 
-            <div className="flex items-center gap-3 cursor-pointer">
-              <div className="w-8 h-8 rounded-full overflow-hidden">
-                <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=E7E0C4&color=407F3E`} alt="Avatar" className="w-full h-full object-cover" />
+            <div className="relative">
+              <div 
+                className="flex items-center gap-3 cursor-pointer"
+                onClick={(e) => { e.stopPropagation(); setIsUserMenuOpen(!isUserMenuOpen); }}
+              >
+                <div className="w-8 h-8 rounded-full overflow-hidden">
+                  <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=E7E0C4&color=407F3E`} alt="Avatar" className="w-full h-full object-cover" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-slate-800">{fullName}</span>
+                  <span className="px-2 py-0.5 bg-[#E7E0C4] text-[#407F3E] text-[10px] font-bold rounded-full uppercase tracking-wider">
+                    Quản lý khoa
+                  </span>
+                  <ChevronDown className="w-4 h-4 text-slate-400" />
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-slate-800">{fullName}</span>
-                <span className="px-2 py-0.5 bg-[#E7E0C4] text-[#407F3E] text-[10px] font-bold rounded-full uppercase tracking-wider">
-                  Quản lý khoa
-                </span>
-                <ChevronDown className="w-4 h-4 text-slate-400" />
-              </div>
+
+              {isUserMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsUserMenuOpen(false)}></div>
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-100 py-1 z-50">
+                    <button
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        confirmLogout();
+                      }}
+                      className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 font-medium transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Đăng xuất
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </header>

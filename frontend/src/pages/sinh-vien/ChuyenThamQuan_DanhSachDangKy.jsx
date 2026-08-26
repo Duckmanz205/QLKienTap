@@ -1,108 +1,110 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   MapPin, Laptop, Calendar, Clock, Image as ImageIcon, Users
 } from 'lucide-react';
+import { sinhVienApi } from '../../services/api';
 
 export default function ChuyenThamQuan_DanhSachDangKy() {
   const [activeTab, setActiveTab] = useState('coTheDangKy');
+  const [student, setStudent] = useState(null);
+  const [factories, setFactories] = useState([]);
+  
+  const [availableTrips, setAvailableTrips] = useState([]);
+  const [registeredTrips, setRegisteredTrips] = useState([]);
 
-  // Mock Data
-  const availableTrips = [
-    {
-      id: 1,
-      nhaMay: 'Nhà máy Yakult HCM',
-      ngayThamQuan: '10/09/2026',
-      gioBatDau: '08:00',
-      gioKetThuc: '11:00',
-      hinhThuc: 'Trực tiếp',
-      conTrong: 15
-    },
-    {
-      id: 2,
-      nhaMay: 'Công ty Cổ phần Sữa Việt Nam (Vinamilk)',
-      ngayThamQuan: '15/09/2026',
-      gioBatDau: '13:00',
-      gioKetThuc: '16:00',
-      hinhThuc: 'Trực tuyến',
-      conTrong: 120
-    },
-    {
-      id: 3,
-      nhaMay: 'Tập đoàn C.P Việt Nam',
-      ngayThamQuan: '20/09/2026',
-      gioBatDau: '08:00',
-      gioKetThuc: '12:00',
-      hinhThuc: 'Trực tiếp',
-      conTrong: 5
-    },
-    {
-      id: 4,
-      nhaMay: 'Acecook Việt Nam',
-      ngayThamQuan: '25/09/2026',
-      gioBatDau: '14:00',
-      gioKetThuc: '17:00',
-      hinhThuc: 'Trực tiếp',
-      conTrong: 20
-    }
-  ];
+  // Form states for Propose
+  const [factoryId, setFactoryId] = useState('');
+  const [ngayThamQuan, setNgayThamQuan] = useState('');
+  const [gioBatDau, setGioBatDau] = useState('');
+  const [gioKetThuc, setGioKetThuc] = useState('');
+  const [hinhThuc, setHinhThuc] = useState('TrucTiep');
 
-  const registeredTrips = [
-    {
-      id: 101,
-      nhaMay: 'Nhà máy Ajinomoto Biên Hòa',
-      ngayThamQuan: '05/09/2026',
-      hinhThuc: 'Trực tiếp',
-      trangThai: 'Chờ duyệt',
-      canCancel: true
-    },
-    {
-      id: 102,
-      nhaMay: 'Heineken Việt Nam',
-      ngayThamQuan: '01/09/2026',
-      hinhThuc: 'Trực tiếp',
-      trangThai: 'Hợp lệ',
-      canCancel: false
-    },
-    {
-      id: 103,
-      nhaMay: 'KIDO Group',
-      ngayThamQuan: '15/08/2026',
-      hinhThuc: 'Trực tuyến',
-      trangThai: 'Đã tham gia',
-      canCancel: false
-    },
-    {
-      id: 104,
-      nhaMay: 'Nestlé Trị An',
-      ngayThamQuan: '10/08/2026',
-      hinhThuc: 'Trực tiếp',
-      trangThai: 'Đã hủy',
-      canCancel: false
-    },
-    {
-      id: 105,
-      nhaMay: 'Suntory PepsiCo',
-      ngayThamQuan: '05/08/2026',
-      hinhThuc: 'Trực tiếp',
-      trangThai: 'Vắng mặt',
-      canCancel: false
+  useEffect(() => {
+    const userJson = localStorage.getItem('user');
+    if (userJson) {
+      const { user } = JSON.parse(userJson);
+      sinhVienApi.getProfile(user.id).then(res => {
+        setStudent(res.data);
+        fetchData(res.data.id);
+      }).catch(err => console.error(err));
     }
-  ];
+    sinhVienApi.getFactories().then(res => setFactories(res.data || [])).catch(err => console.error(err));
+  }, []);
+
+  const fetchData = async (svId) => {
+    try {
+      const [availRes, regRes] = await Promise.all([
+        sinhVienApi.getAvailableTrips(svId),
+        sinhVienApi.getRegisteredTrips(svId)
+      ]);
+      setAvailableTrips(availRes.data || []);
+      setRegisteredTrips(regRes.data || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleRegister = async (tripId) => {
+    if (!window.confirm("Bạn có chắc chắn muốn đăng ký chuyến kiến tập này?")) return;
+    try {
+      await sinhVienApi.registerTrip(tripId);
+      alert('Đăng ký thành công!');
+      fetchData(student.id);
+      setActiveTab('daDangKy');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Có lỗi xảy ra');
+    }
+  };
+
+  const handleCancelRegistration = async (registrationId) => {
+    const reason = window.prompt("Nhập lý do hủy đăng ký:");
+    if (!reason) return;
+    try {
+      await sinhVienApi.requestCancel({ dangKyId: registrationId, lyDo: reason });
+      alert('Đã gửi yêu cầu hủy đăng ký');
+      fetchData(student.id);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Có lỗi xảy ra');
+    }
+  };
+
+  const handleProposalSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await sinhVienApi.proposeTrip({
+        nhaMayId: parseInt(factoryId),
+        ngayThamQuan,
+        gioBatDau,
+        gioKetThuc,
+        hinhThuc
+      });
+      alert('Đã gửi đề xuất chuyến đi tự do thành công!');
+      setFactoryId('');
+      setNgayThamQuan('');
+      setGioBatDau('');
+      setGioKetThuc('');
+      setActiveTab('coTheDangKy');
+      fetchData(student.id);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Có lỗi xảy ra');
+    }
+  };
 
   const getStatusBadge = (status) => {
     switch (status) {
-      case 'Chờ duyệt':
-        return <span className="inline-flex items-center px-3 py-1 whitespace-nowrap rounded-full text-[11px] font-bold bg-[#DBD468] text-slate-800 shadow-sm border border-[#DBD468]/20">{status}</span>;
-      case 'Hợp lệ':
-      case 'Đã tham gia':
-      case 'Hoàn thành':
-        return <span className="inline-flex items-center px-3 py-1 whitespace-nowrap rounded-full text-[11px] font-bold bg-[#89B449] text-white shadow-sm border border-[#89B449]/20">{status}</span>;
-      case 'Bị loại':
-      case 'Vắng mặt':
-      case 'Không đạt':
-        return <span className="inline-flex items-center px-3 py-1 whitespace-nowrap rounded-full text-[11px] font-bold bg-[#E68A8C] text-white shadow-sm border border-[#E68A8C]/20">{status}</span>;
-      case 'Đã hủy':
-        return <span className="inline-flex items-center px-3 py-1 whitespace-nowrap rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200">{status}</span>;
+      case 'ChoDuyet':
+      case 'ChoHuy':
+        return <span className="inline-flex items-center px-3 py-1 whitespace-nowrap rounded-full text-[11px] font-bold bg-[#DBD468] text-slate-800 shadow-sm border border-[#DBD468]/20">{status === 'ChoDuyet' ? 'Chờ duyệt' : 'Chờ hủy'}</span>;
+      case 'HopLe':
+      case 'DaThamGia':
+      case 'HoanThanh':
+        return <span className="inline-flex items-center px-3 py-1 whitespace-nowrap rounded-full text-[11px] font-bold bg-[#89B449] text-white shadow-sm border border-[#89B449]/20">{status === 'HopLe' ? 'Hợp lệ' : (status === 'DaThamGia' ? 'Đã tham gia' : 'Hoàn thành')}</span>;
+      case 'BiLoai':
+      case 'VangMat':
+      case 'KhongDat':
+        return <span className="inline-flex items-center px-3 py-1 whitespace-nowrap rounded-full text-[11px] font-bold bg-[#E68A8C] text-white shadow-sm border border-[#E68A8C]/20">{status === 'BiLoai' ? 'Bị loại' : (status === 'VangMat' ? 'Vắng mặt' : 'Không đạt')}</span>;
+      case 'DaHuy':
+        return <span className="inline-flex items-center px-3 py-1 whitespace-nowrap rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200">Đã hủy</span>;
       default:
         return <span className="inline-flex items-center px-3 py-1 whitespace-nowrap rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200">{status}</span>;
     }
@@ -115,10 +117,10 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-[#E7E0C4] mb-8">
+      <div className="flex border-b border-[#E7E0C4] mb-8 overflow-x-auto">
         <button
           onClick={() => setActiveTab('coTheDangKy')}
-          className={`px-6 py-3 font-bold text-sm transition-colors relative cursor-pointer ${
+          className={`px-6 py-3 font-bold text-sm transition-colors relative cursor-pointer whitespace-nowrap ${
             activeTab === 'coTheDangKy' ? 'text-[#89B449]' : 'text-slate-500 hover:text-slate-700'
           }`}
         >
@@ -129,7 +131,7 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
         </button>
         <button
           onClick={() => setActiveTab('daDangKy')}
-          className={`px-6 py-3 font-bold text-sm transition-colors relative cursor-pointer ${
+          className={`px-6 py-3 font-bold text-sm transition-colors relative cursor-pointer whitespace-nowrap ${
             activeTab === 'daDangKy' ? 'text-[#89B449]' : 'text-slate-500 hover:text-slate-700'
           }`}
         >
@@ -140,7 +142,7 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
         </button>
         <button
           onClick={() => setActiveTab('deXuatTuDo')}
-          className={`px-6 py-3 font-bold text-sm transition-colors relative cursor-pointer ${
+          className={`px-6 py-3 font-bold text-sm transition-colors relative cursor-pointer whitespace-nowrap ${
             activeTab === 'deXuatTuDo' ? 'text-[#89B449]' : 'text-slate-500 hover:text-slate-700'
           }`}
         >
@@ -157,55 +159,64 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
         {/* TAB 1: Có thể đăng ký */}
         {activeTab === 'coTheDangKy' && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            {availableTrips.map(trip => {
-              const isOnline = trip.hinhThuc === 'Trực tuyến';
-              return (
-                <div key={trip.id} className="bg-white rounded-2xl border border-[#E7E0C4] shadow-sm hover:shadow-md transition-all overflow-hidden flex flex-col group">
-                  {/* Image Placeholder */}
-                  <div className="h-40 bg-slate-100 flex items-center justify-center border-b border-[#E7E0C4] relative overflow-hidden group-hover:bg-[#89B449]/5 transition-colors">
-                    <ImageIcon className="w-10 h-10 text-slate-300 group-hover:scale-110 transition-transform duration-500" />
-                    <div className="absolute top-3 right-3">
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider shadow-sm ${
-                        isOnline ? 'bg-slate-800 text-white' : 'bg-[#E7E0C4] text-slate-800'
-                      }`}>
-                        {isOnline ? <Laptop className="w-3 h-3" /> : <MapPin className="w-3 h-3" />}
-                        {trip.hinhThuc}
-                      </span>
+            {availableTrips.length === 0 ? (
+              <div className="col-span-full p-8 text-center text-slate-500 bg-white rounded-2xl border border-[#E7E0C4]">
+                Hiện không có chuyến đi nào mở đăng ký.
+              </div>
+            ) : (
+              availableTrips.map(trip => {
+                const isOnline = trip.hinh_thuc === 'TrucTuyen';
+                return (
+                  <div key={trip.id} className="bg-white rounded-2xl border border-[#E7E0C4] shadow-sm hover:shadow-md transition-all overflow-hidden flex flex-col group">
+                    {/* Image Placeholder */}
+                    <div className="h-40 bg-slate-100 flex items-center justify-center border-b border-[#E7E0C4] relative overflow-hidden group-hover:bg-[#89B449]/5 transition-colors">
+                      <ImageIcon className="w-10 h-10 text-slate-300 group-hover:scale-110 transition-transform duration-500" />
+                      <div className="absolute top-3 right-3">
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider shadow-sm ${
+                          isOnline ? 'bg-slate-800 text-white' : 'bg-[#E7E0C4] text-slate-800'
+                        }`}>
+                          {isOnline ? <Laptop className="w-3 h-3" /> : <MapPin className="w-3 h-3" />}
+                          {isOnline ? 'Trực tuyến' : 'Trực tiếp'}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                  
-                  {/* Content */}
-                  <div className="p-5 flex-1 flex flex-col">
-                    <h3 className="text-lg font-black text-slate-800 mb-4 line-clamp-2 leading-tight group-hover:text-[#407F3E] transition-colors">{trip.nhaMay}</h3>
                     
-                    <div className="space-y-3 mb-6 mt-auto">
-                      <div className="flex items-center gap-3 text-sm font-medium text-slate-600">
-                        <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
-                          <Calendar className="w-4 h-4 text-slate-400" />
+                    {/* Content */}
+                    <div className="p-5 flex-1 flex flex-col">
+                      <h3 className="text-lg font-black text-slate-800 mb-4 line-clamp-2 leading-tight group-hover:text-[#407F3E] transition-colors">{trip.nhaMay?.ten_nha_may}</h3>
+                      
+                      <div className="space-y-3 mb-6 mt-auto">
+                        <div className="flex items-center gap-3 text-sm font-medium text-slate-600">
+                          <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
+                            <Calendar className="w-4 h-4 text-slate-400" />
+                          </div>
+                          {trip.ngay_tham_quan ? new Date(trip.ngay_tham_quan).toLocaleDateString('vi-VN') : '--'}
                         </div>
-                        {trip.ngayThamQuan}
-                      </div>
-                      <div className="flex items-center gap-3 text-sm font-medium text-slate-600">
-                        <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
-                          <Clock className="w-4 h-4 text-slate-400" />
+                        <div className="flex items-center gap-3 text-sm font-medium text-slate-600">
+                          <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
+                            <Clock className="w-4 h-4 text-slate-400" />
+                          </div>
+                          {(trip.gio_bat_dau || '--').slice(0, 5)} - {(trip.gio_ket_thuc || '--').slice(0, 5)}
                         </div>
-                        {trip.gioBatDau} - {trip.gioKetThuc}
-                      </div>
-                      <div className="flex items-center gap-3 text-sm font-medium text-slate-600">
-                        <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
-                          <Users className="w-4 h-4 text-[#89B449]" />
+                        <div className="flex items-center gap-3 text-sm font-medium text-slate-600">
+                          <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
+                            <Users className="w-4 h-4 text-[#89B449]" />
+                          </div>
+                          Còn <span className="font-bold text-[#89B449]">{Math.max(0, trip.so_luong_sinh_vien - (trip.da_dang_ky || 0))}</span> chỗ
                         </div>
-                        Còn <span className="font-bold text-[#89B449]">{trip.conTrong}</span> chỗ
                       </div>
-                    </div>
 
-                    <button className="w-full py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl text-sm font-bold uppercase tracking-wider transition-colors shadow-sm cursor-pointer">
-                      Đăng ký
-                    </button>
+                      <button 
+                        onClick={() => handleRegister(trip.id)}
+                        className="w-full py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl text-sm font-bold uppercase tracking-wider transition-colors shadow-sm cursor-pointer"
+                      >
+                        Đăng ký
+                      </button>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         )}
 
@@ -224,35 +235,49 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                   </tr>
                 </thead>
                 <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
-                  {registeredTrips.map(trip => {
-                    const isOnline = trip.hinhThuc === 'Trực tuyến';
-                    return (
-                      <tr key={trip.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="p-4 pl-6 font-bold text-slate-800">{trip.nhaMay}</td>
-                        <td className="p-4 font-medium text-slate-600">{trip.ngayThamQuan}</td>
-                        <td className="p-4 text-center">
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shrink-0 ${
-                            isOnline ? 'bg-slate-100 text-slate-600' : 'bg-[#89B449]/10 text-[#407F3E]'
-                          }`}>
-                            {isOnline ? <Laptop className="w-3 h-3" /> : <MapPin className="w-3 h-3" />}
-                            {trip.hinhThuc}
-                          </span>
-                        </td>
-                        <td className="p-4 text-center">
-                          {getStatusBadge(trip.trangThai)}
-                        </td>
-                        <td className="p-4 text-right pr-6">
-                          {trip.canCancel ? (
-                            <button className="text-xs font-bold text-[#E68A8C] hover:text-[#E68A8C]/70 hover:underline transition-colors cursor-pointer">
-                              Hủy đăng ký
-                            </button>
-                          ) : (
-                            <span className="text-xs font-bold text-slate-300 italic">Không thể hủy</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {registeredTrips.length === 0 ? (
+                    <tr>
+                      <td colSpan="5" className="p-8 text-center text-slate-500 italic">
+                        Bạn chưa đăng ký chuyến kiến tập nào.
+                      </td>
+                    </tr>
+                  ) : (
+                    registeredTrips.map(reg => {
+                      const trip = reg.chuyenThamQuan;
+                      const isOnline = trip?.hinh_thuc === 'TrucTuyen';
+                      const canCancel = reg.trang_thai === 'ChoDuyet' || reg.trang_thai === 'HopLe';
+
+                      return (
+                        <tr key={reg.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="p-4 pl-6 font-bold text-slate-800">{trip?.nhaMay?.ten_nha_may || 'Chưa rõ'}</td>
+                          <td className="p-4 font-medium text-slate-600">{trip?.ngay_tham_quan ? new Date(trip.ngay_tham_quan).toLocaleDateString('vi-VN') : '--'}</td>
+                          <td className="p-4 text-center">
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shrink-0 ${
+                              isOnline ? 'bg-slate-100 text-slate-600' : 'bg-[#89B449]/10 text-[#407F3E]'
+                            }`}>
+                              {isOnline ? <Laptop className="w-3 h-3" /> : <MapPin className="w-3 h-3" />}
+                              {isOnline ? 'Trực tuyến' : 'Trực tiếp'}
+                            </span>
+                          </td>
+                          <td className="p-4 text-center">
+                            {getStatusBadge(reg.trang_thai)}
+                          </td>
+                          <td className="p-4 text-right pr-6">
+                            {canCancel ? (
+                              <button 
+                                onClick={() => handleCancelRegistration(reg.id)}
+                                className="text-xs font-bold text-[#E68A8C] hover:text-[#E68A8C]/70 hover:underline transition-colors cursor-pointer"
+                              >
+                                Hủy đăng ký
+                              </button>
+                            ) : (
+                              <span className="text-xs font-bold text-slate-300 italic">Không thể hủy</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
@@ -264,36 +289,70 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
           <div className="bg-white rounded-2xl border border-[#E7E0C4] shadow-sm p-6 lg:p-8 max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
             <h2 className="text-xl font-bold text-slate-800 mb-6 border-b border-[#E7E0C4] pb-4">Biểu mẫu Đề xuất Sinh viên đi tự do</h2>
             
-            <form className="space-y-6">
+            <form onSubmit={handleProposalSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
-                  <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Tên doanh nghiệp / Đơn vị tiếp nhận <span className="text-[#E68A8C]">*</span></label>
-                  <input type="text" placeholder="Nhập tên doanh nghiệp..." className="w-full px-4 py-3 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-800 font-medium" />
+                  <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Chọn Nhà máy <span className="text-[#E68A8C]">*</span></label>
+                  <select 
+                    value={factoryId}
+                    onChange={(e) => setFactoryId(e.target.value)}
+                    required
+                    className="w-full px-4 py-3 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-800 font-medium"
+                  >
+                    <option value="">-- Chọn Nhà máy đã có trên hệ thống --</option>
+                    {factories.map(f => (
+                      <option key={f.id} value={f.id}>{f.ten_nha_may}</option>
+                    ))}
+                  </select>
                 </div>
                 
                 <div className="md:col-span-2">
-                  <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Địa chỉ <span className="text-[#E68A8C]">*</span></label>
-                  <input type="text" placeholder="Nhập địa chỉ đầy đủ..." className="w-full px-4 py-3 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-800 font-medium" />
+                  <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Ngày dự kiến tham quan <span className="text-[#E68A8C]">*</span></label>
+                  <input 
+                    type="date" 
+                    value={ngayThamQuan}
+                    onChange={(e) => setNgayThamQuan(e.target.value)}
+                    required
+                    className="w-full px-4 py-3 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-800 font-medium" 
+                  />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Họ tên người liên hệ <span className="text-[#E68A8C]">*</span></label>
-                  <input type="text" placeholder="Người phụ trách tại DN" className="w-full px-4 py-3 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-800 font-medium" />
+                  <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Giờ bắt đầu</label>
+                  <input 
+                    type="time" 
+                    value={gioBatDau}
+                    onChange={(e) => setGioBatDau(e.target.value)}
+                    className="w-full px-4 py-3 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-800 font-medium" 
+                  />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Số điện thoại liên hệ <span className="text-[#E68A8C]">*</span></label>
-                  <input type="tel" placeholder="09xxxxxxx" className="w-full px-4 py-3 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-800 font-medium" />
+                  <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Giờ kết thúc</label>
+                  <input 
+                    type="time" 
+                    value={gioKetThuc}
+                    onChange={(e) => setGioKetThuc(e.target.value)}
+                    className="w-full px-4 py-3 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-800 font-medium" 
+                  />
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Ngày dự kiến tham quan <span className="text-[#E68A8C]">*</span></label>
-                  <input type="date" className="w-full px-4 py-3 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-800 font-medium" />
+                  <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Hình thức <span className="text-[#E68A8C]">*</span></label>
+                  <select 
+                    value={hinhThuc}
+                    onChange={(e) => setHinhThuc(e.target.value)}
+                    required
+                    className="w-full px-4 py-3 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-800 font-medium"
+                  >
+                    <option value="TrucTiep">Trực tiếp</option>
+                    <option value="TrucTuyen">Trực tuyến</option>
+                  </select>
                 </div>
               </div>
 
               <div className="pt-6 mt-6 border-t border-[#E7E0C4] flex justify-end">
-                <button type="button" className="px-6 py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl text-sm font-bold uppercase tracking-wider transition-colors shadow-sm cursor-pointer">
+                <button type="submit" className="px-6 py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl text-sm font-bold uppercase tracking-wider transition-colors shadow-sm cursor-pointer">
                   Gửi đề xuất
                 </button>
               </div>

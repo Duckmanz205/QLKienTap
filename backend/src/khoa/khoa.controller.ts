@@ -3,12 +3,16 @@ import {
   Get,
   Post,
   Put,
+  Delete,
   Body,
   Param,
   ParseIntPipe,
   Query,
   UseGuards,
+  BadRequestException,
+  Patch,
 } from '@nestjs/common';
+import { CurrentUser, JwtPayloadUser } from '../auth/decorators/user.decorator';
 import { KhoaService } from './khoa.service';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -40,6 +44,10 @@ import {
   GetRefundRequestsQueryDto,
   GetEnrollmentsQueryDto,
   CreateStudentDto,
+  UpdateStudentDto,
+  GetAccountsQueryDto,
+  CreateLecturerDto,
+  UpdateLecturerDto,
 } from './dto/khoa.dto';
 
 @Controller('khoa')
@@ -81,6 +89,33 @@ export class KhoaController {
     return this.khoaService.createCourse(body);
   }
 
+  @Put('years/:id')
+  async updateYear(@Param('id') id: number, @Body() body: Partial<any>) {
+    return this.khoaService.updateYear(+id, body);
+  }
+  @Delete('years/:id')
+  async deleteYear(@Param('id') id: number) {
+    return this.khoaService.deleteYear(+id);
+  }
+
+  @Put('terms/:id')
+  async updateTerm(@Param('id') id: number, @Body() body: Partial<any>) {
+    return this.khoaService.updateTerm(+id, body);
+  }
+  @Delete('terms/:id')
+  async deleteTerm(@Param('id') id: number) {
+    return this.khoaService.deleteTerm(+id);
+  }
+
+  @Put('courses/:id')
+  async updateCourse(@Param('id') id: number, @Body() body: Partial<any>) {
+    return this.khoaService.updateCourse(+id, body);
+  }
+  @Delete('courses/:id')
+  async deleteCourse(@Param('id') id: number) {
+    return this.khoaService.deleteCourse(+id);
+  }
+
   @Get('factories')
   async getFactories() {
     return this.khoaService.getFactories();
@@ -104,6 +139,21 @@ export class KhoaController {
     return this.khoaService.getLecturers();
   }
 
+  @Post('lecturers')
+  async createLecturer(@Body() body: CreateLecturerDto) {
+    return this.khoaService.createLecturer(body);
+  }
+
+  @Put('lecturers/:id')
+  async updateLecturer(@Param('id') id: number, @Body() body: UpdateLecturerDto) {
+    return this.khoaService.updateLecturer(+id, body);
+  }
+
+  @Patch('lecturers/:id/board-eligibility')
+  async updateLecturerBoardEligibility(@Param('id') id: number, @Body('du_dk_hoi_dong') duDkHoiDong: boolean) {
+    return this.khoaService.updateLecturerBoardEligibility(+id, duDkHoiDong);
+  }
+
   @Get('students')
   async getStudents(@Query() query: GetStudentsQueryDto) {
     return this.khoaService.getStudents(
@@ -116,6 +166,39 @@ export class KhoaController {
   @Post('students')
   async createStudent(@Body() body: CreateStudentDto) {
     return this.khoaService.createStudent(body);
+  }
+
+  @Put('students/:id')
+  async updateStudent(@Param('id') id: number, @Body() body: UpdateStudentDto) {
+    return this.khoaService.updateStudent(+id, body);
+  }
+
+  @Delete('students/:id')
+  async deleteStudent(@Param('id') id: number) {
+    return this.khoaService.deleteStudent(+id);
+  }
+
+  @Get('accounts')
+  async getAccounts(@Query() query: GetAccountsQueryDto) {
+    return this.khoaService.getAccounts(
+      query.page || 1, query.limit || 15, query.search, query.vaiTro, query.trangThai,
+    );
+  }
+
+  @Post('accounts/:id/toggle-lock')
+  async toggleAccountLock(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: JwtPayloadUser,
+  ) {
+    if (id === user.sub) {
+      throw new BadRequestException('Không thể tự khóa tài khoản của chính mình');
+    }
+    return this.khoaService.toggleAccountLock(id);
+  }
+
+  @Post('accounts/:id/reset-password')
+  async resetAccountPassword(@Param('id', ParseIntPipe) id: number) {
+    return this.khoaService.resetAccountPassword(id);
   }
 
   @Get('campaigns')
@@ -242,6 +325,27 @@ export class KhoaController {
     return this.khoaService.getFinalResultsReport(lichKienTapId);
   }
 
+  @Get('report/visited-students')
+  async getVisitedStudentsReport(
+    @Query('lichKienTapId') lichKienTapId?: string,
+  ) {
+    return this.khoaService.getVisitedStudentsReport(lichKienTapId ? parseInt(lichKienTapId) : undefined);
+  }
+
+  @Get('report/not-visited-students')
+  async getNotVisitedStudentsReport(
+    @Query('lichKienTapId') lichKienTapId?: string,
+  ) {
+    return this.khoaService.getNotVisitedStudentsReport(lichKienTapId ? parseInt(lichKienTapId) : undefined);
+  }
+
+  @Get('report/eligible-students')
+  async getEligibleStudentsReport(
+    @Query('lichKienTapId') lichKienTapId?: string,
+  ) {
+    return this.khoaService.getEligibleStudentsReport(lichKienTapId ? parseInt(lichKienTapId) : undefined);
+  }
+
   @Get('dashboard-stats')
   async getDashboardStats() {
     return this.khoaService.getDashboardStats();
@@ -283,6 +387,7 @@ export class KhoaController {
       query.page || 1,
       query.limit || 10,
       query.search,
+      query.lichKienTapId,
     );
   }
 

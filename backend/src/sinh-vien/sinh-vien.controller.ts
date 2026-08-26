@@ -214,4 +214,9 @@ export class SinhVienController {
     const student = await this.svService.getStudentByAccountId(user.sub);
     return this.svService.getStudentGrades(student.id);
   }
+
+  @Get('dashboard-stats/:studentId')
+  async getDashboardStats(@Param('studentId') studentId: number) {
+    return this.svService.getDashboardStats(+studentId);
+  }
 }

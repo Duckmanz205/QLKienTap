@@ -884,4 +884,72 @@ export class SinhVienService {
 
     return results;
   }
+
+  // Dashboard Stats
+  async getDashboardStats(studentId: number) {
+    const sv = await this.svRepo.findOne({ where: { id: studentId } });
+    if (!sv) throw new NotFoundException('Không tìm thấy sinh viên');
+
+    const trips = await this.phieuRepo.find({
+      where: { sinh_vien_id: studentId },
+      relations: { baiThuHoach: true },
+    });
+
+    const registered = trips.length;
+    const completed = trips.filter(
+      (t) => t.trang_thai === 'DaThamGia' || t.trang_thai === 'HoanThanh',
+    ).length;
+
+    const pendingReports = trips.filter(
+      (t) =>
+        (t.trang_thai === 'DaThamGia' || t.trang_thai === 'HoanThanh') &&
+        (!t.baiThuHoach || Object.keys(t.baiThuHoach).length === 0),
+    ).length;
+
+    let avgScore = 'Chưa có';
+    const lksvs = await this.lksvRepo.find({
+      where: { sinh_vien_id: studentId },
+      order: { id: 'DESC' },
+    });
+
+    if (lksvs.length > 0) {
+      const latestLksv = lksvs[0];
+      const ketQua = await this.kqRepo.findOne({
+        where: { lich_kien_tap_sinh_vien_id: latestLksv.id },
+      });
+
+      if (ketQua && ketQua.diem_tong_ket !== null) {
+        avgScore = Number(ketQua.diem_tong_ket).toFixed(1);
+      } else {
+        const boChuyen = await this.boChuyenRepo.findOne({
+          where: { lich_kien_tap_sinh_vien_id: latestLksv.id },
+        });
+
+        if (boChuyen) {
+          const mapping = await this.boChuyenChuyenRepo.find({
+            where: { bo_chuyen_bao_cao_id: boChuyen.id },
+          });
+
+          if (mapping.length > 0) {
+            const scores = [];
+            for (const map of mapping) {
+              const diem = await this.diemPhieuRepo.findOne({
+                where: { phieu_dang_ky_id: map.phieu_dang_ky_id },
+              });
+              scores.push(
+                Number(diem?.diem_chuan_bi || 0) * 0.3 +
+                Number(diem?.diem_bai_thu_hoach || 0) * 0.3 +
+                Number(diem?.diem_bao_cao_tqnm || 0) * 0.4 +
+                Number(diem?.diem_cong || 0)
+              );
+            }
+            const avg = scores.reduce((sum, val) => sum + val, 0) / scores.length;
+            avgScore = avg.toFixed(1);
+          }
+        }
+      }
+    }
+
+    return { registered, completed, pendingReports, avgScore };
+  }
 }
