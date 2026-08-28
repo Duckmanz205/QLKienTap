@@ -52,7 +52,12 @@ export default function TaiKhoanNguoiDung_Khoa() {
     }
   };
 
-  const roleOptions = ["Tất cả vai trò", "Quản lý khoa", "Giảng viên", "Sinh viên"];
+  const roleOptions = [
+    { value: "Tất cả vai trò", label: "Tất cả vai trò" },
+    { value: "QuanLyKhoa", label: "Quản lý khoa" },
+    { value: "GiangVien", label: "Giảng viên" },
+    { value: "SinhVien", label: "Sinh viên" },
+  ];
   const trangThaiOptions = [
     { value: "Tất cả", label: "Tất cả" },
     { value: "HoatDong", label: "Hoạt động" },
@@ -108,23 +113,25 @@ export default function TaiKhoanNguoiDung_Khoa() {
             onClick={() => { setIsRoleDropdownOpen(!isRoleDropdownOpen); setIsTrangThaiDropdownOpen(false); }}
             className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isRoleDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
           >
-            <span className="text-slate-700 font-medium truncate pr-2">{filterRole}</span>
+            <span className="text-slate-700 font-medium truncate pr-2">
+              {roleOptions.find(o => o.value === filterRole)?.label || filterRole}
+            </span>
             <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
           </div>
           {isRoleDropdownOpen && (
             <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1">
               {roleOptions.map(opt => (
                 <div 
-                  key={opt}
-                  onClick={() => { setFilterRole(opt); setIsRoleDropdownOpen(false); }}
+                  key={opt.value}
+                  onClick={() => { setFilterRole(opt.value); setIsRoleDropdownOpen(false); }}
                   className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                    (filterRole === opt) 
+                    (filterRole === opt.value) 
                       ? 'bg-[#E7E0C4] text-slate-800 font-bold' 
                       : 'text-slate-700 hover:bg-[#E7E0C4]/50'
                   }`}
                 >
-                  <span className="truncate pr-2">{opt}</span>
-                  {filterRole === opt && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                  <span className="truncate pr-2">{opt.label}</span>
+                  {filterRole === opt.value && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
                 </div>
               ))}
             </div>

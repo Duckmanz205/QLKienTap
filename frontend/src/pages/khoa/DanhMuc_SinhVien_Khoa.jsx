@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Upload, Plus, Search, ChevronDown, Check,
-  Edit2, Key, Trash2, X
+  Edit2, Key, Trash2, X, CloudUpload
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { khoaApi } from '../../services/api';
 
 export default function DanhMuc_SinhVien_Khoa() {
@@ -30,6 +31,12 @@ export default function DanhMuc_SinhVien_Khoa() {
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newPhone, setNewPhone] = useState('');
+
+  // Import States
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importData, setImportData] = useState([]);
+  const [isImporting, setIsImporting] = useState(false);
+  const [khoaList, setKhoaList] = useState([]);
 
   useEffect(() => {
     fetchData(1);
@@ -135,6 +142,73 @@ export default function DanhMuc_SinhVien_Khoa() {
     return matchesKhoa && matchesClass && matchesHocLai;
   });
 
+  const handleOpenImportModal = async () => {
+    setIsImportModalOpen(true);
+    try {
+      const res = await khoaApi.getCourses();
+      setKhoaList(res.data || []);
+    } catch (err) {
+      console.error('Lỗi khi lấy danh sách khóa', err);
+    }
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const bstr = evt.target.result;
+      const wb = XLSX.read(bstr, { type: 'binary' });
+      const wsname = wb.SheetNames[0];
+      const ws = wb.Sheets[wsname];
+      const data = XLSX.utils.sheet_to_json(ws);
+      
+      const formattedData = data.map(row => {
+        const tenKhoa = String(row['Khóa'] || row['ten_khoa'] || '').trim();
+        const matchedKhoa = khoaList.find(k => k.ten_khoa === tenKhoa);
+        return {
+          mssv: String(row['MSSV'] || row['mssv'] || ''),
+          ho_ten: String(row['Họ tên'] || row['ho_ten'] || ''),
+          email: String(row['Email'] || row['email'] || ''),
+          sdt: String(row['SĐT'] || row['sdt'] || ''),
+          ten_lop: String(row['Lớp'] || row['ten_lop'] || ''),
+          khoa_id: matchedKhoa ? matchedKhoa.id : undefined,
+        };
+      }).filter(r => r.mssv && r.ho_ten);
+
+      setImportData(formattedData);
+    };
+    reader.readAsBinaryString(file);
+    e.target.value = ''; // Reset input
+  };
+
+  const handleImportExcel = async () => {
+    if (importData.length === 0) {
+      alert('Không có dữ liệu hợp lệ để import');
+      return;
+    }
+    setIsImporting(true);
+    let successCount = 0;
+    let errorCount = 0;
+    
+    for (const record of importData) {
+      try {
+        await khoaApi.createStudent(record);
+        successCount++;
+      } catch (err) {
+        console.error(err);
+        errorCount++;
+      }
+    }
+    
+    alert(`Import hoàn tất. Thành công: ${successCount}, Lỗi: ${errorCount}`);
+    setIsImporting(false);
+    setIsImportModalOpen(false);
+    setImportData([]);
+    fetchData(1);
+  };
+
   return (
     <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-2 animate-in fade-in duration-300 relative">
       {/* Header section */}
@@ -142,7 +216,7 @@ export default function DanhMuc_SinhVien_Khoa() {
         <h1 className="text-2xl font-bold text-slate-800">Sinh viên</h1>
         <div className="flex gap-3">
           <button 
-            onClick={() => alert('Tính năng nhập từ Excel đang phát triển')}
+            onClick={handleOpenImportModal}
             className="px-4 py-2 border-2 border-[#407F3E] text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors cursor-pointer"
           >
             <Upload className="w-4 h-4" />
@@ -480,6 +554,101 @@ export default function DanhMuc_SinhVien_Khoa() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Import Modal */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => !isImporting && setIsImportModalOpen(false)}></div>
+          <div className="bg-white w-full max-w-5xl rounded-2xl shadow-xl relative z-10 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+            <div className="px-6 py-4 border-b border-[#E7E0C4] flex items-center justify-between">
+              <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                <Upload className="w-5 h-5 text-[#407F3E]" />
+                Nhập danh sách sinh viên từ Excel
+              </h2>
+              <button disabled={isImporting} type="button" onClick={() => setIsImportModalOpen(false)} className="p-1.5 text-slate-400 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg transition-colors cursor-pointer disabled:opacity-50">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-6 flex flex-col gap-6 overflow-hidden flex-1 bg-slate-50">
+              <div className="flex gap-4 items-center">
+                <label className="flex-1">
+                  <div className="border-2 border-dashed border-[#E7E0C4] rounded-xl p-8 bg-white flex flex-col items-center justify-center text-center hover:bg-slate-50 hover:border-[#89B449] transition-colors cursor-pointer group">
+                    <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center shadow-sm mb-3 group-hover:scale-110 transition-transform">
+                      <CloudUpload className="w-6 h-6 text-[#89B449]" />
+                    </div>
+                    <p className="text-sm font-semibold text-slate-600 mb-1">
+                      Kéo thả file Excel vào đây, hoặc bấm để chọn file
+                    </p>
+                    <p className="text-xs text-slate-400">Định dạng hỗ trợ: .xlsx, .xls</p>
+                  </div>
+                  <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleFileUpload} disabled={isImporting} />
+                </label>
+              </div>
+
+              {importData.length > 0 && (
+                <div className="flex-1 bg-white border border-[#E7E0C4] rounded-xl shadow-sm overflow-hidden flex flex-col">
+                  <div className="px-4 py-3 bg-slate-50 border-b border-[#E7E0C4] flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">Xem trước dữ liệu ({importData.length} dòng)</span>
+                  </div>
+                  <div className="flex-1 overflow-auto">
+                    <table className="w-full text-left text-sm whitespace-nowrap">
+                      <thead className="sticky top-0 bg-[#E7E0C4] z-10">
+                        <tr className="text-slate-800 font-bold uppercase tracking-wider text-xs">
+                          <th className="px-4 py-3">MSSV</th>
+                          <th className="px-4 py-3">Họ tên</th>
+                          <th className="px-4 py-3">Lớp</th>
+                          <th className="px-4 py-3">Email</th>
+                          <th className="px-4 py-3">SĐT</th>
+                          <th className="px-4 py-3">Cảnh báo</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
+                        {importData.map((row, idx) => (
+                          <tr key={idx} className="hover:bg-slate-50">
+                            <td className="px-4 py-2 font-bold text-[#407F3E]">{row.mssv}</td>
+                            <td className="px-4 py-2 text-slate-800">{row.ho_ten}</td>
+                            <td className="px-4 py-2">{row.ten_lop}</td>
+                            <td className="px-4 py-2">{row.email}</td>
+                            <td className="px-4 py-2">{row.sdt}</td>
+                            <td className="px-4 py-2">
+                              {row.khoa_id === undefined && (
+                                <span className="text-red-500 text-xs italic">
+                                  Không tìm thấy khóa khớp — sẽ tạo không gán khóa
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-[#E7E0C4] bg-slate-50/50 flex items-center justify-end gap-3 rounded-b-2xl">
+              <button disabled={isImporting} type="button" onClick={() => setIsImportModalOpen(false)} className="px-5 py-2.5 border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-bold transition-colors cursor-pointer disabled:opacity-50">
+                Hủy
+              </button>
+              <button 
+                disabled={isImporting || importData.length === 0} 
+                onClick={handleImportExcel} 
+                className="px-6 py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl text-sm font-bold transition-colors shadow-sm cursor-pointer disabled:opacity-50 flex items-center gap-2"
+              >
+                {isImporting ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                    Đang import...
+                  </>
+                ) : (
+                  'Xác nhận Import'
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

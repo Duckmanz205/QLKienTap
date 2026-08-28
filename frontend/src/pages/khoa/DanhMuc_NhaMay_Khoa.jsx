@@ -33,8 +33,13 @@ export default function DanhMuc_NhaMay_Khoa() {
   const [trangThai, setTrangThai] = useState('HoatDong');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [nhomNganhOptions, setNhomNganhOptions] = useState(["Tất cả nhóm ngành"]);
+
   useEffect(() => {
     fetchFactories();
+    khoaApi.getFactoryIndustryGroups().then(res => {
+      setNhomNganhOptions(["Tất cả nhóm ngành", ...(res.data || [])]);
+    }).catch(err => console.error(err));
   }, []);
 
   useEffect(() => {
@@ -116,11 +121,7 @@ export default function DanhMuc_NhaMay_Khoa() {
     }
   };
 
-  const nhomNganhOptions = [
-    "Tất cả nhóm ngành", "Đồ uống", "Sữa - dầu - chất béo", "Đường - bánh - kẹo", 
-    "Trà - cà phê - ca cao", "Lương thực - bột mì - mì ăn liền", "Nước chấm - gia vị", 
-    "Chế biến thủy sản", "Trung tâm phân tích - kiểm nghiệm"
-  ];
+
 
   const trangThaiOptions = ["Tất cả", "Hoạt động", "Ngừng hợp tác"];
 

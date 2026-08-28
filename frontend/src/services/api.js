@@ -120,6 +120,7 @@ export const khoaApi = {
   updateCourse: (id, data) => api.put(`/khoa/courses/${id}`, data),
   deleteCourse: (id) => api.delete(`/khoa/courses/${id}`),
   getFactories: () => api.get('/khoa/factories'),
+  getFactoryIndustryGroups: () => api.get('/khoa/factories/industry-groups'),
   createFactory: (data) => api.post('/khoa/factories', data),
   updateFactory: (id, data) => api.put(`/khoa/factories/${id}`, data),
   getLecturers: () => api.get('/khoa/lecturers'),
@@ -160,6 +161,7 @@ export const khoaApi = {
   getVisitedStudentsReport: (params) => api.get('/khoa/report/visited-students', { params }),
   getNotVisitedStudentsReport: (params) => api.get('/khoa/report/not-visited-students', { params }),
   getEligibleStudentsReport: (params) => api.get('/khoa/report/eligible-students', { params }),
+  bulkConfirmPayments: (records) => api.post('/khoa/bulk-confirm-payments', { records }),
 };
 
 export default api;

@@ -395,6 +395,14 @@ export class CreateKhoaNotificationDto {
   @IsInt()
   @Min(1)
   khoa_id?: number;
+
+  @IsOptional()
+  @IsString()
+  file_url?: string;
+
+  @IsOptional()
+  @IsString()
+  file_name?: string;
 }
 
 export class ExportStudentListDto {

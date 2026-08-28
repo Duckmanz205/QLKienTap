@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Plus, X, ChevronRight, Bold, Italic, List, 
   ChevronDown, Check, UploadCloud, FileText,
   MessageSquare
 } from 'lucide-react';
-import { khoaApi } from '../../services/api';
+import api, { khoaApi } from '../../services/api';
 
 export default function ThongBao_Khoa() {
   const [notifications, setNotifications] = useState([]);
@@ -16,6 +16,9 @@ export default function ThongBao_Khoa() {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [selectedDoiTuong, setSelectedDoiTuong] = useState('');
+  const [attachedFile, setAttachedFile] = useState(null);
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
+  const fileInputRef = useRef(null);
 
   const doiTuongOptions = ["Tất cả", "Sinh viên", "Giảng viên"];
 
@@ -33,6 +36,12 @@ export default function ThongBao_Khoa() {
     }
   };
 
+  const handleAttachmentSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) setAttachedFile(file);
+    e.target.value = null;
+  };
+
   const handleComposeSubmit = async (e) => {
     e.preventDefault();
     if (!title || !content || !selectedDoiTuong) {
@@ -41,19 +50,36 @@ export default function ThongBao_Khoa() {
     }
 
     try {
+      let fileUrl, fileName;
+      if (attachedFile) {
+        setIsUploadingAttachment(true);
+        const formData = new FormData();
+        formData.append('file', attachedFile);
+        const uploadRes = await api.post('/upload/attachment', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        fileUrl = uploadRes.data.url || uploadRes.data.path; 
+        fileName = uploadRes.data.originalName || attachedFile.name;
+        setIsUploadingAttachment(false);
+      }
+
       await khoaApi.createNotification({
         tieu_de: title,
         noi_dung: content,
-        doi_tuong_nhan: selectedDoiTuong === 'Tất cả' ? 'ALL' : selectedDoiTuong === 'Sinh viên' ? 'STUDENT' : 'LECTURER'
+        doi_tuong_nhan: selectedDoiTuong === 'Tất cả' ? 'ALL' : selectedDoiTuong === 'Sinh viên' ? 'STUDENT' : 'LECTURER',
+        file_url: fileUrl,
+        file_name: fileName
       });
       alert('Gửi thông báo thành công');
       setIsModalOpen(false);
       setTitle('');
       setContent('');
       setSelectedDoiTuong('');
+      setAttachedFile(null);
       fetchNotifications();
     } catch (err) {
       console.error(err);
+      setIsUploadingAttachment(false);
       alert('Gửi thông báo thất bại');
     }
   };
@@ -231,13 +257,37 @@ export default function ThongBao_Khoa() {
                 {/* Tệp đính kèm */}
                 <div className="relative z-10">
                   <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Tệp đính kèm (tùy chọn)</label>
-                  <div className="border-2 border-dashed border-[#E7E0C4] hover:border-[#89B449] bg-white rounded-xl p-6 flex flex-col items-center justify-center transition-colors cursor-pointer group">
-                    <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mb-3 group-hover:bg-[#89B449]/10 transition-colors">
-                      <UploadCloud className="w-6 h-6 text-slate-400 group-hover:text-[#89B449]" />
+                  <input type="file" ref={fileInputRef} className="hidden" onChange={handleAttachmentSelect} accept=".pdf,.doc,.docx,.xlsx,.xls,.png,.jpg,.jpeg,.zip,.rar" />
+                  
+                  {attachedFile ? (
+                    <div className="border border-[#E7E0C4] bg-white rounded-xl p-4 flex items-center justify-between shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <FileText className="w-8 h-8 text-[#407F3E]" />
+                        <div>
+                          <p className="text-sm font-bold text-slate-800 line-clamp-1">{attachedFile.name}</p>
+                          <p className="text-xs text-slate-500">{(attachedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                        </div>
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => setAttachedFile(null)}
+                        className="p-2 text-slate-400 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg transition-colors cursor-pointer"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
                     </div>
-                    <p className="text-sm font-bold text-slate-700 mb-1">Kéo thả file vào đây hoặc nhấn để chọn</p>
-                    <p className="text-xs font-medium text-slate-400">Hỗ trợ định dạng: PDF, DOCX, XLSX (Tối đa 10MB)</p>
-                  </div>
+                  ) : (
+                    <div 
+                      onClick={() => fileInputRef.current?.click()}
+                      className="border-2 border-dashed border-[#E7E0C4] hover:border-[#89B449] bg-white rounded-xl p-6 flex flex-col items-center justify-center transition-colors cursor-pointer group"
+                    >
+                      <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mb-3 group-hover:bg-[#89B449]/10 transition-colors">
+                        <UploadCloud className="w-6 h-6 text-slate-400 group-hover:text-[#89B449]" />
+                      </div>
+                      <p className="text-sm font-bold text-slate-700 mb-1">Kéo thả file vào đây hoặc nhấn để chọn</p>
+                      <p className="text-xs font-medium text-slate-400">Hỗ trợ định dạng: PDF, DOCX, XLSX (Tối đa 5MB)</p>
+                    </div>
+                  )}
                 </div>
 
               </div>
@@ -246,9 +296,10 @@ export default function ThongBao_Khoa() {
               <div className="px-6 py-4 border-t border-[#E7E0C4] bg-slate-50/50 flex items-center justify-end rounded-b-2xl z-10">
                 <button 
                   type="submit"
-                  className="px-6 py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl text-sm font-bold transition-colors shadow-sm cursor-pointer"
+                  disabled={isUploadingAttachment}
+                  className="px-6 py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl text-sm font-bold transition-colors shadow-sm cursor-pointer disabled:opacity-50"
                 >
-                  Gửi thông báo
+                  {isUploadingAttachment ? 'Đang tải file lên...' : 'Gửi thông báo'}
                 </button>
               </div>
             </form>

@@ -121,6 +121,11 @@ export class KhoaController {
     return this.khoaService.getFactories();
   }
 
+  @Get('factories/industry-groups')
+  async getFactoryIndustryGroups() {
+    return this.khoaService.getFactoryIndustryGroups();
+  }
+
   @Post('factories')
   async createFactory(@Body() body: CreateFactoryDto) {
     return this.khoaService.createFactory(body);
@@ -417,5 +422,10 @@ export class KhoaController {
       fileName,
       downloadUrl: `/api/upload/file/excels/${fileName}`,
     };
+  }
+
+  @Post('bulk-confirm-payments')
+  async bulkConfirmPayments(@Body('records') records: any[]) {
+    return this.khoaService.bulkConfirmPayments(records);
   }
 }
