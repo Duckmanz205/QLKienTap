@@ -1,13 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   ChevronDown, Check, ChevronRight, UploadCloud, Search, DollarSign
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { khoaApi } from '../../services/api';
 
 export default function QuanLyLePhi_Khoa() {
   const [schedules, setSchedules] = useState([]);
   const [fees, setFees] = useState([]);
   const [viewingDetail, setViewingDetail] = useState(null);
+  const fileInputRef = useRef(null);
   
   // Dropdown States for Filters
   const [isLichDropdownOpen, setIsLichDropdownOpen] = useState(false);
@@ -88,12 +90,47 @@ export default function QuanLyLePhi_Khoa() {
     return true;
   });
 
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const wb = XLSX.read(evt.target.result, { type: 'binary' });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const data = XLSX.utils.sheet_to_json(sheet);
+        const records = data.map(row => ({
+          noi_dung_chuyen_khoan: String(row['Nội dung chuyển khoản'] || row['noi_dung_chuyen_khoan'] || ''),
+          so_tien: row['Số tiền'] || row['so_tien'] ? Number(row['Số tiền'] || row['so_tien']) : undefined
+        })).filter(r => r.noi_dung_chuyen_khoan && r.noi_dung_chuyen_khoan.trim() !== '');
+
+        if (records.length === 0) {
+          alert('Không tìm thấy dữ liệu "Nội dung chuyển khoản" hợp lệ trong file.');
+          return;
+        }
+
+        const res = await khoaApi.bulkConfirmPayments(records);
+        alert(res.data.message || 'Cập nhật thành công');
+        fetchFees();
+      } catch (err) {
+        console.error(err);
+        alert('Lỗi đọc file hoặc gọi API cập nhật.');
+      }
+    };
+    reader.readAsBinaryString(file);
+    e.target.value = null; // reset
+  };
+
   return (
     <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300 relative" onClick={closeAllDropdowns}>
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <h1 className="text-2xl font-bold text-slate-800">Quản lý lệ phí</h1>
-        <button className="px-5 py-2.5 border border-[#407F3E] text-[#407F3E] hover:bg-[#407F3E]/10 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer">
+        <input type="file" accept=".xlsx,.xls" className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
+        <button 
+          onClick={() => fileInputRef.current?.click()}
+          className="px-5 py-2.5 border border-[#407F3E] text-[#407F3E] hover:bg-[#407F3E]/10 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer"
+        >
           <UploadCloud className="w-4 h-4" />
           Tải danh sách đã đóng phí
         </button>

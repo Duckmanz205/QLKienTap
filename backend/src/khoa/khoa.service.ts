@@ -170,6 +170,15 @@ export class KhoaService {
   async getFactories() {
     return this.nhaMayRepo.find();
   }
+
+  async getFactoryIndustryGroups() {
+    const rows = await this.nhaMayRepo
+      .createQueryBuilder('nm')
+      .select('DISTINCT nm.nhom_nganh', 'nhom_nganh')
+      .where('nm.nhom_nganh IS NOT NULL')
+      .getRawMany();
+    return rows.map((r) => r.nhom_nganh).filter(Boolean);
+  }
   async createFactory(data: Partial<NhaMay>) {
     return this.nhaMayRepo.save(data);
   }
@@ -1550,6 +1559,8 @@ export class KhoaService {
     noi_dung: string;
     nguoi_gui_id: number;
     khoa_id?: number;
+    file_url?: string;
+    file_name?: string;
   }) {
     const notif = new ThongBao();
     notif.tieu_de = data.tieu_de;
@@ -1562,6 +1573,15 @@ export class KhoaService {
     notif.da_chinh_sua = false;
 
     const savedNotif = await this.thongBaoRepo.save(notif);
+
+    if (data.file_url) {
+      const file = new ThongBaoFile();
+      file.thongbao_id = savedNotif.id;
+      file.ten_file = data.file_name || 'attachment';
+      file.duong_dan = data.file_url;
+      file.dung_luong_kb = 0;
+      await this.tbFileRepo.save(file);
+    }
 
     // Queue background jobs for email and reminder notification
     await this.taskQueueService.addJob('send-email', {
@@ -1577,5 +1597,29 @@ export class KhoaService {
     });
 
     return savedNotif;
+  }
+
+  async bulkConfirmPayments(records: { noi_dung_chuyen_khoan: string; so_tien?: number }[]) {
+    let successCount = 0;
+    let notFoundCount = 0;
+    for (const r of records) {
+      const hd = await this.hoaDonRepo.findOne({
+        where: { noi_dung_chuyen_khoan: r.noi_dung_chuyen_khoan },
+        relations: { phieuDangKy: true },
+      });
+      if (!hd) {
+        notFoundCount++;
+        continue;
+      }
+      hd.trang_thai = 'DaDongDungHan';
+      hd.ngay_dong_thuc_te = new Date();
+      await this.hoaDonRepo.save(hd);
+      if (hd.phieuDangKy) {
+        hd.phieuDangKy.trang_thai = 'HopLe';
+        await this.phieuRepo.save(hd.phieuDangKy);
+      }
+      successCount++;
+    }
+    return { message: `Đối chiếu xong: ${successCount} hóa đơn cập nhật, ${notFoundCount} không tìm thấy nội dung chuyển khoản khớp.` };
   }
 }
