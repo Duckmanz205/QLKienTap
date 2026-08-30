@@ -57,6 +57,8 @@ export default function Login() {
         navigate('/giang-vien');
       } else if (user.vai_tro === 'QuanLyKhoa') {
         navigate('/khoa');
+      } else if (user.vai_tro === 'QuanLyCLB') {
+        navigate('/clb');
       } else {
         setError('Vai trò tài khoản không hợp lệ');
       }

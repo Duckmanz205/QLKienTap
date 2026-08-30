@@ -72,7 +72,7 @@ export class TaiKhoan {
   mat_khau_hash: string;
 
   @Column()
-  vai_tro: string; // 'QuanLyKhoa' | 'GiangVien' | 'SinhVien'
+  vai_tro: string; // 'QuanLyKhoa' | 'QuanLyCLB' | 'GiangVien' | 'SinhVien'
 
   @Column({ default: 'HoatDong' })
   trang_thai: string; // 'HoatDong' | 'KhoaTaiKhoan'

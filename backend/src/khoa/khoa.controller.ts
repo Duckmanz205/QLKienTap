@@ -52,85 +52,101 @@ import {
 
 @Controller('khoa')
 @UseGuards(AuthGuard, RolesGuard)
-@Roles('QuanLyKhoa', 'Khoa')
+@Roles('QuanLyKhoa', 'QuanLyCLB')
 export class KhoaController {
   constructor(
     private readonly khoaService: KhoaService,
     private readonly taskQueueService: TaskQueueService,
   ) {}
 
+  @Roles('QuanLyKhoa')
   @Get('years')
   async getYears() {
     return this.khoaService.getYears();
   }
 
+  @Roles('QuanLyKhoa')
   @Post('years')
   async createYear(@Body() body: CreateYearDto) {
     return this.khoaService.createYear(body);
   }
 
+  @Roles('QuanLyKhoa')
   @Get('terms')
   async getTerms() {
     return this.khoaService.getTerms();
   }
 
+  @Roles('QuanLyKhoa')
   @Post('terms')
   async createTerm(@Body() body: CreateTermDto) {
     return this.khoaService.createTerm(body);
   }
 
+  @Roles('QuanLyKhoa')
   @Get('courses')
   async getCourses() {
     return this.khoaService.getCourses();
   }
 
+  @Roles('QuanLyKhoa')
   @Post('courses')
   async createCourse(@Body() body: CreateCourseDto) {
     return this.khoaService.createCourse(body);
   }
 
+  @Roles('QuanLyKhoa')
   @Put('years/:id')
   async updateYear(@Param('id') id: number, @Body() body: Partial<any>) {
     return this.khoaService.updateYear(+id, body);
   }
+  @Roles('QuanLyKhoa')
   @Delete('years/:id')
   async deleteYear(@Param('id') id: number) {
     return this.khoaService.deleteYear(+id);
   }
 
+  @Roles('QuanLyKhoa')
   @Put('terms/:id')
   async updateTerm(@Param('id') id: number, @Body() body: Partial<any>) {
     return this.khoaService.updateTerm(+id, body);
   }
+  @Roles('QuanLyKhoa')
   @Delete('terms/:id')
   async deleteTerm(@Param('id') id: number) {
     return this.khoaService.deleteTerm(+id);
   }
 
+  @Roles('QuanLyKhoa')
   @Put('courses/:id')
   async updateCourse(@Param('id') id: number, @Body() body: Partial<any>) {
     return this.khoaService.updateCourse(+id, body);
   }
+  @Roles('QuanLyKhoa')
   @Delete('courses/:id')
   async deleteCourse(@Param('id') id: number) {
     return this.khoaService.deleteCourse(+id);
   }
 
+  @Roles('QuanLyKhoa', 'QuanLyCLB')
   @Get('factories')
   async getFactories() {
     return this.khoaService.getFactories();
   }
 
+  @Roles('QuanLyKhoa', 'QuanLyCLB')
   @Get('factories/industry-groups')
   async getFactoryIndustryGroups() {
     return this.khoaService.getFactoryIndustryGroups();
   }
 
+  @Roles('QuanLyCLB')
   @Post('factories')
   async createFactory(@Body() body: CreateFactoryDto) {
     return this.khoaService.createFactory(body);
   }
 
+  @Roles('QuanLyCLB')
   @Put('factories/:id')
   async updateFactory(
     @Param('id', ParseIntPipe) id: number,
@@ -139,26 +155,31 @@ export class KhoaController {
     return this.khoaService.updateFactory(id, body);
   }
 
+  @Roles('QuanLyKhoa')
   @Get('lecturers')
   async getLecturers() {
     return this.khoaService.getLecturers();
   }
 
+  @Roles('QuanLyKhoa')
   @Post('lecturers')
   async createLecturer(@Body() body: CreateLecturerDto) {
     return this.khoaService.createLecturer(body);
   }
 
+  @Roles('QuanLyKhoa')
   @Put('lecturers/:id')
   async updateLecturer(@Param('id') id: number, @Body() body: UpdateLecturerDto) {
     return this.khoaService.updateLecturer(+id, body);
   }
 
+  @Roles('QuanLyKhoa')
   @Patch('lecturers/:id/board-eligibility')
   async updateLecturerBoardEligibility(@Param('id') id: number, @Body('du_dk_hoi_dong') duDkHoiDong: boolean) {
     return this.khoaService.updateLecturerBoardEligibility(+id, duDkHoiDong);
   }
 
+  @Roles('QuanLyCLB')
   @Get('students')
   async getStudents(@Query() query: GetStudentsQueryDto) {
     return this.khoaService.getStudents(
@@ -168,21 +189,25 @@ export class KhoaController {
     );
   }
 
+  @Roles('QuanLyCLB')
   @Post('students')
   async createStudent(@Body() body: CreateStudentDto) {
     return this.khoaService.createStudent(body);
   }
 
+  @Roles('QuanLyCLB')
   @Put('students/:id')
   async updateStudent(@Param('id') id: number, @Body() body: UpdateStudentDto) {
     return this.khoaService.updateStudent(+id, body);
   }
 
+  @Roles('QuanLyCLB')
   @Delete('students/:id')
   async deleteStudent(@Param('id') id: number) {
     return this.khoaService.deleteStudent(+id);
   }
 
+  @Roles('QuanLyKhoa')
   @Get('accounts')
   async getAccounts(@Query() query: GetAccountsQueryDto) {
     return this.khoaService.getAccounts(
@@ -190,6 +215,7 @@ export class KhoaController {
     );
   }
 
+  @Roles('QuanLyKhoa')
   @Post('accounts/:id/toggle-lock')
   async toggleAccountLock(
     @Param('id', ParseIntPipe) id: number,
@@ -201,31 +227,37 @@ export class KhoaController {
     return this.khoaService.toggleAccountLock(id);
   }
 
+  @Roles('QuanLyKhoa')
   @Post('accounts/:id/reset-password')
   async resetAccountPassword(@Param('id', ParseIntPipe) id: number) {
     return this.khoaService.resetAccountPassword(id);
   }
 
+  @Roles('QuanLyKhoa')
   @Get('campaigns')
   async getCampaigns() {
     return this.khoaService.getCampaigns();
   }
 
+  @Roles('QuanLyKhoa')
   @Post('campaigns')
   async createCampaign(@Body() body: CreateCampaignDto) {
     return this.khoaService.createCampaign(body);
   }
 
+  @Roles('QuanLyKhoa')
   @Get('schedules')
   async getSchedules() {
     return this.khoaService.getSchedules();
   }
 
+  @Roles('QuanLyKhoa')
   @Post('schedules')
   async createSchedule(@Body() body: CreateScheduleDto) {
     return this.khoaService.createSchedule(body);
   }
 
+  @Roles('QuanLyCLB')
   @Post('import-students')
   async importStudents(@Body() body: ImportStudentsDto) {
     return this.khoaService.importStudentsToSchedule(
@@ -234,16 +266,19 @@ export class KhoaController {
     );
   }
 
+  @Roles('QuanLyCLB')
   @Get('trips')
   async getTrips() {
     return this.khoaService.getTrips();
   }
 
+  @Roles('QuanLyCLB')
   @Post('trips')
   async createTrip(@Body() body: CreateTripDto) {
     return this.khoaService.createTrip(body);
   }
 
+  @Roles('QuanLyCLB')
   @Post('approve-trip')
   async approveTrip(@Body() body: ApproveTripDto) {
     if (body.registrationId) {
@@ -260,6 +295,7 @@ export class KhoaController {
     );
   }
 
+  @Roles('QuanLyCLB')
   @Post('approve-cancel')
   async approveCancel(@Body() body: ApproveCancelDto) {
     return this.khoaService.approveCancelRequest(
@@ -269,11 +305,13 @@ export class KhoaController {
     );
   }
 
+  @Roles('QuanLyCLB')
   @Post('filter-assign-students')
   async filterAssignStudents(@Body() body: FilterAssignStudentsDto) {
     return this.khoaService.filterAndAssignStudents(body.tripId);
   }
 
+  @Roles('QuanLyKhoa')
   @Post('assign-gvhd')
   async assignGvhd(@Body() body: AssignGvhdDto) {
     return this.khoaService.assignLecturerGuide(
@@ -282,6 +320,7 @@ export class KhoaController {
     );
   }
 
+  @Roles('QuanLyKhoa')
   @Post('assign-gvdd')
   async assignGvdd(@Body() body: AssignGvddDto) {
     return this.khoaService.assignTourLeader(
@@ -291,6 +330,7 @@ export class KhoaController {
     );
   }
 
+  @Roles('QuanLyKhoa')
   @Post('create-board')
   async createBoard(@Body() body: CreateBoardDto) {
     return this.khoaService.createBoard(
@@ -301,6 +341,7 @@ export class KhoaController {
     );
   }
 
+  @Roles('QuanLyKhoa')
   @Post('add-board-member')
   async addBoardMember(@Body() body: AddBoardMemberDto) {
     return this.khoaService.addBoardMember(
@@ -310,6 +351,7 @@ export class KhoaController {
     );
   }
 
+  @Roles('QuanLyKhoa')
   @Post('lock-grades')
   async lockGrades(@Body() body: LockGradesDto) {
     return this.khoaService.lockAndFinalizeGrades(
@@ -318,11 +360,13 @@ export class KhoaController {
     );
   }
 
+  @Roles('QuanLyKhoa', 'QuanLyCLB')
   @Get('retake-students-report')
   async getRetakeStudentsReport() {
     return this.khoaService.getRetakeStudentsReport();
   }
 
+  @Roles('QuanLyKhoa', 'QuanLyCLB')
   @Get('final-results-report/:lichKienTapId')
   async getFinalResultsReport(
     @Param('lichKienTapId', ParseIntPipe) lichKienTapId: number,
@@ -330,6 +374,7 @@ export class KhoaController {
     return this.khoaService.getFinalResultsReport(lichKienTapId);
   }
 
+  @Roles('QuanLyKhoa', 'QuanLyCLB')
   @Get('report/visited-students')
   async getVisitedStudentsReport(
     @Query('lichKienTapId') lichKienTapId?: string,
@@ -337,6 +382,7 @@ export class KhoaController {
     return this.khoaService.getVisitedStudentsReport(lichKienTapId ? parseInt(lichKienTapId) : undefined);
   }
 
+  @Roles('QuanLyKhoa', 'QuanLyCLB')
   @Get('report/not-visited-students')
   async getNotVisitedStudentsReport(
     @Query('lichKienTapId') lichKienTapId?: string,
@@ -344,6 +390,7 @@ export class KhoaController {
     return this.khoaService.getNotVisitedStudentsReport(lichKienTapId ? parseInt(lichKienTapId) : undefined);
   }
 
+  @Roles('QuanLyKhoa', 'QuanLyCLB')
   @Get('report/eligible-students')
   async getEligibleStudentsReport(
     @Query('lichKienTapId') lichKienTapId?: string,
@@ -351,11 +398,13 @@ export class KhoaController {
     return this.khoaService.getEligibleStudentsReport(lichKienTapId ? parseInt(lichKienTapId) : undefined);
   }
 
+  @Roles('QuanLyKhoa', 'QuanLyCLB')
   @Get('dashboard-stats')
   async getDashboardStats() {
     return this.khoaService.getDashboardStats();
   }
 
+  @Roles('QuanLyCLB')
   @Get('registrations')
   async getRegistrations(@Query() query: GetRegistrationsQueryDto) {
     return this.khoaService.getRegistrations(
@@ -368,6 +417,7 @@ export class KhoaController {
     );
   }
 
+  @Roles('QuanLyCLB')
   @Get('refund-requests')
   async getRefundRequests(@Query() query: GetRefundRequestsQueryDto) {
     return this.khoaService.getRefundRequests(
@@ -377,6 +427,7 @@ export class KhoaController {
     );
   }
 
+  @Roles('QuanLyCLB')
   @Post('approve-refund')
   async approveRefund(@Body() body: ApproveRefundDto) {
     return this.khoaService.approveRefund(
@@ -386,6 +437,7 @@ export class KhoaController {
     );
   }
 
+  @Roles('QuanLyKhoa')
   @Get('enrollments')
   async getEnrollments(@Query() query: GetEnrollmentsQueryDto) {
     return this.khoaService.getEnrollments(
@@ -396,16 +448,19 @@ export class KhoaController {
     );
   }
 
+  @Roles('QuanLyKhoa', 'QuanLyCLB')
   @Get('notifications')
   async getNotifications() {
     return this.khoaService.getNotifications();
   }
 
+  @Roles('QuanLyKhoa', 'QuanLyCLB')
   @Post('notifications')
   async createNotification(@Body() body: CreateKhoaNotificationDto) {
     return this.khoaService.createNotification(body);
   }
 
+  @Roles('QuanLyCLB')
   @Post('export-student-list')
   async exportStudentList(@Body() body: ExportStudentListDto) {
     const fileName = `student_export_${Date.now()}.xlsx`;
@@ -424,6 +479,7 @@ export class KhoaController {
     };
   }
 
+  @Roles('QuanLyCLB')
   @Post('bulk-confirm-payments')
   async bulkConfirmPayments(@Body('records') records: any[]) {
     return this.khoaService.bulkConfirmPayments(records);
