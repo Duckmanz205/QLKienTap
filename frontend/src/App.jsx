@@ -25,6 +25,7 @@ import ThongBao_GV from './pages/giang-vien/ThongBao_GV';
 
 // Khoa / Admin Pages
 import DashBoard_Khoa from './pages/khoa/DashBoard_Khoa';
+import DashBoard_CLB from './pages/khoa/DashBoard_CLB';
 import DanhMuc_SinhVien_Khoa from './pages/khoa/DanhMuc_SinhVien_Khoa';
 import DanhMuc_GiangVien_Khoa from './pages/khoa/DanhMuc_GiangVien_Khoa';
 import DanhMuc_NhaMay_Khoa from './pages/khoa/DanhMuc_NhaMay_Khoa';
@@ -110,27 +111,34 @@ export default function App() {
             <Route path="giang-vien/notifications" element={<ThongBao_GV />} />
           </Route>
 
-          {/* Khoa/Admin Portal Routes */}
+          {/* Khoa Portal Routes */}
           <Route element={<ProtectedRoute allowedRoles={['QuanLyKhoa', 'Khoa']} />}>
             <Route path="khoa" element={<DashBoard_Khoa />} />
             <Route path="khoa/danh-muc-nen" element={<DanhMucNen_ThemMoiHocKy_Khoa />} />
             <Route path="khoa/lich-kien-tap" element={<LichKienTap_Khoa />} />
-            <Route path="khoa/students" element={<DanhMuc_SinhVien_Khoa />} />
-            <Route path="khoa/plans" element={<PlanManagement_Khoa />} />
-            <Route path="khoa/registrations" element={<RegistrationManagement_Khoa />} />
-            <Route path="khoa/supervisors" element={<SupervisorAssignment_Khoa />} />
-            <Route path="khoa/leaders" element={<LeaderAssignment_Khoa />} />
-            <Route path="khoa/notifications" element={<ThongBao_Khoa />} />
-            <Route path="khoa/reports" element={<BaoCaoThongKe_Khoa />} />
             <Route path="khoa/lecturers" element={<DanhMuc_GiangVien_Khoa />} />
-            <Route path="khoa/factories" element={<DanhMuc_NhaMay_Khoa />} />
-            <Route path="khoa/trips" element={<ChuyenThamQuan_DSLoc />} />
             <Route path="khoa/boards" element={<HoiDongChamBaoCao_Khoa />} />
             <Route path="khoa/accounts" element={<TaiKhoanNguoiDung_Khoa />} />
-            <Route path="khoa/fees" element={<QuanLyLePhi_Khoa />} />
             <Route path="khoa/results" element={<KetQuaKienTap_MaTranDiem_Khoa />} />
-            <Route path="khoa/refund-approval" element={<DuyetHoanPhi_Khoa />} />
-            <Route path="khoa/visit-report" element={<XemTruocBaoCaoThamQuan_Khoa />} />
+            <Route path="khoa/notifications" element={<ThongBao_Khoa />} />
+            <Route path="khoa/reports" element={<BaoCaoThongKe_Khoa />} />
+          </Route>
+
+          {/* CLB Portal Routes */}
+          <Route element={<ProtectedRoute allowedRoles={['QuanLyCLB']} />}>
+            <Route path="clb" element={<DashBoard_CLB />} />
+            <Route path="clb/students" element={<DanhMuc_SinhVien_Khoa />} />
+            <Route path="clb/factories" element={<DanhMuc_NhaMay_Khoa />} />
+            <Route path="clb/trips" element={<ChuyenThamQuan_DSLoc />} />
+            <Route path="clb/plans" element={<PlanManagement_Khoa />} />
+            <Route path="clb/registrations" element={<RegistrationManagement_Khoa />} />
+            <Route path="clb/supervisors" element={<SupervisorAssignment_Khoa />} />
+            <Route path="clb/leaders" element={<LeaderAssignment_Khoa />} />
+            <Route path="clb/fees" element={<QuanLyLePhi_Khoa />} />
+            <Route path="clb/refund-approval" element={<DuyetHoanPhi_Khoa />} />
+            <Route path="clb/visit-report" element={<XemTruocBaoCaoThamQuan_Khoa />} />
+            <Route path="clb/notifications" element={<ThongBao_Khoa />} />
+            <Route path="clb/reports" element={<BaoCaoThongKe_Khoa />} />
           </Route>
         </Route>
 

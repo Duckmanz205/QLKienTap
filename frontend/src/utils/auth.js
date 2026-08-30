@@ -11,6 +11,7 @@ export const getDashboardPathForRole = (role) => {
   if (role === 'SinhVien') return '/sinh-vien';
   if (role === 'GiangVien') return '/giang-vien';
   if (role === 'QuanLyKhoa' || role === 'Khoa') return '/khoa';
+  if (role === 'QuanLyCLB') return '/clb';
   return '/login';
 };
 
@@ -28,7 +29,7 @@ export const getValidSession = () => {
       parsed.user &&
       typeof parsed.user === 'object' &&
       typeof parsed.user.vai_tro === 'string' &&
-      ['SinhVien', 'GiangVien', 'QuanLyKhoa', 'Khoa'].includes(parsed.user.vai_tro)
+      ['SinhVien', 'GiangVien', 'QuanLyKhoa', 'Khoa', 'QuanLyCLB'].includes(parsed.user.vai_tro)
     ) {
       return parsed;
     }

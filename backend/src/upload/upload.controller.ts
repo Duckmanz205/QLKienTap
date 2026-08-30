@@ -509,8 +509,8 @@ export class UploadController {
       } else {
         throw new ForbiddenException('Bạn không có quyền truy cập file này.');
       }
-    } else if (userRole === 'QuanLyKhoa' || userRole === 'Khoa') {
-      // QuanLyKhoa/Khoa có quyền tải file hợp lệ trong các bucket nghiệp vụ (bao gồm cả file legacy 'sv', 'general')
+    } else if (userRole === 'QuanLyKhoa' || userRole === 'Khoa' || userRole === 'QuanLyCLB') {
+      // QuanLyKhoa/Khoa/QuanLyCLB có quyền tải file hợp lệ trong các bucket nghiệp vụ (bao gồm cả file legacy 'sv', 'general')
     } else {
       throw new ForbiddenException(
         'Bạn không có quyền truy cập tài nguyên này.',
@@ -622,7 +622,7 @@ export class UploadController {
       } else {
         throw new ForbiddenException('Bạn không có quyền truy cập file này.');
       }
-    } else if (userRole === 'QuanLyKhoa' || userRole === 'Khoa') {
+    } else if (userRole === 'QuanLyKhoa' || userRole === 'Khoa' || userRole === 'QuanLyCLB') {
     } else {
       throw new ForbiddenException(
         'Bạn không có quyền truy cập tài nguyên này.',
