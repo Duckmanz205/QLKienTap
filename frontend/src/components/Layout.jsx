@@ -162,6 +162,7 @@ export default function Layout() {
     if (path === '/clb/trips') return 'Chuyến tham quan';
     if (path === '/clb/notifications') return 'Thông báo';
     if (path === '/clb/reports') return 'Báo cáo thống kê';
+    if (path === '/clb/results') return 'Kết quả kiến tập';
 
     return 'IMS Portal';
   };
@@ -438,6 +439,7 @@ export default function Layout() {
     { to: '/khoa', label: 'Trang chủ', icon: Home, category: 'TRANG CHỦ' },
     // DANH MỤC HỆ THỐNG
     { to: '/khoa/danh-muc-nen', label: 'Danh mục nền', icon: Layers, category: 'DANH MỤC HỆ THỐNG' },
+    { to: '/khoa/students', label: 'Sinh viên', icon: Users, category: 'DANH MỤC HỆ THỐNG' },
     { to: '/khoa/lecturers', label: 'Giảng viên', icon: User, category: 'DANH MỤC HỆ THỐNG' },
     { to: '/khoa/accounts', label: 'Tài khoản người dùng', icon: Key, category: 'DANH MỤC HỆ THỐNG' },
     // KẾ HOẠCH KIẾN TẬP
@@ -464,6 +466,8 @@ export default function Layout() {
     // TÀI CHÍNH
     { to: '/clb/fees', label: 'Quản lý lệ phí', icon: CreditCard, category: 'TÀI CHÍNH' },
     { to: '/clb/refund-approval', label: 'Duyệt hoàn phí', icon: RotateCcw, category: 'TÀI CHÍNH' },
+    // ĐÁNH GIÁ & KẾT QUẢ
+    { to: '/clb/results', label: 'Kết quả kiến tập', icon: Award, category: 'ĐÁNH GIÁ & KẾT QUẢ' },
     // Standalone top-levels below the groups
     { to: '/clb/notifications', label: 'Thông báo', icon: Bell, category: 'NONE', badge: true },
     { to: '/clb/reports', label: 'Báo cáo thống kê', icon: Activity, category: 'NONE' }
@@ -527,6 +531,7 @@ export default function Layout() {
           {/* Collapsible Groups */}
           {['DANH MỤC HỆ THỐNG', 'KẾ HOẠCH KIẾN TẬP', 'ĐĂNG KÝ & PHÂN CÔNG', 'ĐÁNH GIÁ & KẾT QUẢ', 'TÀI CHÍNH'].map((group) => {
             const items = khoaMenuItems.filter((item) => item.category === group);
+            if (items.length === 0) return null;
             const isCollapsed = collapsedGroups[group];
 
             return (

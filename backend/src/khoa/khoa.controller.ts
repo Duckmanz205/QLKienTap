@@ -52,7 +52,7 @@ import {
 
 @Controller('khoa')
 @UseGuards(AuthGuard, RolesGuard)
-@Roles('QuanLyKhoa', 'QuanLyCLB')
+@Roles('QuanLyKhoa')
 export class KhoaController {
   constructor(
     private readonly khoaService: KhoaService,
@@ -128,13 +128,13 @@ export class KhoaController {
     return this.khoaService.deleteCourse(+id);
   }
 
-  @Roles('QuanLyKhoa', 'QuanLyCLB')
+  @Roles('QuanLyKhoa')
   @Get('factories')
   async getFactories() {
     return this.khoaService.getFactories();
   }
 
-  @Roles('QuanLyKhoa', 'QuanLyCLB')
+  @Roles('QuanLyKhoa')
   @Get('factories/industry-groups')
   async getFactoryIndustryGroups() {
     return this.khoaService.getFactoryIndustryGroups();
@@ -179,7 +179,7 @@ export class KhoaController {
     return this.khoaService.updateLecturerBoardEligibility(+id, duDkHoiDong);
   }
 
-  @Roles('QuanLyCLB')
+  @Roles('QuanLyKhoa')
   @Get('students')
   async getStudents(@Query() query: GetStudentsQueryDto) {
     return this.khoaService.getStudents(
@@ -189,7 +189,7 @@ export class KhoaController {
     );
   }
 
-  @Roles('QuanLyCLB')
+  @Roles('QuanLyKhoa')
   @Post('students')
   async createStudent(@Body() body: CreateStudentDto) {
     return this.khoaService.createStudent(body);
@@ -257,22 +257,14 @@ export class KhoaController {
     return this.khoaService.createSchedule(body);
   }
 
-  @Roles('QuanLyCLB')
+  @Roles('QuanLyKhoa')
   @Post('import-students')
   async importStudents(@Body() body: ImportStudentsDto) {
     return this.khoaService.importStudentsToSchedule(
       body.lichId,
       body.studentIds,
     );
-  }
-
-  @Roles('QuanLyCLB')
-  @Get('trips')
-  async getTrips() {
-    return this.khoaService.getTrips();
-  }
-
-  @Roles('QuanLyCLB')
+  }@Roles('QuanLyCLB')
   @Post('trips')
   async createTrip(@Body() body: CreateTripDto) {
     return this.khoaService.createTrip(body);
@@ -360,13 +352,13 @@ export class KhoaController {
     );
   }
 
-  @Roles('QuanLyKhoa', 'QuanLyCLB')
+  @Roles('QuanLyKhoa')
   @Get('retake-students-report')
   async getRetakeStudentsReport() {
     return this.khoaService.getRetakeStudentsReport();
   }
 
-  @Roles('QuanLyKhoa', 'QuanLyCLB')
+  @Roles('QuanLyKhoa')
   @Get('final-results-report/:lichKienTapId')
   async getFinalResultsReport(
     @Param('lichKienTapId', ParseIntPipe) lichKienTapId: number,
@@ -374,7 +366,7 @@ export class KhoaController {
     return this.khoaService.getFinalResultsReport(lichKienTapId);
   }
 
-  @Roles('QuanLyKhoa', 'QuanLyCLB')
+  @Roles('QuanLyKhoa')
   @Get('report/visited-students')
   async getVisitedStudentsReport(
     @Query('lichKienTapId') lichKienTapId?: string,
@@ -382,7 +374,7 @@ export class KhoaController {
     return this.khoaService.getVisitedStudentsReport(lichKienTapId ? parseInt(lichKienTapId) : undefined);
   }
 
-  @Roles('QuanLyKhoa', 'QuanLyCLB')
+  @Roles('QuanLyKhoa')
   @Get('report/not-visited-students')
   async getNotVisitedStudentsReport(
     @Query('lichKienTapId') lichKienTapId?: string,
@@ -390,7 +382,7 @@ export class KhoaController {
     return this.khoaService.getNotVisitedStudentsReport(lichKienTapId ? parseInt(lichKienTapId) : undefined);
   }
 
-  @Roles('QuanLyKhoa', 'QuanLyCLB')
+  @Roles('QuanLyKhoa')
   @Get('report/eligible-students')
   async getEligibleStudentsReport(
     @Query('lichKienTapId') lichKienTapId?: string,
@@ -398,7 +390,7 @@ export class KhoaController {
     return this.khoaService.getEligibleStudentsReport(lichKienTapId ? parseInt(lichKienTapId) : undefined);
   }
 
-  @Roles('QuanLyKhoa', 'QuanLyCLB')
+  @Roles('QuanLyKhoa')
   @Get('dashboard-stats')
   async getDashboardStats() {
     return this.khoaService.getDashboardStats();
@@ -448,19 +440,19 @@ export class KhoaController {
     );
   }
 
-  @Roles('QuanLyKhoa', 'QuanLyCLB')
+  @Roles('QuanLyKhoa')
   @Get('notifications')
   async getNotifications() {
     return this.khoaService.getNotifications();
   }
 
-  @Roles('QuanLyKhoa', 'QuanLyCLB')
+  @Roles('QuanLyKhoa')
   @Post('notifications')
   async createNotification(@Body() body: CreateKhoaNotificationDto) {
     return this.khoaService.createNotification(body);
   }
 
-  @Roles('QuanLyCLB')
+  @Roles('QuanLyKhoa')
   @Post('export-student-list')
   async exportStudentList(@Body() body: ExportStudentListDto) {
     const fileName = `student_export_${Date.now()}.xlsx`;
@@ -485,3 +477,4 @@ export class KhoaController {
     return this.khoaService.bulkConfirmPayments(records);
   }
 }
+

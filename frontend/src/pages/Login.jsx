@@ -55,7 +55,7 @@ export default function Login() {
         navigate('/sinh-vien');
       } else if (user.vai_tro === 'GiangVien') {
         navigate('/giang-vien');
-      } else if (user.vai_tro === 'QuanLyKhoa') {
+      } else if (user.vai_tro === 'QuanLyKhoa' || user.vai_tro === 'QuanTriVienHeThong') {
         navigate('/khoa');
       } else if (user.vai_tro === 'QuanLyCLB') {
         navigate('/clb');

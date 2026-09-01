@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import { KhoaController } from './khoa.controller';
+import { ClbController } from './clb.controller';
 import { KhoaService } from './khoa.service';
 import {
   NamHoc,
@@ -26,13 +27,16 @@ import {
   PhanCongGVHD,
   DiemDanh,
   BaiThuHoach,
-  DiemPhieuDangKy,
+  DiemPhieuThamQuan,
+  DiemChuanBi,
+  DiemBaiThuHoach,
+  PhieuThamQuan,
+  DeXuatChuyenThamQuan,
   HoiDongChamBaoCao,
   HoiDong_ThanhVien,
   DiemHoiDong_ChiTiet,
   BoChuyenBaoCao,
   BoChuyenBaoCao_Chuyen,
-  KetQuaHocPhan,
 } from '../entities/qlkt.entity';
 
 @Module({
@@ -60,17 +64,20 @@ import {
       PhanCongGVHD,
       DiemDanh,
       BaiThuHoach,
-      DiemPhieuDangKy,
+      DiemPhieuThamQuan,
+      DiemChuanBi,
+      DiemBaiThuHoach,
+      PhieuThamQuan,
+      DeXuatChuyenThamQuan,
       HoiDongChamBaoCao,
       HoiDong_ThanhVien,
       DiemHoiDong_ChiTiet,
       BoChuyenBaoCao,
       BoChuyenBaoCao_Chuyen,
-      KetQuaHocPhan,
     ]),
     AuthModule,
   ],
-  controllers: [KhoaController],
+  controllers: [KhoaController, ClbController],
   providers: [KhoaService],
   exports: [KhoaService],
 })

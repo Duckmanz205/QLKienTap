@@ -112,11 +112,12 @@ export default function App() {
           </Route>
 
           {/* Khoa Portal Routes */}
-          <Route element={<ProtectedRoute allowedRoles={['QuanLyKhoa', 'Khoa']} />}>
+          <Route element={<ProtectedRoute allowedRoles={['QuanLyKhoa', 'QuanTriVienHeThong']} />}>
             <Route path="khoa" element={<DashBoard_Khoa />} />
             <Route path="khoa/danh-muc-nen" element={<DanhMucNen_ThemMoiHocKy_Khoa />} />
             <Route path="khoa/lich-kien-tap" element={<LichKienTap_Khoa />} />
             <Route path="khoa/lecturers" element={<DanhMuc_GiangVien_Khoa />} />
+            <Route path="khoa/students" element={<DanhMuc_SinhVien_Khoa />} />
             <Route path="khoa/boards" element={<HoiDongChamBaoCao_Khoa />} />
             <Route path="khoa/accounts" element={<TaiKhoanNguoiDung_Khoa />} />
             <Route path="khoa/results" element={<KetQuaKienTap_MaTranDiem_Khoa />} />
@@ -137,6 +138,7 @@ export default function App() {
             <Route path="clb/fees" element={<QuanLyLePhi_Khoa />} />
             <Route path="clb/refund-approval" element={<DuyetHoanPhi_Khoa />} />
             <Route path="clb/visit-report" element={<XemTruocBaoCaoThamQuan_Khoa />} />
+            <Route path="clb/results" element={<KetQuaKienTap_MaTranDiem_Khoa />} />
             <Route path="clb/notifications" element={<ThongBao_Khoa />} />
             <Route path="clb/reports" element={<BaoCaoThongKe_Khoa />} />
           </Route>

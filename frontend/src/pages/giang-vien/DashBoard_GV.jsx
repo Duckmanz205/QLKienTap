@@ -45,7 +45,7 @@ export default function DashBoard_GV() {
       
       setGuidedStudentsCount((studentsRes.data || []).length);
       setTrips(tripsRes.data || []);
-      setReports(reportsRes.data || []);
+      setReports(reportsRes.data?.data || []);
       setBoards(boardsRes.data || []);
       setStats(statsRes.data || { doanDangDan: 0, baiCanCham: 0, buoiBaoCao: 0, tongSvHuongDan: 0 });
     } catch (err) {
@@ -63,14 +63,16 @@ export default function DashBoard_GV() {
       rawDate: new Date(t.ngay_tham_quan)
     })),
     ...boards.map(b => ({
-      id: `board_${b.id}`,
+      id: `board_${b.session?.id}`,
       type: 'HoiDong',
-      title: `Hội đồng Bảo vệ - Nhóm ${b.id}`,
-      date: b.ngay_bao_cao ? new Date(b.ngay_bao_cao).toLocaleDateString('vi-VN') : '--',
-      time: `${(b.gio_bat_dau || '--').slice(0, 5)} - ${(b.gio_ket_thuc || '--').slice(0, 5)}`,
-      rawDate: new Date(b.ngay_bao_cao)
+      title: `Hội đồng Bảo vệ - Nhóm ${b.session?.id}`,
+      date: b.session?.ngay_bao_cao ? new Date(b.session.ngay_bao_cao).toLocaleDateString('vi-VN') : '--',
+      time: `${(b.session?.gio_bat_dau || '--').slice(0, 5)} - ${(b.session?.gio_ket_thuc || '--').slice(0, 5)}`,
+      rawDate: b.session?.ngay_bao_cao ? new Date(b.session.ngay_bao_cao) : new Date(0)
     }))
   ].sort((a, b) => a.rawDate - b.rawDate).slice(0, 5);
+
+  const pendingReports = reports.filter(r => r.trang_thai !== 'DaCham');
 
   const getTagStyle = (type) => {
     if (type === 'DanDoan') {
@@ -258,13 +260,13 @@ export default function DashBoard_GV() {
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-10 h-10 rounded-full bg-[#E7E0C4]/30 text-[#407F3E] font-bold border border-[#E7E0C4] flex items-center justify-center shrink-0">
-                      {report.phieuDangKy?.sinhVien?.ho_ten?.charAt(0) || 'S'}
+                      {report.phieuThamQuan?.phieuDangKy?.sinhVien?.ho_ten?.charAt(0) || 'S'}
                     </div>
                     <div className="min-w-0">
-                      <h4 className="text-sm font-bold text-slate-800 line-clamp-1">{report.phieuDangKy?.sinhVien?.ho_ten}</h4>
+                      <h4 className="text-sm font-bold text-slate-800 line-clamp-1">{report.phieuThamQuan?.phieuDangKy?.sinhVien?.ho_ten}</h4>
                       <p className="text-[11px] font-medium text-slate-500 truncate mt-0.5">
                         <MapPin className="w-3 h-3 inline-block mr-1 -mt-0.5" />
-                        {report.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Đã nộp bài'} • {new Date(report.ngay_nop || Date.now()).toLocaleDateString('vi-VN')}
+                        {report.phieuThamQuan?.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Đã nộp bài'} • {new Date(report.ngay_nop || Date.now()).toLocaleDateString('vi-VN')}
                       </p>
                     </div>
                   </div>

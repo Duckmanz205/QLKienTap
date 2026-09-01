@@ -126,10 +126,6 @@ export class CreateCampaignDto {
 
   @IsInt()
   @Min(1)
-  nam_hoc_id: number;
-
-  @IsInt()
-  @Min(1)
   hoc_ky_id: number;
 
   @IsOptional()
