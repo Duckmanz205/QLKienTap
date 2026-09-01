@@ -124,17 +124,6 @@ export default function DanhMuc_GiangVien_Khoa() {
     }
   };
 
-  const handleResetPassword = async (gv) => {
-    if (window.confirm(`Bạn có chắc chắn muốn đặt lại mật khẩu cho giảng viên ${gv.ho_ten}?`)) {
-      try {
-        await khoaApi.resetAccountPassword(gv.taikhoan_id);
-        alert('Đặt lại mật khẩu thành công');
-      } catch (err) {
-        console.error(err);
-        alert(err.response?.data?.message || 'Có lỗi xảy ra');
-      }
-    }
-  };
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
@@ -291,10 +280,10 @@ export default function DanhMuc_GiangVien_Khoa() {
                     <td className="p-4 text-center">
                       <button 
                         onClick={() => toggleHoiDongStatus(gv.id, gv.du_dk_hoi_dong)}
-                        className={`w-10 h-5.5 rounded-full relative transition-colors cursor-pointer inline-block align-middle ${gv.du_dk_hoi_dong ? 'bg-[#89B449]' : 'bg-slate-300'}`}
+                        className={`w-10 h-6 rounded-full relative transition-colors cursor-pointer inline-block align-middle ${gv.du_dk_hoi_dong ? 'bg-[#89B449]' : 'bg-slate-300'}`}
                         title={gv.du_dk_hoi_dong ? "Đủ điều kiện" : "Chưa đủ điều kiện"}
                       >
-                        <div className={`absolute top-0.5 w-4.5 h-4.5 bg-white rounded-full shadow-sm transition-transform duration-200 ${gv.du_dk_hoi_dong ? 'translate-x-[18px]' : 'translate-x-[2px]'}`}></div>
+                        <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${gv.du_dk_hoi_dong ? 'translate-x-4' : 'translate-x-0'}`}></div>
                       </button>
                     </td>
                     <td className="p-4 text-center">
@@ -309,9 +298,7 @@ export default function DanhMuc_GiangVien_Khoa() {
                         <button onClick={() => handleOpenModal(gv)} className="p-1.5 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded transition-colors cursor-pointer" title="Sửa thông tin">
                           <Edit2 className="w-4 h-4" />
                         </button>
-                        <button onClick={() => handleResetPassword(gv)} className="p-1.5 hover:text-[#89B449] hover:bg-[#89B449]/10 rounded transition-colors cursor-pointer" title="Reset mật khẩu">
-                          <Key className="w-4 h-4" />
-                        </button>
+
                         <button 
                           className="p-1.5 text-slate-300 cursor-not-allowed" 
                           title="Không thể xóa giảng viên từ giao diện này" 

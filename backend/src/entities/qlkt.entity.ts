@@ -353,8 +353,11 @@ export class LichKienTap {
   @Column({ type: 'datetime2' })
   han_chot_diem: Date;
 
+  @Column({ nullable: true })
+  ly_do_tu_choi: string;
+
   @Column({ default: 'Nhap' })
-  trang_thai: string; // 'Nhap' | 'MoDangKy' | 'DangDienRa' | 'DaKetThuc' | 'DaKhoa'
+  trang_thai: string; // 'Nhap' | 'ChoDuyet' | 'DaDuyet' | 'TuChoi' | 'MoDangKy' | 'DangDienRa' | 'DaKetThuc' | 'DaKhoa'
 }
 
 @Entity('LichKienTap_SinhVien')

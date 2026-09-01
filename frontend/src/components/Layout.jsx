@@ -143,7 +143,7 @@ export default function Layout() {
     if (path === '/khoa/leaders') return 'Phân công GV dẫn đoàn';
     if (path === '/khoa/notifications') return 'Thông báo';
     if (path === '/khoa/reports') return 'Báo cáo thống kê';
-    if (path === '/khoa/accounts') return 'Tài khoản người dùng';
+    if (path === '/qtv/accounts') return 'Tài khoản người dùng';
     if (path === '/khoa/fees') return 'Quản lý lệ phí';
     if (path === '/khoa/results') return 'Kết quả kiến tập';
     if (path === '/khoa/refund-approval') return 'Duyệt hoàn phí';
@@ -151,7 +151,7 @@ export default function Layout() {
 
     if (path === '/clb') return 'Trang chủ';
     if (path === '/clb/students') return 'Quản lý Sinh viên';
-    if (path === '/clb/plans') return 'Đợt kiến tập';
+    if (path === '/clb/lich-kien-tap') return 'Lịch kiến tập';
     if (path === '/clb/registrations') return 'Quản lý đăng ký';
     if (path === '/clb/supervisors') return 'Phân công GVHD';
     if (path === '/clb/leaders') return 'Phân công GV dẫn đoàn';
@@ -430,48 +430,62 @@ export default function Layout() {
     );
   }
 
-  // --- 3. KHOA & CLB SIDEBAR AND LAYOUT ---
+  // --- 3. KHOA & CLB & ADMIN SIDEBAR AND LAYOUT ---
+  const isAdmin = vai_tro === 'QuanTriVienHeThong';
   const isKhoa = vai_tro === 'QuanLyKhoa' || vai_tro === 'Khoa';
-  const roleName = isKhoa ? 'Quản lý Khoa' : 'Quản lý CLB';
-  const rolePrefix = isKhoa ? '/khoa' : '/clb';
+  const isClb = vai_tro === 'QuanLyCLB';
+  
+  const roleName = isAdmin ? 'Admin Hệ thống' : (isKhoa ? 'Quản lý Khoa' : 'Quản lý CLB');
+  const rolePrefix = isClb ? '/clb' : '/khoa';
 
-  const khoaMenuItems = isKhoa ? [
-    { to: '/khoa', label: 'Trang chủ', icon: Home, category: 'TRANG CHỦ' },
-    // DANH MỤC HỆ THỐNG
-    { to: '/khoa/danh-muc-nen', label: 'Danh mục nền', icon: Layers, category: 'DANH MỤC HỆ THỐNG' },
-    { to: '/khoa/students', label: 'Sinh viên', icon: Users, category: 'DANH MỤC HỆ THỐNG' },
-    { to: '/khoa/lecturers', label: 'Giảng viên', icon: User, category: 'DANH MỤC HỆ THỐNG' },
-    { to: '/khoa/accounts', label: 'Tài khoản người dùng', icon: Key, category: 'DANH MỤC HỆ THỐNG' },
-    // KẾ HOẠCH KIẾN TẬP
-    { to: '/khoa/lich-kien-tap', label: 'Lịch kiến tập', icon: Layers, category: 'KẾ HOẠCH KIẾN TẬP' },
-    // ĐÁNH GIÁ & KẾT QUẢ
-    { to: '/khoa/boards', label: 'Hội đồng chấm báo cáo', icon: Presentation, category: 'ĐÁNH GIÁ & KẾT QUẢ' },
-    { to: '/khoa/results', label: 'Kết quả kiến tập', icon: Award, category: 'ĐÁNH GIÁ & KẾT QUẢ' },
-    // Standalone top-levels below the groups
-    { to: '/khoa/notifications', label: 'Thông báo', icon: Bell, category: 'NONE', badge: true },
-    { to: '/khoa/reports', label: 'Báo cáo thống kê', icon: Activity, category: 'NONE' }
-  ] : [
-    { to: '/clb', label: 'Trang chủ', icon: Home, category: 'TRANG CHỦ' },
-    // DANH MỤC HỆ THỐNG
-    { to: '/clb/students', label: 'Sinh viên', icon: Users, category: 'DANH MỤC HỆ THỐNG' },
-    { to: '/clb/factories', label: 'Nhà máy', icon: Compass, category: 'DANH MỤC HỆ THỐNG' },
-    // KẾ HOẠCH KIẾN TẬP
-    { to: '/clb/plans', label: 'Đợt kiến tập', icon: Calendar, category: 'KẾ HOẠCH KIẾN TẬP' },
-    { to: '/clb/trips', label: 'Chuyến tham quan', icon: Compass, category: 'KẾ HOẠCH KIẾN TẬP' },
-    { to: '/clb/visit-report', label: 'Báo cáo tham quan', icon: Eye, category: 'KẾ HOẠCH KIẾN TẬP' },
-    // ĐĂNG KÝ & PHÂN CÔNG
-    { to: '/clb/registrations', label: 'Quản lý đăng ký', icon: FileCheck, category: 'ĐĂNG KÝ & PHÂN CÔNG' },
-    { to: '/clb/supervisors', label: 'Phân công GVHD', icon: GraduationCap, category: 'ĐĂNG KÝ & PHÂN CÔNG' },
-    { to: '/clb/leaders', label: 'Phân công GV dẫn đoàn', icon: UserCheck, category: 'ĐĂNG KÝ & PHÂN CÔNG' },
-    // TÀI CHÍNH
-    { to: '/clb/fees', label: 'Quản lý lệ phí', icon: CreditCard, category: 'TÀI CHÍNH' },
-    { to: '/clb/refund-approval', label: 'Duyệt hoàn phí', icon: RotateCcw, category: 'TÀI CHÍNH' },
-    // ĐÁNH GIÁ & KẾT QUẢ
-    { to: '/clb/results', label: 'Kết quả kiến tập', icon: Award, category: 'ĐÁNH GIÁ & KẾT QUẢ' },
-    // Standalone top-levels below the groups
-    { to: '/clb/notifications', label: 'Thông báo', icon: Bell, category: 'NONE', badge: true },
-    { to: '/clb/reports', label: 'Báo cáo thống kê', icon: Activity, category: 'NONE' }
-  ];
+  let khoaMenuItems = [];
+
+  if (isAdmin) {
+    khoaMenuItems = [
+      { to: '/qtv/accounts', label: 'Tài khoản người dùng', icon: Key, category: 'DANH MỤC HỆ THỐNG' },
+    ];
+  } else if (isKhoa) {
+    khoaMenuItems = [
+      { to: '/khoa', label: 'Trang chủ', icon: Home, category: 'TRANG CHỦ' },
+      // DANH MỤC HỆ THỐNG
+      { to: '/khoa/danh-muc-nen', label: 'Danh mục nền', icon: Layers, category: 'DANH MỤC HỆ THỐNG' },
+      { to: '/khoa/students', label: 'Sinh viên', icon: Users, category: 'DANH MỤC HỆ THỐNG' },
+      { to: '/khoa/lecturers', label: 'Giảng viên', icon: User, category: 'DANH MỤC HỆ THỐNG' },
+
+      // KẾ HOẠCH KIẾN TẬP
+      { to: '/khoa/plans', label: 'Đợt kiến tập', icon: Calendar, category: 'KẾ HOẠCH KIẾN TẬP' },
+      { to: '/khoa/lich-kien-tap', label: 'Lịch kiến tập', icon: Layers, category: 'KẾ HOẠCH KIẾN TẬP' },
+      // ĐÁNH GIÁ & KẾT QUẢ
+      { to: '/khoa/boards', label: 'Hội đồng chấm báo cáo', icon: Presentation, category: 'ĐÁNH GIÁ & KẾT QUẢ' },
+      { to: '/khoa/results', label: 'Kết quả kiến tập', icon: Award, category: 'ĐÁNH GIÁ & KẾT QUẢ' },
+      // Standalone top-levels below the groups
+      { to: '/khoa/notifications', label: 'Thông báo', icon: Bell, category: 'NONE', badge: true },
+      { to: '/khoa/reports', label: 'Báo cáo thống kê', icon: Activity, category: 'NONE' }
+    ];
+  } else {
+    khoaMenuItems = [
+      { to: '/clb', label: 'Trang chủ', icon: Home, category: 'TRANG CHỦ' },
+      // DANH MỤC HỆ THỐNG
+      { to: '/clb/students', label: 'Sinh viên', icon: Users, category: 'DANH MỤC HỆ THỐNG' },
+      { to: '/clb/factories', label: 'Nhà máy', icon: Compass, category: 'DANH MỤC HỆ THỐNG' },
+      // KẾ HOẠCH KIẾN TẬP
+      { to: '/clb/lich-kien-tap', label: 'Lịch kiến tập', icon: Calendar, category: 'KẾ HOẠCH KIẾN TẬP' },
+      { to: '/clb/trips', label: 'Chuyến tham quan', icon: Compass, category: 'KẾ HOẠCH KIẾN TẬP' },
+      { to: '/clb/visit-report', label: 'Báo cáo tham quan', icon: Eye, category: 'KẾ HOẠCH KIẾN TẬP' },
+      // ĐĂNG KÝ & PHÂN CÔNG
+      { to: '/clb/registrations', label: 'Quản lý đăng ký', icon: FileCheck, category: 'ĐĂNG KÝ & PHÂN CÔNG' },
+      { to: '/clb/supervisors', label: 'Phân công GVHD', icon: GraduationCap, category: 'ĐĂNG KÝ & PHÂN CÔNG' },
+      { to: '/clb/leaders', label: 'Phân công GV dẫn đoàn', icon: UserCheck, category: 'ĐĂNG KÝ & PHÂN CÔNG' },
+      // TÀI CHÍNH
+      { to: '/clb/fees', label: 'Quản lý lệ phí', icon: CreditCard, category: 'TÀI CHÍNH' },
+      { to: '/clb/refund-approval', label: 'Duyệt hoàn phí', icon: RotateCcw, category: 'TÀI CHÍNH' },
+      // ĐÁNH GIÁ & KẾT QUẢ
+      { to: '/clb/results', label: 'Kết quả kiến tập', icon: Award, category: 'ĐÁNH GIÁ & KẾT QUẢ' },
+      // Standalone top-levels below the groups
+      { to: '/clb/notifications', label: 'Thông báo', icon: Bell, category: 'NONE', badge: true },
+      { to: '/clb/reports', label: 'Báo cáo thống kê', icon: Activity, category: 'NONE' }
+    ];
+  }
 
   useEffect(() => {
     // Automatically expand the group containing the active path on navigation

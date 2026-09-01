@@ -5,9 +5,13 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { khoaApi } from '../../services/api';
+import Toast from '../../components/Toast';
+import ConfirmModal from '../../components/ConfirmModal';
 
 export default function DanhMuc_SinhVien_Khoa() {
   const [students, setStudents] = useState([]);
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+  const [confirmModal, setConfirmModal] = useState({ show: false, action: null, stud: null, title: '', message: '' });
   
   // Filter States
   const [searchTerm, setSearchTerm] = useState('');
@@ -63,7 +67,7 @@ export default function DanhMuc_SinhVien_Khoa() {
           sdt: newPhone,
           ten_lop: newClass,
         });
-        alert('Cập nhật sinh viên thành công');
+        setToast({ show: true, message: 'Cập nhật sinh viên thành công', type: 'success' });
       } else {
         await khoaApi.createStudent({
           mssv: newMssv,
@@ -72,7 +76,7 @@ export default function DanhMuc_SinhVien_Khoa() {
           email: newEmail,
           sdt: newPhone,
         });
-        alert('Thêm sinh viên thành công');
+        setToast({ show: true, message: 'Thêm sinh viên thành công', type: 'success' });
       }
       setShowSingleModal(false);
       setEditingStudent(null);
@@ -84,7 +88,7 @@ export default function DanhMuc_SinhVien_Khoa() {
       fetchData(1);
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.message || 'Có lỗi xảy ra');
+      setToast({ show: true, message: err.response?.data?.message || 'Có lỗi xảy ra', type: 'error' });
     }
   };
 
@@ -98,30 +102,33 @@ export default function DanhMuc_SinhVien_Khoa() {
     setShowSingleModal(true);
   };
 
-  const handleDeleteClick = async (stud) => {
-    if (window.confirm(`Bạn có chắc chắn muốn xóa sinh viên ${stud.ho_ten}?`)) {
-      try {
-        const res = await khoaApi.deleteStudent(stud.id);
-        alert(res.data.message || 'Xóa sinh viên thành công');
-        fetchData();
-      } catch (err) {
-        console.error(err);
-        alert(err.response?.data?.message || 'Có lỗi xảy ra khi xóa sinh viên');
-      }
-    }
+  const handleDeleteClick = (stud) => {
+    setConfirmModal({
+      show: true,
+      action: 'delete',
+      stud,
+      title: 'Xóa sinh viên',
+      message: (
+        <>
+          Bạn có chắc chắn muốn xóa sinh viên <span className="font-semibold text-gray-800">{stud.ho_ten}</span> khỏi hệ thống?
+        </>
+      )
+    });
   };
 
-  const handleResetPassword = async (stud) => {
-    if (window.confirm(`Bạn có chắc chắn muốn reset mật khẩu của sinh viên ${stud.ho_ten} về mặc định?`)) {
+  const executeConfirmAction = async () => {
+    const { action, stud } = confirmModal;
+    if (action === 'delete') {
       try {
-        const res = await khoaApi.resetAccountPassword(stud.taikhoan_id);
-        alert(res.data.message || 'Đã đặt lại mật khẩu');
+        const res = await khoaApi.deleteStudent(stud.id);
+        setToast({ show: true, message: res.data.message || 'Xóa sinh viên thành công', type: 'success' });
         fetchData();
       } catch (err) {
         console.error(err);
-        alert(err.response?.data?.message || 'Có lỗi xảy ra khi reset mật khẩu');
+        setToast({ show: true, message: err.response?.data?.message || 'Có lỗi xảy ra khi xóa sinh viên', type: 'error' });
       }
     }
+    setConfirmModal({ show: false, action: null, stud: null, title: '', message: '' });
   };
 
   const extractKhoa = (ten_lop) => {
@@ -185,7 +192,7 @@ export default function DanhMuc_SinhVien_Khoa() {
 
   const handleImportExcel = async () => {
     if (importData.length === 0) {
-      alert('Không có dữ liệu hợp lệ để import');
+      setToast({ show: true, message: 'Không có dữ liệu hợp lệ để import', type: 'error' });
       return;
     }
     setIsImporting(true);
@@ -202,7 +209,7 @@ export default function DanhMuc_SinhVien_Khoa() {
       }
     }
     
-    alert(`Import hoàn tất. Thành công: ${successCount}, Lỗi: ${errorCount}`);
+    setToast({ show: true, message: `Import hoàn tất. Thành công: ${successCount}, Lỗi: ${errorCount}`, type: 'success' });
     setIsImporting(false);
     setIsImportModalOpen(false);
     setImportData([]);
@@ -211,6 +218,15 @@ export default function DanhMuc_SinhVien_Khoa() {
 
   return (
     <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-2 animate-in fade-in duration-300 relative">
+      <Toast show={toast.show} message={toast.message} type={toast.type} onClose={() => setToast({ show: false, message: '', type: 'success' })} />
+      <ConfirmModal
+        isOpen={confirmModal.show}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        actionType={confirmModal.action}
+        onConfirm={executeConfirmAction}
+        onCancel={() => setConfirmModal({ show: false, action: null, stud: null, title: '', message: '' })}
+      />
       {/* Header section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <h1 className="text-2xl font-bold text-slate-800">Sinh viên</h1>
@@ -318,9 +334,9 @@ export default function DanhMuc_SinhVien_Khoa() {
           <span className="text-sm font-semibold text-slate-700">Chỉ hiện SV học lại</span>
           <button 
             onClick={() => setFilterHocLai(!filterHocLai)}
-            className={`w-10 h-5.5 rounded-full relative transition-colors cursor-pointer ${filterHocLai ? 'bg-[#89B449]' : 'bg-slate-300'}`}
+            className={`w-10 h-6 rounded-full relative transition-colors cursor-pointer ${filterHocLai ? 'bg-[#89B449]' : 'bg-slate-300'}`}
           >
-            <div className={`absolute top-0.5 w-4.5 h-4.5 bg-white rounded-full shadow-sm transition-transform duration-200 ${filterHocLai ? 'translate-x-[18px]' : 'translate-x-[2px]'}`}></div>
+            <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${filterHocLai ? 'translate-x-4' : 'translate-x-0'}`}></div>
           </button>
         </div>
       </div>
@@ -379,13 +395,7 @@ export default function DanhMuc_SinhVien_Khoa() {
                           >
                             <Edit2 className="w-4 h-4" />
                           </button>
-                          <button 
-                            className="p-1.5 hover:text-[#89B449] hover:bg-[#89B449]/10 rounded transition-colors cursor-pointer" 
-                            title="Reset mật khẩu"
-                            onClick={() => handleResetPassword(stud)}
-                          >
-                            <Key className="w-4 h-4" />
-                          </button>
+
                           <button 
                             className="p-1.5 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded transition-colors cursor-pointer" 
                             title="Xóa sinh viên" 

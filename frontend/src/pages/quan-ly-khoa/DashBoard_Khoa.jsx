@@ -37,6 +37,10 @@ export default function DashBoard_Khoa() {
     if (userStr) {
       try {
         const parsed = JSON.parse(userStr);
+        if (parsed?.user?.vai_tro === 'QuanTriVienHeThong') {
+          navigate('/qtv/accounts', { replace: true });
+          return;
+        }
         if (parsed.user && parsed.user.ten_hien_thi) {
           setUserProfile({ ho_ten: parsed.user.ten_hien_thi });
         } else if (parsed.ho_ten) {

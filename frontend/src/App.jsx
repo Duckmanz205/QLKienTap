@@ -24,26 +24,31 @@ import HoiDongChamBaoCao_DSBuoi_GV from './pages/giang-vien/HoiDongChamBaoCao_DS
 import ThongBao_GV from './pages/giang-vien/ThongBao_GV';
 
 // Khoa / Admin Pages
-import DashBoard_Khoa from './pages/khoa/DashBoard_Khoa';
-import DashBoard_CLB from './pages/khoa/DashBoard_CLB';
-import DanhMuc_SinhVien_Khoa from './pages/khoa/DanhMuc_SinhVien_Khoa';
-import DanhMuc_GiangVien_Khoa from './pages/khoa/DanhMuc_GiangVien_Khoa';
-import DanhMuc_NhaMay_Khoa from './pages/khoa/DanhMuc_NhaMay_Khoa';
-import DanhMucNen_ThemMoiHocKy_Khoa from './pages/khoa/DanhMucNen_ThemMoiHocKy_Khoa';
-import LichKienTap_Khoa from './pages/khoa/LichKienTap_Khoa';
-import ChuyenThamQuan_DSLoc from './pages/khoa/ChuyenThamQuan_DSLoc';
-import HoiDongChamBaoCao_Khoa from './pages/khoa/HoiDongChamBaoCao_Khoa';
-import PlanManagement_Khoa from './pages/khoa/PlanManagement_Khoa';
-import RegistrationManagement_Khoa from './pages/khoa/RegistrationManagement_Khoa';
-import SupervisorAssignment_Khoa from './pages/khoa/SupervisorAssignment_Khoa';
-import LeaderAssignment_Khoa from './pages/khoa/LeaderAssignment_Khoa';
-import ThongBao_Khoa from './pages/khoa/ThongBao_Khoa';
-import BaoCaoThongKe_Khoa from './pages/khoa/BaoCaoThongKe_Khoa';
-import TaiKhoanNguoiDung_Khoa from './pages/khoa/TaiKhoanNguoiDung_Khoa';
-import QuanLyLePhi_Khoa from './pages/khoa/QuanLyLePhi_Khoa';
-import KetQuaKienTap_MaTranDiem_Khoa from './pages/khoa/KetQuaKienTap_MaTranDiem_Khoa';
-import DuyetHoanPhi_Khoa from './pages/khoa/DuyetHoanPhi_Khoa';
-import XemTruocBaoCaoThamQuan_Khoa from './pages/khoa/XemTruocBaoCaoThamQuan_Khoa';
+import DashBoard_Khoa from './pages/quan-ly-khoa/DashBoard_Khoa';
+import DashBoard_CLB from './pages/clb/DashBoard_CLB';
+import DanhMuc_SinhVien_Khoa from './pages/shared/DanhMuc_SinhVien_Khoa';
+import DanhMuc_GiangVien_Khoa from './pages/quan-ly-khoa/DanhMuc_GiangVien_Khoa';
+import DanhMuc_NhaMay_Khoa from './pages/clb/DanhMuc_NhaMay_Khoa';
+import DanhMucNen_ThemMoiHocKy_Khoa from './pages/quan-ly-khoa/DanhMucNen_ThemMoiHocKy_Khoa';
+import LichKienTap_Khoa from './pages/shared/LichKienTap_Khoa';
+import ChuyenThamQuan_DSLoc from './pages/clb/ChuyenThamQuan_DSLoc';
+import HoiDongChamBaoCao_Khoa from './pages/quan-ly-khoa/HoiDongChamBaoCao_Khoa';
+import PlanManagement_Khoa from './pages/quan-ly-khoa/PlanManagement_Khoa';
+import RegistrationManagement_Khoa from './pages/clb/RegistrationManagement_Khoa';
+import SupervisorAssignment_Khoa from './pages/clb/SupervisorAssignment_Khoa';
+import LeaderAssignment_Khoa from './pages/clb/LeaderAssignment_Khoa';
+import ThongBao_Khoa from './pages/shared/ThongBao_Khoa';
+import BaoCaoThongKe_Khoa from './pages/shared/BaoCaoThongKe_Khoa';
+import TaiKhoanNguoiDung_Khoa from './pages/qtv/TaiKhoanNguoiDung_Khoa';
+import QuanLyLePhi_Khoa from './pages/clb/QuanLyLePhi_Khoa';
+import KetQuaKienTap_MaTranDiem_Khoa from './pages/shared/KetQuaKienTap_MaTranDiem_Khoa';
+import DuyetHoanPhi_Khoa from './pages/clb/DuyetHoanPhi_Khoa';
+import XemTruocBaoCaoThamQuan_Khoa from './pages/shared/XemTruocBaoCaoThamQuan_Khoa';
+import BaoCao_SVThamQuan_Khoa from './pages/shared/BaoCao_SVThamQuan_Khoa';
+import BaoCao_SVChuaThamQuan_Khoa from './pages/shared/BaoCao_SVChuaThamQuan_Khoa';
+import BaoCao_SVDuDieuKien_Khoa from './pages/shared/BaoCao_SVDuDieuKien_Khoa';
+import BaoCao_SVKhongThucHien_Khoa from './pages/shared/BaoCao_SVKhongThucHien_Khoa';
+import BaoCao_SVDatKhongDat_Khoa from './pages/shared/BaoCao_SVDatKhongDat_Khoa';
 
 import ProtectedRoute from './components/ProtectedRoute';
 import { getValidSession, getDashboardPathForRole } from './utils/auth';
@@ -112,17 +117,24 @@ export default function App() {
           </Route>
 
           {/* Khoa Portal Routes */}
-          <Route element={<ProtectedRoute allowedRoles={['QuanLyKhoa', 'QuanTriVienHeThong']} />}>
+          <Route element={<ProtectedRoute allowedRoles={['QuanLyKhoa']} />}>
             <Route path="khoa" element={<DashBoard_Khoa />} />
             <Route path="khoa/danh-muc-nen" element={<DanhMucNen_ThemMoiHocKy_Khoa />} />
+            <Route path="khoa/plans" element={<PlanManagement_Khoa />} />
             <Route path="khoa/lich-kien-tap" element={<LichKienTap_Khoa />} />
             <Route path="khoa/lecturers" element={<DanhMuc_GiangVien_Khoa />} />
             <Route path="khoa/students" element={<DanhMuc_SinhVien_Khoa />} />
             <Route path="khoa/boards" element={<HoiDongChamBaoCao_Khoa />} />
-            <Route path="khoa/accounts" element={<TaiKhoanNguoiDung_Khoa />} />
+
             <Route path="khoa/results" element={<KetQuaKienTap_MaTranDiem_Khoa />} />
             <Route path="khoa/notifications" element={<ThongBao_Khoa />} />
             <Route path="khoa/reports" element={<BaoCaoThongKe_Khoa />} />
+            <Route path="khoa/visit-report" element={<XemTruocBaoCaoThamQuan_Khoa />} />
+            <Route path="khoa/visited-students" element={<BaoCao_SVThamQuan_Khoa />} />
+            <Route path="khoa/not-visited-students" element={<BaoCao_SVChuaThamQuan_Khoa />} />
+            <Route path="khoa/eligible-students" element={<BaoCao_SVDuDieuKien_Khoa />} />
+            <Route path="khoa/retake-students" element={<BaoCao_SVKhongThucHien_Khoa />} />
+            <Route path="khoa/final-results" element={<BaoCao_SVDatKhongDat_Khoa />} />
           </Route>
 
           {/* CLB Portal Routes */}
@@ -131,7 +143,7 @@ export default function App() {
             <Route path="clb/students" element={<DanhMuc_SinhVien_Khoa />} />
             <Route path="clb/factories" element={<DanhMuc_NhaMay_Khoa />} />
             <Route path="clb/trips" element={<ChuyenThamQuan_DSLoc />} />
-            <Route path="clb/plans" element={<PlanManagement_Khoa />} />
+            <Route path="clb/lich-kien-tap" element={<LichKienTap_Khoa />} />
             <Route path="clb/registrations" element={<RegistrationManagement_Khoa />} />
             <Route path="clb/supervisors" element={<SupervisorAssignment_Khoa />} />
             <Route path="clb/leaders" element={<LeaderAssignment_Khoa />} />
@@ -141,6 +153,16 @@ export default function App() {
             <Route path="clb/results" element={<KetQuaKienTap_MaTranDiem_Khoa />} />
             <Route path="clb/notifications" element={<ThongBao_Khoa />} />
             <Route path="clb/reports" element={<BaoCaoThongKe_Khoa />} />
+            <Route path="clb/visited-students" element={<BaoCao_SVThamQuan_Khoa />} />
+            <Route path="clb/not-visited-students" element={<BaoCao_SVChuaThamQuan_Khoa />} />
+            <Route path="clb/eligible-students" element={<BaoCao_SVDuDieuKien_Khoa />} />
+            <Route path="clb/retake-students" element={<BaoCao_SVKhongThucHien_Khoa />} />
+            <Route path="clb/final-results" element={<BaoCao_SVDatKhongDat_Khoa />} />
+          </Route>
+
+          {/* QTV Portal Routes */}
+          <Route element={<ProtectedRoute allowedRoles={['QuanTriVienHeThong']} />}>
+            <Route path="qtv/accounts" element={<TaiKhoanNguoiDung_Khoa />} />
           </Route>
         </Route>
 

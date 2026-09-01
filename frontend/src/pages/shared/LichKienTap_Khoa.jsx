@@ -4,8 +4,14 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { khoaApi } from '../../services/api';
+import { getValidSession } from '../../utils/auth';
 
 export default function LichKienTap_Khoa() {
+  const session = getValidSession();
+  const userRole = session?.user?.vai_tro;
+  const isKhoa = userRole === 'QuanLyKhoa' || userRole === 'QuanTriVienHeThong';
+  const isCLB = userRole === 'QuanLyCLB';
+
   const [schedules, setSchedules] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   const [courses, setCourses] = useState([]);
@@ -113,6 +119,29 @@ export default function LichKienTap_Khoa() {
       alert("Lỗi tải danh sách SV");
     }
   };
+
+  const handleApprove = async (id) => {
+    if (!window.confirm("Bạn có chắc chắn muốn duyệt lịch này?")) return;
+    try {
+      await khoaApi.approveSchedule(id);
+      alert("Đã duyệt lịch kiến tập thành công");
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      alert("Lỗi khi duyệt lịch");
+    }
+  };
+
+  const handleReject = async (id, lyDo) => {
+    try {
+      await khoaApi.rejectSchedule(id, lyDo);
+      alert("Đã từ chối lịch kiến tập thành công");
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      alert("Lỗi khi từ chối lịch");
+    }
+  };
   
   const filteredStudents = allStudents.filter(st => {
     if (!studentSearchTerm) return true;
@@ -200,7 +229,17 @@ export default function LichKienTap_Khoa() {
     switch (status) {
       case 'Nháp':
         return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200">Nháp</span>;
+      case 'Chờ duyệt':
+      case 'ChoDuyet':
+        return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#E68A8C]/20 text-[#E68A8C] border border-[#E68A8C]/30 shadow-sm">Chờ duyệt</span>;
+      case 'Đã duyệt':
+      case 'DaDuyet':
+        return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#407F3E]/20 text-[#407F3E] border border-[#407F3E]/30 shadow-sm">Đã duyệt</span>;
+      case 'Từ chối':
+      case 'TuChoi':
+        return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-red-100 text-red-600 border border-red-200 shadow-sm">Từ chối</span>;
       case 'Mở đăng ký':
+      case 'MoDangKy':
         return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#89B449] text-white border border-[#89B449]/20 shadow-sm">Mở đăng ký</span>;
       case 'Đang diễn ra':
         return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#407F3E] text-white border border-[#407F3E]/20 shadow-sm">Đang diễn ra</span>;
@@ -240,23 +279,25 @@ export default function LichKienTap_Khoa() {
       {/* Header section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <h1 className="text-2xl font-bold text-slate-800">Lịch kiến tập</h1>
-        <button 
-          onClick={() => {
-            setCreateStep(1);
-            setCreateForm({
-              ten_lich: '', dot_kien_tap_id: '', khoa_id: '', 
-              tg_mo_dang_ky_tu: '', tg_mo_dang_ky_den: '', tg_dien_ra_tu: '', tg_dien_ra_den: '', 
-              han_chot_nop_bao_cao: '', han_chot_diem: ''
-            });
-            setUploadedStudents([]);
-            setFileError('');
-            setIsModalOpen(true);
-          }}
-          className="px-4 py-2 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors shadow-sm cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          Tạo lịch kiến tập
-        </button>
+        {isCLB && (
+          <button 
+            onClick={() => {
+              setCreateStep(1);
+              setCreateForm({
+                ten_lich: '', dot_kien_tap_id: '', khoa_id: '', 
+                tg_mo_dang_ky_tu: '', tg_mo_dang_ky_den: '', tg_dien_ra_tu: '', tg_dien_ra_den: '', 
+                han_chot_nop_bao_cao: '', han_chot_diem: ''
+              });
+              setUploadedStudents([]);
+              setFileError('');
+              setIsModalOpen(true);
+            }}
+            className="px-4 py-2 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors shadow-sm cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            Tạo lịch kiến tập
+          </button>
+        )}
       </div>
 
       {/* Filter Bar */}
@@ -333,17 +374,46 @@ export default function LichKienTap_Khoa() {
                     <td className="p-4 text-xs font-medium text-[#E68A8C]">{s.han_bao_cao}</td>
                     <td className="p-4 text-xs font-medium text-[#E68A8C]">{s.han_diem}</td>
                     <td className="p-4 text-center">
-                      {getStatusBadge(s.trang_thai)}
+                      <div className="flex flex-col items-center gap-1">
+                        {getStatusBadge(s.trang_thai)}
+                        {s.trang_thai === 'TuChoi' && s.ly_do_tu_choi && (
+                          <span className="text-[10px] text-red-500 font-medium">Lý do: {s.ly_do_tu_choi}</span>
+                        )}
+                      </div>
                     </td>
                     <td className="p-4 text-right pr-6">
                       <div className="flex items-center justify-end gap-2">
-                        <button 
-                          className="p-1.5 text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer" 
-                          title="Tải danh sách SV"
-                          onClick={() => handleOpenImport(s)}
-                        >
-                          <Upload className="w-4 h-4" />
-                        </button>
+                        {isCLB && (s.trang_thai === 'DaDuyet' || s.trang_thai === 'MoDangKy' || s.trang_thai === 'DangDienRa') && (
+                          <button 
+                            className="p-1.5 text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer" 
+                            title="Tải danh sách SV"
+                            onClick={() => handleOpenImport(s)}
+                          >
+                            <Upload className="w-4 h-4" />
+                          </button>
+                        )}
+
+                        {isKhoa && s.trang_thai === 'ChoDuyet' && (
+                          <>
+                            <button
+                              className="p-1.5 text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer"
+                              title="Duyệt lịch"
+                              onClick={() => handleApprove(s.id)}
+                            >
+                              <Check className="w-5 h-5" />
+                            </button>
+                            <button
+                              className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                              title="Từ chối"
+                              onClick={() => {
+                                const reason = prompt("Nhập lý do từ chối:");
+                                if (reason) handleReject(s.id, reason);
+                              }}
+                            >
+                              <X className="w-5 h-5" />
+                            </button>
+                          </>
+                        )}
                         <button 
                           className="p-1.5 text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer" 
                           title="Xem chi tiết"

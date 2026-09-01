@@ -9,6 +9,7 @@ export default function KetQuaKienTap_Khoa() {
   const [schedules, setSchedules] = useState([]);
   const [selectedLich, setSelectedLich] = useState('');
   const [isLichDropdownOpen, setIsLichDropdownOpen] = useState(false);
+  const [searchLich, setSearchLich] = useState('');
   const [results, setResults] = useState([]);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
@@ -37,8 +38,8 @@ export default function KetQuaKienTap_Khoa() {
 
   const fetchEnrollments = async () => {
     try {
-      const res = await khoaApi.getEnrollments({ lichKienTapId: selectedLich });
-      setResults(res.data || []);
+      const res = await khoaApi.getEnrollments({ lichKienTapId: selectedLich, limit: 1000 });
+      setResults(res.data?.data || []);
     } catch (err) {
       console.error(err);
     }
@@ -108,24 +109,40 @@ export default function KetQuaKienTap_Khoa() {
             className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isLichDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
           >
             <span className={`truncate pr-2 font-medium ${selectedLich ? 'text-slate-700' : 'text-slate-400'}`}>
-              {schedules.find(s => s.id === selectedLich)?.ten_dot || 'Chọn lịch kiến tập'}
+              {schedules.find(s => s.id === selectedLich)?.ten_lich || 'Chọn lịch kiến tập'}
             </span>
             <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
           </div>
           {isLichDropdownOpen && (
-            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 max-h-48 overflow-y-auto animate-in slide-in-from-top-1">
-              {schedules.map(opt => (
-                <div 
-                  key={opt.id}
-                  onClick={() => { setSelectedLich(opt.id); setIsLichDropdownOpen(false); }}
-                  className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                    selectedLich === opt.id ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
-                  }`}
-                >
-                  <span className="truncate pr-2">{opt.ten_dot}</span>
-                  {selectedLich === opt.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                </div>
-              ))}
+            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col">
+              <div className="px-2 pb-1 border-b border-[#E7E0C4]/50">
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm lịch..."
+                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-md text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E]"
+                  value={searchLich}
+                  onChange={(e) => setSearchLich(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+              <div className="overflow-y-auto max-h-48">
+                {schedules.filter(opt => opt.ten_lich?.toLowerCase().includes(searchLich.toLowerCase())).length > 0 ? (
+                  schedules.filter(opt => opt.ten_lich?.toLowerCase().includes(searchLich.toLowerCase())).map(opt => (
+                    <div 
+                      key={opt.id}
+                      onClick={() => { setSelectedLich(opt.id); setIsLichDropdownOpen(false); setSearchLich(''); }}
+                      className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                        selectedLich === opt.id ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                      }`}
+                    >
+                      <span className="truncate pr-2">{opt.ten_lich}</span>
+                      {selectedLich === opt.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                    </div>
+                  ))
+                ) : (
+                  <div className="px-4 py-3 text-sm text-slate-400 italic text-center">Không tìm thấy lịch kiến tập</div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -181,50 +198,97 @@ export default function KetQuaKienTap_Khoa() {
       {/* Main Table */}
       <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-visible">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[1000px]">
+          <table className="w-full text-left border-collapse min-w-[1400px]">
             <thead>
-              <tr className="bg-[#E7E0C4] text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
-                <th className="p-4 pl-6">MSSV</th>
-                <th className="p-4">Họ tên</th>
-                <th className="p-4 text-center">Điểm quá trình (10)</th>
-                <th className="p-4 text-center">Điểm báo cáo (10)</th>
-                <th className="p-4 text-center text-[#407F3E]">Điểm tổng kết</th>
-                <th className="p-4 text-center">Kết quả</th>
-                <th className="p-4 text-right pr-6">Thao tác</th>
+              <tr className="bg-[#E7E0C4] text-slate-800 text-[10px] font-bold uppercase tracking-wider border-b border-white">
+                <th className="p-2 pl-4 border-r border-white text-center" rowSpan={2}>MSSV</th>
+                <th className="p-2 border-r border-white text-center" rowSpan={2}>Họ tên</th>
+                <th className="p-2 border-r border-white text-center" rowSpan={2}>Lớp</th>
+                
+                <th className="p-2 border-r border-white text-center bg-[#FCE4D6]" colSpan={5}>NM1</th>
+                <th className="p-2 border-r border-white text-center bg-[#DDEBF7]" colSpan={5}>NM2</th>
+                <th className="p-2 border-r border-white text-center bg-[#E2EFDA]" colSpan={5}>NM3</th>
+
+                <th className="p-2 text-center bg-[#FFF2CC] text-[#407F3E]" rowSpan={2}>Tổng kết</th>
+                <th className="p-2 text-center border-l border-white" rowSpan={2}>Kết quả</th>
+                <th className="p-2 pr-4 text-center border-l border-white" rowSpan={2}>Chi tiết</th>
+              </tr>
+              <tr className="bg-[#E7E0C4] text-slate-800 text-[9px] font-bold uppercase tracking-tighter border-b border-white">
+                {/* NM1 */}
+                <th className="p-1 border-r border-white text-center bg-[#FCE4D6]">Chuẩn bị</th>
+                <th className="p-1 border-r border-white text-center bg-[#FCE4D6]">Báo cáo</th>
+                <th className="p-1 border-r border-white text-center bg-[#FCE4D6]">Vấn đáp</th>
+                <th className="p-1 border-r border-white text-center bg-[#FCE4D6]">Cộng</th>
+                <th className="p-1 border-r border-white text-center bg-[#FCE4D6]">Tổng NM1</th>
+                {/* NM2 */}
+                <th className="p-1 border-r border-white text-center bg-[#DDEBF7]">Chuẩn bị</th>
+                <th className="p-1 border-r border-white text-center bg-[#DDEBF7]">Báo cáo</th>
+                <th className="p-1 border-r border-white text-center bg-[#DDEBF7]">Vấn đáp</th>
+                <th className="p-1 border-r border-white text-center bg-[#DDEBF7]">Cộng</th>
+                <th className="p-1 border-r border-white text-center bg-[#DDEBF7]">Tổng NM2</th>
+                {/* NM3 */}
+                <th className="p-1 border-r border-white text-center bg-[#E2EFDA]">Chuẩn bị</th>
+                <th className="p-1 border-r border-white text-center bg-[#E2EFDA]">Báo cáo</th>
+                <th className="p-1 border-r border-white text-center bg-[#E2EFDA]">Vấn đáp</th>
+                <th className="p-1 border-r border-white text-center bg-[#E2EFDA]">Cộng</th>
+                <th className="p-1 border-r border-white text-center bg-[#E2EFDA]">Tổng NM3</th>
               </tr>
             </thead>
-            <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
+            <tbody className="text-xs text-slate-700">
               {results.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-slate-500 font-medium">Không có kết quả nào.</td>
+                  <td colSpan={21} className="p-8 text-center text-slate-500 font-medium border-b border-[#E7E0C4]/50">Không có kết quả nào.</td>
                 </tr>
               ) : (
-                results.map(r => {
+                results.map((r, index) => {
                   const sv = r.sinhVien || {};
+                  const trips = r.trips || [];
+                  const t1 = trips[0] || {};
+                  const t2 = trips[1] || {};
+                  const t3 = trips[2] || {};
+                  
                   return (
-                    <tr key={r.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="p-4 pl-6 font-mono font-bold text-[#407F3E]">{sv.mssv}</td>
-                      <td className="p-4 font-bold text-slate-800">{sv.ho_ten}</td>
-                      <td className="p-4 text-center font-mono text-slate-600">
-                        {r.diem_chuan_bi !== null ? r.diem_chuan_bi : '--'}
-                      </td>
-                      <td className="p-4 text-center font-mono text-slate-600">
-                        {r.diem_bao_cao !== null ? r.diem_bao_cao : '--'}
-                      </td>
-                      <td className="p-4 text-center">
+                    <tr key={r.id} className={`hover:bg-slate-50 transition-colors border-b border-[#E7E0C4]/50 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
+                      <td className="p-2 pl-4 font-mono font-bold text-[#407F3E] border-r border-[#E7E0C4]/50 text-center">{sv.mssv}</td>
+                      <td className="p-2 font-bold text-slate-800 border-r border-[#E7E0C4]/50 whitespace-nowrap">{sv.ho_ten}</td>
+                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 text-[10px] text-slate-500">{sv.ten_lop || '--'}</td>
+
+                      {/* NM1 */}
+                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono">{t1.diem_chuan_bi ?? '--'}</td>
+                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono text-blue-600">{t1.diem_bao_cao ?? '--'}</td>
+                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono text-red-600">{t1.diem_van_dap ?? '--'}</td>
+                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono text-green-600">{t1.diem_cong ?? '--'}</td>
+                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono font-bold">{t1.diem_tong_nm ?? '--'}</td>
+                      
+                      {/* NM2 */}
+                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono">{t2.diem_chuan_bi ?? '--'}</td>
+                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono text-blue-600">{t2.diem_bao_cao ?? '--'}</td>
+                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono text-red-600">{t2.diem_van_dap ?? '--'}</td>
+                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono text-green-600">{t2.diem_cong ?? '--'}</td>
+                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono font-bold">{t2.diem_tong_nm ?? '--'}</td>
+
+                      {/* NM3 */}
+                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono">{t3.diem_chuan_bi ?? '--'}</td>
+                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono text-blue-600">{t3.diem_bao_cao ?? '--'}</td>
+                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono text-red-600">{t3.diem_van_dap ?? '--'}</td>
+                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono text-green-600">{t3.diem_cong ?? '--'}</td>
+                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono font-bold">{t3.diem_tong_nm ?? '--'}</td>
+
+                      {/* TỔNG */}
+                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 bg-[#FFF2CC]/30">
                         {r.diem_tong_ket !== null ? (
-                          <span className="font-bold text-lg text-[#407F3E]">{r.diem_tong_ket}</span>
+                          <span className="font-bold text-sm text-[#407F3E]">{r.diem_tong_ket}</span>
                         ) : (
                           <span className="text-slate-400 font-bold">--</span>
                         )}
                       </td>
-                      <td className="p-4 text-center">
+                      <td className="p-2 text-center border-r border-[#E7E0C4]/50">
                         {getStatusBadge(r.trang_thai)}
                       </td>
-                      <td className="p-4 text-right pr-6">
+                      <td className="p-2 text-center pr-4">
                         <button 
                           onClick={() => setSelectedStudent(r)}
-                          className="p-1.5 text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer" 
+                          className="p-1 text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer inline-flex justify-center" 
                           title="Xem chi tiết điểm"
                         >
                           <ChevronRight className="w-5 h-5" />
