@@ -35,6 +35,7 @@ export default function Layout() {
   const location = useLocation();
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState({
     'DANH MỤC HỆ THỐNG': true,
     'KẾ HOẠCH KIẾN TẬP': true,
@@ -147,6 +148,22 @@ export default function Layout() {
     if (path === '/khoa/results') return 'Kết quả kiến tập';
     if (path === '/khoa/refund-approval') return 'Duyệt hoàn phí';
     if (path === '/khoa/visit-report') return 'Báo cáo tham quan';
+
+    if (path === '/clb') return 'Trang chủ';
+    if (path === '/clb/students') return 'Quản lý Sinh viên';
+    if (path === '/clb/plans') return 'Đợt kiến tập';
+    if (path === '/clb/registrations') return 'Quản lý đăng ký';
+    if (path === '/clb/supervisors') return 'Phân công GVHD';
+    if (path === '/clb/leaders') return 'Phân công GV dẫn đoàn';
+    if (path === '/clb/fees') return 'Quản lý lệ phí';
+    if (path === '/clb/refund-approval') return 'Duyệt hoàn phí';
+    if (path === '/clb/visit-report') return 'Báo cáo tham quan';
+    if (path === '/clb/factories') return 'Nhà máy';
+    if (path === '/clb/trips') return 'Chuyến tham quan';
+    if (path === '/clb/notifications') return 'Thông báo';
+    if (path === '/clb/reports') return 'Báo cáo thống kê';
+    if (path === '/clb/results') return 'Kết quả kiến tập';
+
     return 'IMS Portal';
   };
 
@@ -413,32 +430,47 @@ export default function Layout() {
     );
   }
 
-  // --- 3. KHOA/ADMIN SIDEBAR AND LAYOUT ---
-  const khoaMenuItems = [
+  // --- 3. KHOA & CLB SIDEBAR AND LAYOUT ---
+  const isKhoa = vai_tro === 'QuanLyKhoa' || vai_tro === 'Khoa';
+  const roleName = isKhoa ? 'Quản lý Khoa' : 'Quản lý CLB';
+  const rolePrefix = isKhoa ? '/khoa' : '/clb';
+
+  const khoaMenuItems = isKhoa ? [
     { to: '/khoa', label: 'Trang chủ', icon: Home, category: 'TRANG CHỦ' },
     // DANH MỤC HỆ THỐNG
     { to: '/khoa/danh-muc-nen', label: 'Danh mục nền', icon: Layers, category: 'DANH MỤC HỆ THỐNG' },
     { to: '/khoa/students', label: 'Sinh viên', icon: Users, category: 'DANH MỤC HỆ THỐNG' },
     { to: '/khoa/lecturers', label: 'Giảng viên', icon: User, category: 'DANH MỤC HỆ THỐNG' },
-    { to: '/khoa/factories', label: 'Nhà máy', icon: Compass, category: 'DANH MỤC HỆ THỐNG' },
     { to: '/khoa/accounts', label: 'Tài khoản người dùng', icon: Key, category: 'DANH MỤC HỆ THỐNG' },
     // KẾ HOẠCH KIẾN TẬP
-    { to: '/khoa/plans', label: 'Đợt kiến tập', icon: Calendar, category: 'KẾ HOẠCH KIẾN TẬP' },
     { to: '/khoa/lich-kien-tap', label: 'Lịch kiến tập', icon: Layers, category: 'KẾ HOẠCH KIẾN TẬP' },
-    { to: '/khoa/trips', label: 'Chuyến tham quan', icon: Compass, category: 'KẾ HOẠCH KIẾN TẬP' },
-    // ĐĂNG KÝ & PHÂN CÔNG
-    { to: '/khoa/registrations', label: 'Quản lý đăng ký', icon: FileCheck, category: 'ĐĂNG KÝ & PHÂN CÔNG' },
-    { to: '/khoa/supervisors', label: 'Phân công GVHD', icon: GraduationCap, category: 'ĐĂNG KÝ & PHÂN CÔNG' },
-    { to: '/khoa/leaders', label: 'Phân công GV dẫn đoàn', icon: UserCheck, category: 'ĐĂNG KÝ & PHÂN CÔNG' },
     // ĐÁNH GIÁ & KẾT QUẢ
     { to: '/khoa/boards', label: 'Hội đồng chấm báo cáo', icon: Presentation, category: 'ĐÁNH GIÁ & KẾT QUẢ' },
     { to: '/khoa/results', label: 'Kết quả kiến tập', icon: Award, category: 'ĐÁNH GIÁ & KẾT QUẢ' },
-    // TÀI CHÍNH
-    { to: '/khoa/fees', label: 'Quản lý lệ phí', icon: CreditCard, category: 'TÀI CHÍNH' },
-    { to: '/khoa/refund-approval', label: 'Duyệt hoàn phí', icon: RotateCcw, category: 'TÀI CHÍNH' },
     // Standalone top-levels below the groups
     { to: '/khoa/notifications', label: 'Thông báo', icon: Bell, category: 'NONE', badge: true },
     { to: '/khoa/reports', label: 'Báo cáo thống kê', icon: Activity, category: 'NONE' }
+  ] : [
+    { to: '/clb', label: 'Trang chủ', icon: Home, category: 'TRANG CHỦ' },
+    // DANH MỤC HỆ THỐNG
+    { to: '/clb/students', label: 'Sinh viên', icon: Users, category: 'DANH MỤC HỆ THỐNG' },
+    { to: '/clb/factories', label: 'Nhà máy', icon: Compass, category: 'DANH MỤC HỆ THỐNG' },
+    // KẾ HOẠCH KIẾN TẬP
+    { to: '/clb/plans', label: 'Đợt kiến tập', icon: Calendar, category: 'KẾ HOẠCH KIẾN TẬP' },
+    { to: '/clb/trips', label: 'Chuyến tham quan', icon: Compass, category: 'KẾ HOẠCH KIẾN TẬP' },
+    { to: '/clb/visit-report', label: 'Báo cáo tham quan', icon: Eye, category: 'KẾ HOẠCH KIẾN TẬP' },
+    // ĐĂNG KÝ & PHÂN CÔNG
+    { to: '/clb/registrations', label: 'Quản lý đăng ký', icon: FileCheck, category: 'ĐĂNG KÝ & PHÂN CÔNG' },
+    { to: '/clb/supervisors', label: 'Phân công GVHD', icon: GraduationCap, category: 'ĐĂNG KÝ & PHÂN CÔNG' },
+    { to: '/clb/leaders', label: 'Phân công GV dẫn đoàn', icon: UserCheck, category: 'ĐĂNG KÝ & PHÂN CÔNG' },
+    // TÀI CHÍNH
+    { to: '/clb/fees', label: 'Quản lý lệ phí', icon: CreditCard, category: 'TÀI CHÍNH' },
+    { to: '/clb/refund-approval', label: 'Duyệt hoàn phí', icon: RotateCcw, category: 'TÀI CHÍNH' },
+    // ĐÁNH GIÁ & KẾT QUẢ
+    { to: '/clb/results', label: 'Kết quả kiến tập', icon: Award, category: 'ĐÁNH GIÁ & KẾT QUẢ' },
+    // Standalone top-levels below the groups
+    { to: '/clb/notifications', label: 'Thông báo', icon: Bell, category: 'NONE', badge: true },
+    { to: '/clb/reports', label: 'Báo cáo thống kê', icon: Activity, category: 'NONE' }
   ];
 
   useEffect(() => {
@@ -466,7 +498,7 @@ export default function Layout() {
               Quản lý kiến tập
             </span>
             <span className="text-[10px] text-[#e5ffdc]/70 font-semibold tracking-widest block uppercase">
-              HUIT — Quản lý Khoa
+              HUIT — {roleName}
             </span>
           </div>
         </div>
@@ -474,7 +506,7 @@ export default function Layout() {
         <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
           {/* Top-level item: Trang chủ */}
           {(() => {
-            const homeItem = khoaMenuItems.find(i => i.to === '/khoa' && i.category === 'TRANG CHỦ');
+            const homeItem = khoaMenuItems.find(i => i.to === rolePrefix && i.category === 'TRANG CHỦ');
             if (homeItem) {
               const Icon = homeItem.icon;
               const isActive = location.pathname === homeItem.to;
@@ -499,6 +531,7 @@ export default function Layout() {
           {/* Collapsible Groups */}
           {['DANH MỤC HỆ THỐNG', 'KẾ HOẠCH KIẾN TẬP', 'ĐĂNG KÝ & PHÂN CÔNG', 'ĐÁNH GIÁ & KẾT QUẢ', 'TÀI CHÍNH'].map((group) => {
             const items = khoaMenuItems.filter((item) => item.category === group);
+            if (items.length === 0) return null;
             const isCollapsed = collapsedGroups[group];
 
             return (
@@ -580,7 +613,7 @@ export default function Layout() {
             </div>
             <div className="flex flex-col min-w-0">
               <span className="text-white font-bold text-sm truncate">{fullName}</span>
-              <span className="text-[#e5ffdc]/60 text-xs">Quản lý Khoa</span>
+              <span className="text-[#e5ffdc]/60 text-xs">{roleName}</span>
             </div>
           </div>
           <button
@@ -605,24 +638,47 @@ export default function Layout() {
           </div>
 
           <div className="flex items-center gap-4">
-            <button className="relative p-2 text-slate-600 hover:text-[#407F3E] transition-colors cursor-pointer">
+            <Link to={`${rolePrefix}/notifications`} className="relative p-2 text-slate-600 hover:text-[#407F3E] transition-colors cursor-pointer">
               <Bell className="w-5 h-5" />
               <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-[#DBD468] rounded-full border-2 border-white"></span>
-            </button>
+            </Link>
 
             <div className="w-px h-6 bg-[#E7E0C4]"></div>
 
-            <div className="flex items-center gap-3 cursor-pointer">
-              <div className="w-8 h-8 rounded-full overflow-hidden">
-                <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=E7E0C4&color=407F3E`} alt="Avatar" className="w-full h-full object-cover" />
+            <div className="relative">
+              <div 
+                className="flex items-center gap-3 cursor-pointer"
+                onClick={(e) => { e.stopPropagation(); setIsUserMenuOpen(!isUserMenuOpen); }}
+              >
+                <div className="w-8 h-8 rounded-full overflow-hidden">
+                  <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=E7E0C4&color=407F3E`} alt="Avatar" className="w-full h-full object-cover" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-slate-800">{fullName}</span>
+                  <span className="px-2 py-0.5 bg-[#E7E0C4] text-[#407F3E] text-[10px] font-bold rounded-full uppercase tracking-wider">
+                    {roleName}
+                  </span>
+                  <ChevronDown className="w-4 h-4 text-slate-400" />
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-slate-800">{fullName}</span>
-                <span className="px-2 py-0.5 bg-[#E7E0C4] text-[#407F3E] text-[10px] font-bold rounded-full uppercase tracking-wider">
-                  Quản lý khoa
-                </span>
-                <ChevronDown className="w-4 h-4 text-slate-400" />
-              </div>
+
+              {isUserMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsUserMenuOpen(false)}></div>
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-100 py-1 z-50">
+                    <button
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        confirmLogout();
+                      }}
+                      className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 font-medium transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Đăng xuất
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </header>

@@ -1,49 +1,56 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   UploadCloud, FileText, CheckCircle2, AlertCircle, ChevronRight, Lock,
   ArrowLeft, Search, ZoomIn, ZoomOut, AlertTriangle, Send, Maximize2, Minimize2
 } from 'lucide-react';
+import { sinhVienApi } from '../../services/api';
 
 export default function NopBaiThuHoach_SV() {
+  const [student, setStudent] = useState(null);
+  const [trips, setTrips] = useState([]);
   const [selectedTrip, setSelectedTrip] = useState(null);
   const [uploadedFile, setUploadedFile] = useState(null);
   const [isTextMaximized, setIsTextMaximized] = useState(false);
-  
-  // Mock Data
-  const trips = [
-    {
-      id: 1,
-      nhaMay: 'Nhà máy Yakult HCM',
-      ngayThamQuan: '10/09/2026',
-      loaiChuyen: 'khoa',
-      hinhThuc: 'Trực tiếp',
-      trangThai: 'Chưa nộp',
-      hanNop: '17/09/2026'
-    },
-    {
-      id: 2,
-      nhaMay: 'Acecook Việt Nam',
-      ngayThamQuan: '25/08/2026',
-      loaiChuyen: 'tu_do',
-      hinhThuc: 'Trực tiếp',
-      trangThai: 'Trễ hạn - trừ điểm',
-      hanNop: '01/09/2026'
-    },
-    {
-      id: 3,
-      nhaMay: 'Vinamilk Bình Dương',
-      ngayThamQuan: '15/08/2026',
-      loaiChuyen: 'khoa',
-      hinhThuc: 'Trực tuyến',
-      trangThai: 'Đã nộp',
-      hanNop: '22/08/2026',
-      fileDinhKem: 'BaoCao_Vinamilk_NguyenVanAn.pdf'
-    }
-  ];
+  const [zoomLevel, setZoomLevel] = useState(100);
 
+  useEffect(() => {
+    const userJson = localStorage.getItem('user');
+    if (userJson) {
+      const { user } = JSON.parse(userJson);
+      sinhVienApi.getProfile(user.id).then(res => {
+        setStudent(res.data);
+        fetchTrips(res.data.id);
+      }).catch(err => console.error(err));
+    }
+  }, []);
+
+  const fetchTrips = async (svId) => {
+    try {
+      const res = await sinhVienApi.getRegisteredTrips(svId);
+      const validTrips = (res.data || []).filter(t => t.trang_thai === 'HopLe' || t.trang_thai === 'DaThamGia' || t.trang_thai === 'HoanThanh');
+      setTrips(validTrips.map(trip => {
+        let status = 'Chưa nộp';
+        if (trip.baiThuHoach) status = 'Đã nộp';
+        
+        return {
+          id: trip.id,
+          nhaMay: trip.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Chưa xác định',
+          ngayThamQuan: trip.chuyenThamQuan?.ngay_tham_quan ? new Date(trip.chuyenThamQuan.ngay_tham_quan).toLocaleDateString('vi-VN') : '--',
+          loaiChuyen: trip.chuyenThamQuan?.loai_chuyen || 'khoa',
+          hinhThuc: trip.chuyenThamQuan?.hinh_thuc === 'TrucTuyen' ? 'Trực tuyến' : 'Trực tiếp',
+          trangThai: status,
+          hanNop: '1 tuần sau chuyến đi', // Backend mock logic
+          baiThuHoach: trip.baiThuHoach
+        };
+      }));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+  
   // Logic for the final committee selection card
   const completedTrips = trips.filter(t => t.trangThai === 'Đã nộp');
-  const hasEnoughTrips = true; // Enabled for UI testing
+  const hasEnoughTrips = completedTrips.length >= 3; 
 
   const getStatusBadge = (status) => {
     switch (status) {
@@ -60,16 +67,28 @@ export default function NopBaiThuHoach_SV() {
 
   const handleUploadMock = () => {
     setUploadedFile({
-      name: 'BaoCao_ThuHoach_NguyenVanAn.pdf',
+      name: 'BaoCao_ThuHoach.pdf',
       size: '2.4 MB',
       text: "LỜI MỞ ĐẦU\n\nKiến tập là một hoạt động vô cùng quan trọng đối với sinh viên chuyên ngành Công nghệ Thực phẩm. Nhờ sự hỗ trợ của nhà trường và công ty, đoàn chúng em đã có cơ hội tham quan quy trình sản xuất thực tế.\n\nI. QUY TRÌNH CÔNG NGHỆ\nNhà máy áp dụng dây chuyền khép kín hoàn toàn từ khâu xử lý nguyên liệu đến đóng gói. Các cánh tay robot tự động làm nhiệm vụ xếp palette, giảm thiểu nhân công và đảm bảo vệ sinh an toàn thực phẩm mức tối đa.\n\nII. BÀI HỌC KINH NGHIỆM\nChuyến tham quan giúp em hiểu rõ hơn về các tiêu chuẩn HACCP và ISO được ứng dụng trong thực tế sản xuất công nghiệp..."
     });
   };
 
-  const handleSubmit = () => {
-    alert("Nộp bài thành công!");
-    setUploadedFile(null);
-    setSelectedTrip(null);
+  const handleSubmit = async () => {
+    if (!uploadedFile) return;
+    try {
+      await sinhVienApi.submitReport({
+        registrationId: selectedTrip.id,
+        fileBaoCaoUrl: uploadedFile.name,
+        fileXacNhanUrl: null,
+      });
+      alert("Nộp bài thành công!");
+      setUploadedFile(null);
+      setSelectedTrip(null);
+      if (student) fetchTrips(student.id);
+    } catch (err) {
+      console.error(err);
+      alert("Có lỗi xảy ra khi nộp bài");
+    }
   };
 
   // ---------------------------------------------------------
@@ -85,43 +104,64 @@ export default function NopBaiThuHoach_SV() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column: List of trips */}
         <div className="lg:col-span-2 space-y-5">
-          {trips.map(trip => {
-            const isTuDo = trip.loaiChuyen === 'tu_do';
-            
-            return (
-              <div key={trip.id} className="bg-white rounded-2xl border border-[#E7E0C4] shadow-sm overflow-hidden flex flex-col transition-all hover:border-[#407F3E]/50 group">
-                <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-black text-slate-800 truncate mb-1 group-hover:text-[#407F3E] transition-colors">{trip.nhaMay}</h3>
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-medium text-slate-500">
-                      <span>Ngày đi: <strong>{trip.ngayThamQuan}</strong></span>
-                      <span>Hạn nộp: <strong>{trip.hanNop}</strong></span>
-                      <span className="inline-block px-1.5 py-0.5 rounded border border-slate-200 bg-slate-50 text-[10px] uppercase tracking-wider">{trip.hinhThuc}</span>
-                      {isTuDo && (
-                        <span className="inline-block px-1.5 py-0.5 rounded border border-indigo-200 bg-indigo-50 text-indigo-700 text-[10px] uppercase tracking-wider font-bold">Chuyến tự do</span>
+          {trips.length === 0 ? (
+             <div className="p-8 text-center text-slate-500 font-medium bg-white rounded-2xl border border-[#E7E0C4]">
+               Chưa có chuyến kiến tập nào hợp lệ.
+             </div>
+          ) : (
+            trips.map(trip => {
+              const isTuDo = trip.loaiChuyen === 'tu_do';
+              
+              return (
+                <div key={trip.id} className="bg-white rounded-2xl border border-[#E7E0C4] shadow-sm overflow-hidden flex flex-col transition-all hover:border-[#407F3E]/50 group">
+                  <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-lg font-black text-slate-800 truncate mb-1 group-hover:text-[#407F3E] transition-colors">{trip.nhaMay}</h3>
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-medium text-slate-500">
+                        <span>Ngày đi: <strong>{trip.ngayThamQuan}</strong></span>
+                        <span>Hạn nộp: <strong>{trip.hanNop}</strong></span>
+                        <span className="inline-block px-1.5 py-0.5 rounded border border-slate-200 bg-slate-50 text-[10px] uppercase tracking-wider">{trip.hinhThuc}</span>
+                        {isTuDo && (
+                          <span className="inline-block px-1.5 py-0.5 rounded border border-indigo-200 bg-indigo-50 text-indigo-700 text-[10px] uppercase tracking-wider font-bold">Chuyến tự do</span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-4 shrink-0">
+                      {getStatusBadge(trip.trangThai)}
+                      {trip.trangThai !== 'Đã nộp' ? (
+                        <button 
+                          onClick={() => {
+                            setSelectedTrip(trip);
+                            setUploadedFile(null);
+                          }}
+                          className="px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-1.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 shadow-sm transition-colors cursor-pointer"
+                        >
+                          Nộp bài <ChevronRight className="w-4 h-4" />
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={() => {
+                            setSelectedTrip(trip);
+                            if (trip.baiThuHoach) {
+                              setUploadedFile({
+                                name: trip.baiThuHoach.file_bao_cao_url || 'BaoCao_ThuHoach.pdf',
+                                size: 'Đã nộp',
+                                text: trip.baiThuHoach.noi_dung_trich_xuat || 'Đây là nội dung bài làm đã nộp (đã được lưu trên hệ thống).'
+                              });
+                            }
+                          }}
+                          className="px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
+                        >
+                          Xem lại <FileText className="w-4 h-4" />
+                        </button>
                       )}
                     </div>
                   </div>
-                  
-                  <div className="flex items-center gap-4 shrink-0">
-                    {getStatusBadge(trip.trangThai)}
-                    {trip.trangThai !== 'Đã nộp' ? (
-                      <button 
-                        onClick={() => setSelectedTrip(trip)}
-                        className="px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-1.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 shadow-sm transition-colors cursor-pointer"
-                      >
-                        Nộp bài <ChevronRight className="w-4 h-4" />
-                      </button>
-                    ) : (
-                      <button className="px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer">
-                        Xem lại <FileText className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
 
         {/* Right Column: Committee Selection Card */}
@@ -173,7 +213,10 @@ export default function NopBaiThuHoach_SV() {
             </div>
 
             {hasEnoughTrips && (
-              <button className="w-full mt-6 py-3.5 bg-[#DBD468] hover:bg-[#c9c256] text-slate-900 rounded-xl font-black text-sm uppercase tracking-wider transition-colors shadow-lg cursor-pointer">
+              <button 
+                onClick={() => alert('Chức năng đăng ký hội đồng đang được cập nhật (UI mới)')}
+                className="w-full mt-6 py-3.5 bg-[#DBD468] hover:bg-[#c9c256] text-slate-900 rounded-xl font-black text-sm uppercase tracking-wider transition-colors shadow-lg cursor-pointer"
+              >
                 Đăng ký Hội đồng ngay
               </button>
             )}
@@ -208,6 +251,10 @@ export default function NopBaiThuHoach_SV() {
           {!uploadedFile ? (
             <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
               Hạn nộp: {selectedTrip.hanNop}
+            </span>
+          ) : selectedTrip.trangThai === 'Đã nộp' ? (
+            <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+              Bài nộp đã được ghi nhận
             </span>
           ) : (
             <button 
@@ -250,14 +297,27 @@ export default function NopBaiThuHoach_SV() {
             <>
               {/* PDF Toolbar */}
               <div className="h-12 bg-white/90 backdrop-blur border-b border-[#E7E0C4] flex items-center justify-center gap-6 shrink-0 absolute top-0 left-0 right-0 z-10 shadow-sm">
-                <button className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors text-slate-600"><ZoomOut className="w-4 h-4" /></button>
-                <span className="text-xs font-bold text-slate-700">100%</span>
-                <button className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors text-slate-600"><ZoomIn className="w-4 h-4" /></button>
+                <button 
+                  onClick={() => setZoomLevel(prev => Math.max(50, prev - 10))}
+                  className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors text-slate-600 cursor-pointer"
+                >
+                  <ZoomOut className="w-4 h-4" />
+                </button>
+                <span className="text-xs font-bold text-slate-700 w-10 text-center">{zoomLevel}%</span>
+                <button 
+                  onClick={() => setZoomLevel(prev => Math.min(200, prev + 10))}
+                  className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors text-slate-600 cursor-pointer"
+                >
+                  <ZoomIn className="w-4 h-4" />
+                </button>
               </div>
 
               {/* PDF Canvas (Simulated) */}
               <div className="flex-1 overflow-y-auto p-6 pt-16 flex justify-center custom-scrollbar">
-                <div className="bg-white w-full max-w-[600px] min-h-[800px] shadow-xl border border-slate-200 p-10 relative">
+                <div 
+                  className="bg-white w-full max-w-[600px] min-h-[800px] shadow-xl border border-slate-200 p-10 relative"
+                  style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center', transition: 'transform 0.15s ease' }}
+                >
                   <h1 className="text-lg font-black uppercase tracking-wider text-center mb-8 border-b-2 border-slate-900 pb-2 inline-block relative left-1/2 -translate-x-1/2">BÁO CÁO THU HOẠCH KIẾN TẬP</h1>
                   <div className="whitespace-pre-wrap text-sm text-slate-800 leading-loose text-justify font-serif">
                     {uploadedFile.text}

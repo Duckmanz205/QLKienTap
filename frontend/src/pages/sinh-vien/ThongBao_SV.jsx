@@ -1,63 +1,49 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Bell, FileText, CheckCircle, AlertCircle, Paperclip, 
   CreditCard, Compass
 } from 'lucide-react';
+import { sinhVienApi } from '../../services/api';
 
 export default function ThongBao_SV() {
   const [filter, setFilter] = useState('all'); // 'all' or 'unread'
+  const [student, setStudent] = useState(null);
+  const [notifications, setNotifications] = useState([]);
 
-  // Mock Data
-  const notifications = [
-    {
-      id: 1,
-      type: 'reminder',
-      isUnread: true,
-      title: 'Nhắc nhở: Hạn cuối nộp bài thu hoạch chuyến đi Yakult HCM',
-      preview: 'Sinh viên lưu ý hạn nộp bài thu hoạch cho chuyến tham quan tại nhà máy Yakult HCM là ngày 17/09/2026. Vui lòng nộp đúng hạn để tránh bị trừ điểm hệ số. Nếu gặp vấn đề kỹ thuật, liên hệ ngay với giáo vụ khoa.',
-      time: '2 giờ trước',
-      fileName: 'HuongDanVietBaoCao.pdf'
-    },
-    {
-      id: 2,
-      type: 'financial',
-      isUnread: true,
-      title: 'Xác nhận thanh toán lệ phí tham quan thành công',
-      preview: 'Hệ thống đã ghi nhận khoản thanh toán lệ phí 150.000 VNĐ cho chuyến đi Vinamilk Bình Dương. Biên lai điện tử đã được đính kèm bên dưới.',
-      time: '1 ngày trước',
-      fileName: 'BienLai_Vinamilk_MSSV123456.pdf'
-    },
-    {
-      id: 3,
-      type: 'trip',
-      isUnread: false,
-      title: 'Cập nhật lịch trình: Chuyến tham quan Acecook Việt Nam',
-      preview: 'Lịch trình di chuyển của đoàn tham quan Acecook vào ngày 25/08/2026 đã có thay đổi nhỏ về giờ tập trung. Vui lòng xem chi tiết lịch trình mới nhất.',
-      time: '3 ngày trước',
-      fileName: null
-    },
-    {
-      id: 4,
-      type: 'general',
-      isUnread: false,
-      title: 'Quyết định thành lập hội đồng đánh giá báo cáo Kiến tập đợt 1',
-      preview: 'Ban chủ nhiệm Khoa chính thức công bố danh sách hội đồng và lịch bảo vệ báo cáo cho đợt 1 năm học 2025-2026. Sinh viên đã nộp bài chú ý theo dõi.',
-      time: '1 tuần trước',
-      fileName: 'QuyetDinh_HoiDongChamThi.pdf'
-    },
-    {
-      id: 5,
-      type: 'alert',
-      isUnread: false,
-      title: 'Cảnh báo: Vi phạm quy định thanh toán lệ phí',
-      preview: 'Sinh viên chưa hoàn tất lệ phí tham quan nhà máy Acecook theo đúng thời hạn. Chuyến tham quan này đã bị vô hiệu hóa.',
-      time: '2 tuần trước',
-      fileName: null
+  useEffect(() => {
+    const userJson = localStorage.getItem('user');
+    if (userJson) {
+      const { user } = JSON.parse(userJson);
+      sinhVienApi.getProfile(user.id).then(res => {
+        setStudent(res.data);
+        fetchNotifications(res.data.id);
+      }).catch(err => console.error(err));
     }
-  ];
+  }, []);
+
+  const fetchNotifications = async (svId) => {
+    try {
+      const res = await sinhVienApi.getNotifications(svId);
+      setNotifications(res.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleRead = async (item) => {
+    if (!item.da_doc) {
+      try {
+        await sinhVienApi.markNotificationRead(item.id);
+        fetchNotifications(student.id);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    // You can also add modal or expanded state here if you want to show full details
+  };
 
   const filteredNotifications = filter === 'unread' 
-    ? notifications.filter(n => n.isUnread) 
+    ? notifications.filter(n => !n.da_doc) 
     : notifications;
 
   const getIconForType = (type) => {
@@ -131,13 +117,14 @@ export default function ThongBao_SV() {
               {filteredNotifications.map((notif) => (
                 <div 
                   key={notif.id} 
+                  onClick={() => handleRead(notif)}
                   className={`p-5 flex gap-4 transition-colors hover:bg-slate-50 cursor-pointer ${
-                    notif.isUnread ? 'bg-[#E7E0C4]/10' : 'bg-white'
+                    !notif.da_doc ? 'bg-[#E7E0C4]/10' : 'bg-white'
                   }`}
                 >
                   {/* Unread Dot */}
                   <div className="pt-2 shrink-0 flex items-center justify-center w-2">
-                    <div className={`w-2.5 h-2.5 rounded-full ${notif.isUnread ? 'bg-[#DBD468]' : 'bg-transparent'}`}></div>
+                    <div className={`w-2.5 h-2.5 rounded-full ${!notif.da_doc ? 'bg-[#DBD468]' : 'bg-transparent'}`}></div>
                   </div>
 
                   {/* Icon */}
@@ -148,23 +135,23 @@ export default function ThongBao_SV() {
                   {/* Content */}
                   <div className="flex-1 min-w-0 flex flex-col gap-1.5">
                     <div className="flex items-start justify-between gap-4">
-                      <h3 className={`text-base leading-tight pr-4 ${notif.isUnread ? 'font-black text-slate-800' : 'font-bold text-slate-700'}`}>
-                        {notif.title}
+                      <h3 className={`text-base leading-tight pr-4 ${!notif.da_doc ? 'font-black text-slate-800' : 'font-bold text-slate-700'}`}>
+                        {notif.tieu_de}
                       </h3>
                       <span className="text-[11px] font-bold text-slate-400 whitespace-nowrap shrink-0 mt-0.5">
-                        {notif.time}
+                        {new Date(notif.ngay_gui).toLocaleString('vi-VN')}
                       </span>
                     </div>
                     
-                    <p className={`text-sm leading-relaxed line-clamp-2 ${notif.isUnread ? 'text-slate-600 font-medium' : 'text-slate-500'}`}>
-                      {notif.preview}
+                    <p className={`text-sm leading-relaxed ${!notif.da_doc ? 'text-slate-600 font-medium' : 'text-slate-500'}`}>
+                      {notif.noi_dung}
                     </p>
 
                     {/* Attachment Chip */}
-                    {notif.fileName && (
+                    {notif.file_dinh_kem && (
                       <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] font-bold text-slate-600 hover:border-[#407F3E] hover:bg-[#407F3E]/5 hover:text-[#407F3E] transition-colors w-fit">
                         <Paperclip className="w-3.5 h-3.5 shrink-0" />
-                        <span className="truncate max-w-[200px] sm:max-w-xs">{notif.fileName}</span>
+                        <span className="truncate max-w-[200px] sm:max-w-xs">{notif.file_dinh_kem}</span>
                       </div>
                     )}
                   </div>

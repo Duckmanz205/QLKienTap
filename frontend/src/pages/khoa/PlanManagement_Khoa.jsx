@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Plus, ChevronRight, ChevronDown, Check, X
+  Plus, ChevronRight, ChevronDown, Check, X, PlusCircle, Folder, Search
 } from 'lucide-react';
 import { khoaApi } from '../../services/api';
 
 export default function PlanManagement_Khoa() {
   const [campaigns, setCampaigns] = useState([]);
+  const [years, setYears] = useState([]);
+  const [terms, setTerms] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [viewingDetail, setViewingDetail] = useState(null);
 
   // Modal Form States
   const [campaignName, setCampaignName] = useState('');
@@ -16,23 +19,55 @@ export default function PlanManagement_Khoa() {
   // Custom Dropdown for Năm học
   const [selectedYear, setSelectedYear] = useState('');
   const [isYearDropdownOpen, setIsYearDropdownOpen] = useState(false);
-  const yearOptions = ["2023-2024", "2024-2025", "2025-2026"];
 
   // Custom Dropdown for Học kỳ
   const [selectedTerm, setSelectedTerm] = useState('');
   const [isTermDropdownOpen, setIsTermDropdownOpen] = useState(false);
-  const termOptions = ["Học kỳ 1", "Học kỳ 2", "Học kỳ hè"];
 
   useEffect(() => {
-    fetchData();
+    fetchInitialData();
   }, []);
 
-  const fetchData = async () => {
+  const fetchInitialData = async () => {
     try {
-      const res = await khoaApi.getCampaigns();
-      setCampaigns(res.data);
+      const [campRes, yearsRes, termsRes] = await Promise.all([
+        khoaApi.getCampaigns(),
+        khoaApi.getYears(),
+        khoaApi.getTerms()
+      ]);
+      setCampaigns(campRes.data);
+      setYears(yearsRes.data);
+      setTerms(termsRes.data);
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleCreateCampaign = async () => {
+    if (!campaignName || !selectedYear || !selectedTerm || !campaignBD || !campaignKT) {
+      alert('Vui lòng điền đầy đủ thông tin');
+      return;
+    }
+    
+    try {
+      await khoaApi.createCampaign({
+        ten_dot: campaignName,
+        nam_hoc_id: selectedYear,
+        hoc_ky_id: selectedTerm,
+        tg_bat_dau: campaignBD,
+        tg_ket_thuc: campaignKT
+      });
+      alert('Tạo đợt kiến tập thành công');
+      setIsModalOpen(false);
+      setCampaignName('');
+      setSelectedYear('');
+      setSelectedTerm('');
+      setCampaignBD('');
+      setCampaignKT('');
+      fetchInitialData();
+    } catch (err) {
+      console.error(err);
+      alert('Lỗi khi tạo đợt kiến tập');
     }
   };
 
@@ -66,12 +101,12 @@ export default function PlanManagement_Khoa() {
     return {
       id: c.id,
       ten_dot: c.ten_dot,
-      nam_hoc: c.namHoc?.ten_nam_hoc || '2023-2024',
-      hoc_ky: c.hocKy?.ten_hoc_ky || 'Học kỳ 1',
+      nam_hoc: c.namHoc?.ten_nam_hoc || 'Đang cập nhật',
+      hoc_ky: c.hocKy?.ten_hoc_ky || 'Đang cập nhật',
       tg_bat_dau: new Date(c.tg_bat_dau).toLocaleDateString('vi-VN'),
       tg_ket_thuc: new Date(c.tg_ket_thuc).toLocaleDateString('vi-VN'),
       trang_thai: mockStatus,
-      so_lich_con: Math.floor(Math.random() * 5) + 1 // Mock small number badge
+      so_lich_con: c.LichKienTap?.length || 0 // assuming backend returns relation
     };
   });
 
@@ -130,6 +165,7 @@ export default function PlanManagement_Khoa() {
                       <button 
                         className="p-1.5 text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer" 
                         title="Xem chi tiết"
+                        onClick={() => setViewingDetail(c)}
                       >
                         <ChevronRight className="w-5 h-5" />
                       </button>
@@ -189,24 +225,24 @@ export default function PlanManagement_Khoa() {
                     className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-sm flex justify-between items-center cursor-pointer transition-all ${isYearDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
                   >
                     <span className={`font-medium ${selectedYear ? 'text-slate-800' : 'text-slate-400'}`}>
-                      {selectedYear || 'Chọn năm học'}
+                      {years.find(y => y.id === selectedYear)?.ten_nam_hoc || 'Chọn năm học'}
                     </span>
                     <ChevronDown className="w-4 h-4 text-slate-400" />
                   </div>
                   {isYearDropdownOpen && (
                     <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1">
-                      {yearOptions.map(opt => (
+                      {years.map(opt => (
                         <div 
-                          key={opt}
-                          onClick={() => { setSelectedYear(opt); setIsYearDropdownOpen(false); }}
+                          key={opt.id}
+                          onClick={() => { setSelectedYear(opt.id); setIsYearDropdownOpen(false); }}
                           className={`px-4 py-2.5 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                            (selectedYear === opt) 
+                            (selectedYear === opt.id) 
                               ? 'bg-[#E7E0C4] text-slate-800 font-bold' 
                               : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
                           }`}
                         >
-                          {opt}
-                          {selectedYear === opt && <Check className="w-4 h-4 text-[#407F3E]" />}
+                          {opt.ten_nam_hoc}
+                          {selectedYear === opt.id && <Check className="w-4 h-4 text-[#407F3E]" />}
                         </div>
                       ))}
                     </div>
@@ -221,24 +257,24 @@ export default function PlanManagement_Khoa() {
                     className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-sm flex justify-between items-center cursor-pointer transition-all ${isTermDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
                   >
                     <span className={`font-medium ${selectedTerm ? 'text-slate-800' : 'text-slate-400'}`}>
-                      {selectedTerm || 'Chọn học kỳ'}
+                      {terms.find(t => t.id === selectedTerm)?.ten_hoc_ky || 'Chọn học kỳ'}
                     </span>
                     <ChevronDown className="w-4 h-4 text-slate-400" />
                   </div>
                   {isTermDropdownOpen && (
                     <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1">
-                      {termOptions.map(opt => (
+                      {terms.map(opt => (
                         <div 
-                          key={opt}
-                          onClick={() => { setSelectedTerm(opt); setIsTermDropdownOpen(false); }}
+                          key={opt.id}
+                          onClick={() => { setSelectedTerm(opt.id); setIsTermDropdownOpen(false); }}
                           className={`px-4 py-2.5 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                            (selectedTerm === opt) 
+                            (selectedTerm === opt.id) 
                               ? 'bg-[#E7E0C4] text-slate-800 font-bold' 
                               : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
                           }`}
                         >
-                          {opt}
-                          {selectedTerm === opt && <Check className="w-4 h-4 text-[#407F3E]" />}
+                          {opt.ten_hoc_ky}
+                          {selectedTerm === opt.id && <Check className="w-4 h-4 text-[#407F3E]" />}
                         </div>
                       ))}
                     </div>
@@ -277,10 +313,60 @@ export default function PlanManagement_Khoa() {
                 Hủy
               </button>
               <button 
-                onClick={() => setIsModalOpen(false)}
+                onClick={handleCreateCampaign}
                 className="px-5 py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl text-sm font-bold transition-colors shadow-sm cursor-pointer"
               >
                 Lưu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal - Xem chi tiết */}
+      {viewingDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div 
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={(e) => { e.stopPropagation(); setViewingDetail(null); }}
+          ></div>
+          
+          <div 
+            className="bg-white w-full max-w-2xl rounded-2xl shadow-xl relative z-10 animate-in zoom-in-95 duration-200 flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 py-4 border-b border-[#E7E0C4] flex items-center justify-between">
+              <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                Chi tiết
+              </h2>
+              <button 
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setViewingDetail(null); }}
+                className="p-1.5 text-slate-400 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              {Object.entries(viewingDetail).map(([key, value]) => {
+                if (typeof value === 'object' && value !== null) return null;
+                return (
+                  <div key={key} className="flex flex-col border-b border-slate-100 pb-2">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{key}</span>
+                    <span className="text-sm font-medium text-slate-800 break-words">{String(value)}</span>
+                  </div>
+                );
+              })}
+            </div>
+            
+            <div className="px-6 py-4 border-t border-[#E7E0C4] bg-slate-50/50 flex items-center justify-end rounded-b-2xl">
+              <button 
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setViewingDetail(null); }}
+                className="px-6 py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl text-sm font-bold transition-colors shadow-sm cursor-pointer"
+              >
+                Đóng
               </button>
             </div>
           </div>

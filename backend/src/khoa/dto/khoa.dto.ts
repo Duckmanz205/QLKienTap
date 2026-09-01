@@ -126,10 +126,6 @@ export class CreateCampaignDto {
 
   @IsInt()
   @Min(1)
-  nam_hoc_id: number;
-
-  @IsInt()
-  @Min(1)
   hoc_ky_id: number;
 
   @IsOptional()
@@ -395,6 +391,14 @@ export class CreateKhoaNotificationDto {
   @IsInt()
   @Min(1)
   khoa_id?: number;
+
+  @IsOptional()
+  @IsString()
+  file_url?: string;
+
+  @IsOptional()
+  @IsString()
+  file_name?: string;
 }
 
 export class ExportStudentListDto {
@@ -490,6 +494,12 @@ export class GetEnrollmentsQueryDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  lichKienTapId?: number;
 }
 
 export class CreateStudentDto {
@@ -516,4 +526,64 @@ export class CreateStudentDto {
   @IsOptional()
   @IsInt()
   khoa_id?: number;
+}
+
+export class UpdateStudentDto {
+  @IsOptional() @IsString() email?: string;
+  @IsOptional() @IsString() sdt?: string;
+  @IsOptional() @IsString() ten_lop?: string;
+}
+
+export class GetAccountsQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsString()
+  vaiTro?: string;
+
+  @IsOptional()
+  @IsString()
+  trangThai?: string;
+}
+
+export class CreateLecturerDto {
+  @IsString()
+  @IsNotEmpty({ message: 'Mã giảng viên không được để trống' })
+  ma_gv: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Họ tên không được để trống' })
+  ho_ten: string;
+
+  @IsOptional()
+  @IsString()
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  sdt?: string;
+
+  @IsOptional()
+  @IsInt()
+  so_sv_toi_da_huong_dan?: number;
+}
+
+export class UpdateLecturerDto {
+  @IsOptional() @IsString() email?: string;
+  @IsOptional() @IsString() sdt?: string;
+  @IsOptional() @IsInt() so_sv_toi_da_huong_dan?: number;
 }

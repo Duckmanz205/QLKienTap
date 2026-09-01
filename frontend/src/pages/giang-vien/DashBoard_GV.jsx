@@ -1,85 +1,85 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Users, Edit3, Presentation, GraduationCap, 
   MapPin, Calendar, Clock, ArrowRight, User
 } from 'lucide-react';
+import { giangVienApi } from '../../services/api';
 
 export default function DashBoard_GV() {
   const navigate = useNavigate();
   const [activeRole, setActiveRole] = useState('DanDoan'); // 'DanDoan', 'HuongDan', 'HoiDong'
 
-  // Mock Data
-  const lecturer = { hoTen: 'ThS. Trần Minh Triết', id: 1 };
-  
-  const stats = {
-    doanDangDan: 2,
-    baiCanCham: 15,
-    buoiBaoCao: 3,
-    tongSvHuongDan: 45
+  const [lecturer, setLecturer] = useState({ hoTen: 'Giảng viên', id: null });
+  const [trips, setTrips] = useState([]);
+  const [reports, setReports] = useState([]);
+  const [boards, setBoards] = useState([]);
+  const [guidedStudentsCount, setGuidedStudentsCount] = useState(0);
+  const [stats, setStats] = useState({
+    doanDangDan: 0,
+    baiCanCham: 0,
+    buoiBaoCao: 0,
+    tongSvHuongDan: 0
+  });
+
+  useEffect(() => {
+    const userJson = localStorage.getItem('user');
+    if (userJson) {
+      const { user } = JSON.parse(userJson);
+      giangVienApi.getProfile(user.id).then(res => {
+        setLecturer(res.data);
+        fetchDashboardData(res.data.id);
+      }).catch(err => console.error(err));
+    }
+  }, []);
+
+  const fetchDashboardData = async (gvId) => {
+    try {
+      const [studentsRes, tripsRes, reportsRes, boardsRes, statsRes] = await Promise.all([
+        giangVienApi.getGuidedStudents(gvId),
+        giangVienApi.getLedTrips(gvId),
+        giangVienApi.getGuidedReports(gvId),
+        giangVienApi.getBoardSessions(gvId),
+        giangVienApi.getDashboardStats(gvId)
+      ]);
+      
+      setGuidedStudentsCount((studentsRes.data || []).length);
+      setTrips(tripsRes.data || []);
+      setReports(reportsRes.data?.data || []);
+      setBoards(boardsRes.data || []);
+      setStats(statsRes.data || { doanDangDan: 0, baiCanCham: 0, buoiBaoCao: 0, tongSvHuongDan: 0 });
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const scheduleInWeek = [
-    {
-      id: 1,
+    ...trips.map(t => ({
+      id: `trip_${t.id}`,
       type: 'DanDoan',
-      title: 'Chuyến tham quan Yakult HCM',
-      date: 'Thứ Năm, 10/09/2026',
-      time: '08:00 - 11:30'
-    },
-    {
-      id: 2,
+      title: t.nhaMay?.ten_nha_may || 'Chuyến tham quan',
+      date: t.ngay_tham_quan ? new Date(t.ngay_tham_quan).toLocaleDateString('vi-VN') : '--',
+      time: `${(t.gio_bat_dau || '--').slice(0, 5)} - ${(t.gio_ket_thuc || '--').slice(0, 5)}`,
+      rawDate: new Date(t.ngay_tham_quan)
+    })),
+    ...boards.map(b => ({
+      id: `board_${b.session?.id}`,
       type: 'HoiDong',
-      title: 'Hội đồng Bảo vệ Báo cáo Kiến tập - Nhóm 1',
-      date: 'Thứ Sáu, 11/09/2026',
-      time: '13:30 - 17:00'
-    },
-    {
-      id: 3,
-      type: 'DanDoan',
-      title: 'Chuyến tham quan Vinamilk Bình Dương',
-      date: 'Thứ Bảy, 12/09/2026',
-      time: '07:30 - 12:00'
-    }
-  ];
+      title: `Hội đồng Bảo vệ - Nhóm ${b.session?.id}`,
+      date: b.session?.ngay_bao_cao ? new Date(b.session.ngay_bao_cao).toLocaleDateString('vi-VN') : '--',
+      time: `${(b.session?.gio_bat_dau || '--').slice(0, 5)} - ${(b.session?.gio_ket_thuc || '--').slice(0, 5)}`,
+      rawDate: b.session?.ngay_bao_cao ? new Date(b.session.ngay_bao_cao) : new Date(0)
+    }))
+  ].sort((a, b) => a.rawDate - b.rawDate).slice(0, 5);
 
-  const pendingReports = [
-    {
-      id: 101,
-      studentName: 'Nguyễn Văn An',
-      nhaMay: 'Nhà máy Yakult HCM',
-      ngayNop: '08/09/2026',
-      avatar: 'https://ui-avatars.com/api/?name=Nguyen+Van+An&background=f1f5f9&color=475569'
-    },
-    {
-      id: 102,
-      studentName: 'Trần Thị Bình',
-      nhaMay: 'Acecook Việt Nam',
-      ngayNop: '09/09/2026',
-      avatar: 'https://ui-avatars.com/api/?name=Tran+Thi+Binh&background=f1f5f9&color=475569'
-    },
-    {
-      id: 103,
-      studentName: 'Lê Hoàng Cường',
-      nhaMay: 'Vinamilk Bình Dương',
-      ngayNop: '09/09/2026',
-      avatar: 'https://ui-avatars.com/api/?name=Le+Hoang+Cuong&background=f1f5f9&color=475569'
-    },
-    {
-      id: 104,
-      studentName: 'Phạm Duy Khang',
-      nhaMay: 'Nhà máy Yakult HCM',
-      ngayNop: '10/09/2026',
-      avatar: 'https://ui-avatars.com/api/?name=Pham+Duy+Khang&background=f1f5f9&color=475569'
-    }
-  ];
+  const pendingReports = reports.filter(r => r.trang_thai !== 'DaCham');
 
   const getTagStyle = (type) => {
     if (type === 'DanDoan') {
       return 'bg-[#407F3E]/10 text-[#407F3E] border-[#407F3E]/20';
     }
     if (type === 'HoiDong') {
-      return 'bg-[#89B449]/10 text-[#407F3E] border-[#89B449]/30'; // Slight variation for Hội đồng
+      return 'bg-[#89B449]/10 text-[#407F3E] border-[#89B449]/30'; 
     }
     return 'bg-slate-100 text-slate-600 border-slate-200';
   };
@@ -97,7 +97,7 @@ export default function DashBoard_GV() {
       <div className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Trang chủ</h1>
-          <p className="text-sm font-medium text-slate-500 mt-1">Xin chào Giảng viên, {lecturer.hoTen}!</p>
+          <p className="text-sm font-medium text-slate-500 mt-1">Xin chào Giảng viên, {lecturer.ho_ten}!</p>
         </div>
         
         {/* Role Toggles */}
@@ -186,41 +186,48 @@ export default function DashBoard_GV() {
           <div className="flex items-center justify-between mb-6 shrink-0 border-b border-[#E7E0C4] pb-4">
             <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
               <Calendar className="w-5 h-5 text-[#407F3E]" />
-              Lịch trong tuần
+              Lịch trình sắp tới
             </h2>
-            <button className="text-xs font-bold text-[#407F3E] hover:underline flex items-center gap-1 cursor-pointer">
+            <button 
+              onClick={() => navigate('/giang-vien/led-trips')}
+              className="text-xs font-bold text-[#407F3E] hover:underline flex items-center gap-1 cursor-pointer"
+            >
               Xem tất cả <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
 
           <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 flex flex-col gap-4">
-            {scheduleInWeek.map((schedule) => (
-              <div key={schedule.id} className="relative flex gap-4 p-4 rounded-xl border border-[#E7E0C4] hover:border-[#89B449]/50 hover:bg-[#89B449]/5 transition-colors group cursor-pointer">
-                <div className="mt-1 flex flex-col items-center">
-                  <div className="w-2.5 h-2.5 rounded-full bg-[#407F3E] ring-4 ring-white group-hover:ring-[#89B449]/20 transition-all"></div>
-                  <div className="w-px h-full bg-[#E7E0C4] mt-2 group-last:hidden"></div>
-                </div>
-                
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-3 mb-1.5">
-                    <h4 className="text-sm font-bold text-slate-800 line-clamp-1 group-hover:text-[#407F3E] transition-colors">{schedule.title}</h4>
-                    <span className={`inline-block px-2 py-0.5 border rounded text-[9px] font-bold uppercase tracking-wider shrink-0 ${getTagStyle(schedule.type)}`}>
-                      {getTagLabel(schedule.type)}
-                    </span>
+            {scheduleInWeek.length === 0 ? (
+              <div className="text-center py-6 text-sm text-slate-500 font-medium">Không có lịch trình sắp tới.</div>
+            ) : (
+              scheduleInWeek.map((schedule) => (
+                <div key={schedule.id} className="relative flex gap-4 p-4 rounded-xl border border-[#E7E0C4] hover:border-[#89B449]/50 hover:bg-[#89B449]/5 transition-colors group cursor-pointer">
+                  <div className="mt-1 flex flex-col items-center">
+                    <div className="w-2.5 h-2.5 rounded-full bg-[#407F3E] ring-4 ring-white group-hover:ring-[#89B449]/20 transition-all"></div>
+                    <div className="w-px h-full bg-[#E7E0C4] mt-2 group-last:hidden"></div>
                   </div>
-                  <div className="flex items-center gap-4 text-xs font-medium text-slate-500">
-                    <div className="flex items-center gap-1">
-                      <Calendar className="w-3.5 h-3.5" />
-                      {schedule.date}
+                  
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-3 mb-1.5">
+                      <h4 className="text-sm font-bold text-slate-800 line-clamp-1 group-hover:text-[#407F3E] transition-colors">{schedule.title}</h4>
+                      <span className={`inline-block px-2 py-0.5 border rounded text-[9px] font-bold uppercase tracking-wider shrink-0 ${getTagStyle(schedule.type)}`}>
+                        {getTagLabel(schedule.type)}
+                      </span>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5" />
-                      {schedule.time}
+                    <div className="flex items-center gap-4 text-xs font-medium text-slate-500">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="w-3.5 h-3.5" />
+                        {schedule.date}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5" />
+                        {schedule.time}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
@@ -231,7 +238,10 @@ export default function DashBoard_GV() {
               <Edit3 className="w-5 h-5 text-[#DBD468]" />
               Bài chờ chấm ({stats.baiCanCham})
             </h2>
-            <button className="text-xs font-bold text-[#407F3E] hover:underline flex items-center gap-1 cursor-pointer">
+            <button 
+              onClick={() => navigate('/giang-vien/grading')}
+              className="text-xs font-bold text-[#407F3E] hover:underline flex items-center gap-1 cursor-pointer"
+            >
               Đến trang chấm điểm <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -243,25 +253,28 @@ export default function DashBoard_GV() {
                 <p className="text-sm font-bold">Không có bài nào chờ chấm</p>
               </div>
             ) : (
-              pendingReports.map((report) => (
+              pendingReports.slice(0, 5).map((report) => (
                 <div 
                   key={report.id}
                   className="flex items-center justify-between p-3.5 rounded-xl border border-[#E7E0C4] hover:bg-slate-50 transition-colors group"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-full border border-[#E7E0C4] overflow-hidden shrink-0">
-                      <img src={report.avatar} alt={report.studentName} className="w-full h-full object-cover" />
+                    <div className="w-10 h-10 rounded-full bg-[#E7E0C4]/30 text-[#407F3E] font-bold border border-[#E7E0C4] flex items-center justify-center shrink-0">
+                      {report.phieuThamQuan?.phieuDangKy?.sinhVien?.ho_ten?.charAt(0) || 'S'}
                     </div>
                     <div className="min-w-0">
-                      <h4 className="text-sm font-bold text-slate-800 line-clamp-1">{report.studentName}</h4>
+                      <h4 className="text-sm font-bold text-slate-800 line-clamp-1">{report.phieuThamQuan?.phieuDangKy?.sinhVien?.ho_ten}</h4>
                       <p className="text-[11px] font-medium text-slate-500 truncate mt-0.5">
                         <MapPin className="w-3 h-3 inline-block mr-1 -mt-0.5" />
-                        {report.nhaMay} • Nộp: {report.ngayNop}
+                        {report.phieuThamQuan?.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Đã nộp bài'} • {new Date(report.ngay_nop || Date.now()).toLocaleDateString('vi-VN')}
                       </p>
                     </div>
                   </div>
                   
-                  <button className="ml-4 shrink-0 px-3 py-1.5 bg-[#407F3E]/10 text-[#407F3E] hover:bg-[#407F3E] hover:text-white rounded-lg text-xs font-bold transition-colors cursor-pointer border border-[#407F3E]/20">
+                  <button 
+                    onClick={() => navigate('/giang-vien/grading')}
+                    className="ml-4 shrink-0 px-3 py-1.5 bg-[#407F3E]/10 text-[#407F3E] hover:bg-[#407F3E] hover:text-white rounded-lg text-xs font-bold transition-colors cursor-pointer border border-[#407F3E]/20"
+                  >
                     Chấm ngay
                   </button>
                 </div>

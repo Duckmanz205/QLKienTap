@@ -50,38 +50,8 @@ export default function DashBoard_SV() {
       const gradesRes = await sinhVienApi.getGrades(svId);
       setGrades(gradesRes.data || []);
 
-      const registered = tripsList.length;
-      const completed = tripsList.filter(t => t.trang_thai === 'DaThamGia' || t.trang_thai === 'HoanThanh').length;
-      
-      const pendingReports = tripsList.filter(t => 
-        (t.trang_thai === 'DaThamGia' || t.trang_thai === 'HoanThanh') && !t.baiThuHoach
-      ).length;
-
-      let avgScore = 'Chưa có';
-      if (gradesRes.data && gradesRes.data.length > 0) {
-        const currentTerm = gradesRes.data[0];
-        if (currentTerm.diem_tong_ket !== null) {
-          avgScore = Number(currentTerm.diem_tong_ket).toFixed(1);
-        } else if (currentTerm.selectedTrips && currentTerm.selectedTrips.length > 0) {
-          const scores = currentTerm.selectedTrips.map(trip => {
-            return (
-              Number(trip.diem_chuan_bi || 0) * 0.3 +
-              Number(trip.diem_bai_thu_hoach || 0) * 0.3 +
-              Number(trip.diem_bao_cao_tqnm || 0) * 0.4 +
-              Number(trip.diem_cong || 0)
-            );
-          });
-          const avg = scores.reduce((sum, val) => sum + val, 0) / scores.length;
-          avgScore = avg.toFixed(1);
-        }
-      }
-
-      setStats({
-        registered,
-        completed,
-        pendingReports,
-        avgScore
-      });
+      const statsRes = await sinhVienApi.getDashboardStats(svId);
+      setStats(statsRes.data);
 
     } catch (err) {
       console.error('Error loading dashboard data:', err);

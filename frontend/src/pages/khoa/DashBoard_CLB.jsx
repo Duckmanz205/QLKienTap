@@ -14,7 +14,7 @@ import {
   Activity
 } from 'lucide-react';
 
-export default function DashBoard_Khoa() {
+export default function DashBoard_CLB() {
   const navigate = useNavigate();
   const [stats, setStats] = useState({
     studentCount: 520,
@@ -28,7 +28,7 @@ export default function DashBoard_Khoa() {
   const [loading, setLoading] = useState(true);
 
   // Loaded user profile details
-  const [userProfile, setUserProfile] = useState({ ho_ten: 'Trưởng Khoa CNTP' });
+  const [userProfile, setUserProfile] = useState({ ho_ten: 'Quản lý CLB' });
 
   useEffect(() => {
     fetchStats();
@@ -115,10 +115,10 @@ export default function DashBoard_Khoa() {
         </div>
         <div className="relative z-10 max-w-2xl">
           <span className="bg-white/20 text-white text-[11px] px-3 py-1 rounded-full font-bold tracking-wide uppercase">
-            HỆ THỐNG QUẢN LÝ KIẾN TẬP - KHOA CÔNG NGHỆ THỰC PHẨM
+            HỆ THỐNG QUẢN LÝ KIẾN TẬP - CLB
           </span>
           <h1 className="text-3xl font-black font-sans tracking-tight mt-3 text-white">
-            Tổng quan Hoạt động Kiến tập Khoa
+            Tổng quan Hoạt động Kiến tập CLB
           </h1>
           <p className="text-white/90 text-sm mt-2 leading-relaxed font-medium">
             Chào mừng Thầy/Cô <strong className="text-white font-bold">{userProfile.ho_ten}</strong>. Hệ thống quản lý thông tin kiến tập hiện tại đang được theo dõi và giám sát chặt chẽ. Dưới đây là thống kê tình hình đợt kiến tập và hành trình hôm nay.
@@ -280,14 +280,14 @@ export default function DashBoard_Khoa() {
           <div className="mt-8 pt-4 border-t border-[#E7E0C4] space-y-3">
             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Thao tác nhanh</h4>
             <button 
-              onClick={() => navigate('/khoa/lich-kien-tap')}
+              onClick={() => navigate('/clb/plans')}
               className="w-full flex items-center justify-between p-3 rounded-xl bg-[#407F3E]/5 hover:bg-[#407F3E]/10 text-[#407F3E] text-xs font-bold transition-all"
             >
-              <span>Tạo lịch kiến tập lớp mới</span>
+              <span>Xem đợt kiến tập</span>
               <ArrowRight size={14} />
             </button>
             <button 
-              onClick={() => navigate('/khoa/refund-approval')}
+              onClick={() => navigate('/clb/refund-approval')}
               className="w-full flex items-center justify-between p-3 rounded-xl bg-[#89B449]/5 hover:bg-[#89B449]/10 text-[#89B449] text-xs font-bold transition-all"
             >
               <span>Phê duyệt hoàn lệ phí</span>

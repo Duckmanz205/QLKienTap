@@ -26,25 +26,14 @@ Frontend (React + Vite)  ──▶  Backend (NestJS)  ──▶  SQL Server
 
 ## 🛠️ Bước 1: Chuẩn bị Database
 
-### 1.1. Tạo database (nếu chưa có)
+Hệ thống sử dụng CSDL với nhiều Trigger và Constraint phức tạp, do đó **không sử dụng tính năng tự động tạo bảng (synchronize) của TypeORM**.
 
-Mở SSMS, kết nối vào SQL Server và chạy:
+### 1.1. Khởi tạo Schema và Dữ liệu
 
-```sql
-CREATE DATABASE QLKienTap;
-```
+Mở SQL Server Management Studio (SSMS) và thực thi lần lượt 2 script sau (nằm trong thư mục `TaiLieu/`):
 
-### 1.2. Tạo bảng tự động từ TypeORM
-
-Mở file `backend/src/app.module.ts` dòng **30**, tạm sửa:
-
-```diff
-- synchronize: false, // TAT trong production, dung migrations thay the
-+ synchronize: true,  // TẠM BẬT để TypeORM tự tạo bảng
-```
-
-> ⚠️ Sau khi bảng đã được tạo xong (backend khởi động thành công lần đầu), hãy **chuyển lại thành `false`** để tránh mất dữ liệu.
-> Nếu database của bạn **đã có sẵn bảng**, bước này có thể bỏ qua.
+1. **`QLKienTap_Database_v2.sql`**: Chạy script này trước để tạo database `QLKienTap`, các bảng, view, constraint và triggers theo cấu trúc V2 mới nhất.
+2. **`QLKienTap_ImportData.sql`**: Chạy script này sau khi đã tạo schema để insert dữ liệu mẫu (danh mục nền, tài khoản, sinh viên, giảng viên...). Mật khẩu của admin và clb đã được đưa về mặc định là `123456`.
 
 ---
 
@@ -125,11 +114,13 @@ Database đã có sẵn dữ liệu. Các tài khoản sử dụng **mật khẩ
 
 | Vai trò | Tên đăng nhập (ví dụ) | Mật khẩu | Ghi chú |
 | :--- | :--- | :--- | :--- |
-| **Quản lý Khoa** | `admin01` | `AdminHuit2025` | Tài khoản quản trị viên |
-| **Sinh viên** | `2022220001` (MSSV bất kỳ) | `SvHuit2025` | Dùng MSSV có trong bảng TaiKhoan |
-| **Giảng viên** | Mã GV có trong DB | `GvHuit2025` | Dùng tên đăng nhập GV trong DB |
+| **Quản trị viên** | `admin` | `123456` | Quản trị viên hệ thống (Admin tổng) |
+| **Quản lý Khoa** | `admin01` | `123456` | Quản lý học thuật, duyệt lịch |
+| **Quản lý CLB** | `clb01` | `123456` | Vận hành, điều phối chuyến đi |
+| **Sinh viên** | `2005190573` (MSSV bất kỳ) | `SvHuit2025` | Mật khẩu cho SV từ dữ liệu mẫu |
+| **Giảng viên** | `GV001` (Mã GV bất kỳ) | `GvHuit2025` | Dùng mã GV trong DB |
 
-> 💡 Mật khẩu mặc định hoạt động nhờ cơ chế: nếu `mat_khau_hash` trong DB là `$2b$10$hash_placeholder`, hệ thống sẽ so khớp với mật khẩu mặc định theo vai trò.
+> 💡 **Lưu ý**: Đối với sinh viên được **import mới** vào hệ thống sau này (thông qua tính năng Import Sinh viên), mật khẩu mặc định tự động tạo sẽ là **Mã số sinh viên (MSSV)** của sinh viên đó. Mật khẩu mẫu `SvHuit2025` chỉ áp dụng cho tài khoản từ file mock data.
 
 ---
 
@@ -190,7 +181,7 @@ CodeDoAn/
 │   │   ├── auth/               ← Xác thực (Login, đổi MK)
 │   │   ├── entities/           ← TypeORM Entities (33 bảng)
 │   │   ├── giang-vien/         ← Module Giảng viên
-│   │   ├── khoa/               ← Module Quản lý Khoa (Admin)
+│   │   ├── khoa/               ← Module Quản lý Khoa & Quản lý CLB (Admin)
 │   │   ├── sinh-vien/          ← Module Sinh viên
 │   │   ├── app.module.ts       ← Module gốc (cấu hình DB)
 │   │   └── main.ts             ← Entry point (CORS, port)
@@ -203,7 +194,7 @@ CodeDoAn/
     │   │   ├── Login.jsx       ← Trang đăng nhập
     │   │   ├── sinh-vien/      ← 8 trang Sinh viên
     │   │   ├── giang-vien/     ← 8 trang Giảng viên
-    │   │   └── khoa/           ← 16 trang Admin
+    │   │   └── khoa/           ← 17 trang Admin (Khoa & CLB)
     │   ├── services/api.js     ← Axios API client
     │   └── App.jsx             ← Router chính
     ├── vite.config.js

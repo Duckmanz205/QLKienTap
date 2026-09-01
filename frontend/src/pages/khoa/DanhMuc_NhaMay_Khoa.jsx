@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Plus, Search, ChevronDown, Check,
-  Edit2, Building2, Wifi, Users
+  Edit2, Building2, Wifi, Users, X
 } from 'lucide-react';
 import { khoaApi } from '../../services/api';
 
@@ -20,8 +20,26 @@ export default function DanhMuc_NhaMay_Khoa() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(15);
 
+  // Modal States
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editData, setEditData] = useState(null); // null means Create
+  
+  // Form States
+  const [tenNhaMay, setTenNhaMay] = useState('');
+  const [diaChi, setDiaChi] = useState('');
+  const [nhomNganh, setNhomNganh] = useState('');
+  const [hoTroTrucTiep, setHoTroTrucTiep] = useState(true);
+  const [hoTroTrucTuyen, setHoTroTrucTuyen] = useState(false);
+  const [trangThai, setTrangThai] = useState('HoatDong');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [nhomNganhOptions, setNhomNganhOptions] = useState(["Tất cả nhóm ngành"]);
+
   useEffect(() => {
     fetchFactories();
+    khoaApi.getFactoryIndustryGroups().then(res => {
+      setNhomNganhOptions(["Tất cả nhóm ngành", ...(res.data || [])]);
+    }).catch(err => console.error(err));
   }, []);
 
   useEffect(() => {
@@ -37,11 +55,73 @@ export default function DanhMuc_NhaMay_Khoa() {
     }
   };
 
-  const nhomNganhOptions = [
-    "Tất cả nhóm ngành", "Đồ uống", "Sữa - dầu - chất béo", "Đường - bánh - kẹo", 
-    "Trà - cà phê - ca cao", "Lương thực - bột mì - mì ăn liền", "Nước chấm - gia vị", 
-    "Chế biến thủy sản", "Trung tâm phân tích - kiểm nghiệm"
-  ];
+  const handleOpenCreateModal = () => {
+    setEditData(null);
+    setTenNhaMay('');
+    setDiaChi('');
+    setNhomNganh('');
+    setHoTroTrucTiep(true);
+    setHoTroTrucTuyen(false);
+    setTrangThai('HoatDong');
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEditModal = (factory) => {
+    setEditData(factory);
+    setTenNhaMay(factory.ten_nha_may);
+    setDiaChi(factory.dia_chi);
+    setNhomNganh(factory.nhom_nganh);
+    setHoTroTrucTiep(factory.ho_tro_truc_tiep);
+    setHoTroTrucTuyen(factory.ho_tro_truc_tuyen);
+    setTrangThai(factory.trang_thai);
+    setIsModalOpen(true);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      if (editData) {
+        // Edit mode
+        await khoaApi.updateFactory(editData.id, {
+          ten_nha_may: tenNhaMay,
+          dia_chi: diaChi,
+          nhom_nganh: nhomNganh,
+          ho_tro_truc_tiep: hoTroTrucTiep,
+          ho_tro_truc_tuyen: hoTroTrucTuyen,
+          trang_thai: trangThai,
+        });
+      } else {
+        // Create mode
+        await khoaApi.createFactory({
+          ten_nha_may: tenNhaMay,
+          dia_chi: diaChi,
+          nhom_nganh: nhomNganh,
+          ho_tro_truc_tiep: hoTroTrucTiep,
+          ho_tro_truc_tuyen: hoTroTrucTuyen,
+        });
+      }
+      setIsModalOpen(false);
+      fetchFactories();
+    } catch (err) {
+      console.error(err);
+      alert('Có lỗi xảy ra!');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const toggleStatus = async (id, currentStatus) => {
+    try {
+      const next = currentStatus === 'HoatDong' ? 'NgungHopTac' : 'HoatDong';
+      await khoaApi.updateFactory(id, { trang_thai: next });
+      fetchFactories();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+
 
   const trangThaiOptions = ["Tất cả", "Hoạt động", "Ngừng hợp tác"];
 
@@ -65,11 +145,14 @@ export default function DanhMuc_NhaMay_Khoa() {
   const paginatedFactories = filteredFactories.slice((page - 1) * limit, page * limit);
 
   return (
-    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-2 animate-in fade-in duration-300">
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-2 animate-in fade-in duration-300 relative">
       {/* Header section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <h1 className="text-2xl font-bold text-slate-800">Nhà máy</h1>
-        <button className="px-4 py-2 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors shadow-sm cursor-pointer">
+        <button 
+          onClick={handleOpenCreateModal}
+          className="px-4 py-2 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors shadow-sm cursor-pointer"
+        >
           <Plus className="w-4 h-4" />
           Thêm nhà máy
         </button>
@@ -167,11 +250,14 @@ export default function DanhMuc_NhaMay_Khoa() {
                     <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(#407F3E 1px, transparent 1px)', backgroundSize: '10px 10px' }}></div>
                     
                     {/* Status Pill */}
-                    <div className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-[10px] font-bold shadow-sm border ${
+                    <div className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-[10px] font-bold shadow-sm border cursor-pointer hover:opacity-80 ${
                       isHoatDong 
                         ? 'bg-[#89B449] text-white border-[#407F3E]/20' 
                         : 'bg-slate-200 text-slate-500 border-slate-300'
-                    }`}>
+                    }`}
+                      title="Nhấn để đổi trạng thái"
+                      onClick={() => toggleStatus(f.id, f.trang_thai)}
+                    >
                       {isHoatDong ? 'Hoạt động' : 'Ngừng hợp tác'}
                     </div>
                   </div>
@@ -214,7 +300,11 @@ export default function DanhMuc_NhaMay_Khoa() {
                         </div>
 
                         {/* Edit Button */}
-                        <button className="p-2 text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer" title="Chỉnh sửa thông tin">
+                        <button 
+                          onClick={() => handleOpenEditModal(f)}
+                          className="p-2 text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer" 
+                          title="Chỉnh sửa thông tin"
+                        >
                           <Edit2 className="w-4 h-4" />
                         </button>
                       </div>
@@ -284,6 +374,118 @@ export default function DanhMuc_NhaMay_Khoa() {
           </div>
         )}
       </div>
+
+      {/* Create / Edit Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <h2 className="text-lg font-bold text-slate-800">
+                {editData ? 'Chỉnh sửa doanh nghiệp' : 'Thêm doanh nghiệp mới'}
+              </h2>
+              <button 
+                onClick={() => setIsModalOpen(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-200 text-slate-500 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1.5">Tên nhà máy / Công ty <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  required
+                  value={tenNhaMay}
+                  onChange={e => setTenNhaMay(e.target.value)}
+                  placeholder="Ví dụ: Công ty Cổ phần Acecook..."
+                  className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] text-sm transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1.5">Địa chỉ <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  required
+                  value={diaChi}
+                  onChange={e => setDiaChi(e.target.value)}
+                  placeholder="Ví dụ: KCN Tân Bình, TP.HCM"
+                  className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] text-sm transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1.5">Nhóm ngành nghề <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  required
+                  value={nhomNganh}
+                  onChange={e => setNhomNganh(e.target.value)}
+                  placeholder="Ví dụ: Chế biến thực phẩm"
+                  className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] text-sm transition-all"
+                />
+              </div>
+
+              <div className="pt-2">
+                <label className="block text-sm font-bold text-slate-700 mb-2">Khả năng hỗ trợ tham quan</label>
+                <div className="flex flex-wrap gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={hoTroTrucTiep}
+                      onChange={e => setHoTroTrucTiep(e.target.checked)}
+                      className="w-4 h-4 rounded border-slate-300 text-[#407F3E] focus:ring-[#407F3E]"
+                    />
+                    <span className="text-sm font-medium text-slate-700">Trực tiếp (Offline)</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={hoTroTrucTuyen}
+                      onChange={e => setHoTroTrucTuyen(e.target.checked)}
+                      className="w-4 h-4 rounded border-slate-300 text-[#407F3E] focus:ring-[#407F3E]"
+                    />
+                    <span className="text-sm font-medium text-slate-700">Trực tuyến (Online)</span>
+                  </label>
+                </div>
+              </div>
+
+              {editData && (
+                <div className="pt-2">
+                  <label className="block text-sm font-bold text-slate-700 mb-2">Trạng thái</label>
+                  <select 
+                    value={trangThai}
+                    onChange={(e) => setTrangThai(e.target.value)}
+                    className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] text-sm transition-all cursor-pointer"
+                  >
+                    <option value="HoatDong">Hoạt động (Đang hợp tác)</option>
+                    <option value="NgungHopTac">Ngừng hợp tác</option>
+                  </select>
+                </div>
+              )}
+
+              <div className="pt-4 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="flex-1 px-4 py-2.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg text-sm font-bold transition-colors cursor-pointer"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex-1 px-4 py-2.5 bg-[#407F3E] hover:bg-[#407F3E]/90 text-white rounded-lg text-sm font-bold transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmitting ? 'Đang xử lý...' : (editData ? 'Lưu thay đổi' : 'Thêm nhà máy')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

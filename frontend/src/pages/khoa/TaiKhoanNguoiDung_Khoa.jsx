@@ -3,20 +3,10 @@ import {
   Search, ChevronDown, Check,
   Key, Lock, Unlock
 } from 'lucide-react';
-
-const initialUserAccounts = [
-  { username: 'admin_khoa', fullname: 'Nguyễn Văn A', role: 'Quản lý khoa', status: 'Hoạt động', lastLogin: '19/08/2023 08:30' },
-  { username: 'gv_tuan', fullname: 'Lê Minh Tuấn', role: 'Giảng viên', status: 'Hoạt động', lastLogin: '18/08/2023 15:45' },
-  { username: 'sv_hoa', fullname: 'Phạm Thị Hoa', role: 'Sinh viên', status: 'Khóa tài khoản', lastLogin: '15/08/2023 09:12' },
-  { username: 'gv_lan', fullname: 'Trần Thị Lan', role: 'Giảng viên', status: 'Hoạt động', lastLogin: '19/08/2023 10:20' },
-  { username: 'sv_hung', fullname: 'Nguyễn Duy Hưng', role: 'Sinh viên', status: 'Hoạt động', lastLogin: '19/08/2023 14:05' },
-  { username: 'sv_dung', fullname: 'Lê Tiến Dũng', role: 'Sinh viên', status: 'Hoạt động', lastLogin: '17/08/2023 11:30' },
-  { username: 'admin_audit', fullname: 'Vũ Quốc Huy', role: 'Quản lý khoa', status: 'Hoạt động', lastLogin: '12/08/2023 16:50' },
-  { username: 'gv_phuong', fullname: 'Đỗ Minh Phương', role: 'Giảng viên', status: 'Khóa tài khoản', lastLogin: '10/08/2023 13:15' }
-];
+import { khoaApi } from '../../services/api';
 
 export default function TaiKhoanNguoiDung_Khoa() {
-  const [accounts, setAccounts] = useState(initialUserAccounts);
+  const [accounts, setAccounts] = useState([]);
   
   // Filter States
   const [searchTerm, setSearchTerm] = useState('');
@@ -30,47 +20,69 @@ export default function TaiKhoanNguoiDung_Khoa() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(15);
 
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalAccounts, setTotalAccounts] = useState(0);
+
   useEffect(() => {
-    setPage(1);
-  }, [searchTerm, filterRole, filterTrangThai]);
+    const delayDebounceFn = setTimeout(() => {
+      fetchData(1);
+    }, 500);
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm]);
 
-  const roleOptions = ["Tất cả vai trò", "Quản lý khoa", "Giảng viên", "Sinh viên"];
-  const trangThaiOptions = ["Tất cả", "Hoạt động", "Khóa tài khoản"];
+  useEffect(() => {
+    fetchData(page);
+  }, [page, limit, filterRole, filterTrangThai]);
 
-  const filteredAccounts = accounts.filter(acc => {
-    const matchesSearch = acc.username.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          acc.fullname.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    let matchesRole = true;
-    if (filterRole !== "Tất cả vai trò") {
-      matchesRole = acc.role === filterRole;
+  const fetchData = async (targetPage = page) => {
+    try {
+      const res = await khoaApi.getAccounts({
+        page: targetPage,
+        limit,
+        search: searchTerm,
+        vaiTro: filterRole !== "Tất cả vai trò" ? filterRole : undefined,
+        trangThai: filterTrangThai !== "Tất cả" ? filterTrangThai : undefined
+      });
+      setAccounts(res.data.data || []);
+      setTotalAccounts(res.data.total || 0);
+      setTotalPages(res.data.totalPages || 1);
+      setPage(targetPage);
+    } catch (err) {
+      console.error(err);
     }
-
-    let matchesTrangThai = true;
-    if (filterTrangThai !== "Tất cả") {
-      matchesTrangThai = acc.status === filterTrangThai;
-    }
-    
-    return matchesSearch && matchesRole && matchesTrangThai;
-  });
-
-  const totalAccounts = filteredAccounts.length;
-  const totalPages = Math.ceil(totalAccounts / limit) || 1;
-  const paginatedAccounts = filteredAccounts.slice((page - 1) * limit, page * limit);
-
-  const handleToggleStatus = (username) => {
-    setAccounts(prev => prev.map(acc => {
-      if (acc.username === username) {
-        const nextStatus = acc.status === 'Hoạt động' ? 'Khóa tài khoản' : 'Hoạt động';
-        return { ...acc, status: nextStatus };
-      }
-      return acc;
-    }));
   };
 
-  const handleResetPassword = (fullname) => {
-    if (window.confirm(`Bạn có chắc chắn muốn đặt lại mật khẩu của ${fullname}?`)) {
-      alert(`Đã đặt lại mật khẩu cho: ${fullname}`);
+  const roleOptions = [
+    { value: "Tất cả vai trò", label: "Tất cả vai trò" },
+    { value: "QuanLyKhoa", label: "Quản lý khoa" },
+    { value: "GiangVien", label: "Giảng viên" },
+    { value: "SinhVien", label: "Sinh viên" },
+  ];
+  const trangThaiOptions = [
+    { value: "Tất cả", label: "Tất cả" },
+    { value: "HoatDong", label: "Hoạt động" },
+    { value: "KhoaTaiKhoan", label: "Khóa tài khoản" },
+  ];
+
+  const handleToggleStatus = async (id) => {
+    try {
+      const res = await khoaApi.toggleAccountLock(id);
+      alert(res.data.message);
+      fetchData();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Có lỗi xảy ra');
+    }
+  };
+
+  const handleResetPassword = async (id, ho_ten) => {
+    if (window.confirm(`Bạn có chắc chắn muốn đặt lại mật khẩu của ${ho_ten || 'người dùng này'}?`)) {
+      try {
+        const res = await khoaApi.resetAccountPassword(id);
+        alert(res.data.message);
+        fetchData();
+      } catch (err) {
+        alert(err.response?.data?.message || 'Có lỗi xảy ra');
+      }
     }
   };
 
@@ -101,23 +113,25 @@ export default function TaiKhoanNguoiDung_Khoa() {
             onClick={() => { setIsRoleDropdownOpen(!isRoleDropdownOpen); setIsTrangThaiDropdownOpen(false); }}
             className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isRoleDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
           >
-            <span className="text-slate-700 font-medium truncate pr-2">{filterRole}</span>
+            <span className="text-slate-700 font-medium truncate pr-2">
+              {roleOptions.find(o => o.value === filterRole)?.label || filterRole}
+            </span>
             <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
           </div>
           {isRoleDropdownOpen && (
             <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1">
               {roleOptions.map(opt => (
                 <div 
-                  key={opt}
-                  onClick={() => { setFilterRole(opt); setIsRoleDropdownOpen(false); }}
+                  key={opt.value}
+                  onClick={() => { setFilterRole(opt.value); setIsRoleDropdownOpen(false); }}
                   className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                    (filterRole === opt) 
+                    (filterRole === opt.value) 
                       ? 'bg-[#E7E0C4] text-slate-800 font-bold' 
                       : 'text-slate-700 hover:bg-[#E7E0C4]/50'
                   }`}
                 >
-                  <span className="truncate pr-2">{opt}</span>
-                  {filterRole === opt && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                  <span className="truncate pr-2">{opt.label}</span>
+                  {filterRole === opt.value && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
                 </div>
               ))}
             </div>
@@ -130,23 +144,25 @@ export default function TaiKhoanNguoiDung_Khoa() {
             onClick={() => { setIsTrangThaiDropdownOpen(!isTrangThaiDropdownOpen); setIsRoleDropdownOpen(false); }}
             className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isTrangThaiDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
           >
-            <span className="text-slate-700 font-medium">{filterTrangThai}</span>
+            <span className="text-slate-700 font-medium">
+              {trangThaiOptions.find(o => o.value === filterTrangThai)?.label || filterTrangThai}
+            </span>
             <ChevronDown className="w-4 h-4 text-slate-400" />
           </div>
           {isTrangThaiDropdownOpen && (
             <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1">
               {trangThaiOptions.map(opt => (
                 <div 
-                  key={opt}
-                  onClick={() => { setFilterTrangThai(opt); setIsTrangThaiDropdownOpen(false); }}
+                  key={opt.value}
+                  onClick={() => { setFilterTrangThai(opt.value); setIsTrangThaiDropdownOpen(false); }}
                   className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                    (filterTrangThai === opt) 
+                    (filterTrangThai === opt.value) 
                       ? 'bg-[#E7E0C4] text-slate-800 font-bold' 
                       : 'text-slate-700 hover:bg-[#E7E0C4]/50'
                   }`}
                 >
-                  {opt}
-                  {filterTrangThai === opt && <Check className="w-4 h-4 text-[#407F3E]" />}
+                  {opt.label}
+                  {filterTrangThai === opt.value && <Check className="w-4 h-4 text-[#407F3E]" />}
                 </div>
               ))}
             </div>
@@ -169,26 +185,26 @@ export default function TaiKhoanNguoiDung_Khoa() {
               </tr>
             </thead>
             <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
-              {paginatedAccounts.length === 0 ? (
+              {accounts.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="p-8 text-center text-slate-500 font-medium">Không tìm thấy tài khoản nào khớp điều kiện</td>
                 </tr>
               ) : (
-                paginatedAccounts.map(acc => {
-                  const isLocked = acc.status === 'Khóa tài khoản';
+                accounts.map(acc => {
+                  const isLocked = acc.trang_thai === 'KhoaTaiKhoan';
                   
                   let roleColor = '';
-                  if (acc.role === 'Quản lý khoa') roleColor = 'bg-[#407F3E] text-white';
-                  else if (acc.role === 'Giảng viên') roleColor = 'bg-[#89B449] text-white';
+                  if (acc.vai_tro === 'Quản lý khoa') roleColor = 'bg-[#407F3E] text-white';
+                  else if (acc.vai_tro === 'Giảng viên') roleColor = 'bg-[#89B449] text-white';
                   else roleColor = 'bg-[#E7E0C4] text-slate-800 border border-[#407F3E]/20';
 
                   return (
-                    <tr key={acc.username} className={`transition-colors ${isLocked ? 'bg-slate-50/50 opacity-80 hover:opacity-100' : 'hover:bg-slate-50'}`}>
-                      <td className="p-4 pl-6 font-mono font-bold text-slate-800">{acc.username}</td>
-                      <td className="p-4 font-bold text-slate-700">{acc.fullname}</td>
+                    <tr key={acc.id} className={`transition-colors ${isLocked ? 'bg-slate-50/50 opacity-80 hover:opacity-100' : 'hover:bg-slate-50'}`}>
+                      <td className="p-4 pl-6 font-mono font-bold text-slate-800">{acc.ten_dang_nhap}</td>
+                      <td className="p-4 font-bold text-slate-700">{acc.ho_ten}</td>
                       <td className="p-4 text-center">
                         <span className={`inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold shadow-sm ${roleColor}`}>
-                          {acc.role}
+                          {acc.vai_tro}
                         </span>
                       </td>
                       <td className="p-4 text-center">
@@ -197,17 +213,17 @@ export default function TaiKhoanNguoiDung_Khoa() {
                             ? 'bg-[#E68A8C] text-white border-[#E68A8C]/20' 
                             : 'bg-[#89B449] text-white border-[#89B449]/20'
                         }`}>
-                          {acc.status}
+                          {acc.trang_thai === 'KhoaTaiKhoan' ? 'Khóa tài khoản' : 'Hoạt động'}
                         </span>
                       </td>
                       <td className="p-4 text-center text-slate-500 font-medium">
-                        {acc.lastLogin || '-'}
+                        {acc.lan_dang_nhap_cuoi ? new Date(acc.lan_dang_nhap_cuoi).toLocaleString('vi-VN') : '-'}
                       </td>
                       <td className="p-4 text-right pr-6">
                         <div className="flex justify-end items-center gap-2 text-slate-400">
                           {/* Reset Password */}
                           <button 
-                            onClick={() => handleResetPassword(acc.fullname)}
+                            onClick={() => handleResetPassword(acc.id, acc.ho_ten)}
                             className="p-1.5 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer" 
                             title="Đặt lại mật khẩu"
                           >
@@ -216,7 +232,7 @@ export default function TaiKhoanNguoiDung_Khoa() {
                           
                           {/* Toggle Lock */}
                           <button
-                            onClick={() => handleToggleStatus(acc.username)}
+                            onClick={() => handleToggleStatus(acc.id)}
                             className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
                               isLocked 
                                 ? 'text-[#89B449] hover:bg-[#89B449]/10' 
@@ -237,7 +253,7 @@ export default function TaiKhoanNguoiDung_Khoa() {
         </div>
         
         {/* Pagination Footer */}
-        {paginatedAccounts.length > 0 && (
+        {accounts.length > 0 && (
           <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
               <span>Hiển thị</span>

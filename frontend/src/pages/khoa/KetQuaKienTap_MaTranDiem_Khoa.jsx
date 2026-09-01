@@ -1,15 +1,61 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Lock, ChevronDown, Check, ChevronRight, AlertTriangle, 
-  CheckCircle2, XCircle, Clock, Ban
+  CheckCircle2, XCircle, Clock, Ban, Award
 } from 'lucide-react';
+import { khoaApi } from '../../services/api';
 
 export default function KetQuaKienTap_Khoa() {
-  const [isLichDropdownOpen, setIsLichDropdownOpen] = useState(false);
+  const [schedules, setSchedules] = useState([]);
   const [selectedLich, setSelectedLich] = useState('');
-  const lichOptions = ["Đợt kiến tập - Học kỳ 1 - 2025-2026", "Đợt kiến tập - Học kỳ 2 - 2024-2025"];
+  const [isLichDropdownOpen, setIsLichDropdownOpen] = useState(false);
+  const [results, setResults] = useState([]);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState(null);
 
-  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false); // To show the confirm modal mockup
+  useEffect(() => {
+    fetchSchedules();
+  }, []);
+
+  useEffect(() => {
+    if (selectedLich) {
+      fetchEnrollments();
+    }
+  }, [selectedLich]);
+
+  const fetchSchedules = async () => {
+    try {
+      const res = await khoaApi.getSchedules();
+      setSchedules(res.data);
+      if (res.data.length > 0) {
+        setSelectedLich(res.data[0].id);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchEnrollments = async () => {
+    try {
+      const res = await khoaApi.getEnrollments({ lichKienTapId: selectedLich });
+      setResults(res.data || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleLockGrades = async (e) => {
+    e.stopPropagation();
+    try {
+      await khoaApi.lockGrades({ lichKienTapId: selectedLich });
+      alert('Đã khóa điểm đợt này thành công!');
+      setIsConfirmModalOpen(false);
+      fetchEnrollments(); // refresh state if needed
+    } catch (err) {
+      console.error(err);
+      alert('Khóa điểm thất bại');
+    }
+  };
 
   // Close all dropdowns
   const closeAllDropdowns = () => {
@@ -22,35 +68,19 @@ export default function KetQuaKienTap_Khoa() {
     setter(!isLichDropdownOpen);
   };
 
-  // Mock Data
-  const results = [
-    { id: 1, mssv: '2001215001', ten: 'Nguyễn Văn An', diem: '8.5', trangThai: 'Đã đạt' },
-    { id: 2, mssv: '2001215002', ten: 'Trần Thị Bình', diem: '9.2', trangThai: 'Đã đạt' },
-    { id: 3, mssv: '2001215003', ten: 'Lê Hoàng Cường', diem: '4.5', trangThai: 'Không đạt' },
-    { id: 4, mssv: '2001215004', ten: 'Phạm Duy Khang', diem: null, trangThai: 'Đang thực hiện' },
-    { id: 5, mssv: '2001215005', ten: 'Vũ Quốc Huy', diem: null, trangThai: 'Chưa hoàn thành' },
-    { id: 6, mssv: '2001215006', ten: 'Hoàng Quốc Việt', diem: '7.8', trangThai: 'Đã đạt' },
-  ];
+  // Stats calculation
+  const statDaDat = results.filter(r => r.trang_thai === 'Đạt').length;
+  const statKhongDat = results.filter(r => r.trang_thai === 'Không đạt').length;
+  const statDangThucHien = results.filter(r => !r.trang_thai).length; // or mapped by other logic
 
-  // Stats
-  const statDaDat = results.filter(r => r.trangThai === 'Đã đạt').length;
-  const statKhongDat = results.filter(r => r.trangThai === 'Không đạt').length;
-  const statDangThucHien = results.filter(r => r.trangThai === 'Đang thực hiện').length;
-  const statChuaHoanThanh = results.filter(r => r.trangThai === 'Chưa hoàn thành').length;
-
-  // Status Badge Helper
   const getStatusBadge = (status) => {
     switch (status) {
-      case 'Đã đạt':
+      case 'Đạt':
         return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#89B449] text-white shadow-sm border border-[#89B449]/20">{status}</span>;
-      case 'Đang thực hiện':
-        return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#DBD468] text-slate-800 shadow-sm border border-[#DBD468]/20">{status}</span>;
       case 'Không đạt':
         return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#E68A8C] text-white shadow-sm border border-[#E68A8C]/20">{status}</span>;
-      case 'Chưa hoàn thành':
-        return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200">{status}</span>;
       default:
-        return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200">{status}</span>;
+        return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200">{status || 'Chưa HT'}</span>;
     }
   };
 
@@ -77,21 +107,23 @@ export default function KetQuaKienTap_Khoa() {
             onClick={(e) => handleDropdownClick(e, setIsLichDropdownOpen)}
             className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isLichDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
           >
-            <span className={`truncate pr-2 font-medium ${selectedLich ? 'text-slate-700' : 'text-slate-400'}`}>{selectedLich || 'Chọn lịch kiến tập'}</span>
+            <span className={`truncate pr-2 font-medium ${selectedLich ? 'text-slate-700' : 'text-slate-400'}`}>
+              {schedules.find(s => s.id === selectedLich)?.ten_dot || 'Chọn lịch kiến tập'}
+            </span>
             <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
           </div>
           {isLichDropdownOpen && (
-            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1">
-              {lichOptions.map(opt => (
+            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 max-h-48 overflow-y-auto animate-in slide-in-from-top-1">
+              {schedules.map(opt => (
                 <div 
-                  key={opt}
-                  onClick={() => { setSelectedLich(opt); setIsLichDropdownOpen(false); }}
+                  key={opt.id}
+                  onClick={() => { setSelectedLich(opt.id); setIsLichDropdownOpen(false); }}
                   className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                    selectedLich === opt ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                    selectedLich === opt.id ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
                   }`}
                 >
-                  <span className="truncate pr-2">{opt}</span>
-                  {selectedLich === opt && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                  <span className="truncate pr-2">{opt.ten_dot}</span>
+                  {selectedLich === opt.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
                 </div>
               ))}
             </div>
@@ -112,7 +144,7 @@ export default function KetQuaKienTap_Khoa() {
           </div>
         </div>
 
-        {/* Đang thực hiện */}
+        {/* Đang thực hiện (Mock) */}
         <div className="bg-[#DBD468]/15 border border-[#DBD468]/30 rounded-xl p-4 flex items-center gap-4 shadow-sm">
           <div className="w-12 h-12 bg-[#DBD468] rounded-full flex items-center justify-center text-slate-800 shadow-sm shrink-0">
             <Clock className="w-6 h-6" />
@@ -123,14 +155,14 @@ export default function KetQuaKienTap_Khoa() {
           </div>
         </div>
 
-        {/* Chưa hoàn thành */}
+        {/* Chưa hoàn thành (Mock) */}
         <div className="bg-slate-100/70 border border-slate-200 rounded-xl p-4 flex items-center gap-4 shadow-sm">
           <div className="w-12 h-12 bg-slate-300 rounded-full flex items-center justify-center text-slate-600 shadow-sm shrink-0">
             <Ban className="w-6 h-6" />
           </div>
           <div>
             <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Chưa hoàn thành</div>
-            <div className="text-2xl font-black text-slate-800">{statChuaHoanThanh}</div>
+            <div className="text-2xl font-black text-slate-800">0</div>
           </div>
         </div>
 
@@ -148,13 +180,15 @@ export default function KetQuaKienTap_Khoa() {
 
       {/* Main Table */}
       <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-visible">
-        <div className="overflow-visible">
-          <table className="w-full text-left border-collapse">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse min-w-[1000px]">
             <thead>
               <tr className="bg-[#E7E0C4] text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
                 <th className="p-4 pl-6">MSSV</th>
                 <th className="p-4">Họ tên</th>
-                <th className="p-4 text-center">Điểm tổng kết</th>
+                <th className="p-4 text-center">Điểm quá trình (10)</th>
+                <th className="p-4 text-center">Điểm báo cáo (10)</th>
+                <th className="p-4 text-center text-[#407F3E]">Điểm tổng kết</th>
                 <th className="p-4 text-center">Kết quả</th>
                 <th className="p-4 text-right pr-6">Thao tác</th>
               </tr>
@@ -162,38 +196,106 @@ export default function KetQuaKienTap_Khoa() {
             <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
               {results.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-slate-500 font-medium">Không có kết quả nào.</td>
+                  <td colSpan={7} className="p-8 text-center text-slate-500 font-medium">Không có kết quả nào.</td>
                 </tr>
               ) : (
-                results.map(r => (
-                  <tr key={r.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="p-4 pl-6 font-mono font-bold text-[#407F3E]">{r.mssv}</td>
-                    <td className="p-4 font-bold text-slate-800">{r.ten}</td>
-                    <td className="p-4 text-center">
-                      {r.diem ? (
-                        <span className="font-bold text-lg text-slate-800">{r.diem}</span>
-                      ) : (
-                        <span className="text-slate-400 font-bold">--</span>
-                      )}
-                    </td>
-                    <td className="p-4 text-center">
-                      {getStatusBadge(r.trangThai)}
-                    </td>
-                    <td className="p-4 text-right pr-6">
-                      <button 
-                        className="p-1.5 text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer" 
-                        title="Xem chi tiết điểm"
-                      >
-                        <ChevronRight className="w-5 h-5" />
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                results.map(r => {
+                  const sv = r.sinhVien || {};
+                  return (
+                    <tr key={r.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="p-4 pl-6 font-mono font-bold text-[#407F3E]">{sv.mssv}</td>
+                      <td className="p-4 font-bold text-slate-800">{sv.ho_ten}</td>
+                      <td className="p-4 text-center font-mono text-slate-600">
+                        {r.diem_chuan_bi !== null ? r.diem_chuan_bi : '--'}
+                      </td>
+                      <td className="p-4 text-center font-mono text-slate-600">
+                        {r.diem_bao_cao !== null ? r.diem_bao_cao : '--'}
+                      </td>
+                      <td className="p-4 text-center">
+                        {r.diem_tong_ket !== null ? (
+                          <span className="font-bold text-lg text-[#407F3E]">{r.diem_tong_ket}</span>
+                        ) : (
+                          <span className="text-slate-400 font-bold">--</span>
+                        )}
+                      </td>
+                      <td className="p-4 text-center">
+                        {getStatusBadge(r.trang_thai)}
+                      </td>
+                      <td className="p-4 text-right pr-6">
+                        <button 
+                          onClick={() => setSelectedStudent(r)}
+                          className="p-1.5 text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer" 
+                          title="Xem chi tiết điểm"
+                        >
+                          <ChevronRight className="w-5 h-5" />
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Grade Detail Modal */}
+      {selectedStudent && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-[#E7E0C4] bg-[#E7E0C4]/30 flex items-center justify-between">
+              <h2 className="font-extrabold text-slate-800 text-lg flex items-center gap-2">
+                <Award className="w-5 h-5 text-[#407F3E]" />
+                <span>Chi tiết điểm sinh viên</span>
+              </h2>
+              <button 
+                onClick={() => setSelectedStudent(null)} 
+                className="text-slate-400 hover:text-slate-800 text-2xl font-bold cursor-pointer"
+              >
+                &times;
+              </button>
+            </div>
+            <div className="p-6 space-y-4 text-sm font-semibold text-slate-600">
+              <div className="flex items-center gap-3 bg-[#E7E0C4]/15 p-3 rounded-xl border border-[#E7E0C4]/40">
+                <div className="w-10 h-10 rounded-full bg-[#407F3E] flex items-center justify-center text-white font-bold text-base shadow-sm">
+                  {selectedStudent.sinhVien?.ho_ten?.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <p className="text-slate-800 font-bold text-base leading-tight">{selectedStudent.sinhVien?.ho_ten}</p>
+                  <p className="text-xs text-slate-400 font-mono mt-0.5">MSSV: {selectedStudent.sinhVien?.mssv}</p>
+                </div>
+              </div>
+
+              <div className="space-y-2.5">
+                <div className="flex justify-between border-b border-slate-100 pb-1.5">
+                  <span className="text-slate-500">Điểm quá trình (Chuyên cần, Bài TH):</span>
+                  <span className="text-slate-800 font-bold font-mono">{selectedStudent.diem_chuan_bi ?? '--'} / 10.0</span>
+                </div>
+                <div className="flex justify-between border-b border-slate-100 pb-1.5">
+                  <span className="text-slate-500">Điểm cộng chuyên cần:</span>
+                  <span className="text-slate-800 font-bold font-mono">+{selectedStudent.diem_cong ?? '0'}</span>
+                </div>
+                <div className="flex justify-between border-b border-slate-100 pb-1.5">
+                  <span className="text-slate-500">Điểm báo cáo TQNM:</span>
+                  <span className="text-slate-800 font-bold font-mono">{selectedStudent.diem_bao_cao ?? '--'} / 10.0</span>
+                </div>
+                <div className="flex justify-between pt-1.5 text-base">
+                  <span className="text-[#407F3E] font-extrabold">Điểm tổng kết học phần:</span>
+                  <span className="text-[#407F3E] font-black font-mono">{selectedStudent.diem_tong_ket ?? '--'}</span>
+                </div>
+              </div>
+            </div>
+            <div className="p-4 bg-slate-50 border-t border-[#E7E0C4] flex justify-end">
+              <button 
+                onClick={() => setSelectedStudent(null)} 
+                className="px-5 py-2.5 bg-slate-700 hover:bg-slate-800 text-white font-bold rounded-xl text-xs cursor-pointer shadow-sm transition-colors"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Confirm Lock Modal */}
       {isConfirmModalOpen && (
@@ -223,7 +325,7 @@ export default function KetQuaKienTap_Khoa() {
                 Hủy
               </button>
               <button 
-                onClick={(e) => { e.stopPropagation(); setIsConfirmModalOpen(false); }}
+                onClick={handleLockGrades}
                 className="flex-1 py-3 bg-[#E68A8C] text-white hover:bg-[#E68A8C]/90 rounded-xl text-sm font-bold transition-colors shadow-sm cursor-pointer"
               >
                 Xác nhận khóa điểm

@@ -12,16 +12,20 @@ import {
   YeuCauHuyDangKy,
   HoaDonLePhi,
   DonHoanPhi,
+  PhieuThamQuan,
+  DeXuatChuyenThamQuan,
+  DiemPhieuThamQuan,
+  DiemBaiThuHoach,
+  DiemChuanBi,
   BaiThuHoach,
-  DiemPhieuDangKy,
-  LichKienTap_SinhVien,
+  DanhSachDen,
+  ThongBaoDaDoc,
   BoChuyenBaoCao,
   BoChuyenBaoCao_Chuyen,
-  KetQuaHocPhan,
+  DiemDanh,
+  LichKienTap_SinhVien,
   NhaMay,
   ThongBao,
-  ThongBaoDaDoc,
-  DanhSachDen,
 } from '../entities/qlkt.entity';
 
 @Injectable()
@@ -36,16 +40,18 @@ export class SinhVienService {
     private huyRepo: Repository<YeuCauHuyDangKy>,
     @InjectRepository(HoaDonLePhi) private hoaDonRepo: Repository<HoaDonLePhi>,
     @InjectRepository(DonHoanPhi) private hoanPhiRepo: Repository<DonHoanPhi>,
+    @InjectRepository(DiemDanh) private diemDanhRepo: Repository<DiemDanh>,
+    @InjectRepository(DiemPhieuThamQuan) private diemPhieuRepo: Repository<DiemPhieuThamQuan>,
+    @InjectRepository(PhieuThamQuan) private phieuTQRepo: Repository<PhieuThamQuan>,
+    @InjectRepository(DeXuatChuyenThamQuan) private deXuatRepo: Repository<DeXuatChuyenThamQuan>,
     @InjectRepository(BaiThuHoach) private baiThuRepo: Repository<BaiThuHoach>,
-    @InjectRepository(DiemPhieuDangKy)
-    private diemPhieuRepo: Repository<DiemPhieuDangKy>,
     @InjectRepository(LichKienTap_SinhVien)
     private lksvRepo: Repository<LichKienTap_SinhVien>,
     @InjectRepository(BoChuyenBaoCao)
     private boChuyenRepo: Repository<BoChuyenBaoCao>,
     @InjectRepository(BoChuyenBaoCao_Chuyen)
     private boChuyenChuyenRepo: Repository<BoChuyenBaoCao_Chuyen>,
-    @InjectRepository(KetQuaHocPhan) private kqRepo: Repository<KetQuaHocPhan>,
+
     @InjectRepository(NhaMay) private nhaMayRepo: Repository<NhaMay>,
     @InjectRepository(ThongBao) private thongBaoRepo: Repository<ThongBao>,
     @InjectRepository(ThongBaoDaDoc)
@@ -167,7 +173,7 @@ export class SinhVienService {
       const count = await this.phieuRepo.count({
         where: {
           chuyen_tham_quan_id: trip.id,
-          trang_thai: In(['HopLe', 'ChoDuyet', 'HoanThanh']),
+          trang_thai: In(['HopLe', 'ChoDuyet']),
         },
       });
       results.push({
@@ -186,7 +192,7 @@ export class SinhVienService {
       where: { sinh_vien_id: studentId },
       relations: {
         chuyenThamQuan: { nhaMay: true },
-        baiThuHoach: true,
+        phieuThamQuan: { baiThuHoach: true },
       },
       order: { ngay_dang_ky: 'DESC' },
     });
@@ -211,30 +217,16 @@ export class SinhVienService {
 
       const trip = await manager.findOne(ChuyenThamQuan, {
         where: { id: tripId },
-        relations: { lichKienTap: { dotKienTap: { namHoc: true } } },
+        relations: { lichKienTap: { dotKienTap: { hocKy: { namHoc: true } } } },
       });
       if (!trip) throw new NotFoundException('Không tìm thấy chuyến tham quan');
       if (trip.trang_thai !== 'MoDangKy') {
         throw new BadRequestException('Chuyến đi này hiện đang đóng đăng ký');
       }
 
-      // Kiem tra khung gio dang ky (neu duoc thiet lap)
-      const now = new Date();
-      if (
-        trip.thoi_gian_mo_dang_ky &&
-        now < new Date(trip.thoi_gian_mo_dang_ky)
-      ) {
-        throw new BadRequestException('Chuyến đi chưa đến giờ mở đăng ký');
-      }
-      if (
-        trip.thoi_gian_dong_dang_ky &&
-        now > new Date(trip.thoi_gian_dong_dang_ky)
-      ) {
-        throw new BadRequestException('Chuyến đi đã hết thời gian đăng ký');
-      }
 
       const startYearStr =
-        trip.lichKienTap.dotKienTap.namHoc.ten_nam_hoc.split('-')[0];
+        trip.lichKienTap.dotKienTap.hocKy.namHoc.ten_nam_hoc.split('-')[0];
       const startYear = parseInt(startYearStr, 10);
       const studyYear = startYear - student.khoa.nam_nhap_hoc + 1;
       if (studyYear < 2) {
@@ -255,7 +247,7 @@ export class SinhVienService {
       const existingSameDay = await manager.find(PhieuDangKy, {
         where: {
           sinh_vien_id: studentId,
-          trang_thai: In(['ChoDuyet', 'HopLe', 'DaThamGia', 'HoanThanh']),
+          trang_thai: In(['ChoDuyet', 'HopLe']),
         },
         relations: { chuyenThamQuan: true },
       });
@@ -320,27 +312,17 @@ export class SinhVienService {
       );
     }
 
-    const newChuyen = new ChuyenThamQuan();
-    newChuyen.nha_may_id = nhaMayId;
-    newChuyen.lich_kien_tap_id = currentLksv.lich_kien_tap_id;
-    newChuyen.ngay_tham_quan = ngayThamQuan;
-    newChuyen.gio_bat_dau = gioBatDau;
-    newChuyen.gio_ket_thuc = gioKetThuc;
-    newChuyen.hinh_thuc = hinhThuc;
-    newChuyen.cach_to_chuc = 'TuDo';
-    newChuyen.suc_chua = 1;
-    newChuyen.trang_thai = 'Nhap';
-    newChuyen.de_xuat_boi_id = studentId;
-    newChuyen.trang_thai_duyet_tudo = 'ChoDuyet';
+    const deXuat = new DeXuatChuyenThamQuan();
+    deXuat.nha_may_id = nhaMayId;
+    deXuat.lich_kien_tap_id = currentLksv.lich_kien_tap_id;
+    deXuat.ngay_tham_quan_de_xuat = ngayThamQuan;
+    deXuat.gio_bat_dau_de_xuat = gioBatDau;
+    deXuat.gio_ket_thuc_de_xuat = gioKetThuc;
+    deXuat.hinh_thuc = hinhThuc;
+    deXuat.sinh_vien_id = studentId;
+    deXuat.trang_thai_duyet = 'ChoDuyet';
 
-    const saved = await this.chuyenRepo.save(newChuyen);
-
-    // Tu dong dang ky luon cho SV nay
-    const phieu = new PhieuDangKy();
-    phieu.sinh_vien_id = studentId;
-    phieu.chuyen_tham_quan_id = saved.id;
-    phieu.trang_thai = 'ChoDuyet';
-    await this.phieuRepo.save(phieu);
+    const saved = await this.deXuatRepo.save(deXuat);
 
     return {
       message: 'Đề xuất chuyến đi tự do thành công, đang chờ Khoa duyệt',
@@ -685,9 +667,16 @@ export class SinhVienService {
       );
     }
 
+    const phieuTQ = await this.phieuTQRepo.findOne({
+      where: { phieu_dang_ky_id: registrationId },
+    });
+    if (!phieuTQ) {
+      throw new BadRequestException('Chuyến đi này chưa được cấp phiếu tham quan');
+    }
+
     if (phieu.chuyenThamQuan.cach_to_chuc === 'DoKhoaToChuc') {
       const dd = await this.dataSource.manager.findOne('DiemDanh', {
-        where: { phieu_dang_ky_id: registrationId },
+        where: { phieu_tham_quan_id: phieuTQ.id },
       });
       if (!dd || (dd as any).trang_thai !== 'CoMat') {
         throw new BadRequestException(
@@ -708,7 +697,7 @@ export class SinhVienService {
     }
 
     const report = new BaiThuHoach();
-    report.phieu_dang_ky_id = registrationId;
+    report.phieu_tham_quan_id = phieuTQ.id;
     report.file_bao_cao = validBaoCaoRef;
     report.file_xac_nhan_tham_quan = (validXacNhanRef || null) as any;
     report.ngay_nop = now;
@@ -722,14 +711,13 @@ export class SinhVienService {
 
     // Khoi tao ban ghi diem neu chua co
     let diem = await this.diemPhieuRepo.findOne({
-      where: { phieu_dang_ky_id: registrationId },
+      where: { phieu_tham_quan_id: phieuTQ.id },
     });
     if (!diem) {
-      diem = new DiemPhieuDangKy();
-      diem.phieu_dang_ky_id = registrationId;
+      diem = new DiemPhieuThamQuan();
+      diem.phieu_tham_quan_id = phieuTQ.id;
+      await this.diemPhieuRepo.save(diem);
     }
-    diem.diem_bai_thu_hoach_ai = null;
-    await this.diemPhieuRepo.save(diem);
 
     return { message: 'Nộp bài thu hoạch thành công', report };
   }
@@ -817,14 +805,17 @@ export class SinhVienService {
     const bo = new BoChuyenBaoCao();
     bo.lich_kien_tap_sinh_vien_id = termStudentId;
     bo.ngay_chon = new Date();
-    bo.tu_dong = false; // Do nguoi dung chon thu cong
+
     const savedBo = await this.boChuyenRepo.save(bo);
 
     for (const rId of registrationIds) {
-      const bcc = new BoChuyenBaoCao_Chuyen();
-      bcc.bo_chuyen_bao_cao_id = savedBo.id;
-      bcc.phieu_dang_ky_id = rId;
-      await this.boChuyenChuyenRepo.save(bcc);
+      const phieuTQ = await this.phieuTQRepo.findOne({ where: { phieu_dang_ky_id: rId } });
+      if (phieuTQ) {
+        const bcc = new BoChuyenBaoCao_Chuyen();
+        bcc.bo_chuyen_bao_cao_id = savedBo.id;
+        bcc.phieu_tham_quan_id = phieuTQ.id;
+        await this.boChuyenChuyenRepo.save(bcc);
+      }
     }
 
     return { message: 'Chốt bộ 3 chuyến báo cáo thành công' };
@@ -847,28 +838,27 @@ export class SinhVienService {
       if (boChuyen) {
         const mapping = await this.boChuyenChuyenRepo.find({
           where: { bo_chuyen_bao_cao_id: boChuyen.id },
-          relations: { phieuDangKy: { chuyenThamQuan: { nhaMay: true } } },
         });
 
         for (const map of mapping) {
+          const phieuTQ = await this.phieuTQRepo.findOne({ where: { id: map.phieu_tham_quan_id }, relations: { phieuDangKy: { chuyenThamQuan: { nhaMay: true } } } });
           const score = await this.diemPhieuRepo.findOne({
-            where: { phieu_dang_ky_id: map.phieu_dang_ky_id },
+            where: { phieu_tham_quan_id: map.phieu_tham_quan_id },
           });
-          selectedTrips.push({
-            phieu_dang_ky_id: map.phieu_dang_ky_id,
-            ten_nha_may: map.phieuDangKy.chuyenThamQuan.nhaMay.ten_nha_may,
-            hinh_thuc: map.phieuDangKy.chuyenThamQuan.hinh_thuc,
-            diem_chuan_bi: score?.diem_chuan_bi || 0,
-            diem_bai_thu_hoach: score?.diem_bai_thu_hoach || 0,
-            diem_bao_cao_tqnm: score?.diem_bao_cao_tqnm || 0,
-            diem_cong: score?.diem_cong || 0,
-          });
+          if (phieuTQ) {
+            selectedTrips.push({
+              phieu_dang_ky_id: phieuTQ.phieu_dang_ky_id,
+              ten_nha_may: phieuTQ.phieuDangKy.chuyenThamQuan.nhaMay.ten_nha_may,
+              hinh_thuc: phieuTQ.phieuDangKy.chuyenThamQuan.hinh_thuc,
+              diem_chuan_bi: score?.diem_chuan_bi_final || 0,
+              diem_bai_thu_hoach: score?.diem_thu_hoach_final || 0,
+              diem_bao_cao_tqnm: score?.diem_hoi_dong_final || 0,
+              diem_cong: score?.diem_cong_final || 0,
+            });
+          }
         }
       }
 
-      const kq = await this.kqRepo.findOne({
-        where: { lich_kien_tap_sinh_vien_id: lksv.id },
-      });
 
       results.push({
         id: lksv.id,
@@ -876,12 +866,76 @@ export class SinhVienService {
         ten_lich: lksv.lichKienTap.ten_lich,
         lan_dang_ky: lksv.lan_dang_ky,
         trang_thai: lksv.trang_thai,
-        diem_tong_ket: kq?.diem_tong_ket || null,
-        ket_qua: kq?.ket_qua || 'DangThucHien',
+        diem_tong_ket: lksv.trang_thai === 'Dat' ? 5.0 : null,
+        ket_qua: lksv.trang_thai,
         selectedTrips,
       });
     }
 
     return results;
+  }
+
+  // Dashboard Stats
+  async getDashboardStats(studentId: number) {
+    const sv = await this.svRepo.findOne({ where: { id: studentId } });
+    if (!sv) throw new NotFoundException('Không tìm thấy sinh viên');
+
+    const trips = await this.phieuRepo.find({
+      where: { sinh_vien_id: studentId },
+      relations: { phieuThamQuan: { baiThuHoach: true } },
+    });
+
+    const registered = trips.length;
+    const completed = trips.filter(
+      (t) => t.phieuThamQuan && t.trang_thai === 'HopLe',
+    ).length;
+
+    const pendingReports = trips.filter(
+      (t) =>
+        t.phieuThamQuan && t.trang_thai === 'HopLe' &&
+        (!t.phieuThamQuan?.baiThuHoach || Object.keys(t.phieuThamQuan.baiThuHoach).length === 0),
+    ).length;
+
+    let avgScore = 'Chưa có';
+    const lksvs = await this.lksvRepo.find({
+      where: { sinh_vien_id: studentId },
+      order: { id: 'DESC' },
+    });
+
+    if (lksvs.length > 0) {
+      const latestLksv = lksvs[0];
+      if (latestLksv.trang_thai === 'Dat') {
+        avgScore = '5.0';
+      } else {
+        const boChuyen = await this.boChuyenRepo.findOne({
+          where: { lich_kien_tap_sinh_vien_id: latestLksv.id },
+        });
+
+        if (boChuyen) {
+          const mapping = await this.boChuyenChuyenRepo.find({
+            where: { bo_chuyen_bao_cao_id: boChuyen.id },
+          });
+
+          if (mapping.length > 0) {
+            const scores = [];
+            for (const map of mapping) {
+              const diem = await this.diemPhieuRepo.findOne({
+                where: { phieu_tham_quan_id: map.phieu_tham_quan_id },
+              });
+              scores.push(
+                Number(diem?.diem_chuan_bi_final || 0) * 0.3 +
+                Number(diem?.diem_thu_hoach_final || 0) * 0.3 +
+                Number(diem?.diem_hoi_dong_final || 0) * 0.4 +
+                Number(diem?.diem_cong_final || 0)
+              );
+            }
+            const avg = scores.reduce((sum, val) => sum + val, 0) / scores.length;
+            avgScore = avg.toFixed(1);
+          }
+        }
+      }
+    }
+
+    return { registered, completed, pendingReports, avgScore };
   }
 }

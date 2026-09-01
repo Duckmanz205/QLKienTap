@@ -26,6 +26,9 @@ export class RolesGuard implements CanActivate {
         'Bạn không có quyền truy cập tài nguyên này (Thiếu vai trò)',
       );
     }
+    if (user.role === 'QuanTriVienHeThong') {
+      return true;
+    }
     const hasRole = requiredRoles.includes(user.role);
     if (!hasRole) {
       throw new ForbiddenException(
