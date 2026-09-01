@@ -3,10 +3,14 @@ import {
   Search, ChevronDown, Check,
   Key, Lock, Unlock
 } from 'lucide-react';
-import { khoaApi } from '../../services/api';
+import { qtvApi } from '../../services/api';
+import Toast from '../../components/Toast';
+import ConfirmModal from '../../components/ConfirmModal';
 
 export default function TaiKhoanNguoiDung_Khoa() {
   const [accounts, setAccounts] = useState([]);
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+  const [confirmModal, setConfirmModal] = useState({ show: false, id: null, ho_ten: '' });
   
   // Filter States
   const [searchTerm, setSearchTerm] = useState('');
@@ -36,7 +40,7 @@ export default function TaiKhoanNguoiDung_Khoa() {
 
   const fetchData = async (targetPage = page) => {
     try {
-      const res = await khoaApi.getAccounts({
+      const res = await qtvApi.getAccounts({
         page: targetPage,
         limit,
         search: searchTerm,
@@ -66,28 +70,41 @@ export default function TaiKhoanNguoiDung_Khoa() {
 
   const handleToggleStatus = async (id) => {
     try {
-      const res = await khoaApi.toggleAccountLock(id);
-      alert(res.data.message);
+      const res = await qtvApi.toggleAccountLock(id);
+      setToast({ show: true, message: res.data.message, type: 'success' });
       fetchData();
     } catch (err) {
-      alert(err.response?.data?.message || 'Có lỗi xảy ra');
+      setToast({ show: true, message: err.response?.data?.message || 'Có lỗi xảy ra', type: 'error' });
     }
   };
 
-  const handleResetPassword = async (id, ho_ten) => {
-    if (window.confirm(`Bạn có chắc chắn muốn đặt lại mật khẩu của ${ho_ten || 'người dùng này'}?`)) {
-      try {
-        const res = await khoaApi.resetAccountPassword(id);
-        alert(res.data.message);
-        fetchData();
-      } catch (err) {
-        alert(err.response?.data?.message || 'Có lỗi xảy ra');
-      }
+  const executeResetPassword = async () => {
+    try {
+      const res = await qtvApi.resetAccountPassword(confirmModal.id);
+      setToast({ show: true, message: res.data.message, type: 'success' });
+      fetchData();
+    } catch (err) {
+      setToast({ show: true, message: err.response?.data?.message || 'Có lỗi xảy ra', type: 'error' });
+    } finally {
+      setConfirmModal({ show: false, id: null, ho_ten: '' });
     }
   };
 
   return (
     <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-2 animate-in fade-in duration-300">
+      <Toast show={toast.show} message={toast.message} type={toast.type} onClose={() => setToast({ show: false, message: '', type: 'success' })} />
+      <ConfirmModal
+        isOpen={confirmModal.show}
+        title="Xác nhận đặt lại mật khẩu"
+        message={
+          <>
+            Bạn có chắc chắn muốn đặt lại mật khẩu của người dùng <span className="font-semibold text-gray-800">{confirmModal.ho_ten || 'này'}</span>? Mật khẩu sẽ được khôi phục về mặc định.
+          </>
+        }
+        actionType="reset"
+        onConfirm={executeResetPassword}
+        onCancel={() => setConfirmModal({ show: false, id: null, ho_ten: '' })}
+      />
       {/* Header section */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-800">Tài khoản người dùng</h1>
@@ -223,9 +240,9 @@ export default function TaiKhoanNguoiDung_Khoa() {
                         <div className="flex justify-end items-center gap-2 text-slate-400">
                           {/* Reset Password */}
                           <button 
-                            onClick={() => handleResetPassword(acc.id, acc.ho_ten)}
-                            className="p-1.5 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer" 
-                            title="Đặt lại mật khẩu"
+                            onClick={() => setConfirmModal({ show: true, id: acc.id, ho_ten: acc.ho_ten })}
+                            className="p-1.5 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg transition-colors cursor-pointer"
+                            title="Reset mật khẩu"
                           >
                             <Key className="w-4 h-4" />
                           </button>

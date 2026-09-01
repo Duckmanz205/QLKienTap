@@ -12,7 +12,7 @@ import {
   EntityManager,
 } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
-import { TaskQueueService } from '../queue/task-queue.service';
+import { TaskQueueService } from '../../queue/task-queue.service';
 import {
   NamHoc,
   HocKy,
@@ -44,7 +44,7 @@ import {
   BoChuyenBaoCao_Chuyen,
   DeXuatChuyenThamQuan,
   PhieuThamQuan,
-} from '../entities/qlkt.entity';
+} from '../../entities/qlkt.entity';
 
 @Injectable()
 export class KhoaService {
@@ -418,11 +418,42 @@ export class KhoaService {
     return this.lichRepo.find({ relations: { dotKienTap: true, khoa: true } });
   }
   async createSchedule(data: Partial<LichKienTap>) {
+    data.trang_thai = 'ChoDuyet';
     return this.lichRepo.save(data);
+  }
+
+  async approveSchedule(id: number) {
+    const lich = await this.lichRepo.findOne({ where: { id } });
+    if (!lich) throw new BadRequestException('Không tìm thấy lịch kiến tập');
+    if (lich.trang_thai !== 'ChoDuyet') {
+      throw new BadRequestException('Lịch không ở trạng thái chờ duyệt');
+    }
+    lich.trang_thai = 'DaDuyet';
+    lich.ly_do_tu_choi = null as any;
+    return this.lichRepo.save(lich);
+  }
+
+  async rejectSchedule(id: number, reason: string) {
+    const lich = await this.lichRepo.findOne({ where: { id } });
+    if (!lich) throw new BadRequestException('Không tìm thấy lịch kiến tập');
+    if (lich.trang_thai !== 'ChoDuyet') {
+      throw new BadRequestException('Lịch không ở trạng thái chờ duyệt');
+    }
+    lich.trang_thai = 'TuChoi';
+    lich.ly_do_tu_choi = reason || 'Chưa nhập lý do';
+    return this.lichRepo.save(lich);
   }
 
   // Import Sinh Vien vao Lich Kien Tap
   async importStudentsToSchedule(lichId: number, studentIds: number[]) {
+    const lich = await this.lichRepo.findOne({ where: { id: lichId } });
+    if (!lich) throw new BadRequestException('Không tìm thấy lịch kiến tập');
+    
+    // Check approval status before importing
+    if (lich.trang_thai !== 'DaDuyet' && lich.trang_thai !== 'MoDangKy' && lich.trang_thai !== 'DangDienRa') {
+      throw new BadRequestException('Chỉ được thêm sinh viên khi lịch kiến tập đã được duyệt');
+    }
+
     for (const svId of studentIds) {
       const exist = await this.lksvRepo.findOne({
         where: { lich_kien_tap_id: lichId, sinh_vien_id: svId },
@@ -1284,6 +1315,7 @@ export class KhoaService {
         ...(lichKienTapId ? { chuyenThamQuan: { lich_kien_tap_id: lichKienTapId } } : {}),
       },
       relations: {
+        chuyenThamQuan: true,
         sinhVien: { khoa: true },
       },
     });
@@ -1291,7 +1323,10 @@ export class KhoaService {
     const svMap = new Map();
     phieus.forEach((p) => {
       if (p.sinhVien) {
-        svMap.set(p.sinhVien.id, p.sinhVien);
+        if (!svMap.has(p.sinhVien.id)) {
+          svMap.set(p.sinhVien.id, { ...p.sinhVien, visitsCount: 0 });
+        }
+        svMap.get(p.sinhVien.id).visitsCount++;
       }
     });
     return Array.from(svMap.values());
@@ -1538,6 +1573,44 @@ export class KhoaService {
       .take(take)
       .skip(skip)
       .getManyAndCount();
+
+    if (data.length > 0 && lichKienTapId) {
+      const sinhVienIds = data.map((e) => e.sinh_vien_id);
+      const phieus = await this.phieuRepo.find({
+        where: {
+          sinh_vien_id: In(sinhVienIds),
+          trang_thai: 'HopLe',
+          chuyenThamQuan: {
+            lich_kien_tap_id: lichKienTapId,
+          },
+        },
+        relations: {
+          chuyenThamQuan: {
+            nhaMay: true,
+          },
+          phieuThamQuan: {
+            diemPhieuThamQuan: true,
+          },
+        },
+        order: {
+          chuyenThamQuan: {
+            ngay_tham_quan: 'ASC',
+          },
+        },
+      });
+
+      data.forEach((e: any) => {
+        const studentTrips = phieus.filter((p) => p.sinh_vien_id === e.sinh_vien_id);
+        e.trips = studentTrips.map((p) => ({
+          nhaMay: p.chuyenThamQuan?.nhaMay?.ten_nha_may,
+          diem_chuan_bi: p.phieuThamQuan?.diemPhieuThamQuan?.diem_chuan_bi_final,
+          diem_bao_cao: p.phieuThamQuan?.diemPhieuThamQuan?.diem_thu_hoach_final,
+          diem_van_dap: p.phieuThamQuan?.diemPhieuThamQuan?.diem_hoi_dong_final,
+          diem_cong: p.phieuThamQuan?.diemPhieuThamQuan?.diem_cong_final,
+          diem_tong_nm: p.phieuThamQuan?.diemPhieuThamQuan?.diem_tong_chuyen,
+        }));
+      });
+    }
 
     return {
       data,

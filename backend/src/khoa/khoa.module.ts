@@ -1,9 +1,10 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
-import { KhoaController } from './khoa.controller';
-import { ClbController } from './clb.controller';
-import { KhoaService } from './khoa.service';
+import { KhoaController } from './quan-ly-khoa/quan-ly-khoa.controller';
+import { ClbController } from './clb/clb.controller';
+import { QtvController } from './qtv/qtv.controller';
+import { KhoaService } from './shared/khoa.service';
 import {
   NamHoc,
   HocKy,
@@ -77,7 +78,7 @@ import {
     ]),
     AuthModule,
   ],
-  controllers: [KhoaController, ClbController],
+  controllers: [KhoaController, ClbController, QtvController],
   providers: [KhoaService],
   exports: [KhoaService],
 })

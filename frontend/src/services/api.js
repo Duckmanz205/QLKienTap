@@ -117,6 +117,12 @@ const getAdminPrefix = () => {
   return '/khoa';
 };
 
+export const qtvApi = {
+  getAccounts: (params) => api.get('/qtv/account', { params }),
+  toggleAccountLock: (id) => api.post(`/qtv/account/${id}/toggle-lock`),
+  resetAccountPassword: (id) => api.post(`/qtv/account/${id}/reset-password`),
+};
+
 export const khoaApi = {
   getYears: () => api.get(`${getAdminPrefix()}/years`),
   createYear: (data) => api.post(`${getAdminPrefix()}/years`, data),
@@ -142,13 +148,12 @@ export const khoaApi = {
   createStudent: (data) => api.post(`${getAdminPrefix()}/students`, data),
   updateStudent: (id, data) => api.put(`${getAdminPrefix()}/students/${id}`, data),
   deleteStudent: (id) => api.delete(`${getAdminPrefix()}/students/${id}`),
-  getAccounts: (params) => api.get(`${getAdminPrefix()}/accounts`, { params }),
-  toggleAccountLock: (id) => api.post(`${getAdminPrefix()}/accounts/${id}/toggle-lock`),
-  resetAccountPassword: (id) => api.post(`${getAdminPrefix()}/accounts/${id}/reset-password`),
   getCampaigns: () => api.get(`${getAdminPrefix()}/campaigns`),
   createCampaign: (data) => api.post(`${getAdminPrefix()}/campaigns`, data),
   getSchedules: () => api.get(`${getAdminPrefix()}/schedules`),
   createSchedule: (data) => api.post(`${getAdminPrefix()}/schedules`, data),
+  approveSchedule: (id) => api.post(`${getAdminPrefix()}/schedules/${id}/approve`),
+  rejectSchedule: (id, lyDo) => api.post(`${getAdminPrefix()}/schedules/${id}/reject`, { lyDo }),
   importStudents: (data) => api.post(`${getAdminPrefix()}/import-students`, data),
   getTrips: () => api.get(`${getAdminPrefix()}/trips`),
   createTrip: (data) => api.post(`${getAdminPrefix()}/trips`, data),

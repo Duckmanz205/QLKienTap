@@ -12,12 +12,12 @@ import {
   BadRequestException,
   Patch,
 } from '@nestjs/common';
-import { CurrentUser, JwtPayloadUser } from '../auth/decorators/user.decorator';
-import { KhoaService } from './khoa.service';
-import { AuthGuard } from '../auth/guards/auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { TaskQueueService } from '../queue/task-queue.service';
+import { CurrentUser, JwtPayloadUser } from '../../auth/decorators/user.decorator';
+import { KhoaService } from '../shared/khoa.service';
+import { AuthGuard } from '../../auth/guards/auth.guard';
+import { RolesGuard } from '../../auth/guards/roles.guard';
+import { Roles } from '../../auth/decorators/roles.decorator';
+import { TaskQueueService } from '../../queue/task-queue.service';
 import {
   CreateYearDto,
   CreateTermDto,
@@ -48,7 +48,7 @@ import {
   GetAccountsQueryDto,
   CreateLecturerDto,
   UpdateLecturerDto,
-} from './dto/khoa.dto';
+} from '../shared/dto/khoa.dto';
 
 @Controller('khoa')
 @UseGuards(AuthGuard, RolesGuard)
@@ -207,31 +207,6 @@ export class KhoaController {
     return this.khoaService.deleteStudent(+id);
   }
 
-  @Roles('QuanLyKhoa')
-  @Get('accounts')
-  async getAccounts(@Query() query: GetAccountsQueryDto) {
-    return this.khoaService.getAccounts(
-      query.page || 1, query.limit || 15, query.search, query.vaiTro, query.trangThai,
-    );
-  }
-
-  @Roles('QuanLyKhoa')
-  @Post('accounts/:id/toggle-lock')
-  async toggleAccountLock(
-    @Param('id', ParseIntPipe) id: number,
-    @CurrentUser() user: JwtPayloadUser,
-  ) {
-    if (id === user.sub) {
-      throw new BadRequestException('Không thể tự khóa tài khoản của chính mình');
-    }
-    return this.khoaService.toggleAccountLock(id);
-  }
-
-  @Roles('QuanLyKhoa')
-  @Post('accounts/:id/reset-password')
-  async resetAccountPassword(@Param('id', ParseIntPipe) id: number) {
-    return this.khoaService.resetAccountPassword(id);
-  }
 
   @Roles('QuanLyKhoa')
   @Get('campaigns')
@@ -252,9 +227,18 @@ export class KhoaController {
   }
 
   @Roles('QuanLyKhoa')
-  @Post('schedules')
-  async createSchedule(@Body() body: CreateScheduleDto) {
-    return this.khoaService.createSchedule(body);
+  @Post('schedules/:id/approve')
+  async approveSchedule(@Param('id', ParseIntPipe) id: number) {
+    return this.khoaService.approveSchedule(id);
+  }
+
+  @Roles('QuanLyKhoa')
+  @Post('schedules/:id/reject')
+  async rejectSchedule(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('lyDo') lyDo: string,
+  ) {
+    return this.khoaService.rejectSchedule(id, lyDo);
   }
 
   @Roles('QuanLyKhoa')

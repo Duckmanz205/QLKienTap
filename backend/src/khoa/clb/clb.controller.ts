@@ -11,11 +11,11 @@ import {
   UseGuards,
   Patch,
 } from '@nestjs/common';
-import { KhoaService } from './khoa.service';
-import { AuthGuard } from '../auth/guards/auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { TaskQueueService } from '../queue/task-queue.service';
+import { KhoaService } from '../shared/khoa.service';
+import { AuthGuard } from '../../auth/guards/auth.guard';
+import { RolesGuard } from '../../auth/guards/roles.guard';
+import { Roles } from '../../auth/decorators/roles.decorator';
+import { TaskQueueService } from '../../queue/task-queue.service';
 import {
   CreateFactoryDto,
   UpdateFactoryDto,
@@ -26,6 +26,7 @@ import {
   FilterAssignStudentsDto,
   ApproveRefundDto,
   CreateKhoaNotificationDto,
+  CreateScheduleDto,
   ExportStudentListDto,
   GetStudentsQueryDto,
   GetRegistrationsQueryDto,
@@ -34,7 +35,7 @@ import {
   UpdateStudentDto,
   GetEnrollmentsQueryDto,
   LockGradesDto,
-} from './dto/khoa.dto';
+} from '../shared/dto/khoa.dto';
 
 @Controller('clb')
 @UseGuards(AuthGuard, RolesGuard)
@@ -43,7 +44,7 @@ export class ClbController {
   constructor(
     private readonly khoaService: KhoaService,
     private readonly taskQueueService: TaskQueueService,
-  ) {}
+  ) { }
 
   @Get('factories')
   async getFactories() {
@@ -243,6 +244,11 @@ export class ClbController {
   @Get('schedules')
   async getSchedules() {
     return this.khoaService.getSchedules();
+  }
+
+  @Post('schedules')
+  async createSchedule(@Body() body: CreateScheduleDto) {
+    return this.khoaService.createSchedule(body);
   }
 
   @Post('lock-grades')
