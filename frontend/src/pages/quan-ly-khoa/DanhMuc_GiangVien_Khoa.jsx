@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Upload, Plus, Search, ChevronDown, Check,
-  Edit2, Key, Trash2, X, CloudUpload
+  Edit2, Key, Trash2, X, CloudUpload, FileSpreadsheet, Download
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { khoaApi } from '../../services/api';
@@ -124,6 +124,29 @@ export default function DanhMuc_GiangVien_Khoa() {
     }
   };
 
+
+  const downloadTemplate = () => {
+    const templateData = [
+      {
+        "Mã GV": "GV001",
+        "Họ tên": "Trần Thị A",
+        "Email": "tranthia@huit.edu.vn",
+        "SĐT": "0912345678",
+        "Số SV hướng dẫn tối đa": 15
+      },
+      {
+        "Mã GV": "GV002",
+        "Họ tên": "Nguyễn Văn B",
+        "Email": "nguyenvanb@huit.edu.vn",
+        "SĐT": "0987654321",
+        "Số SV hướng dẫn tối đa": 10
+      }
+    ];
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "GiangVien");
+    XLSX.writeFile(wb, "Mau_Import_GiangVien.xlsx");
+  };
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
@@ -249,10 +272,9 @@ export default function DanhMuc_GiangVien_Khoa() {
       {/* Main Table */}
       <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-hidden relative z-10">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[950px]">
+          <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-[#E7E0C4] text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
-                <th className="p-4 w-16 text-center">Ảnh</th>
                 <th className="p-4">Mã GV</th>
                 <th className="p-4">Họ tên</th>
                 <th className="p-4">Email</th>
@@ -264,16 +286,11 @@ export default function DanhMuc_GiangVien_Khoa() {
             <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
               {paginatedLecturers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-slate-500 font-medium">Không tìm thấy giảng viên nào khớp điều kiện</td>
+                  <td colSpan={6} className="p-8 text-center text-slate-500 font-medium">Không tìm thấy giảng viên nào khớp điều kiện</td>
                 </tr>
               ) : (
                 paginatedLecturers.map(gv => (
                   <tr key={gv.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="p-4">
-                      <div className="w-8 h-8 rounded-full bg-[#E7E0C4]/50 text-[#407F3E] flex items-center justify-center font-bold text-xs border border-[#407F3E]/20 mx-auto">
-                        {gv.ho_ten ? gv.ho_ten.charAt(0).toUpperCase() : '?'}
-                      </div>
-                    </td>
                     <td className="p-4 font-mono font-bold text-slate-800">{gv.ma_gv}</td>
                     <td className="p-4 font-bold text-[#407F3E]">{gv.ho_ten}</td>
                     <td className="p-4 text-slate-600">{gv.email}</td>
@@ -391,7 +408,6 @@ export default function DanhMuc_GiangVien_Khoa() {
                 <input
                   type="text"
                   required
-                  disabled={!!editingLecturer}
                   value={formData.ma_gv}
                   onChange={(e) => setFormData({...formData, ma_gv: e.target.value})}
                   className="w-full px-4 py-2 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] transition-all disabled:opacity-60"
@@ -403,7 +419,6 @@ export default function DanhMuc_GiangVien_Khoa() {
                 <input
                   type="text"
                   required
-                  disabled={!!editingLecturer}
                   value={formData.ho_ten}
                   onChange={(e) => setFormData({...formData, ho_ten: e.target.value})}
                   className="w-full px-4 py-2 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] transition-all disabled:opacity-60"
@@ -471,6 +486,27 @@ export default function DanhMuc_GiangVien_Khoa() {
             </div>
             
             <div className="p-6 flex flex-col gap-6 overflow-hidden flex-1 bg-slate-50">
+              {/* Banner gợi ý tải file mẫu */}
+              <div className="bg-[#407F3E]/5 border border-[#407F3E]/20 rounded-xl p-3 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white rounded-lg shadow-sm border border-[#407F3E]/10">
+                    <FileSpreadsheet className="w-6 h-6 text-[#407F3E]" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-slate-800 text-sm">Chưa có file đúng định dạng?</p>
+                    <p className="text-sm text-slate-500">Tải file mẫu để đảm bảo import chính xác, tránh sai cột dữ liệu.</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={downloadTemplate}
+                  type="button"
+                  className="shrink-0 flex items-center gap-2 border border-[#407F3E] text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg px-3 py-1.5 text-sm font-bold transition-colors cursor-pointer"
+                >
+                  <Download className="w-4 h-4" />
+                  Tải file mẫu
+                </button>
+              </div>
+
               <div className="flex gap-4 items-center">
                 <label className="flex-1">
                   <div className="border-2 border-dashed border-[#E7E0C4] rounded-xl p-8 bg-white flex flex-col items-center justify-center text-center hover:bg-slate-50 hover:border-[#89B449] transition-colors cursor-pointer group">

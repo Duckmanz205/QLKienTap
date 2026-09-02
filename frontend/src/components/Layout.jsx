@@ -200,7 +200,7 @@ export default function Layout() {
             </div>
           </div>
 
-          <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-5">
+          <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-5 sidebar-scrollbar">
             {studentCategories.map((cat) => {
               const items = studentMenuItems.filter((item) => item.category === cat);
               return (
@@ -335,7 +335,7 @@ export default function Layout() {
             </div>
           </div>
 
-          <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-5">
+          <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-5 sidebar-scrollbar">
             {gvCategories.map((cat) => {
               const items = gvMenuItems.filter((item) => item.category === cat);
               return (
@@ -517,7 +517,7 @@ export default function Layout() {
           </div>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
+        <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-4 sidebar-scrollbar">
           {/* Top-level item: Trang chủ */}
           {(() => {
             const homeItem = khoaMenuItems.find(i => i.to === rolePrefix && i.category === 'TRANG CHỦ');

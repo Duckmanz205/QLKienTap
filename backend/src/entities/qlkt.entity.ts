@@ -210,6 +210,9 @@ export class ThongBao {
 
   @Column({ default: false })
   da_chinh_sua: boolean;
+
+  @Column({ nullable: true })
+  doi_tuong_nhan: string;
 }
 
 @Entity('ThongBaoFile')

@@ -283,11 +283,15 @@ export class SinhVienService {
   // De xuat chuyen tu do
   async proposeTrip(
     studentId: number,
-    nhaMayId: number,
     ngayThamQuan: Date,
     gioBatDau: string,
     gioKetThuc: string,
     hinhThuc: string,
+    nhaMayId?: number,
+    tenNhaMayDeXuat?: string,
+    diaChiDeXuat?: string,
+    nguoiLienHeDeXuat?: string,
+    sdtLienHeDeXuat?: string,
   ) {
     const currentLksv = await this.lksvRepo.findOne({
       where: { sinh_vien_id: studentId, trang_thai: 'DangThucHien' },
@@ -298,22 +302,36 @@ export class SinhVienService {
       );
     }
 
-    const nhaMay = await this.nhaMayRepo.findOne({ where: { id: nhaMayId } });
-    if (!nhaMay) throw new NotFoundException('Không tìm thấy nhà máy');
-
-    if (hinhThuc === 'TrucTuyen' && !nhaMay.ho_tro_truc_tuyen) {
-      throw new BadRequestException(
-        'Nhà máy này không hỗ trợ tham quan trực tuyến',
-      );
+    if (!nhaMayId && !tenNhaMayDeXuat) {
+      throw new BadRequestException('Vui lòng chọn nhà máy hoặc nhập thông tin nhà máy đề xuất');
     }
-    if (hinhThuc === 'TrucTiep' && !nhaMay.ho_tro_truc_tiep) {
-      throw new BadRequestException(
-        'Nhà máy này không hỗ trợ tham quan trực tiếp',
-      );
+
+    if (nhaMayId) {
+      const nhaMay = await this.nhaMayRepo.findOne({ where: { id: nhaMayId } });
+      if (!nhaMay) throw new NotFoundException('Không tìm thấy nhà máy');
+
+      if (hinhThuc === 'TrucTuyen' && !nhaMay.ho_tro_truc_tuyen) {
+        throw new BadRequestException(
+          'Nhà máy này không hỗ trợ tham quan trực tuyến',
+        );
+      }
+      if (hinhThuc === 'TrucTiep' && !nhaMay.ho_tro_truc_tiep) {
+        throw new BadRequestException(
+          'Nhà máy này không hỗ trợ tham quan trực tiếp',
+        );
+      }
     }
 
     const deXuat = new DeXuatChuyenThamQuan();
-    deXuat.nha_may_id = nhaMayId;
+    if (nhaMayId) {
+      deXuat.nha_may_id = nhaMayId;
+    } else {
+      deXuat.ten_nha_may_de_xuat = tenNhaMayDeXuat || '';
+      deXuat.dia_chi_de_xuat = diaChiDeXuat || '';
+      deXuat.nguoi_lien_he_de_xuat = nguoiLienHeDeXuat || '';
+      deXuat.sdt_lien_he_de_xuat = sdtLienHeDeXuat || '';
+    }
+    
     deXuat.lich_kien_tap_id = currentLksv.lich_kien_tap_id;
     deXuat.ngay_tham_quan_de_xuat = ngayThamQuan;
     deXuat.gio_bat_dau_de_xuat = gioBatDau;

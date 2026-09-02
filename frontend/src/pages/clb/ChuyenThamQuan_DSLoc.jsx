@@ -38,6 +38,13 @@ export default function ChuyenThamQuan_DSLoc() {
   const [gioBatDau, setGioBatDau] = useState('');
   const [gioKetThuc, setGioKetThuc] = useState('');
   const [sucChua, setSucChua] = useState('');
+  
+  // Toast Popup State
+  const [popup, setPopup] = useState({ show: false, message: '', type: 'success' });
+  const showPopup = (message, type = 'success') => {
+    setPopup({ show: true, message, type });
+    setTimeout(() => setPopup(prev => ({ ...prev, show: false })), 3000);
+  };
 
   useEffect(() => {
     fetchInitialData();
@@ -62,8 +69,8 @@ export default function ChuyenThamQuan_DSLoc() {
     try {
       const res = await khoaApi.getTrips();
       const allTrips = res.data || [];
-      setTripsKhoa(allTrips.filter(t => t.kieu_chuyen === 'KHOA_TO_CHUC'));
-      setTripsTuDo(allTrips.filter(t => t.kieu_chuyen === 'TU_DO'));
+      setTripsKhoa(allTrips.filter(t => t.cach_to_chuc === 'DoKhoaToChuc'));
+      setTripsTuDo(allTrips.filter(t => t.cach_to_chuc === 'TuDo'));
     } catch (err) {
       console.error(err);
     } finally {
@@ -74,7 +81,7 @@ export default function ChuyenThamQuan_DSLoc() {
   const handleCreateTrip = async (e) => {
     e.preventDefault();
     if (!selectedNhaMay || !selectedLich || !selectedHinhThuc || !ngay || !gioBatDau || !gioKetThuc || !sucChua) {
-      alert("Vui lòng điền đầy đủ thông tin");
+      showPopup("Vui lòng điền đầy đủ thông tin", "error");
       return;
     }
 
@@ -82,13 +89,13 @@ export default function ChuyenThamQuan_DSLoc() {
       await khoaApi.createTrip({
         nha_may_id: selectedNhaMay,
         lich_kien_tap_id: selectedLich,
-        ngay: ngay,
+        ngay_tham_quan: ngay,
         gio_bat_dau: gioBatDau,
         gio_ket_thuc: gioKetThuc,
-        hinh_thuc: selectedHinhThuc === 'Trực tuyến' ? 'ONLINE' : 'OFFLINE',
+        hinh_thuc: selectedHinhThuc === 'Trực tuyến' ? 'TrucTuyen' : 'TrucTiep',
         suc_chua: Number(sucChua)
       });
-      alert('Tạo chuyến tham quan thành công');
+      showPopup('Tạo chuyến tham quan thành công', 'success');
       setIsModalOpen(false);
       
       // Reset form
@@ -103,13 +110,13 @@ export default function ChuyenThamQuan_DSLoc() {
       fetchTrips();
     } catch (err) {
       console.error(err);
-      alert('Lỗi tạo chuyến tham quan');
+      showPopup(err.response?.data?.message || 'Lỗi tạo chuyến tham quan', 'error');
     }
   };
 
   const handleApproveTrip = async (tripId, isApproved) => {
     if (!currentUser) {
-      alert('Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.');
+      showPopup('Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.', 'error');
       return;
     }
     
@@ -121,11 +128,11 @@ export default function ChuyenThamQuan_DSLoc() {
 
     try {
       await khoaApi.approveTrip({ tripId, approverId: currentUser.id, isApproved });
-      alert(isApproved ? 'Duyệt chuyến tham quan thành công' : 'Từ chối chuyến tham quan thành công');
+      showPopup(isApproved ? 'Duyệt chuyến tham quan thành công' : 'Từ chối chuyến tham quan thành công', 'success');
       fetchTrips();
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.message || 'Có lỗi xảy ra khi xử lý yêu cầu');
+      showPopup(err.response?.data?.message || 'Có lỗi xảy ra khi xử lý yêu cầu', 'error');
     }
   };
 
@@ -144,8 +151,23 @@ export default function ChuyenThamQuan_DSLoc() {
 
   return (
     <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300 relative" onClick={closeAllDropdowns}>
+      
+      {/* Custom Popup Toast */}
+      {popup.show && (
+        <div className="fixed inset-0 z-[9999] flex items-start justify-center pt-24 pointer-events-none">
+          <div className="absolute inset-0 bg-transparent pointer-events-auto" onClick={() => setPopup({ ...popup, show: false })}></div>
+          <div className={`relative z-10 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-4 animate-in slide-in-from-top-4 fade-in duration-300 pointer-events-auto ${popup.type === 'error' ? 'bg-[#E68A8C] text-white' : 'bg-[#407F3E] text-white'}`}>
+            <span className="font-bold text-sm">{popup.message}</span>
+            <button onClick={() => setPopup({ ...popup, show: false })} className="p-1 hover:bg-white/20 rounded-full transition-colors">
+              <span className="sr-only">Close</span>
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
-      <div className="mb-6">
+      <div className="mb-6 relative z-0">
         <h1 className="text-2xl font-bold text-slate-800">Chuyến tham quan</h1>
       </div>
 

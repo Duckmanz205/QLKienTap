@@ -10,6 +10,7 @@ import {
   Query,
   UseGuards,
   Patch,
+  Req,
 } from '@nestjs/common';
 import { KhoaService } from '../shared/khoa.service';
 import { AuthGuard } from '../../auth/guards/auth.guard';
@@ -54,6 +55,16 @@ export class ClbController {
   @Get('factories/industry-groups')
   async getFactoryIndustryGroups() {
     return this.khoaService.getFactoryIndustryGroups();
+  }
+
+  @Get('campaigns')
+  async getCampaigns() {
+    return this.khoaService.getCampaigns();
+  }
+
+  @Get('courses')
+  async getCourses() {
+    return this.khoaService.getCourses();
   }
 
   @Post('factories')
@@ -243,12 +254,33 @@ export class ClbController {
 
   @Get('schedules')
   async getSchedules() {
-    return this.khoaService.getSchedules();
+    return this.khoaService.getSchedules('QuanLyCLB');
   }
 
   @Post('schedules')
   async createSchedule(@Body() body: CreateScheduleDto) {
     return this.khoaService.createSchedule(body);
+  }
+
+  @Put('schedules/:id')
+  async updateSchedule(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: CreateScheduleDto,
+  ) {
+    return this.khoaService.updateSchedule(id, body);
+  }
+
+  @Delete('schedules/:id')
+  async deleteSchedule(@Param('id', ParseIntPipe) id: number) {
+    return this.khoaService.deleteSchedule(id);
+  }
+
+  @Post('schedules/:id/submit')
+  async submitSchedule(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: any
+  ) {
+    return this.khoaService.submitScheduleForApproval(id, req.user?.sub || req.user?.id);
   }
 
   @Post('lock-grades')

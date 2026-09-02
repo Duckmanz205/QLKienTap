@@ -25,6 +25,7 @@ import {
   CreateFactoryDto,
   UpdateFactoryDto,
   CreateCampaignDto,
+  UpdateCampaignDto,
   CreateScheduleDto,
   ImportStudentsDto,
   CreateTripDto,
@@ -83,7 +84,7 @@ export class KhoaController {
     return this.khoaService.createTerm(body);
   }
 
-  @Roles('QuanLyKhoa')
+  @Roles('QuanLyKhoa', 'QuanLyCLB')
   @Get('courses')
   async getCourses() {
     return this.khoaService.getCourses();
@@ -180,6 +181,12 @@ export class KhoaController {
   }
 
   @Roles('QuanLyKhoa')
+  @Get('students/classes')
+  async getUniqueClasses() {
+    return this.khoaService.getUniqueClasses();
+  }
+
+  @Roles('QuanLyKhoa', 'QuanLyCLB')
   @Get('students')
   async getStudents(@Query() query: GetStudentsQueryDto) {
     return this.khoaService.getStudents(
@@ -208,7 +215,7 @@ export class KhoaController {
   }
 
 
-  @Roles('QuanLyKhoa')
+  @Roles('QuanLyKhoa', 'QuanLyCLB')
   @Get('campaigns')
   async getCampaigns() {
     return this.khoaService.getCampaigns();
@@ -221,9 +228,48 @@ export class KhoaController {
   }
 
   @Roles('QuanLyKhoa')
+  @Put('campaigns/:id')
+  async updateCampaign(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateCampaignDto) {
+    return this.khoaService.updateCampaign(id, body);
+  }
+
+  @Roles('QuanLyKhoa')
+  @Delete('campaigns/:id')
+  async deleteCampaign(@Param('id', ParseIntPipe) id: number) {
+    return this.khoaService.deleteCampaign(id);
+  }
+
+  @Roles('QuanLyKhoa')
+  @Post('campaigns/:id/publish')
+  async publishCampaign(@Param('id', ParseIntPipe) id: number) {
+    return this.khoaService.publishCampaign(id);
+  }
+
+  @Roles('QuanLyKhoa', 'QuanLyCLB')
   @Get('schedules')
   async getSchedules() {
-    return this.khoaService.getSchedules();
+    return this.khoaService.getSchedules('QuanLyKhoa');
+  }
+
+  @Roles('QuanLyKhoa', 'QuanLyCLB')
+  @Post('schedules')
+  async createSchedule(@Body() body: CreateScheduleDto) {
+    return this.khoaService.createSchedule(body);
+  }
+
+  @Roles('QuanLyKhoa')
+  @Put('schedules/:id')
+  async updateSchedule(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: CreateScheduleDto,
+  ) {
+    return this.khoaService.updateSchedule(id, body);
+  }
+
+  @Roles('QuanLyKhoa')
+  @Delete('schedules/:id')
+  async deleteSchedule(@Param('id', ParseIntPipe) id: number) {
+    return this.khoaService.deleteSchedule(id);
   }
 
   @Roles('QuanLyKhoa')
@@ -241,7 +287,7 @@ export class KhoaController {
     return this.khoaService.rejectSchedule(id, lyDo);
   }
 
-  @Roles('QuanLyKhoa')
+  @Roles('QuanLyKhoa', 'QuanLyCLB')
   @Post('import-students')
   async importStudents(@Body() body: ImportStudentsDto) {
     return this.khoaService.importStudentsToSchedule(

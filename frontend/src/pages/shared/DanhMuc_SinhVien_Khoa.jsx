@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Upload, Plus, Search, ChevronDown, Check,
-  Edit2, Key, Trash2, X, CloudUpload
+  Edit2, Key, Trash2, X, CloudUpload, FileSpreadsheet, Download
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { khoaApi } from '../../services/api';
@@ -17,8 +17,10 @@ export default function DanhMuc_SinhVien_Khoa() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterKhoa, setFilterKhoa] = useState('All');
   const [isKhoaDropdownOpen, setIsKhoaDropdownOpen] = useState(false);
+  const [searchKhoaDropdown, setSearchKhoaDropdown] = useState('');
   const [filterClass, setFilterClass] = useState('All');
   const [isClassDropdownOpen, setIsClassDropdownOpen] = useState(false);
+  const [searchLopDropdown, setSearchLopDropdown] = useState('');
   const [filterHocLai, setFilterHocLai] = useState(false);
   
   // Pagination States
@@ -41,10 +43,31 @@ export default function DanhMuc_SinhVien_Khoa() {
   const [importData, setImportData] = useState([]);
   const [isImporting, setIsImporting] = useState(false);
   const [khoaList, setKhoaList] = useState([]);
+  const [lopList, setLopList] = useState([]);
 
   useEffect(() => {
     fetchData(1);
+    fetchCourses();
+    fetchClasses();
   }, []);
+
+  const fetchClasses = async () => {
+    try {
+      const res = await khoaApi.getUniqueClasses();
+      setLopList(res.data || []);
+    } catch (err) {
+      console.error('Lỗi khi lấy danh sách lớp:', err);
+    }
+  };
+
+  const fetchCourses = async () => {
+    try {
+      const res = await khoaApi.getCourses();
+      setKhoaList(res.data || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const fetchData = async (targetPage = page, targetLimit = limit) => {
     try {
@@ -61,11 +84,16 @@ export default function DanhMuc_SinhVien_Khoa() {
   const handleSingleSubmit = async (e) => {
     e.preventDefault();
     try {
+      const autoTenKhoa = extractKhoa(newClass);
+      
       if (editingStudent) {
         await khoaApi.updateStudent(editingStudent.id, {
+          mssv: newMssv,
+          ho_ten: newName,
           email: newEmail,
           sdt: newPhone,
           ten_lop: newClass,
+          ten_khoa: autoTenKhoa
         });
         setToast({ show: true, message: 'Cập nhật sinh viên thành công', type: 'success' });
       } else {
@@ -75,6 +103,7 @@ export default function DanhMuc_SinhVien_Khoa() {
           ten_lop: newClass,
           email: newEmail,
           sdt: newPhone,
+          ten_khoa: autoTenKhoa
         });
         setToast({ show: true, message: 'Thêm sinh viên thành công', type: 'success' });
       }
@@ -134,12 +163,12 @@ export default function DanhMuc_SinhVien_Khoa() {
   const extractKhoa = (ten_lop) => {
     if (!ten_lop) return 'Khác';
     const match = ten_lop.match(/^(\d+)/);
-    return match ? `${match[1]}ĐHTP` : 'Khác';
+    return match ? `Khóa ${match[1]}` : 'Khác';
   };
 
-  // Mock Dropdown Lists based on prompt
-  const khoaOptions = ["Tất cả khóa", "14ĐHTP", "13ĐHTP", "12ĐHTP", "11ĐHTP (học lại)"];
-  const lopOptions = ["Tất cả lớp", "14DHTP01", "14DHTP02", "14DHTP03"];
+  // Dropdown Lists
+  const khoaOptions = ["Tất cả khóa", ...khoaList.map(k => k.ten_khoa)];
+  const lopOptions = ["Tất cả lớp", ...lopList];
 
   const filteredStudents = students.filter(s => {
     const k = extractKhoa(s.ten_lop);
@@ -149,14 +178,32 @@ export default function DanhMuc_SinhVien_Khoa() {
     return matchesKhoa && matchesClass && matchesHocLai;
   });
 
+  const downloadTemplate = () => {
+    const templateData = [
+      {
+        "MSSV": "20012345",
+        "Họ tên": "Nguyễn Văn A",
+        "Email": "20012345@student.huit.edu.vn",
+        "SĐT": "0912345678",
+        "Lớp": "12DHTP01"
+      },
+      {
+        "MSSV": "20012346",
+        "Họ tên": "Trần Thị B",
+        "Email": "20012346@student.huit.edu.vn",
+        "SĐT": "0987654321",
+        "Lớp": "12DHTP02"
+      }
+    ];
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "SinhVien");
+    XLSX.writeFile(wb, "Mau_Import_SinhVien.xlsx");
+  };
+
   const handleOpenImportModal = async () => {
     setIsImportModalOpen(true);
-    try {
-      const res = await khoaApi.getCourses();
-      setKhoaList(res.data || []);
-    } catch (err) {
-      console.error('Lỗi khi lấy danh sách khóa', err);
-    }
+    // Danh sách khóa đã được load ở fetchCourses() khi component mount
   };
 
   const handleFileUpload = (e) => {
@@ -172,15 +219,18 @@ export default function DanhMuc_SinhVien_Khoa() {
       const data = XLSX.utils.sheet_to_json(ws);
       
       const formattedData = data.map(row => {
-        const tenKhoa = String(row['Khóa'] || row['ten_khoa'] || '').trim();
+        const tenLop = String(row['Lớp'] || row['ten_lop'] || '').trim();
+        const autoTenKhoa = extractKhoa(tenLop);
+        const tenKhoa = String(row['Khóa'] || row['ten_khoa'] || autoTenKhoa).trim();
         const matchedKhoa = khoaList.find(k => k.ten_khoa === tenKhoa);
         return {
           mssv: String(row['MSSV'] || row['mssv'] || ''),
           ho_ten: String(row['Họ tên'] || row['ho_ten'] || ''),
           email: String(row['Email'] || row['email'] || ''),
           sdt: String(row['SĐT'] || row['sdt'] || ''),
-          ten_lop: String(row['Lớp'] || row['ten_lop'] || ''),
+          ten_lop: tenLop,
           khoa_id: matchedKhoa ? matchedKhoa.id : undefined,
+          ten_khoa: tenKhoa,
         };
       }).filter(r => r.mssv && r.ho_ten);
 
@@ -281,21 +331,38 @@ export default function DanhMuc_SinhVien_Khoa() {
             <ChevronDown className="w-4 h-4 text-slate-400" />
           </div>
           {isKhoaDropdownOpen && (
-            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1">
-              {khoaOptions.map(opt => (
-                <div 
-                  key={opt}
-                  onClick={() => { setFilterKhoa(opt === 'Tất cả khóa' ? 'All' : opt); setIsKhoaDropdownOpen(false); }}
-                  className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                    (filterKhoa === opt || (filterKhoa === 'All' && opt === 'Tất cả khóa')) 
-                      ? 'bg-[#E7E0C4] text-slate-800 font-bold' 
-                      : 'text-slate-700 hover:bg-[#E7E0C4]/50'
-                  }`}
-                >
-                  {opt}
-                  {(filterKhoa === opt || (filterKhoa === 'All' && opt === 'Tất cả khóa')) && <Check className="w-4 h-4 text-[#407F3E]" />}
-                </div>
-              ))}
+            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[200px]">
+              <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
+                <input 
+                  type="text" 
+                  placeholder="Tìm khóa..." 
+                  value={searchKhoaDropdown}
+                  onChange={(e) => setSearchKhoaDropdown(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
+                />
+              </div>
+              <div className="max-h-60 overflow-y-auto">
+                {khoaOptions
+                  .filter(opt => opt.toLowerCase().includes(searchKhoaDropdown.toLowerCase()))
+                  .map(opt => (
+                  <div 
+                    key={opt}
+                    onClick={() => { setFilterKhoa(opt === 'Tất cả khóa' ? 'All' : opt); setIsKhoaDropdownOpen(false); setSearchKhoaDropdown(''); }}
+                    className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                      (filterKhoa === opt || (filterKhoa === 'All' && opt === 'Tất cả khóa')) 
+                        ? 'bg-[#E7E0C4] text-slate-800 font-bold' 
+                        : 'text-slate-700 hover:bg-[#E7E0C4]/50'
+                    }`}
+                  >
+                    {opt}
+                    {(filterKhoa === opt || (filterKhoa === 'All' && opt === 'Tất cả khóa')) && <Check className="w-4 h-4 text-[#407F3E]" />}
+                  </div>
+                ))}
+                {khoaOptions.filter(opt => opt.toLowerCase().includes(searchKhoaDropdown.toLowerCase())).length === 0 && (
+                  <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy</div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -310,21 +377,38 @@ export default function DanhMuc_SinhVien_Khoa() {
             <ChevronDown className="w-4 h-4 text-slate-400" />
           </div>
           {isClassDropdownOpen && (
-            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1">
-              {lopOptions.map(opt => (
-                <div 
-                  key={opt}
-                  onClick={() => { setFilterClass(opt === 'Tất cả lớp' ? 'All' : opt); setIsClassDropdownOpen(false); }}
-                  className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                    (filterClass === opt || (filterClass === 'All' && opt === 'Tất cả lớp')) 
-                      ? 'bg-[#E7E0C4] text-slate-800 font-bold' 
-                      : 'text-slate-700 hover:bg-[#E7E0C4]/50'
-                  }`}
-                >
-                  {opt}
-                  {(filterClass === opt || (filterClass === 'All' && opt === 'Tất cả lớp')) && <Check className="w-4 h-4 text-[#407F3E]" />}
-                </div>
-              ))}
+            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[200px]">
+              <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
+                <input 
+                  type="text" 
+                  placeholder="Tìm lớp..." 
+                  value={searchLopDropdown}
+                  onChange={(e) => setSearchLopDropdown(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
+                />
+              </div>
+              <div className="max-h-60 overflow-y-auto">
+                {lopOptions
+                  .filter(opt => opt.toLowerCase().includes(searchLopDropdown.toLowerCase()))
+                  .map(opt => (
+                  <div 
+                    key={opt}
+                    onClick={() => { setFilterClass(opt === 'Tất cả lớp' ? 'All' : opt); setIsClassDropdownOpen(false); setSearchLopDropdown(''); }}
+                    className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                      (filterClass === opt || (filterClass === 'All' && opt === 'Tất cả lớp')) 
+                        ? 'bg-[#E7E0C4] text-slate-800 font-bold' 
+                        : 'text-slate-700 hover:bg-[#E7E0C4]/50'
+                    }`}
+                  >
+                    {opt}
+                    {(filterClass === opt || (filterClass === 'All' && opt === 'Tất cả lớp')) && <Check className="w-4 h-4 text-[#407F3E]" />}
+                  </div>
+                ))}
+                {lopOptions.filter(opt => opt.toLowerCase().includes(searchLopDropdown.toLowerCase())).length === 0 && (
+                  <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy</div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -344,10 +428,9 @@ export default function DanhMuc_SinhVien_Khoa() {
       {/* Main Table */}
       <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-hidden relative z-10">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[950px]">
+          <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-[#E7E0C4] text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
-                <th className="p-4 w-16 text-center">Ảnh</th>
                 <th className="p-4">MSSV</th>
                 <th className="p-4">Họ tên</th>
                 <th className="p-4">Lớp</th>
@@ -360,18 +443,13 @@ export default function DanhMuc_SinhVien_Khoa() {
             <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
               {filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center text-slate-500 font-medium">Không tìm thấy sinh viên nào khớp điều kiện</td>
+                  <td colSpan={7} className="p-8 text-center text-slate-500 font-medium">Không tìm thấy sinh viên nào khớp điều kiện</td>
                 </tr>
               ) : (
                 filteredStudents.map(stud => {
                   const khoa = extractKhoa(stud.ten_lop);
                   return (
                     <tr key={stud.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="p-4">
-                        <div className="w-8 h-8 rounded-full bg-[#89B449]/20 text-[#407F3E] flex items-center justify-center font-bold text-xs border border-[#89B449]/30 mx-auto">
-                          {stud.ho_ten ? stud.ho_ten.charAt(0).toUpperCase() : '?'}
-                        </div>
-                      </td>
                       <td className="p-4 font-mono text-slate-600 text-xs">{stud.mssv}</td>
                       <td className="p-4 font-bold text-slate-800">{stud.ho_ten}</td>
                       <td className="p-4 font-semibold text-slate-700">{stud.ten_lop}</td>
@@ -473,7 +551,7 @@ export default function DanhMuc_SinhVien_Khoa() {
 
       {/* Single Student Modal */}
       {showSingleModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50  animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-xl border border-[#E7E0C4] max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
               <h4 className="font-bold text-slate-800 text-lg">
@@ -493,11 +571,10 @@ export default function DanhMuc_SinhVien_Khoa() {
                   <input 
                     type="text" 
                     required
-                    disabled={!!editingStudent}
                     placeholder="20032119" 
                     value={newMssv}
                     onChange={(e) => setNewMssv(e.target.value)}
-                    className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] text-sm transition-all font-mono disabled:bg-slate-100 disabled:text-slate-500"
+                    className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] text-sm transition-all font-mono"
                   />
                 </div>
                 <div>
@@ -518,11 +595,10 @@ export default function DanhMuc_SinhVien_Khoa() {
                 <input 
                   type="text" 
                   required
-                  disabled={!!editingStudent}
                   placeholder="Ví dụ: Nguyễn Văn Hải" 
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] text-sm transition-all disabled:bg-slate-100 disabled:text-slate-500"
+                  className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] text-sm transition-all"
                 />
               </div>
 
@@ -571,7 +647,7 @@ export default function DanhMuc_SinhVien_Khoa() {
       {/* Import Modal */}
       {isImportModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => !isImporting && setIsImportModalOpen(false)}></div>
+          <div className="absolute inset-0 bg-slate-900/40  animate-in fade-in duration-200" onClick={() => !isImporting && setIsImportModalOpen(false)}></div>
           <div className="bg-white w-full max-w-5xl rounded-2xl shadow-xl relative z-10 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
             <div className="px-6 py-4 border-b border-[#E7E0C4] flex items-center justify-between">
               <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
@@ -584,6 +660,27 @@ export default function DanhMuc_SinhVien_Khoa() {
             </div>
             
             <div className="p-6 flex flex-col gap-6 overflow-hidden flex-1 bg-slate-50">
+              {/* Banner gợi ý tải file mẫu */}
+              <div className="bg-[#407F3E]/5 border border-[#407F3E]/20 rounded-xl p-3 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white rounded-lg shadow-sm border border-[#407F3E]/10">
+                    <FileSpreadsheet className="w-6 h-6 text-[#407F3E]" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-slate-800 text-sm">Chưa có file đúng định dạng?</p>
+                    <p className="text-sm text-slate-500">Tải file mẫu để đảm bảo import chính xác, tránh sai cột dữ liệu.</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={downloadTemplate}
+                  type="button"
+                  className="shrink-0 flex items-center gap-2 border border-[#407F3E] text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg px-3 py-1.5 text-sm font-bold transition-colors cursor-pointer"
+                >
+                  <Download className="w-4 h-4" />
+                  Tải file mẫu
+                </button>
+              </div>
+
               <div className="flex gap-4 items-center">
                 <label className="flex-1">
                   <div className="border-2 border-dashed border-[#E7E0C4] rounded-xl p-8 bg-white flex flex-col items-center justify-center text-center hover:bg-slate-50 hover:border-[#89B449] transition-colors cursor-pointer group">
@@ -625,9 +722,14 @@ export default function DanhMuc_SinhVien_Khoa() {
                             <td className="px-4 py-2">{row.email}</td>
                             <td className="px-4 py-2">{row.sdt}</td>
                             <td className="px-4 py-2">
-                              {row.khoa_id === undefined && (
-                                <span className="text-red-500 text-xs italic">
-                                  Không tìm thấy khóa khớp — sẽ tạo không gán khóa
+                              {row.khoa_id === undefined && row.ten_khoa !== 'Khác' && (
+                                <span className="text-[#407F3E] text-xs italic font-semibold">
+                                  Sẽ tự tạo {row.ten_khoa}
+                                </span>
+                              )}
+                              {row.khoa_id === undefined && row.ten_khoa === 'Khác' && (
+                                <span className="text-[#E68A8C] text-xs italic">
+                                  Không xác định được khóa
                                 </span>
                               )}
                             </td>

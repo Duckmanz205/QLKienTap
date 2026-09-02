@@ -25,3 +25,35 @@ body {
     'opsz' 24;
   vertical-align: middle;
 }
+
+/* Sidebar Auto-Hide Scrollbar */
+.sidebar-scrollbar {
+  scrollbar-width: none; /* Firefox: hide by default */
+}
+
+.sidebar-scrollbar:hover {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  background-color: transparent;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 999px;
+}
+
+.sidebar-scrollbar:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.25);
+}
+
+.sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.4) !important;
+}
