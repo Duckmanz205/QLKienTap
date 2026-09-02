@@ -61,8 +61,8 @@ async function bootstrap() {
     }),
   );
 
-  const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+  const port = process.env.PORT || 3000;
   await app.listen(port);
-  console.log(`🚀 Backend đang chạy tại: http://localhost:${port}/api`);
+  console.log(`Application is running on: ${await app.getUrl()}`);
 }
 bootstrap();

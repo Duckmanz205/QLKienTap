@@ -1,15 +1,85 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { 
-  Plus, ChevronRight, ChevronDown, Check, X, PlusCircle, Folder, Search
+  Plus, ChevronRight, ChevronDown, Check, X, PlusCircle, Folder, Search,
+  Edit2, Trash2, Rocket, MoreVertical
 } from 'lucide-react';
 import { khoaApi } from '../../services/api';
+import Toast from '../../components/Toast';
 
 export default function PlanManagement_Khoa() {
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   const [campaigns, setCampaigns] = useState([]);
   const [years, setYears] = useState([]);
   const [terms, setTerms] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewingDetail, setViewingDetail] = useState(null);
+
+  // Dropdown state
+  const [activeDropdown, setActiveDropdown] = useState(null);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
+
+  useEffect(() => {
+    if (!activeDropdown) return;
+
+    const handleScroll = (e) => {
+      // Bỏ qua cuộn trong chính menu (nếu có)
+      if (e.target.closest?.('.dropdown-menu-portal')) return;
+      setActiveDropdown(null);
+    };
+    
+    const handleClickOutside = (e) => {
+      if (e.target.closest?.('.dropdown-trigger') || e.target.closest?.('.dropdown-menu-portal')) return;
+      setActiveDropdown(null);
+    };
+    
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') setActiveDropdown(null);
+    };
+
+    window.addEventListener('scroll', handleScroll, true);
+    window.addEventListener('click', handleClickOutside, true);
+    window.addEventListener('keydown', handleEsc, true);
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll, true);
+      window.removeEventListener('click', handleClickOutside, true);
+      window.removeEventListener('keydown', handleEsc, true);
+    };
+  }, [activeDropdown]);
+
+  const handleDropdownClick = (e, c) => {
+    e.stopPropagation();
+    if (activeDropdown?.id === c.id) {
+      setActiveDropdown(null);
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const menuHeight = 150;
+    
+    let top = rect.bottom;
+    if (window.innerHeight - rect.bottom < menuHeight) {
+      top = rect.top - menuHeight;
+    }
+    
+    setDropdownPos({
+      top: top,
+      left: rect.right - 192,
+    });
+    setActiveDropdown(c);
+  };
+
+  // Edit State
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+
+  // Delete Confirm State
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+
+  // Publish Confirm State
+  const [isPublishConfirmOpen, setIsPublishConfirmOpen] = useState(false);
+  const [publishingId, setPublishingId] = useState(null);
 
   // Modal Form States
   const [campaignName, setCampaignName] = useState('');
@@ -43,31 +113,98 @@ export default function PlanManagement_Khoa() {
     }
   };
 
-  const handleCreateCampaign = async () => {
-    if (!campaignName || !selectedYear || !selectedTerm || !campaignBD || !campaignKT) {
-      alert('Vui lòng điền đầy đủ thông tin');
+  const resetForm = () => {
+    setIsModalOpen(false);
+    setIsEditMode(false);
+    setEditingId(null);
+    setCampaignName('');
+    setSelectedYear('');
+    setSelectedTerm('');
+    setCampaignBD('');
+    setCampaignKT('');
+  };
+
+  const handleSaveCampaign = async () => {
+    if (!campaignName || !selectedTerm || !campaignBD || !campaignKT) {
+      setToast({ show: true, message: 'Vui lòng điền đầy đủ thông tin', type: 'error' });
       return;
     }
     
     try {
-      await khoaApi.createCampaign({
+      const payload = {
         ten_dot: campaignName,
-        nam_hoc_id: selectedYear,
-        hoc_ky_id: selectedTerm,
-        tg_bat_dau: campaignBD,
-        tg_ket_thuc: campaignKT
-      });
-      alert('Tạo đợt kiến tập thành công');
-      setIsModalOpen(false);
-      setCampaignName('');
-      setSelectedYear('');
-      setSelectedTerm('');
-      setCampaignBD('');
-      setCampaignKT('');
+        hoc_ky_id: parseInt(selectedTerm),
+        ngay_bat_dau: campaignBD,
+        ngay_ket_thuc: campaignKT
+      };
+
+      if (isEditMode) {
+        await khoaApi.updateCampaign(editingId, payload);
+        setToast({ show: true, message: 'Cập nhật đợt kiến tập thành công', type: 'success' });
+      } else {
+        await khoaApi.createCampaign(payload);
+        setToast({ show: true, message: 'Tạo đợt kiến tập thành công', type: 'success' });
+      }
+      resetForm();
       fetchInitialData();
     } catch (err) {
       console.error(err);
-      alert('Lỗi khi tạo đợt kiến tập');
+      let errorMsg = 'Lỗi khi lưu đợt kiến tập';
+      if (err.response?.data?.message) {
+        if (Array.isArray(err.response.data.message)) {
+          errorMsg = err.response.data.message.join(', ');
+        } else {
+          errorMsg = err.response.data.message;
+        }
+      }
+      setToast({ show: true, message: errorMsg, type: 'error' });
+    }
+  };
+
+  const handleEditClick = (c) => {
+    setCampaignName(c.ten_dot);
+    setSelectedYear(c.nam_hoc_id || '');
+    setSelectedTerm(c.hoc_ky_id || '');
+    setCampaignBD(c.raw_bat_dau);
+    setCampaignKT(c.raw_ket_thuc);
+    setEditingId(c.id);
+    setIsEditMode(true);
+    setIsModalOpen(true);
+  };
+
+  const handleDeleteClick = (id) => {
+    setDeletingId(id);
+    setIsDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    try {
+      await khoaApi.deleteCampaign(deletingId);
+      setToast({ show: true, message: 'Xóa đợt kiến tập thành công', type: 'success' });
+      setIsDeleteConfirmOpen(false);
+      setDeletingId(null);
+      fetchInitialData();
+    } catch (err) {
+      console.error(err);
+      setToast({ show: true, message: err.response?.data?.message || 'Lỗi khi xóa đợt kiến tập', type: 'error' });
+    }
+  };
+
+  const handlePublishClick = (id) => {
+    setPublishingId(id);
+    setIsPublishConfirmOpen(true);
+  };
+
+  const confirmPublish = async () => {
+    try {
+      await khoaApi.publishCampaign(publishingId);
+      setToast({ show: true, message: 'Gửi yêu cầu lập lịch thành công', type: 'success' });
+      setIsPublishConfirmOpen(false);
+      setPublishingId(null);
+      fetchInitialData();
+    } catch (err) {
+      console.error(err);
+      setToast({ show: true, message: err.response?.data?.message || 'Lỗi khi gửi yêu cầu', type: 'error' });
     }
   };
 
@@ -89,29 +226,33 @@ export default function PlanManagement_Khoa() {
 
   // Mock data mapping to fit the columns perfectly
   const displayData = campaigns.map(c => {
-    // Generate a mock status if none exists
-    const now = new Date();
-    const start = new Date(c.tg_bat_dau);
-    const end = new Date(c.tg_ket_thuc);
-    
-    let mockStatus = 'Nháp';
-    if (now >= start && now <= end) mockStatus = 'Đang triển khai';
-    else if (now > end) mockStatus = 'Đã kết thúc';
+    let rawStatus = c.trang_thai || 'Nhap';
+    let displayStatus = 'Nháp';
+    if (rawStatus === 'Nhap') displayStatus = 'Nháp';
+    else if (rawStatus === 'DangTrienKhai') displayStatus = 'Đang triển khai';
+    else if (rawStatus === 'DaKetThuc') displayStatus = 'Đã kết thúc';
+    else if (rawStatus === 'DaKhoa') displayStatus = 'Đã khóa';
+    else if (rawStatus === 'DaHuy') displayStatus = 'Đã hủy';
 
     return {
       id: c.id,
       ten_dot: c.ten_dot,
-      nam_hoc: c.namHoc?.ten_nam_hoc || 'Đang cập nhật',
+      nam_hoc: c.hocKy?.namHoc?.ten_nam_hoc || 'Đang cập nhật',
+      nam_hoc_id: c.hocKy?.namHoc?.id,
       hoc_ky: c.hocKy?.ten_hoc_ky || 'Đang cập nhật',
-      tg_bat_dau: new Date(c.tg_bat_dau).toLocaleDateString('vi-VN'),
-      tg_ket_thuc: new Date(c.tg_ket_thuc).toLocaleDateString('vi-VN'),
-      trang_thai: mockStatus,
-      so_lich_con: c.LichKienTap?.length || 0 // assuming backend returns relation
+      hoc_ky_id: c.hocKy?.id,
+      tg_bat_dau: c.ngay_bat_dau ? new Date(c.ngay_bat_dau).toLocaleDateString('vi-VN') : 'Đang cập nhật',
+      tg_ket_thuc: c.ngay_ket_thuc ? new Date(c.ngay_ket_thuc).toLocaleDateString('vi-VN') : 'Đang cập nhật',
+      raw_bat_dau: c.ngay_bat_dau ? c.ngay_bat_dau.split('T')[0] : '',
+      raw_ket_thuc: c.ngay_ket_thuc ? c.ngay_ket_thuc.split('T')[0] : '',
+      trang_thai: displayStatus,
+      raw_trang_thai: rawStatus
     };
   });
 
   return (
     <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300 relative">
+      <Toast show={toast.show} message={toast.message} type={toast.type} onClose={() => setToast({ show: false, message: '', type: 'success' })} />
       {/* Header section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <h1 className="text-2xl font-bold text-slate-800">Đợt kiến tập</h1>
@@ -136,18 +277,21 @@ export default function PlanManagement_Khoa() {
                 <th className="p-4">Ngày bắt đầu</th>
                 <th className="p-4">Ngày kết thúc</th>
                 <th className="p-4 text-center">Trạng thái</th>
-                <th className="p-4 text-center">Số lịch con</th>
                 <th className="p-4 text-right pr-6">Thao tác</th>
               </tr>
             </thead>
             <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
               {displayData.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center text-slate-500 font-medium">Không có đợt kiến tập nào.</td>
+                  <td colSpan={7} className="p-8 text-center text-slate-500 font-medium">Không có đợt kiến tập nào.</td>
                 </tr>
               ) : (
                 displayData.map(c => (
-                  <tr key={c.id} className="hover:bg-slate-50 transition-colors">
+                  <tr 
+                    key={c.id} 
+                    className="hover:bg-slate-50 transition-colors cursor-pointer group"
+                    onClick={() => setViewingDetail(c)}
+                  >
                     <td className="p-4 pl-6 font-bold text-slate-800">{c.ten_dot}</td>
                     <td className="p-4 font-medium text-slate-600">{c.nam_hoc}</td>
                     <td className="p-4 font-medium text-slate-600">{c.hoc_ky}</td>
@@ -156,19 +300,17 @@ export default function PlanManagement_Khoa() {
                     <td className="p-4 text-center">
                       {getStatusBadge(c.trang_thai)}
                     </td>
-                    <td className="p-4 text-center">
-                      <span className="inline-flex items-center justify-center w-6 h-6 rounded bg-[#E7E0C4]/50 text-slate-700 font-bold text-xs border border-[#E7E0C4]">
-                        {c.so_lich_con}
-                      </span>
-                    </td>
-                    <td className="p-4 text-right pr-6">
-                      <button 
-                        className="p-1.5 text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer" 
-                        title="Xem chi tiết"
-                        onClick={() => setViewingDetail(c)}
-                      >
-                        <ChevronRight className="w-5 h-5" />
-                      </button>
+                    <td className="p-4 text-right pr-6 relative" onClick={(e) => e.stopPropagation()}>
+                      {c.raw_trang_thai === 'Nhap' ? (
+                        <button 
+                          onClick={(e) => handleDropdownClick(e, c)}
+                          className="dropdown-trigger p-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                        >
+                          <MoreVertical className="w-5 h-5" />
+                        </button>
+                      ) : (
+                        <div className="w-8 h-8 inline-block"></div> // Placeholder for alignment
+                      )}
                     </td>
                   </tr>
                 ))
@@ -183,7 +325,7 @@ export default function PlanManagement_Khoa() {
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           {/* Dimmed Overlay */}
           <div 
-            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200"
+            className="absolute inset-0 bg-slate-900/10 backdrop-blur-sm animate-in fade-in duration-200"
             onClick={() => setIsModalOpen(false)}
           ></div>
           
@@ -192,11 +334,11 @@ export default function PlanManagement_Khoa() {
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-[#E7E0C4] flex items-center justify-between bg-slate-50/50">
               <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                <Plus className="w-5 h-5 text-[#407F3E]" />
-                Tạo đợt kiến tập
+                {isEditMode ? <Edit2 className="w-5 h-5 text-[#407F3E]" /> : <Plus className="w-5 h-5 text-[#407F3E]" />}
+                {isEditMode ? 'Sửa đợt kiến tập' : 'Tạo đợt kiến tập'}
               </h2>
               <button 
-                onClick={() => setIsModalOpen(false)}
+                onClick={resetForm}
                 className="p-1.5 text-slate-400 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
@@ -307,13 +449,13 @@ export default function PlanManagement_Khoa() {
             {/* Modal Footer */}
             <div className="px-6 py-4 border-t border-[#E7E0C4] bg-slate-50/50 flex items-center justify-end gap-3">
               <button 
-                onClick={() => setIsModalOpen(false)}
+                onClick={resetForm}
                 className="px-5 py-2.5 border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-bold transition-colors cursor-pointer"
               >
                 Hủy
               </button>
               <button 
-                onClick={handleCreateCampaign}
+                onClick={handleSaveCampaign}
                 className="px-5 py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl text-sm font-bold transition-colors shadow-sm cursor-pointer"
               >
                 Lưu
@@ -327,7 +469,7 @@ export default function PlanManagement_Khoa() {
       {viewingDetail && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div 
-            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200"
+            className="absolute inset-0 bg-slate-900/10 backdrop-blur-sm animate-in fade-in duration-200"
             onClick={(e) => { e.stopPropagation(); setViewingDetail(null); }}
           ></div>
           
@@ -349,15 +491,19 @@ export default function PlanManagement_Khoa() {
             </div>
             
             <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-              {Object.entries(viewingDetail).map(([key, value]) => {
-                if (typeof value === 'object' && value !== null) return null;
-                return (
-                  <div key={key} className="flex flex-col border-b border-slate-100 pb-2">
-                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{key}</span>
-                    <span className="text-sm font-medium text-slate-800 break-words">{String(value)}</span>
-                  </div>
-                );
-              })}
+              {Object.entries({
+                'Tên đợt': viewingDetail.ten_dot,
+                'Năm học': viewingDetail.nam_hoc,
+                'Học kỳ': viewingDetail.hoc_ky,
+                'Ngày bắt đầu': viewingDetail.tg_bat_dau,
+                'Ngày kết thúc': viewingDetail.tg_ket_thuc,
+                'Trạng thái': viewingDetail.trang_thai,
+              }).map(([label, value]) => (
+                <div key={label} className="flex flex-col border-b border-slate-100 pb-2">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{label}</span>
+                  <span className="text-sm font-medium text-slate-800 break-words">{String(value)}</span>
+                </div>
+              ))}
             </div>
             
             <div className="px-6 py-4 border-t border-[#E7E0C4] bg-slate-50/50 flex items-center justify-end rounded-b-2xl">
@@ -371,6 +517,64 @@ export default function PlanManagement_Khoa() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Delete Confirm Modal */}
+      {isDeleteConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-slate-900/10 backdrop-blur-sm" onClick={() => setIsDeleteConfirmOpen(false)}></div>
+          <div className="bg-white p-6 rounded-2xl shadow-xl z-10 max-w-sm w-full">
+            <h3 className="text-lg font-bold text-slate-800 mb-2">Xóa đợt kiến tập</h3>
+            <p className="text-sm text-slate-600 mb-6">Bạn có chắc chắn muốn xóa đợt kiến tập này? Thao tác này không thể hoàn tác.</p>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setIsDeleteConfirmOpen(false)} className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 font-bold">Hủy</button>
+              <button onClick={confirmDelete} className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 font-bold">Xóa</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Publish Confirm Modal */}
+      {isPublishConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-slate-900/10 backdrop-blur-sm" onClick={() => setIsPublishConfirmOpen(false)}></div>
+          <div className="bg-white p-6 rounded-2xl shadow-xl z-10 max-w-md w-full">
+            <h3 className="text-lg font-bold text-slate-800 mb-2">Gửi yêu cầu lập lịch</h3>
+            <p className="text-sm text-slate-600 mb-6">Bạn có chắc chắn muốn chốt đợt kiến tập này và chuyển cho Câu lạc bộ lập lịch? Sau khi xác nhận, đợt sẽ không thể chỉnh sửa hay xóa.</p>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setIsPublishConfirmOpen(false)} className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 font-bold">Hủy</button>
+              <button onClick={confirmPublish} className="px-4 py-2 bg-[#407F3E] text-white rounded-lg hover:bg-[#407F3E]/90 font-bold">Xác nhận gửi</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Portal Dropdown Menu */}
+      {activeDropdown && createPortal(
+        <div 
+          className="dropdown-menu-portal fixed w-48 rounded-xl shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-[100] overflow-hidden animate-in fade-in zoom-in-95 duration-100"
+          style={{ top: dropdownPos.top, left: dropdownPos.left }}
+        >
+          <button 
+            onClick={() => { handleEditClick(activeDropdown); setActiveDropdown(null); }} 
+            className="flex items-center w-full px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors border-b border-slate-100 cursor-pointer"
+          >
+            <Edit2 className="w-4 h-4 mr-3 text-blue-500" /> Sửa
+          </button>
+          <button 
+            onClick={() => { handlePublishClick(activeDropdown.id); setActiveDropdown(null); }} 
+            className="flex items-center w-full px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors border-b border-slate-100 cursor-pointer"
+          >
+            <Rocket className="w-4 h-4 mr-3 text-[#407F3E]" /> Lập lịch
+          </button>
+          <button 
+            onClick={() => { handleDeleteClick(activeDropdown.id); setActiveDropdown(null); }} 
+            className="flex items-center w-full px-4 py-3 text-sm font-semibold text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+          >
+            <Trash2 className="w-4 h-4 mr-3 text-red-500" /> Xóa
+          </button>
+        </div>,
+        document.body
       )}
     </div>
   );

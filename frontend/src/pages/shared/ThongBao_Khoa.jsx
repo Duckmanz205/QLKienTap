@@ -115,6 +115,8 @@ export default function ThongBao_Khoa() {
                 let doiTuongLabel = 'Tất cả';
                 if (n.doi_tuong_nhan === 'STUDENT') doiTuongLabel = 'Sinh viên';
                 if (n.doi_tuong_nhan === 'LECTURER') doiTuongLabel = 'Giảng viên';
+                if (n.doi_tuong_nhan === 'CLB') doiTuongLabel = 'Câu lạc bộ';
+                if (n.doi_tuong_nhan === 'KHOA') doiTuongLabel = 'Khoa';
 
                 return (
                   <tr key={n.id} className="hover:bg-slate-50 transition-colors">
@@ -163,7 +165,7 @@ export default function ThongBao_Khoa() {
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           {/* Dimmed Overlay */}
           <div 
-            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200"
+            className="absolute inset-0 bg-slate-900/10  animate-in fade-in duration-200"
             onClick={() => setIsModalOpen(false)}
           ></div>
           
@@ -311,7 +313,7 @@ export default function ThongBao_Khoa() {
       {viewingDetail && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div 
-            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200"
+            className="absolute inset-0 bg-slate-900/10  animate-in fade-in duration-200"
             onClick={(e) => { e.stopPropagation(); setViewingDetail(null); }}
           ></div>
           
@@ -333,15 +335,17 @@ export default function ThongBao_Khoa() {
             </div>
             
             <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-              {Object.entries(viewingDetail).map(([key, value]) => {
-                if (typeof value === 'object' && value !== null) return null;
-                return (
-                  <div key={key} className="flex flex-col border-b border-slate-100 pb-2">
-                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{key}</span>
-                    <span className="text-sm font-medium text-slate-800 break-words">{String(value)}</span>
-                  </div>
-                );
-              })}
+              {Object.entries({
+                'Tiêu đề': viewingDetail.tieu_de,
+                'Nội dung': viewingDetail.noi_dung,
+                'Đối tượng nhận': viewingDetail.doi_tuong_nhan === 'STUDENT' ? 'Sinh viên' : viewingDetail.doi_tuong_nhan === 'LECTURER' ? 'Giảng viên' : viewingDetail.doi_tuong_nhan === 'CLB' ? 'Câu lạc bộ' : viewingDetail.doi_tuong_nhan === 'KHOA' ? 'Khoa' : 'Tất cả',
+                'Ngày gửi': new Date(viewingDetail.created_at || viewingDetail.ngay_gui || new Date()).toLocaleDateString('vi-VN'),
+              }).map(([label, value]) => (
+                <div key={label} className="flex flex-col border-b border-slate-100 pb-2">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{label}</span>
+                  <span className="text-sm font-medium text-slate-800 break-words whitespace-pre-wrap">{String(value)}</span>
+                </div>
+              ))}
             </div>
             
             <div className="px-6 py-4 border-t border-[#E7E0C4] bg-slate-50/50 flex items-center justify-end rounded-b-2xl">

@@ -88,11 +88,15 @@ export class SinhVienController {
     const student = await this.svService.getStudentByAccountId(user.sub);
     return this.svService.proposeTrip(
       student.id,
-      body.nhaMayId,
       body.ngayThamQuan,
       body.gioBatDau,
       body.gioKetThuc,
       body.hinhThuc,
+      body.nhaMayId,
+      body.tenNhaMayDeXuat,
+      body.diaChiDeXuat,
+      body.nguoiLienHeDeXuat,
+      body.sdtLienHeDeXuat,
     );
   }
 

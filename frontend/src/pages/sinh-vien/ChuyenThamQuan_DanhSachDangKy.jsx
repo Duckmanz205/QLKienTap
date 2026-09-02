@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  MapPin, Laptop, Calendar, Clock, Image as ImageIcon, Users
+  MapPin, Laptop, Calendar, Clock, Image as ImageIcon, Users, ChevronDown, Check, Search
 } from 'lucide-react';
 import { sinhVienApi } from '../../services/api';
 
@@ -13,11 +13,30 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
   const [registeredTrips, setRegisteredTrips] = useState([]);
 
   // Form states for Propose
+  const [proposalType, setProposalType] = useState('system'); // 'system' or 'custom'
   const [factoryId, setFactoryId] = useState('');
+  const [isFactoryDropdownOpen, setIsFactoryDropdownOpen] = useState(false);
+  const [factorySearchTerm, setFactorySearchTerm] = useState('');
+  const [customFactory, setCustomFactory] = useState({
+    tenNhaMayDeXuat: '',
+    diaChiDeXuat: '',
+    nguoiLienHeDeXuat: '',
+    sdtLienHeDeXuat: '',
+  });
   const [ngayThamQuan, setNgayThamQuan] = useState('');
   const [gioBatDau, setGioBatDau] = useState('');
   const [gioKetThuc, setGioKetThuc] = useState('');
   const [hinhThuc, setHinhThuc] = useState('TrucTiep');
+
+  // Popup state
+  const [popup, setPopup] = useState({ show: false, message: '', type: 'success' });
+
+  const showPopup = (message, type = 'success') => {
+    setPopup({ show: true, message, type });
+    setTimeout(() => {
+      setPopup(prev => ({ ...prev, show: false }));
+    }, 3000);
+  };
 
   useEffect(() => {
     const userJson = localStorage.getItem('user');
@@ -48,11 +67,11 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
     if (!window.confirm("Bạn có chắc chắn muốn đăng ký chuyến kiến tập này?")) return;
     try {
       await sinhVienApi.registerTrip(tripId);
-      alert('Đăng ký thành công!');
+      showPopup('Đăng ký thành công!', 'success');
       fetchData(student.id);
       setActiveTab('daDangKy');
     } catch (err) {
-      alert(err.response?.data?.message || 'Có lỗi xảy ra');
+      showPopup(err.response?.data?.message || 'Có lỗi xảy ra', 'error');
     }
   };
 
@@ -61,32 +80,50 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
     if (!reason) return;
     try {
       await sinhVienApi.requestCancel({ dangKyId: registrationId, lyDo: reason });
-      alert('Đã gửi yêu cầu hủy đăng ký');
+      showPopup('Đã gửi yêu cầu hủy đăng ký', 'success');
       fetchData(student.id);
     } catch (err) {
-      alert(err.response?.data?.message || 'Có lỗi xảy ra');
+      showPopup(err.response?.data?.message || 'Có lỗi xảy ra', 'error');
     }
   };
 
   const handleProposalSubmit = async (e) => {
     e.preventDefault();
+    if (proposalType === 'system' && !factoryId) {
+      showPopup('Vui lòng chọn nhà máy!', 'error');
+      return;
+    }
     try {
-      await sinhVienApi.proposeTrip({
-        nhaMayId: parseInt(factoryId),
+      const payload = {
         ngayThamQuan,
         gioBatDau,
         gioKetThuc,
         hinhThuc
-      });
-      alert('Đã gửi đề xuất chuyến đi tự do thành công!');
+      };
+      if (proposalType === 'system') {
+        payload.nhaMayId = parseInt(factoryId);
+      } else {
+        payload.tenNhaMayDeXuat = customFactory.tenNhaMayDeXuat;
+        payload.diaChiDeXuat = customFactory.diaChiDeXuat;
+        payload.nguoiLienHeDeXuat = customFactory.nguoiLienHeDeXuat;
+        payload.sdtLienHeDeXuat = customFactory.sdtLienHeDeXuat;
+      }
+      await sinhVienApi.proposeTrip(payload);
+      showPopup('Đã gửi đề xuất chuyến đi tự do thành công!', 'success');
       setFactoryId('');
+      setCustomFactory({
+        tenNhaMayDeXuat: '',
+        diaChiDeXuat: '',
+        nguoiLienHeDeXuat: '',
+        sdtLienHeDeXuat: '',
+      });
       setNgayThamQuan('');
       setGioBatDau('');
       setGioKetThuc('');
       setActiveTab('coTheDangKy');
       fetchData(student.id);
     } catch (err) {
-      alert(err.response?.data?.message || 'Có lỗi xảy ra');
+      showPopup(err.response?.data?.message || 'Có lỗi xảy ra', 'error');
     }
   };
 
@@ -111,8 +148,23 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
   };
 
   return (
-    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300">
-      <div className="mb-6">
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300 relative">
+      
+      {/* Custom Popup Toast */}
+      {popup.show && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 pointer-events-none">
+          <div className="absolute inset-0 bg-white/5 backdrop-blur-[1px] pointer-events-auto" onClick={() => setPopup({ ...popup, show: false })}></div>
+          <div className={`relative z-10 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-4 animate-in slide-in-from-top-4 fade-in duration-300 pointer-events-auto ${popup.type === 'error' ? 'bg-[#E68A8C] text-white' : 'bg-[#407F3E] text-white'}`}>
+            <span className="font-bold text-sm">{popup.message}</span>
+            <button onClick={() => setPopup({ ...popup, show: false })} className="p-1 hover:bg-white/20 rounded-full transition-colors">
+              <span className="sr-only">Close</span>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="mb-6 relative z-0">
         <h1 className="text-2xl font-bold text-slate-800">Chuyến tham quan</h1>
       </div>
 
@@ -289,22 +341,132 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
           <div className="bg-white rounded-2xl border border-[#E7E0C4] shadow-sm p-6 lg:p-8 max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
             <h2 className="text-xl font-bold text-slate-800 mb-6 border-b border-[#E7E0C4] pb-4">Biểu mẫu Đề xuất Sinh viên đi tự do</h2>
             
+            <div className="flex gap-4 mb-6">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input 
+                  type="radio" 
+                  name="proposalType" 
+                  value="system" 
+                  checked={proposalType === 'system'} 
+                  onChange={() => setProposalType('system')}
+                  className="accent-[#407F3E]"
+                />
+                <span className="text-sm font-bold text-slate-700">Công ty liên kết với CLB</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input 
+                  type="radio" 
+                  name="proposalType" 
+                  value="custom" 
+                  checked={proposalType === 'custom'} 
+                  onChange={() => setProposalType('custom')}
+                  className="accent-[#407F3E]"
+                />
+                <span className="text-sm font-bold text-slate-700">Điền thông tin tự do</span>
+              </label>
+            </div>
+
             <form onSubmit={handleProposalSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="md:col-span-2">
-                  <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Chọn Nhà máy <span className="text-[#E68A8C]">*</span></label>
-                  <select 
-                    value={factoryId}
-                    onChange={(e) => setFactoryId(e.target.value)}
-                    required
-                    className="w-full px-4 py-3 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-800 font-medium"
-                  >
-                    <option value="">-- Chọn Nhà máy đã có trên hệ thống --</option>
-                    {factories.map(f => (
-                      <option key={f.id} value={f.id}>{f.ten_nha_may}</option>
-                    ))}
-                  </select>
-                </div>
+                
+                {proposalType === 'system' ? (
+                  <div className="md:col-span-2 relative">
+                    <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Chọn Nhà máy <span className="text-[#E68A8C]">*</span></label>
+                    <div 
+                      onClick={() => setIsFactoryDropdownOpen(!isFactoryDropdownOpen)}
+                      className={`w-full px-4 py-3 bg-slate-50 border rounded-xl text-sm flex justify-between items-center cursor-pointer transition-all ${isFactoryDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+                    >
+                      <span className={`font-medium truncate pr-2 ${factoryId ? 'text-slate-800' : 'text-slate-500'}`}>
+                        {factoryId ? factories.find(f => f.id === parseInt(factoryId))?.ten_nha_may : '-- Chọn Nhà máy đã có trên hệ thống --'}
+                      </span>
+                      <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+                    </div>
+                    {isFactoryDropdownOpen && (
+                      <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 max-h-60 overflow-y-auto animate-in slide-in-from-top-1">
+                        <div className="p-2 border-b border-slate-100 sticky top-0 bg-white z-10">
+                          <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                              <Search className="h-4 w-4 text-slate-400" />
+                            </div>
+                            <input 
+                              type="text" 
+                              placeholder="Tìm kiếm nhà máy..."
+                              value={factorySearchTerm}
+                              onChange={e => setFactorySearchTerm(e.target.value)}
+                              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E]"
+                            />
+                          </div>
+                        </div>
+                        {factories
+                          .filter(f => f.ten_nha_may?.toLowerCase().includes(factorySearchTerm.toLowerCase()))
+                          .map(f => (
+                          <div 
+                            key={f.id}
+                            onClick={() => { setFactoryId(f.id); setIsFactoryDropdownOpen(false); setFactorySearchTerm(''); }}
+                            className={`px-4 py-2.5 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                              (parseInt(factoryId) === f.id) 
+                                ? 'bg-[#E7E0C4]/50 text-slate-800 font-bold' 
+                                : 'text-slate-700 hover:bg-[#E7E0C4]/30 font-medium'
+                            }`}
+                          >
+                            <span className="truncate pr-2">{f.ten_nha_may}</span>
+                            {parseInt(factoryId) === f.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                          </div>
+                        ))}
+                        {factories.filter(f => f.ten_nha_may?.toLowerCase().includes(factorySearchTerm.toLowerCase())).length === 0 && (
+                          <div className="px-4 py-3 text-sm text-slate-500 text-center">Không tìm thấy nhà máy nào</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Tên Nhà máy đề xuất <span className="text-[#E68A8C]">*</span></label>
+                      <input 
+                        type="text" 
+                        value={customFactory.tenNhaMayDeXuat}
+                        onChange={(e) => setCustomFactory({...customFactory, tenNhaMayDeXuat: e.target.value})}
+                        required
+                        placeholder="Nhập tên nhà máy, công ty..."
+                        className="w-full px-4 py-3 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-800 font-medium" 
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Địa chỉ <span className="text-[#E68A8C]">*</span></label>
+                      <input 
+                        type="text" 
+                        value={customFactory.diaChiDeXuat}
+                        onChange={(e) => setCustomFactory({...customFactory, diaChiDeXuat: e.target.value})}
+                        required
+                        placeholder="Nhập địa chỉ..."
+                        className="w-full px-4 py-3 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-800 font-medium" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Người liên hệ <span className="text-[#E68A8C]">*</span></label>
+                      <input 
+                        type="text" 
+                        value={customFactory.nguoiLienHeDeXuat}
+                        onChange={(e) => setCustomFactory({...customFactory, nguoiLienHeDeXuat: e.target.value})}
+                        required
+                        placeholder="Họ tên người liên hệ..."
+                        className="w-full px-4 py-3 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-800 font-medium" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Số điện thoại liên hệ <span className="text-[#E68A8C]">*</span></label>
+                      <input 
+                        type="text" 
+                        value={customFactory.sdtLienHeDeXuat}
+                        onChange={(e) => setCustomFactory({...customFactory, sdtLienHeDeXuat: e.target.value})}
+                        required
+                        placeholder="SĐT..."
+                        className="w-full px-4 py-3 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-800 font-medium" 
+                      />
+                    </div>
+                  </>
+                )}
                 
                 <div className="md:col-span-2">
                   <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Ngày dự kiến tham quan <span className="text-[#E68A8C]">*</span></label>
@@ -323,6 +485,7 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                     type="time" 
                     value={gioBatDau}
                     onChange={(e) => setGioBatDau(e.target.value)}
+                    required
                     className="w-full px-4 py-3 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-800 font-medium" 
                   />
                 </div>
@@ -333,6 +496,7 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                     type="time" 
                     value={gioKetThuc}
                     onChange={(e) => setGioKetThuc(e.target.value)}
+                    required
                     className="w-full px-4 py-3 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-800 font-medium" 
                   />
                 </div>

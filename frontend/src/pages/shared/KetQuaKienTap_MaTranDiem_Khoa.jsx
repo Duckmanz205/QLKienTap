@@ -305,7 +305,7 @@ export default function KetQuaKienTap_Khoa() {
 
       {/* Grade Detail Modal */}
       {selectedStudent && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/60  z-[100] flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
             <div className="p-6 border-b border-[#E7E0C4] bg-[#E7E0C4]/30 flex items-center justify-between">
               <h2 className="font-extrabold text-slate-800 text-lg flex items-center gap-2">
@@ -366,7 +366,7 @@ export default function KetQuaKienTap_Khoa() {
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           {/* Dimmed Overlay */}
           <div 
-            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200"
+            className="absolute inset-0 bg-slate-900/60  animate-in fade-in duration-200"
             onClick={(e) => { e.stopPropagation(); setIsConfirmModalOpen(false); }}
           ></div>
           

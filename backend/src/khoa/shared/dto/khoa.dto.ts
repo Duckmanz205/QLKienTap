@@ -62,6 +62,10 @@ export class CreateCourseDto {
   @IsNotEmpty({ message: 'Tên khoa không được để trống' })
   @Length(1, 200)
   ten_khoa: string;
+
+  @IsOptional()
+  @IsInt()
+  nam_nhap_hoc?: number;
 }
 
 export class CreateFactoryDto {
@@ -142,6 +146,27 @@ export class CreateCampaignDto {
   @IsString()
   @IsIn(['Nhap', 'DangTrienKhai', 'DaKetThuc', 'DaKhoa', 'DaHuy'])
   trang_thai?: string;
+}
+
+export class UpdateCampaignDto {
+  @IsOptional()
+  @IsString()
+  ten_dot?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  hoc_ky_id?: number;
+
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  ngay_bat_dau?: Date;
+
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  ngay_ket_thuc?: Date;
 }
 
 export class CreateScheduleDto {
@@ -526,12 +551,19 @@ export class CreateStudentDto {
   @IsOptional()
   @IsInt()
   khoa_id?: number;
+
+  @IsOptional()
+  @IsString()
+  ten_khoa?: string;
 }
 
 export class UpdateStudentDto {
+  @IsOptional() @IsString() mssv?: string;
+  @IsOptional() @IsString() ho_ten?: string;
   @IsOptional() @IsString() email?: string;
   @IsOptional() @IsString() sdt?: string;
   @IsOptional() @IsString() ten_lop?: string;
+  @IsOptional() @IsString() ten_khoa?: string;
 }
 
 export class GetAccountsQueryDto {
@@ -583,6 +615,8 @@ export class CreateLecturerDto {
 }
 
 export class UpdateLecturerDto {
+  @IsOptional() @IsString() ma_gv?: string;
+  @IsOptional() @IsString() ho_ten?: string;
   @IsOptional() @IsString() email?: string;
   @IsOptional() @IsString() sdt?: string;
   @IsOptional() @IsInt() so_sv_toi_da_huong_dan?: number;
