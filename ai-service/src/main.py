@@ -61,45 +61,23 @@ def extract_sequential_elements(pdf_bytes: bytes) -> list:
 
     for page_num in range(len(doc)):
         page = doc[page_num]
-        page_elements = []
-
-        text_blocks = page.get_text("blocks")
-        for x0, y0, x1, y1, text, block_no, block_type in text_blocks:
-            if block_type == 0 and text.strip():
-                page_elements.append({
-                    "type": "machine_text",
-                    "content": text.strip(),
-                    "y_coord": y0,
-                    "x_coord": x0
-                })
-
-        dict_blocks = page.get_text("dict")["blocks"]
-        for block in dict_blocks:
-            if block["type"] == 1:
-                try:
-                    bbox = block["bbox"]
-                    image_bytes = block["image"]
-                    pil_img = Image.open(io.BytesIO(image_bytes))
-
-                    if pil_img.mode in ('RGBA', 'LA') or (pil_img.mode == 'P' and 'transparency' in pil_img.info):
-                        background = Image.new('RGB', pil_img.size, (255, 255, 255))
-                        background.paste(pil_img, mask=pil_img.convert('RGBA').split()[3])
-                        pil_img = background
-                    else:
-                        pil_img = pil_img.convert("RGB")
-
-                    if pil_img.width > 30 and pil_img.height > 30:
-                        page_elements.append({
-                            "type": "handwritten_image",
-                            "content": pil_img,
-                            "y_coord": bbox[1],
-                            "x_coord": bbox[0]
-                        })
-                except Exception:
-                    pass
-
-        page_elements.sort(key=lambda e: (e["y_coord"], e["x_coord"]))
-        sequential_elements.extend(page_elements)
+        
+        # RENDER TOÀN BỘ TRANG THÀNH ẢNH BẮT BUỘC:
+        # Điều này đảm bảo toàn bộ layout, text chìm, và bảng biểu trên trang đều được xử lý chính xác bởi Qwen-VL
+        pix = page.get_pixmap(dpi=150)
+        mode = "RGBA" if pix.alpha else "RGB"
+        pil_img = Image.frombytes(mode, [pix.width, pix.height], pix.samples)
+        if mode == "RGBA":
+            background = Image.new('RGB', pil_img.size, (255, 255, 255))
+            background.paste(pil_img, mask=pil_img.split()[3])
+            pil_img = background
+            
+        sequential_elements.append({
+            "type": "handwritten_image",
+            "content": pil_img,
+            "y_coord": 0,
+            "x_coord": 0
+        })
 
     return sequential_elements
 

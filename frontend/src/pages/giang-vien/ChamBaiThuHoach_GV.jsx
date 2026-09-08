@@ -25,6 +25,11 @@ export default function ChamBaiThuHoach_GV() {
   const [comments, setComments] = useState('');
   const [zoomLevel, setZoomLevel] = useState(100);
 
+  // New states for UI interactions
+  const [isTeacherCommentExpanded, setIsTeacherCommentExpanded] = useState(false);
+  const [expandedAiFrame, setExpandedAiFrame] = useState(null); // 'hinh_thuc', 'quy_trinh', 'vsattp'
+  const [ocrZoomLevel, setOcrZoomLevel] = useState(100);
+
   // STATE: Quản lý đoạn text OCR để giáo viên có thể chỉnh sửa/mồi dữ liệu test
   const [editableOcrText, setEditableOcrText] = useState('');
 
@@ -240,6 +245,11 @@ export default function ChamBaiThuHoach_GV() {
     </div>
   );
 
+  // STATE: Tabs for Left Pane
+  const [activeTab, setActiveTab] = useState('pdf');
+
+  // ... (giữ nguyên các đoạn code từ useEffect đến hết renderReportList, chỉ thay đổi renderGradingView)
+  
   const renderGradingView = () => {
     const sv = selectedReport.phieuDangKy?.sinhVien || {};
     const nhaMay = selectedReport.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Chuyến đi';
@@ -248,241 +258,290 @@ export default function ChamBaiThuHoach_GV() {
       <div className="h-[calc(100vh-80px)] flex flex-col animate-in fade-in zoom-in-95 duration-300 -m-6">
         
         {/* Top Breadcrumb Bar */}
-        <div className="h-14 bg-white border-b border-[#E7E0C4] flex items-center justify-between px-6 shrink-0 z-10">
+        <div className="h-14 bg-white border-b border-[#E7E0C4] flex items-center justify-between px-6 shrink-0 z-10 shadow-sm">
           <div className="flex items-center gap-2 text-sm font-bold text-slate-600">
-            <button onClick={() => setSelectedReport(null)} className="hover:text-[#407F3E] transition-colors">
-              Bài thu hoạch
+            <button onClick={() => setSelectedReport(null)} className="hover:text-[#407F3E] transition-colors flex items-center gap-1">
+              <ArrowLeft className="w-4 h-4" /> Quay lại
             </button>
+            <span className="text-slate-300">|</span>
+            <span className="text-slate-500">Bài thu hoạch</span>
             <ChevronRight className="w-4 h-4 text-slate-400" />
             <span className="text-[#407F3E]">{nhaMay}</span>
           </div>
+          <div className="flex items-center gap-3">
+             <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-[#E7E0C4] flex items-center justify-center text-[#407F3E] font-bold text-xs">{sv.ho_ten?.charAt(0) || 'S'}</div>
+                <div>
+                   <div className="text-xs font-bold text-slate-800">{sv.ho_ten}</div>
+                   <div className="text-[10px] text-slate-500">MSSV: {sv.mssv}</div>
+                </div>
+             </div>
+          </div>
         </div>
 
-        <div className="flex-1 flex overflow-hidden bg-[#E7E0C4]/20">
+        <div className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-slate-50">
           
-          {/* Left Side: Document Viewer & OCR Editor */}
-          <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar relative space-y-4 p-4">
-            
-            {/* PDF Toolbar */}
-            <div className="bg-white/80 backdrop-blur-sm border border-[#E7E0C4] rounded-xl flex items-center justify-between p-2 shrink-0 shadow-sm z-10 sticky top-0">
-              <div className="flex items-center gap-3 text-slate-600">
-                <button 
-                  onClick={() => setZoomLevel(prev => Math.max(50, prev - 10))}
-                  className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                >
-                  <ZoomOut className="w-4 h-4" />
-                </button>
-                <span className="text-xs font-bold w-10 text-center">{zoomLevel}%</span>
-                <button 
-                  onClick={() => setZoomLevel(prev => Math.min(200, prev + 10))}
-                  className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                >
-                  <ZoomIn className="w-4 h-4" />
-                </button>
-              </div>
-              <div className="flex items-center gap-4 text-xs font-bold text-slate-600">
-                <span>Trang 1 / 1</span>
-                <button className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"><Download className="w-4 h-4" /></button>
-              </div>
+          {/* CỘT 1: BẢN GỐC PDF */}
+          <div className="flex-1 flex flex-col overflow-hidden relative border-r border-[#E7E0C4] bg-[#E7E0C4]/10 min-w-[300px]">
+            <div className="bg-white border-b border-[#E7E0C4] px-4 py-3 flex items-center gap-2 shrink-0 shadow-sm z-10">
+              <FileText className="w-5 h-5 text-[#407F3E]" />
+              <span className="font-bold text-slate-700 text-sm">Tài liệu Báo cáo gốc</span>
             </div>
 
-            {/* PDF Canvas (Simulated) */}
-            <div className="flex justify-center">
-              <div 
-                className="bg-white w-full max-w-[700px] h-fit shadow-md text-slate-800 p-8 relative rounded-xl border border-slate-200"
-                style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center', transition: 'transform 0.15s ease' }}
-              >
-                <div className="text-center mb-6">
-                  <h3 className="font-bold text-xs uppercase tracking-widest mb-1">TRƯỜNG ĐẠI HỌC CÔNG THƯƠNG TP.HCM</h3>
-                  <p className="font-bold text-xs uppercase tracking-widest">KHOA CÔNG NGHỆ THỰC PHẨM</p>
-                  <div className="w-12 h-[1px] bg-slate-300 mx-auto my-4"></div>
-                  <h1 className="text-lg font-black uppercase tracking-wider mb-2">BÁO CÁO THU HOẠCH KIẾN TẬP</h1>
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+              <div className="flex flex-col items-center h-full">
+                {/* PDF Toolbar */}
+                <div className="bg-white border border-[#E7E0C4] rounded-xl flex items-center justify-between p-2 shadow-sm w-full max-w-[800px] mb-4 shrink-0">
+                  <div className="flex items-center gap-3 text-slate-600">
+                    <button onClick={() => setZoomLevel(prev => Math.max(50, prev - 10))} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"><ZoomOut className="w-4 h-4" /></button>
+                    <span className="text-xs font-bold w-12 text-center bg-slate-50 py-1 rounded">{zoomLevel}%</span>
+                    <button onClick={() => setZoomLevel(prev => Math.min(200, prev + 10))} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"><ZoomIn className="w-4 h-4" /></button>
+                  </div>
+                  <div className="flex items-center gap-4 text-xs font-bold text-slate-600">
+                    <span>Trang 1 / 14</span>
+                    <button className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"><Download className="w-4 h-4" /></button>
+                  </div>
                 </div>
-                <div className="space-y-4 max-w-sm mx-auto mb-8 font-medium text-xs">
-                  <div className="flex"><span className="w-32 font-bold">Sinh viên:</span><span>{sv.ho_ten}</span></div>
-                  <div className="flex"><span className="w-32 font-bold">MSSV:</span><span>{sv.mssv}</span></div>
-                </div>
-                <div className="text-justify text-xs leading-relaxed whitespace-pre-wrap">
-                  {selectedReport.file_url_bao_cao 
-                    ? `[Hệ thống sẽ hiển thị file PDF thực tế ở đây: ${selectedReport.file_url_bao_cao}]\n\n(Nội dung mô phỏng bài thu hoạch...)` 
-                    : '(Không tìm thấy nội dung bài thu hoạch)'}
-                </div>
-              </div>
-            </div>
 
-            {/* OCR Textarea */}
-            <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] flex flex-col mt-6 max-w-[700px] mx-auto w-full">
-              <div className="bg-slate-800 text-white px-4 py-2 flex items-center justify-between text-xs font-semibold rounded-t-xl">
-                <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-[#89B449]" />
-                  <span className="uppercase tracking-wider">Trình mồi dữ liệu OCR (Dùng để Test AI)</span>
-                </div>
-              </div>
-              <textarea
-                value={editableOcrText}
-                onChange={(e) => setEditableOcrText(e.target.value)}
-                placeholder="Dán nội dung báo cáo của sinh viên vào đây để mô phỏng dữ liệu OCR..."
-                className="p-4 bg-slate-50 overflow-y-auto font-mono text-xs leading-relaxed text-slate-700 whitespace-pre-wrap w-full h-[200px] resize-none focus:outline-none focus:bg-white rounded-b-xl border-t-0"
-              />
-            </div>
-            
-          </div>
-
-          {/* Right Side: Grading Sidebar */}
-          <div className="w-full md:w-[350px] lg:w-[400px] bg-[#fdfcf8] border-l border-[#E7E0C4] flex flex-col shrink-0 shadow-[-4px_0_15px_-3px_rgba(0,0,0,0.05)] z-20 overflow-y-auto custom-scrollbar p-5 space-y-5">
-            
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-750 p-3 rounded-xl text-xs font-bold flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 text-red-650 shrink-0 mt-0.5" />
-                <span>{error}</span>
-              </div>
-            )}
-
-            {/* Student Info Card */}
-            <div className="bg-white rounded-xl p-4 border border-[#E7E0C4] shadow-sm flex items-start gap-3">
-              <div className="w-12 h-12 rounded-full bg-[#E7E0C4]/30 text-[#407F3E] font-bold border border-[#E7E0C4] flex items-center justify-center shrink-0 text-lg">
-                {sv.ho_ten?.charAt(0) || 'S'}
-              </div>
-              <div>
-                <h3 className="font-bold text-slate-800 text-sm leading-tight mb-1">{sv.ho_ten}</h3>
-                <p className="text-[11px] font-medium text-slate-500 mb-1">MSSV: {sv.mssv}</p>
-                <p className="text-[11px] font-medium text-[#407F3E] flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3" /> {nhaMay}
-                </p>
-              </div>
-            </div>
-
-            {/* AI Suggestion Card (Active) */}
-            <div className="bg-gradient-to-br from-[#89B449]/10 to-[#407F3E]/10 rounded-xl p-5 border border-[#89B449]/30 shadow-sm relative overflow-hidden">
-              <div className="flex items-center gap-2 mb-3 relative z-10">
-                <Sparkles className="w-4 h-4 text-[#407F3E]" />
-                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Hội Đồng AI Chấm Điểm</h4>
-              </div>
-
-              {isAIGrading ? (
-                <div className="flex flex-col items-center justify-center py-4 relative z-10">
-                  <Loader2 className="w-6 h-6 animate-spin text-[#407F3E] mb-2" />
-                  <p className="text-[10px] font-bold text-[#407F3E]">Đang phân tích...</p>
-                </div>
-              ) : !aiResult ? (
-                <div className="space-y-3 relative z-10">
-                  <p className="text-[#407F3E] text-xs font-medium">Sử dụng AI để đối chiếu Rubric tự động.</p>
-                  <button
-                    type="button"
-                    onClick={handleAIGrading}
-                    className="w-full py-2 bg-[#407F3E] hover:bg-[#346832] text-white rounded-lg text-xs font-bold shadow transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                {/* PDF Canvas (Simulated) */}
+                <div className="flex justify-center w-full max-w-[800px] flex-1 pb-10">
+                  <div 
+                    className="bg-white w-full h-fit shadow-md text-slate-800 p-10 relative rounded-xl border border-slate-200 min-h-[800px]"
+                    style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center', transition: 'transform 0.15s ease' }}
                   >
-                    <Bot className="w-3.5 h-3.5" /> Kích hoạt AI
-                  </button>
-                </div>
-              ) : (
-                <div className="relative z-10">
-                  <div className="flex items-baseline justify-between mb-2">
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-3xl font-black text-[#407F3E] leading-none">{aiResult.diem_bao_cao_cuoi_cung.toFixed(1)}</span>
-                      <span className="text-sm font-bold text-[#407F3E]/70">/ 10</span>
+                    <div className="text-center mb-8">
+                      <h3 className="font-bold text-sm uppercase tracking-widest mb-1 text-slate-600">TRƯỜNG ĐẠI HỌC CÔNG THƯƠNG TP.HCM</h3>
+                      <p className="font-bold text-sm uppercase tracking-widest text-slate-600">KHOA CÔNG NGHỆ THỰC PHẨM</p>
+                      <div className="w-16 h-[2px] bg-slate-300 mx-auto my-5"></div>
+                      <h1 className="text-xl font-black uppercase tracking-wider mb-2 text-[#407F3E]">BÁO CÁO THU HOẠCH KIẾN TẬP</h1>
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleAIGrading}
-                      className="px-2 py-1 bg-white hover:bg-slate-50 text-[#407F3E] rounded text-[10px] font-bold uppercase transition-colors flex items-center gap-1 shadow-sm border border-[#E7E0C4]"
-                    >
-                      <RefreshCw className="w-3 h-3" /> Thử lại
-                    </button>
-                  </div>
-                  
-                  {/* Mini Rubric Accordion / List */}
-                  <div className="space-y-2 mt-3 pt-3 border-t border-[#89B449]/20">
-                    <div className="text-[10px]">
-                      <div className="flex justify-between font-bold text-[#407F3E]">
-                        <span>Hình thức:</span>
-                        <span>{aiResult.hinh_thuc_tong_quan?.diem_hinh_thuc}/10 đ</span>
-                      </div>
-                      <p className="text-slate-600 line-clamp-1 italic">{aiResult.hinh_thuc_tong_quan?.ly_do_hinh_thuc}</p>
+                    <div className="space-y-4 max-w-md mx-auto mb-10 font-bold text-sm border-2 border-[#407F3E] p-6 rounded-xl bg-[#407F3E]/5">
+                      <div className="flex justify-between border-b border-[#407F3E]/20 pb-2"><span className="text-slate-500">Sinh viên thực hiện:</span><span className="text-slate-800">{sv.ho_ten}</span></div>
+                      <div className="flex justify-between border-b border-[#407F3E]/20 pb-2"><span className="text-slate-500">Mã số sinh viên:</span><span className="text-slate-800">{sv.mssv}</span></div>
+                      <div className="flex justify-between pb-2"><span className="text-slate-500">Cơ sở kiến tập:</span><span className="text-slate-800 text-right w-1/2 line-clamp-2">{nhaMay}</span></div>
                     </div>
-                    <div className="text-[10px]">
-                      <div className="flex justify-between font-bold text-[#407F3E]">
-                        <span>Quy trình:</span>
-                        <span>{aiResult.quy_trinh_cong_nghe?.diem_quy_trinh}/10 đ</span>
-                      </div>
-                      <p className="text-slate-600 line-clamp-1 italic">{aiResult.quy_trinh_cong_nghe?.ly_do_quy_trinh}</p>
-                    </div>
-                    <div className="text-[10px]">
-                      <div className="flex justify-between font-bold text-[#407F3E]">
-                        <span>VSATTP:</span>
-                        <span>{aiResult.vsattp?.diem_vsattp}/10 đ</span>
-                      </div>
-                      <p className="text-slate-600 line-clamp-1 italic">{aiResult.vsattp?.ly_do_vsattp}</p>
+                    <div className="text-justify text-sm leading-relaxed whitespace-pre-wrap text-slate-500 p-8 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 flex items-center justify-center min-h-[300px]">
+                      {selectedReport.file_url_bao_cao 
+                        ? `Hệ thống sẽ hiển thị file PDF thực tế ở đây: ${selectedReport.file_url_bao_cao}` 
+                        : '(Mô phỏng: Tại đây sẽ hiển thị iframe của trình xem PDF)'}
                     </div>
                   </div>
                 </div>
-              )}
+              </div>
             </div>
-
-            {/* Grading Form */}
-            <form onSubmit={handleSaveGrade} className="bg-white rounded-xl p-5 border border-[#E7E0C4] shadow-sm flex-1">
-              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-5 flex items-center gap-2">
-                <Edit3Icon className="w-4 h-4 text-[#407F3E]" /> Đánh giá & Chấm điểm
-              </h4>
-              
-              <div className="space-y-5">
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-wider">
-                    Điểm GVHD <span className="text-[#E68A8C]">*</span>
-                  </label>
-                  <div className="relative w-28">
-                    <input 
-                      type="number" min="0" max="10" step="0.1" 
-                      value={score}
-                      onChange={(e) => setScore(e.target.value)}
-                      placeholder="--"
-                      required
-                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-lg focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] font-black text-[#407F3E] transition-all text-center shadow-sm"
-                    />
-                    <span className="absolute -right-8 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-sm">/ 10</span>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider">
-                      Nhận xét chi tiết
-                    </label>
-                    <button 
-                      type="button" 
-                      onClick={handleInsertTemplate}
-                      className="text-[10px] font-bold text-[#407F3E] bg-[#89B449]/10 px-2 py-0.5 rounded flex items-center gap-1 cursor-pointer hover:bg-[#89B449]/20 transition-colors"
-                    >
-                      <Sparkles className="w-3 h-3" /> Chèn mẫu
-                    </button>
-                  </div>
-                  <textarea 
-                    rows={6}
-                    value={comments}
-                    onChange={(e) => setComments(e.target.value)}
-                    placeholder="Nhận xét về nội dung, hình thức và tính thực tiễn của bài thu hoạch..."
-                    className="w-full px-4 py-3 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-700 shadow-sm resize-none custom-scrollbar"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-8 space-y-3">
-                <button 
-                  type="submit"
-                  disabled={loading}
-                  className="w-full flex items-center justify-center gap-2 py-3 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-lg text-sm font-bold shadow-md hover:shadow-lg transition-all cursor-pointer disabled:opacity-50"
-                >
-                  <Save className="w-4 h-4" /> Lưu điểm
-                </button>
-                
-                <button type="button" className="w-full flex items-center justify-center gap-2 py-3 bg-white border border-[#407F3E] text-[#407F3E] hover:bg-[#407F3E]/5 rounded-lg text-sm font-bold transition-all cursor-pointer">
-                  <MessageSquareWarning className="w-4 h-4" /> Yêu cầu bổ sung
-                </button>
-              </div>
-
-            </form>
-
           </div>
+
+          {/* CỘT 2: DỮ LIỆU OCR */}
+          <div className="flex-1 flex flex-col overflow-hidden relative border-r border-[#E7E0C4] bg-[#E7E0C4]/10 min-w-[300px]">
+            <div className="bg-white border-b border-[#E7E0C4] px-4 py-3 flex items-center gap-2 shrink-0 shadow-sm z-10">
+              <FileSpreadsheet className="w-5 h-5 text-[#407F3E]" />
+              <span className="font-bold text-slate-700 text-sm">Dữ liệu chữ đã quét (OCR)</span>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+              <div className="flex flex-col items-center h-full">
+                {/* OCR Toolbar */}
+                <div className="bg-white border border-[#E7E0C4] rounded-xl flex items-center justify-between p-2 shadow-sm w-full max-w-[800px] mb-4 shrink-0">
+                  <div className="flex items-center gap-3 text-slate-600">
+                    <button onClick={() => setOcrZoomLevel(prev => Math.max(50, prev - 10))} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"><ZoomOut className="w-4 h-4" /></button>
+                    <span className="text-xs font-bold w-12 text-center bg-slate-50 py-1 rounded">{ocrZoomLevel}%</span>
+                    <button onClick={() => setOcrZoomLevel(prev => Math.min(200, prev + 10))} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"><ZoomIn className="w-4 h-4" /></button>
+                  </div>
+                </div>
+
+                {/* OCR Editor (Simulating PDF page) */}
+                <div className="flex justify-center w-full max-w-[800px] flex-1 pb-10">
+                  <div 
+                    className="bg-white w-full shadow-md relative rounded-xl border border-slate-200 min-h-[800px] flex flex-col"
+                    style={{ transform: `scale(${ocrZoomLevel / 100})`, transformOrigin: 'top center', transition: 'transform 0.15s ease' }}
+                  >
+                    <textarea
+                      value={editableOcrText}
+                      onChange={(e) => setEditableOcrText(e.target.value)}
+                      placeholder="Dán hoặc chỉnh sửa nội dung OCR ở đây..."
+                      className="flex-1 w-full p-10 bg-transparent text-sm font-mono text-slate-700 resize-none focus:outline-none custom-scrollbar leading-relaxed"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* CỘT 3: TRỢ LÝ AI & CHẤM ĐIỂM */}
+          <div className="bg-white flex flex-col shrink-0 z-20 overflow-hidden shadow-[-5px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-[#E7E0C4] w-[320px] lg:w-[350px]">
+            <div className="flex-1 flex flex-col h-full overflow-hidden bg-white">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-slate-800 to-slate-700 px-4 py-3 flex items-center justify-between shrink-0 text-white shadow-sm z-10">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-[#DBD468]" />
+                  <span className="font-bold text-sm">Trợ lý AI & Chấm điểm</span>
+                </div>
+              </div>
+                
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-6">
+                  {/* Phần AI */}
+                  <div className="space-y-4">
+                    {error && (
+                      <div className="bg-red-50 border border-red-200 text-red-750 p-3 rounded-lg text-xs font-bold flex items-start gap-2 shrink-0">
+                        <AlertTriangle className="w-4 h-4 text-red-650 shrink-0 mt-0.5" />
+                        <span>{error}</span>
+                      </div>
+                    )}
+                    
+                    {!aiResult && !isAIGrading && (
+                      <button 
+                        onClick={handleAIGrading} 
+                        className="w-full py-3 bg-[#89B449] hover:bg-[#78a03c] text-white rounded-xl text-sm font-black shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
+                      >
+                        <Bot className="w-5 h-5"/> Kích hoạt AI Chấm Điểm
+                      </button>
+                    )}
+
+                    {isAIGrading && (
+                       <div className="flex flex-col items-center justify-center p-6 bg-slate-50 rounded-xl border border-slate-100">
+                         <div className="relative mb-3">
+                           <div className="w-10 h-10 border-4 border-[#89B449]/30 rounded-full"></div>
+                           <div className="w-10 h-10 border-4 border-[#407F3E] rounded-full border-t-transparent animate-spin absolute top-0 left-0"></div>
+                           <Sparkles className="w-4 h-4 text-[#89B449] absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
+                         </div>
+                         <p className="text-xs font-bold text-[#407F3E] uppercase tracking-widest">Đang phân tích...</p>
+                       </div>
+                    )}
+
+                    {aiResult && !isAIGrading && (
+                      <div className="flex flex-col animate-in fade-in duration-500 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        <div className="flex justify-between items-center mb-3">
+                          <span className="font-bold text-slate-700 text-sm">Kết quả AI phân tích</span>
+                          <button onClick={handleAIGrading} className="px-2 py-1 bg-white border border-slate-200 hover:bg-slate-100 rounded text-xs font-bold flex items-center gap-1 transition-colors text-slate-600">
+                            <RefreshCw className="w-3 h-3"/> Chấm lại
+                          </button>
+                        </div>
+                        <p className="text-[10px] italic text-[#407F3E] font-medium mb-3 bg-[#89B449]/10 py-1.5 px-2 rounded border border-[#89B449]/30 text-center">💡 Nhấn vào khung bên dưới để xem chi tiết nhận xét</p>
+                        
+                        {/* Collapsible Frames */}
+                        <div className="space-y-2.5">
+                           {/* Hình thức */}
+                           <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm hover:border-blue-300 transition-colors cursor-pointer select-none" onClick={() => setExpandedAiFrame(prev => prev === 'hinh_thuc' ? null : 'hinh_thuc')}>
+                             <div className="flex justify-between items-center">
+                               <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-blue-500"></div> Hình thức & Tổng quan</span>
+                               <span className="font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded text-xs">{aiResult.hinh_thuc_tong_quan?.diem_hinh_thuc}/10</span>
+                             </div>
+                             {expandedAiFrame === 'hinh_thuc' && (
+                               <p className="text-xs text-slate-600 mt-2.5 pt-2.5 border-t border-slate-100 leading-relaxed">{aiResult.hinh_thuc_tong_quan?.ly_do_hinh_thuc}</p>
+                             )}
+                           </div>
+                           
+                           {/* Quy trình */}
+                           <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm hover:border-purple-300 transition-colors cursor-pointer select-none" onClick={() => setExpandedAiFrame(prev => prev === 'quy_trinh' ? null : 'quy_trinh')}>
+                             <div className="flex justify-between items-center">
+                               <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-purple-500"></div> Quy trình công nghệ</span>
+                               <span className="font-black text-purple-600 bg-purple-50 px-2 py-0.5 rounded text-xs">{aiResult.quy_trinh_cong_nghe?.diem_quy_trinh}/10</span>
+                             </div>
+                             {expandedAiFrame === 'quy_trinh' && (
+                               <p className="text-xs text-slate-600 mt-2.5 pt-2.5 border-t border-slate-100 leading-relaxed">{aiResult.quy_trinh_cong_nghe?.ly_do_quy_trinh}</p>
+                             )}
+                           </div>
+                           
+                           {/* VSATTP */}
+                           <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm hover:border-orange-300 transition-colors cursor-pointer select-none" onClick={() => setExpandedAiFrame(prev => prev === 'vsattp' ? null : 'vsattp')}>
+                             <div className="flex justify-between items-center">
+                               <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-orange-500"></div> Đảm bảo VSATTP</span>
+                               <span className="font-black text-orange-600 bg-orange-50 px-2 py-0.5 rounded text-xs">{aiResult.vsattp?.diem_vsattp}/10</span>
+                             </div>
+                             {expandedAiFrame === 'vsattp' && (
+                               <p className="text-xs text-slate-600 mt-2.5 pt-2.5 border-t border-slate-100 leading-relaxed">{aiResult.vsattp?.ly_do_vsattp}</p>
+                             )}
+                           </div>
+                        </div>
+
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            const newComments = `[ĐÁNH GIÁ TỪ TRỢ LÝ AI]
+
+🔹 Hình thức & Tổng quan (${aiResult.hinh_thuc_tong_quan?.diem_hinh_thuc}/10):
+${aiResult.hinh_thuc_tong_quan?.ly_do_hinh_thuc}
+
+🔹 Quy trình công nghệ (${aiResult.quy_trinh_cong_nghe?.diem_quy_trinh}/10):
+${aiResult.quy_trinh_cong_nghe?.ly_do_quy_trinh}
+
+🔹 Đảm bảo VSATTP (${aiResult.vsattp?.diem_vsattp}/10):
+${aiResult.vsattp?.ly_do_vsattp}
+`;
+                            setComments(prev => prev ? prev + '\n\n' + newComments : newComments);
+                            setScore(aiResult.diem_bao_cao_cuoi_cung.toString());
+                          }}
+                          className="mt-4 w-full py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2 shrink-0"
+                        >
+                          <CheckCircle className="w-4 h-4" /> Dùng Điểm ({aiResult.diem_bao_cao_cuoi_cung.toFixed(1)}) & Nhận Xét
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <hr className="border-slate-200" />
+
+                  {/* Form Chấm điểm */}
+                  <form id="grading-form" onSubmit={handleSaveGrade} className="space-y-4">
+                     <div className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-200 shadow-sm">
+                       <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Điểm số (0-10) <span className="text-red-500">*</span></label>
+                       <input 
+                         type="number" min="0" max="10" step="0.1" 
+                         value={score}
+                         onChange={(e) => setScore(e.target.value)}
+                         placeholder="0.0"
+                         required
+                         className="w-20 px-2 py-1.5 bg-white border-2 border-slate-300 rounded-lg text-lg focus:outline-none focus:border-[#407F3E] focus:ring-4 focus:ring-[#407F3E]/20 font-black text-[#407F3E] transition-all text-center shadow-inner"
+                       />
+                     </div>
+
+                     <div>
+                       {!isTeacherCommentExpanded ? (
+                         <div 
+                           onClick={() => setIsTeacherCommentExpanded(true)}
+                           className="w-full px-4 py-3 bg-[#DBD468]/10 border-2 border-[#DBD468]/50 border-dashed rounded-xl text-sm font-medium hover:bg-[#DBD468]/20 transition-colors cursor-pointer text-center flex items-center justify-center gap-2"
+                         >
+                           <MessageSquareWarning className="w-4 h-4 text-[#89B449]" />
+                           <span className="text-[#407F3E] font-bold">Nhấn vào đây để thêm nhận xét</span>
+                         </div>
+                       ) : (
+                         <div className="animate-in fade-in zoom-in-95 duration-200">
+                           <div className="flex items-center justify-between mb-2">
+                             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Nhận xét của GV</label>
+                             <div className="flex items-center gap-2">
+                               <button type="button" onClick={handleInsertTemplate} className="text-[10px] font-bold text-[#407F3E] bg-[#407F3E]/10 px-2 py-1 rounded hover:bg-[#407F3E]/20 transition-colors">+ Mẫu</button>
+                               <button type="button" onClick={() => setIsTeacherCommentExpanded(false)} className="text-slate-400 hover:text-red-500 transition-colors">
+                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                   <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                 </svg>
+                               </button>
+                             </div>
+                           </div>
+                           <textarea 
+                             value={comments}
+                             onChange={(e) => setComments(e.target.value)}
+                             placeholder="Nhập nhận xét chi tiết..."
+                             rows={6}
+                             className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:bg-white focus:ring-4 focus:ring-[#407F3E]/10 text-slate-700 resize-none custom-scrollbar leading-relaxed shadow-inner"
+                           />
+                         </div>
+                       )}
+                     </div>
+                  </form>
+                </div>
+
+                {/* Footer Actions */}
+                <div className="p-4 border-t border-slate-200 bg-slate-50 shrink-0">
+                   <button 
+                     type="submit" form="grading-form" disabled={loading}
+                     className="w-full flex items-center justify-center gap-1.5 py-3 bg-[#407F3E] text-white hover:bg-[#346832] rounded-xl text-sm font-black shadow-md hover:shadow-lg transition-all cursor-pointer disabled:opacity-50"
+                   >
+                     <Save className="w-4 h-4 shrink-0" /> {loading ? 'Đang lưu...' : 'Lưu Điểm'}
+                   </button>
+                </div>
+              </div>
+          </div>
+
         </div>
       </div>
     );

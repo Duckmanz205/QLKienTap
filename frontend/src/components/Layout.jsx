@@ -35,6 +35,7 @@ export default function Layout() {
   const location = useLocation();
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState({
     'DANH MỤC HỆ THỐNG': true,
@@ -58,6 +59,14 @@ export default function Layout() {
       navigate('/login', { replace: true });
     }
   }, [session, navigate]);
+
+  useEffect(() => {
+    if (location.pathname === '/giang-vien/grading') {
+      setIsSidebarCollapsed(true);
+    } else {
+      setIsSidebarCollapsed(false);
+    }
+  }, [location.pathname]);
 
   if (!session) return null;
 
@@ -320,29 +329,44 @@ export default function Layout() {
     return (
       <div className="min-h-screen bg-[#f8faf1] flex font-sans">
         {/* Sidebar */}
-        <aside className="fixed left-0 top-0 h-screen w-[260px] bg-[#407F3E] text-white z-50 flex flex-col shadow-xl border-r border-[#2c6b2d]/10">
+        <aside className={`fixed left-0 top-0 h-screen bg-[#407F3E] text-white z-50 flex flex-col shadow-xl border-r border-[#2c6b2d]/10 transition-all duration-300 ${isSidebarCollapsed ? 'w-[80px]' : 'w-[260px]'}`}>
+          <button 
+            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            className="absolute -right-3 top-20 bg-white border border-[#407F3E] text-[#407F3E] rounded-full p-1 shadow-md hover:bg-slate-50 z-50"
+          >
+            <ChevronRight className={`w-3 h-3 transition-transform ${isSidebarCollapsed ? '' : 'rotate-180'}`} />
+          </button>
+          
           <div className="flex flex-col border-b border-white/10 bg-[#2c6b2d]/15">
             <div className="h-16 flex items-center justify-center px-4">
-              <img src="/huit-logo.png" alt="Logo HUIT" className="w-44 max-w-full h-auto object-contain brightness-0 invert opacity-95 shrink-0" />
+              <img src="/huit-logo.png" alt="Logo HUIT" className={`max-w-full h-auto object-contain brightness-0 invert opacity-95 shrink-0 transition-all ${isSidebarCollapsed ? 'w-10' : 'w-44'}`} />
             </div>
-            <div className="pb-3.5 px-4 flex flex-col items-center text-center gap-0.5">
-              <span className="font-extrabold text-[15px] leading-tight text-white uppercase tracking-wider block">
-                Quản lý kiến tập
-              </span>
-              <span className="text-[10px] text-[#e5ffdc]/70 font-semibold tracking-widest block uppercase">
-                HUIT — Giảng viên
-              </span>
-            </div>
+            {!isSidebarCollapsed && (
+              <div className="pb-3.5 px-4 flex flex-col items-center text-center gap-0.5">
+                <span className="font-extrabold text-[15px] leading-tight text-white uppercase tracking-wider block">
+                  Quản lý kiến tập
+                </span>
+                <span className="text-[10px] text-[#e5ffdc]/70 font-semibold tracking-widest block uppercase">
+                  HUIT — Giảng viên
+                </span>
+              </div>
+            )}
           </div>
 
-          <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-5 sidebar-scrollbar">
+          <nav className="flex-1 overflow-y-auto px-2 py-6 space-y-5 sidebar-scrollbar overflow-x-hidden">
             {gvCategories.map((cat) => {
               const items = gvMenuItems.filter((item) => item.category === cat);
+              if (items.length === 0) return null;
               return (
                 <div key={cat} className="space-y-1">
-                  <p className="px-4 text-[10px] font-bold tracking-widest uppercase text-[#e5ffdc]/50 mb-2">
-                    {cat}
-                  </p>
+                  {!isSidebarCollapsed && (
+                    <p className="px-4 text-[10px] font-bold tracking-widest uppercase text-[#e5ffdc]/50 mb-2 truncate">
+                      {cat}
+                    </p>
+                  )}
+                  {isSidebarCollapsed && (
+                     <div className="w-full h-px bg-white/10 my-2"></div>
+                  )}
                   {items.map((item) => {
                     const Icon = item.icon;
                     const isActive = location.pathname === item.to;
@@ -350,14 +374,15 @@ export default function Layout() {
                       <Link
                         key={item.to}
                         to={item.to}
-                        className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${isActive
+                        title={isSidebarCollapsed ? item.label : undefined}
+                        className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-4'} py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${isActive
                           ? 'bg-white text-[#407F3E] shadow-md font-bold scale-[1.02]'
                           : 'text-white/80 hover:bg-[#89B449]/25 hover:text-white'
                           }`}
                       >
                         <div className="flex items-center gap-3">
-                          <Icon className="w-[18px] h-[18px]" />
-                          <span>{item.label}</span>
+                          <Icon className="w-[18px] h-[18px] shrink-0" />
+                          {!isSidebarCollapsed && <span className="truncate">{item.label}</span>}
                         </div>
                       </Link>
                     );
@@ -367,30 +392,33 @@ export default function Layout() {
             })}
           </nav>
 
-          <div className="p-4 border-t border-white/10 bg-[#2c6b2d]/10 flex flex-col gap-4">
-            <div className="flex items-center gap-3 px-2">
-              <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center border-2 border-white/20 font-bold text-white">
+          <div className={`p-4 border-t border-white/10 bg-[#2c6b2d]/10 flex flex-col gap-4 ${isSidebarCollapsed ? 'items-center' : ''}`}>
+            <div className={`flex items-center gap-3 ${isSidebarCollapsed ? 'px-0' : 'px-2'}`}>
+              <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center border-2 border-white/20 font-bold text-white shrink-0">
                 {fullName.charAt(0).toUpperCase()}
               </div>
-              <div className="flex flex-col min-w-0">
-                <span className="text-white font-bold text-sm truncate">{fullName}</span>
-                <span className="text-[#e5ffdc]/60 text-xs">Giảng viên</span>
-              </div>
+              {!isSidebarCollapsed && (
+                <div className="flex flex-col min-w-0">
+                  <span className="text-white font-bold text-sm truncate">{fullName}</span>
+                  <span className="text-[#e5ffdc]/60 text-xs">Giảng viên</span>
+                </div>
+              )}
             </div>
             <button
               onClick={confirmLogout}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 text-red-300 hover:bg-red-500 hover:text-white transition-all text-sm font-bold border border-red-500/20 cursor-pointer"
+              title={isSidebarCollapsed ? "Đăng xuất" : undefined}
+              className={`flex items-center justify-center gap-2 py-2 rounded-xl bg-red-500/10 text-red-300 hover:bg-red-500 hover:text-white transition-all text-sm font-bold border border-red-500/20 cursor-pointer ${isSidebarCollapsed ? 'w-10 px-0' : 'w-full px-4'}`}
             >
-              <LogOut className="w-4 h-4" />
-              <span>Đăng xuất</span>
+              <LogOut className="w-4 h-4 shrink-0" />
+              {!isSidebarCollapsed && <span>Đăng xuất</span>}
             </button>
           </div>
         </aside>
 
         {/* Content Area */}
-        <div className="flex-1 flex flex-col pl-[260px] min-w-0">
+        <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${isSidebarCollapsed ? 'pl-[80px]' : 'pl-[260px]'}`}>
           {/* Header */}
-          <header className="fixed top-0 left-[260px] right-0 h-16 bg-white border-b border-surface-variant/60 z-40 flex items-center justify-between px-6 shadow-sm">
+          <header className={`fixed top-0 right-0 h-16 bg-white border-b border-surface-variant/60 z-40 flex items-center justify-between px-6 shadow-sm transition-all duration-300 ${isSidebarCollapsed ? 'left-[80px]' : 'left-[260px]'}`}>
             <div className="flex items-center gap-2 text-on-surface-variant font-medium text-sm truncate">
               <Link to="/giang-vien" className="hover:text-primary transition-colors flex items-center gap-2 font-semibold shrink-0">
                 <Home className="w-4 h-4" />
