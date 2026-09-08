@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Link, NavLink, useNavigate, Outlet, useLocation } from 'react-router-dom';
-import { 
-  Home, 
-  Compass, 
-  Calendar, 
-  UploadCloud, 
-  GraduationCap, 
-  CreditCard, 
-  RotateCcw, 
-  Bell, 
-  LogOut, 
+import {
+  Home,
+  Compass,
+  Calendar,
+  UploadCloud,
+  GraduationCap,
+  CreditCard,
+  RotateCcw,
+  Bell,
+  LogOut,
   BookOpen,
   ChevronRight,
   ChevronDown,
@@ -34,6 +34,8 @@ export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState({
     'DANH MỤC HỆ THỐNG': true,
     'KẾ HOẠCH KIẾN TẬP': true,
@@ -50,7 +52,7 @@ export default function Layout() {
   };
 
   const session = getValidSession();
-  
+
   useEffect(() => {
     if (!session) {
       navigate('/login', { replace: true });
@@ -65,28 +67,48 @@ export default function Layout() {
 
   // Poll notifications for student count badge
   useEffect(() => {
-    if (vai_tro === 'SinhVien' && details?.id) {
+    if (vai_tro === 'SinhVien' && details?.id && !phai_doi_mat_khau) {
       sinhVienApi.getNotifications(details.id).then(res => {
         const unread = res.data.filter(n => !n.da_doc).length;
         setUnreadNotificationsCount(unread);
       }).catch(err => console.error(err));
     }
-  }, [vai_tro, details]);
+  }, [vai_tro, details, phai_doi_mat_khau]);
 
-  const handleLogout = () => {
+  const confirmLogout = () => {
+    setShowLogoutModal(true);
+  };
+
+  const executeLogout = () => {
     clearSession();
     navigate('/login', { replace: true });
   };
 
+  const renderLogoutModal = () => {
+    if (!showLogoutModal) return null;
+    return (
+      <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center">
+        <div className="bg-white rounded-xl p-6 w-[400px] max-w-[90vw] shadow-xl">
+          <h3 className="text-lg font-bold text-slate-800 mb-2">Xác nhận đăng xuất</h3>
+          <p className="text-slate-600 mb-6">Bạn có chắc chắn muốn đăng xuất khỏi hệ thống?</p>
+          <div className="flex justify-end gap-3">
+            <button onClick={() => setShowLogoutModal(false)} className="px-4 py-2 rounded text-slate-600 hover:bg-slate-100 font-semibold transition-colors">Hủy</button>
+            <button onClick={executeLogout} className="px-4 py-2 rounded bg-red-500 text-white hover:bg-red-600 font-semibold transition-colors">Đăng xuất</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   if (phai_doi_mat_khau) {
     return (
-      <ForceChangePasswordView 
+      <ForceChangePasswordView
         user={user}
         onPasswordChanged={(updatedUser) => {
           localStorage.setItem('user', JSON.stringify({ user: updatedUser, token }));
           window.location.reload();
         }}
-        onLogout={handleLogout}
+        onLogout={executeLogout}
       />
     );
   }
@@ -112,7 +134,8 @@ export default function Layout() {
     if (path === '/giang-vien/notifications') return 'Thông báo';
 
     if (path === '/khoa') return 'Trang chủ';
-    if (path === '/khoa/schedules') return 'Danh mục nền';
+    if (path === '/khoa/danh-muc-nen') return 'Danh mục nền';
+    if (path === '/khoa/lich-kien-tap') return 'Lịch kiến tập';
     if (path === '/khoa/students') return 'Quản lý Sinh viên';
     if (path === '/khoa/plans') return 'Đợt kiến tập';
     if (path === '/khoa/registrations') return 'Quản lý đăng ký';
@@ -120,11 +143,27 @@ export default function Layout() {
     if (path === '/khoa/leaders') return 'Phân công GV dẫn đoàn';
     if (path === '/khoa/notifications') return 'Thông báo';
     if (path === '/khoa/reports') return 'Báo cáo thống kê';
-    if (path === '/khoa/accounts') return 'Tài khoản người dùng';
+    if (path === '/qtv/accounts') return 'Tài khoản người dùng';
     if (path === '/khoa/fees') return 'Quản lý lệ phí';
     if (path === '/khoa/results') return 'Kết quả kiến tập';
     if (path === '/khoa/refund-approval') return 'Duyệt hoàn phí';
     if (path === '/khoa/visit-report') return 'Báo cáo tham quan';
+
+    if (path === '/clb') return 'Trang chủ';
+    if (path === '/clb/students') return 'Quản lý Sinh viên';
+    if (path === '/clb/lich-kien-tap') return 'Lịch kiến tập';
+    if (path === '/clb/registrations') return 'Quản lý đăng ký';
+    if (path === '/clb/supervisors') return 'Phân công GVHD';
+    if (path === '/clb/leaders') return 'Phân công GV dẫn đoàn';
+    if (path === '/clb/fees') return 'Quản lý lệ phí';
+    if (path === '/clb/refund-approval') return 'Duyệt hoàn phí';
+    if (path === '/clb/visit-report') return 'Báo cáo tham quan';
+    if (path === '/clb/factories') return 'Nhà máy';
+    if (path === '/clb/trips') return 'Chuyến tham quan';
+    if (path === '/clb/notifications') return 'Thông báo';
+    if (path === '/clb/reports') return 'Báo cáo thống kê';
+    if (path === '/clb/results') return 'Kết quả kiến tập';
+
     return 'IMS Portal';
   };
 
@@ -147,18 +186,21 @@ export default function Layout() {
       <div className="min-h-screen bg-[#f8faf1] flex font-sans">
         {/* Sidebar */}
         <aside className="fixed left-0 top-0 h-screen w-[260px] bg-[#407F3E] text-white z-50 flex flex-col shadow-xl border-r border-[#2c6b2d]/10">
-          <div className="p-5 flex flex-col gap-1.5 items-center border-b border-white/10 bg-[#2c6b2d]/15">
-            <div className="text-center">
-              <span className="font-extrabold text-[16px] leading-tight text-white uppercase tracking-wider block">
+          <div className="flex flex-col border-b border-white/10 bg-[#2c6b2d]/15">
+            <div className="h-16 flex items-center justify-center px-4">
+              <img src="/huit-logo.png" alt="Logo HUIT" className="w-44 max-w-full h-auto object-contain brightness-0 invert opacity-95 shrink-0" />
+            </div>
+            <div className="pb-3.5 px-4 flex flex-col items-center text-center gap-0.5">
+              <span className="font-extrabold text-[15px] leading-tight text-white uppercase tracking-wider block">
                 Quản lý kiến tập
               </span>
-              <span className="text-[11px] text-[#e5ffdc]/80 font-semibold tracking-widest block uppercase mt-0.5">
+              <span className="text-[10px] text-[#e5ffdc]/70 font-semibold tracking-widest block uppercase">
                 HUIT — Khoa CNTP
               </span>
             </div>
           </div>
 
-          <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-5">
+          <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-5 sidebar-scrollbar">
             {studentCategories.map((cat) => {
               const items = studentMenuItems.filter((item) => item.category === cat);
               return (
@@ -173,11 +215,10 @@ export default function Layout() {
                       <Link
                         key={item.to}
                         to={item.to}
-                        className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${
-                          isActive
-                            ? 'bg-white text-[#407F3E] shadow-md font-bold scale-[1.02]'
-                            : 'text-white/80 hover:bg-[#89B449]/25 hover:text-white'
-                        }`}
+                        className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${isActive
+                          ? 'bg-white text-[#407F3E] shadow-md font-bold scale-[1.02]'
+                          : 'text-white/80 hover:bg-[#89B449]/25 hover:text-white'
+                          }`}
                       >
                         <div className="flex items-center gap-3">
                           <Icon className="w-[18px] h-[18px]" />
@@ -206,8 +247,8 @@ export default function Layout() {
                 <span className="text-[#e5ffdc]/60 text-xs">Sinh viên</span>
               </div>
             </div>
-            <button 
-              onClick={handleLogout}
+            <button
+              onClick={confirmLogout}
               className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 text-red-300 hover:bg-red-500 hover:text-white transition-all text-sm font-bold border border-red-500/20 cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
@@ -220,21 +261,17 @@ export default function Layout() {
         <div className="flex-1 flex flex-col pl-[260px] min-w-0">
           {/* Header */}
           <header className="fixed top-0 left-[260px] right-0 h-16 bg-white border-b border-surface-variant/60 z-40 flex items-center justify-between px-6 shadow-sm">
-            <div className="flex items-center gap-4 min-w-0">
-              <img src="/huit-logo.png" alt="HUIT Logo" className="h-11 md:h-[46px] w-auto object-contain shrink-0 py-0.5" />
-              <div className="h-6 w-[1px] bg-slate-200 shrink-0"></div>
-              <div className="flex items-center gap-2 text-on-surface-variant font-medium text-sm truncate">
-                <Link to="/sinh-vien" className="hover:text-primary transition-colors flex items-center gap-1 font-semibold shrink-0">
-                  <Home className="w-4 h-4" />
-                  <span>IMS Portal</span>
-                </Link>
-                <ChevronRight className="w-3 h-3 text-outline/50 shrink-0" />
-                <span className="text-on-surface font-semibold truncate">{getActiveViewLabel()}</span>
-              </div>
+            <div className="flex items-center gap-2 text-on-surface-variant font-medium text-sm truncate">
+              <Link to="/sinh-vien" className="hover:text-primary transition-colors flex items-center gap-2 font-semibold shrink-0">
+                <Home className="w-4 h-4" />
+                <span>IMS Portal</span>
+              </Link>
+              <ChevronRight className="w-3 h-3 text-outline/50 shrink-0" />
+              <span className="text-on-surface font-semibold truncate">{getActiveViewLabel()}</span>
             </div>
 
             <div className="flex items-center gap-6">
-              <Link 
+              <Link
                 to="/sinh-vien/notifications"
                 className="relative p-2 text-on-surface-variant hover:bg-[#ecefe6] hover:text-primary rounded-full transition-all"
                 title="Thông báo"
@@ -261,6 +298,7 @@ export default function Layout() {
             <Outlet />
           </main>
         </div>
+        {renderLogoutModal()}
       </div>
     );
   }
@@ -283,18 +321,21 @@ export default function Layout() {
       <div className="min-h-screen bg-[#f8faf1] flex font-sans">
         {/* Sidebar */}
         <aside className="fixed left-0 top-0 h-screen w-[260px] bg-[#407F3E] text-white z-50 flex flex-col shadow-xl border-r border-[#2c6b2d]/10">
-          <div className="p-5 flex flex-col gap-1.5 items-center border-b border-white/10 bg-[#2c6b2d]/15">
-            <div className="text-center">
-              <span className="font-extrabold text-[16px] leading-tight text-white uppercase tracking-wider block">
+          <div className="flex flex-col border-b border-white/10 bg-[#2c6b2d]/15">
+            <div className="h-16 flex items-center justify-center px-4">
+              <img src="/huit-logo.png" alt="Logo HUIT" className="w-44 max-w-full h-auto object-contain brightness-0 invert opacity-95 shrink-0" />
+            </div>
+            <div className="pb-3.5 px-4 flex flex-col items-center text-center gap-0.5">
+              <span className="font-extrabold text-[15px] leading-tight text-white uppercase tracking-wider block">
                 Quản lý kiến tập
               </span>
-              <span className="text-[11px] text-[#e5ffdc]/80 font-semibold tracking-widest block uppercase mt-0.5">
+              <span className="text-[10px] text-[#e5ffdc]/70 font-semibold tracking-widest block uppercase">
                 HUIT — Giảng viên
               </span>
             </div>
           </div>
 
-          <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-5">
+          <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-5 sidebar-scrollbar">
             {gvCategories.map((cat) => {
               const items = gvMenuItems.filter((item) => item.category === cat);
               return (
@@ -309,11 +350,10 @@ export default function Layout() {
                       <Link
                         key={item.to}
                         to={item.to}
-                        className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${
-                          isActive
-                            ? 'bg-white text-[#407F3E] shadow-md font-bold scale-[1.02]'
-                            : 'text-white/80 hover:bg-[#89B449]/25 hover:text-white'
-                        }`}
+                        className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${isActive
+                          ? 'bg-white text-[#407F3E] shadow-md font-bold scale-[1.02]'
+                          : 'text-white/80 hover:bg-[#89B449]/25 hover:text-white'
+                          }`}
                       >
                         <div className="flex items-center gap-3">
                           <Icon className="w-[18px] h-[18px]" />
@@ -337,8 +377,8 @@ export default function Layout() {
                 <span className="text-[#e5ffdc]/60 text-xs">Giảng viên</span>
               </div>
             </div>
-            <button 
-              onClick={handleLogout}
+            <button
+              onClick={confirmLogout}
               className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 text-red-300 hover:bg-red-500 hover:text-white transition-all text-sm font-bold border border-red-500/20 cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
@@ -351,21 +391,17 @@ export default function Layout() {
         <div className="flex-1 flex flex-col pl-[260px] min-w-0">
           {/* Header */}
           <header className="fixed top-0 left-[260px] right-0 h-16 bg-white border-b border-surface-variant/60 z-40 flex items-center justify-between px-6 shadow-sm">
-            <div className="flex items-center gap-4 min-w-0">
-              <img src="/huit-logo.png" alt="HUIT Logo" className="h-11 md:h-[46px] w-auto object-contain shrink-0 py-0.5" />
-              <div className="h-6 w-[1px] bg-slate-200 shrink-0"></div>
-              <div className="flex items-center gap-2 text-on-surface-variant font-medium text-sm truncate">
-                <Link to="/giang-vien" className="hover:text-primary transition-colors flex items-center gap-1 font-semibold shrink-0">
-                  <Home className="w-4 h-4" />
-                  <span>IMS Portal</span>
-                </Link>
-                <ChevronRight className="w-3 h-3 text-outline/50 shrink-0" />
-                <span className="text-on-surface font-semibold truncate">{getActiveViewLabel()}</span>
-              </div>
+            <div className="flex items-center gap-2 text-on-surface-variant font-medium text-sm truncate">
+              <Link to="/giang-vien" className="hover:text-primary transition-colors flex items-center gap-2 font-semibold shrink-0">
+                <Home className="w-4 h-4" />
+                <span>IMS Portal</span>
+              </Link>
+              <ChevronRight className="w-3 h-3 text-outline/50 shrink-0" />
+              <span className="text-on-surface font-semibold truncate">{getActiveViewLabel()}</span>
             </div>
 
             <div className="flex items-center gap-6">
-              <Link 
+              <Link
                 to="/giang-vien/notifications"
                 className="relative p-2 text-on-surface-variant hover:bg-[#ecefe6] hover:text-primary rounded-full transition-all"
                 title="Thông báo"
@@ -389,37 +425,67 @@ export default function Layout() {
             <Outlet />
           </main>
         </div>
+        {renderLogoutModal()}
       </div>
     );
   }
 
-  // --- 3. KHOA/ADMIN SIDEBAR AND LAYOUT ---
-  const khoaMenuItems = [
-    { to: '/khoa', label: 'Trang chủ', icon: Home, category: 'TRANG CHỦ' },
-    // DANH MỤC HỆ THỐNG
-    { to: '/khoa/schedules', label: 'Danh mục nền', icon: Layers, category: 'DANH MỤC HỆ THỐNG' },
-    { to: '/khoa/students', label: 'Sinh viên', icon: Users, category: 'DANH MỤC HỆ THỐNG' },
-    { to: '/khoa/lecturers', label: 'Giảng viên', icon: User, category: 'DANH MỤC HỆ THỐNG' },
-    { to: '/khoa/factories', label: 'Nhà máy', icon: Compass, category: 'DANH MỤC HỆ THỐNG' },
-    { to: '/khoa/accounts', label: 'Tài khoản người dùng', icon: Key, category: 'DANH MỤC HỆ THỐNG' },
-    // KẾ HOẠCH KIẾN TẬP
-    { to: '/khoa/plans', label: 'Đợt kiến tập', icon: Calendar, category: 'KẾ HOẠCH KIẾN TẬP' },
-    { to: '/khoa/schedules', label: 'Lịch kiến tập', icon: Layers, category: 'KẾ HOẠCH KIẾN TẬP' },
-    { to: '/khoa/trips', label: 'Chuyến tham quan', icon: Compass, category: 'KẾ HOẠCH KIẾN TẬP' },
-    // ĐĂNG KÝ & PHÂN CÔNG
-    { to: '/khoa/registrations', label: 'Quản lý đăng ký', icon: FileCheck, category: 'ĐĂNG KÝ & PHÂN CÔNG' },
-    { to: '/khoa/supervisors', label: 'Phân công GVHD', icon: GraduationCap, category: 'ĐĂNG KÝ & PHÂN CÔNG' },
-    { to: '/khoa/leaders', label: 'Phân công GV dẫn đoàn', icon: UserCheck, category: 'ĐĂNG KÝ & PHÂN CÔNG' },
-    // ĐÁNH GIÁ & KẾT QUẢ
-    { to: '/khoa/boards', label: 'Hội đồng chấm báo cáo', icon: Presentation, category: 'ĐÁNH GIÁ & KẾT QUẢ' },
-    { to: '/khoa/results', label: 'Kết quả kiến tập', icon: Award, category: 'ĐÁNH GIÁ & KẾT QUẢ' },
-    // TÀI CHÍNH
-    { to: '/khoa/fees', label: 'Quản lý lệ phí', icon: CreditCard, category: 'TÀI CHÍNH' },
-    { to: '/khoa/refund-approval', label: 'Duyệt hoàn phí', icon: RotateCcw, category: 'TÀI CHÍNH' },
-    // Standalone top-levels below the groups
-    { to: '/khoa/notifications', label: 'Thông báo', icon: Bell, category: 'NONE', badge: true },
-    { to: '/khoa/reports', label: 'Báo cáo thống kê', icon: Activity, category: 'NONE' }
-  ];
+  // --- 3. KHOA & CLB & ADMIN SIDEBAR AND LAYOUT ---
+  const isAdmin = vai_tro === 'QuanTriVienHeThong';
+  const isKhoa = vai_tro === 'QuanLyKhoa' || vai_tro === 'Khoa';
+  const isClb = vai_tro === 'QuanLyCLB';
+  
+  const roleName = isAdmin ? 'Admin Hệ thống' : (isKhoa ? 'Quản lý Khoa' : 'Quản lý CLB');
+  const rolePrefix = isClb ? '/clb' : '/khoa';
+
+  let khoaMenuItems = [];
+
+  if (isAdmin) {
+    khoaMenuItems = [
+      { to: '/qtv/accounts', label: 'Tài khoản người dùng', icon: Key, category: 'DANH MỤC HỆ THỐNG' },
+    ];
+  } else if (isKhoa) {
+    khoaMenuItems = [
+      { to: '/khoa', label: 'Trang chủ', icon: Home, category: 'TRANG CHỦ' },
+      // DANH MỤC HỆ THỐNG
+      { to: '/khoa/danh-muc-nen', label: 'Danh mục nền', icon: Layers, category: 'DANH MỤC HỆ THỐNG' },
+      { to: '/khoa/students', label: 'Sinh viên', icon: Users, category: 'DANH MỤC HỆ THỐNG' },
+      { to: '/khoa/lecturers', label: 'Giảng viên', icon: User, category: 'DANH MỤC HỆ THỐNG' },
+
+      // KẾ HOẠCH KIẾN TẬP
+      { to: '/khoa/plans', label: 'Đợt kiến tập', icon: Calendar, category: 'KẾ HOẠCH KIẾN TẬP' },
+      { to: '/khoa/lich-kien-tap', label: 'Lịch kiến tập', icon: Layers, category: 'KẾ HOẠCH KIẾN TẬP' },
+      // ĐÁNH GIÁ & KẾT QUẢ
+      { to: '/khoa/boards', label: 'Hội đồng chấm báo cáo', icon: Presentation, category: 'ĐÁNH GIÁ & KẾT QUẢ' },
+      { to: '/khoa/results', label: 'Kết quả kiến tập', icon: Award, category: 'ĐÁNH GIÁ & KẾT QUẢ' },
+      // Standalone top-levels below the groups
+      { to: '/khoa/notifications', label: 'Thông báo', icon: Bell, category: 'NONE', badge: true },
+      { to: '/khoa/reports', label: 'Báo cáo thống kê', icon: Activity, category: 'NONE' }
+    ];
+  } else {
+    khoaMenuItems = [
+      { to: '/clb', label: 'Trang chủ', icon: Home, category: 'TRANG CHỦ' },
+      // DANH MỤC HỆ THỐNG
+      { to: '/clb/students', label: 'Sinh viên', icon: Users, category: 'DANH MỤC HỆ THỐNG' },
+      { to: '/clb/factories', label: 'Nhà máy', icon: Compass, category: 'DANH MỤC HỆ THỐNG' },
+      // KẾ HOẠCH KIẾN TẬP
+      { to: '/clb/lich-kien-tap', label: 'Lịch kiến tập', icon: Calendar, category: 'KẾ HOẠCH KIẾN TẬP' },
+      { to: '/clb/trips', label: 'Chuyến tham quan', icon: Compass, category: 'KẾ HOẠCH KIẾN TẬP' },
+      { to: '/clb/visit-report', label: 'Báo cáo tham quan', icon: Eye, category: 'KẾ HOẠCH KIẾN TẬP' },
+      // ĐĂNG KÝ & PHÂN CÔNG
+      { to: '/clb/registrations', label: 'Quản lý đăng ký', icon: FileCheck, category: 'ĐĂNG KÝ & PHÂN CÔNG' },
+      { to: '/clb/supervisors', label: 'Phân công GVHD', icon: GraduationCap, category: 'ĐĂNG KÝ & PHÂN CÔNG' },
+      { to: '/clb/leaders', label: 'Phân công GV dẫn đoàn', icon: UserCheck, category: 'ĐĂNG KÝ & PHÂN CÔNG' },
+      // TÀI CHÍNH
+      { to: '/clb/fees', label: 'Quản lý lệ phí', icon: CreditCard, category: 'TÀI CHÍNH' },
+      { to: '/clb/refund-approval', label: 'Duyệt hoàn phí', icon: RotateCcw, category: 'TÀI CHÍNH' },
+      // ĐÁNH GIÁ & KẾT QUẢ
+      { to: '/clb/results', label: 'Kết quả kiến tập', icon: Award, category: 'ĐÁNH GIÁ & KẾT QUẢ' },
+      // Standalone top-levels below the groups
+      { to: '/clb/notifications', label: 'Thông báo', icon: Bell, category: 'NONE', badge: true },
+      { to: '/clb/reports', label: 'Báo cáo thống kê', icon: Activity, category: 'NONE' }
+    ];
+  }
 
   useEffect(() => {
     // Automatically expand the group containing the active path on navigation
@@ -437,32 +503,34 @@ export default function Layout() {
     <div className="min-h-screen bg-[#E7E0C4]/30 flex font-sans">
       {/* Sidebar */}
       <aside className="fixed left-0 top-0 h-screen w-[264px] bg-[#407F3E] text-white z-50 flex flex-col shadow-xl border-r border-[#2c6b2d]/10">
-        <div className="p-5 flex flex-col gap-1.5 items-center border-b border-white/10 bg-white/5">
-          <div className="text-center">
-            <span className="font-extrabold text-[16px] leading-tight text-white uppercase tracking-wider block">
+        <div className="flex flex-col border-b border-white/10 bg-white/5">
+          <div className="h-16 flex items-center justify-center px-4">
+            <img src="/huit-logo.png" alt="Logo HUIT" className="w-44 max-w-full h-auto object-contain brightness-0 invert opacity-95 shrink-0" />
+          </div>
+          <div className="pb-3.5 px-4 flex flex-col items-center text-center gap-0.5">
+            <span className="font-extrabold text-[15px] leading-tight text-white uppercase tracking-wider block">
               Quản lý kiến tập
             </span>
-            <span className="text-[11px] text-[#e5ffdc]/80 font-semibold tracking-widest block uppercase mt-0.5">
-              HUIT — Quản lý Khoa
+            <span className="text-[10px] text-[#e5ffdc]/70 font-semibold tracking-widest block uppercase">
+              HUIT — {roleName}
             </span>
           </div>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
+        <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-4 sidebar-scrollbar">
           {/* Top-level item: Trang chủ */}
           {(() => {
-            const homeItem = khoaMenuItems.find(i => i.to === '/khoa' && i.category === 'TRANG CHỦ');
+            const homeItem = khoaMenuItems.find(i => i.to === rolePrefix && i.category === 'TRANG CHỦ');
             if (homeItem) {
               const Icon = homeItem.icon;
               const isActive = location.pathname === homeItem.to;
               return (
                 <Link
                   to={homeItem.to}
-                  className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${
-                    isActive
-                      ? 'bg-white text-[#407F3E] shadow-md font-bold scale-[1.02]'
-                      : 'text-white hover:bg-[#89B449]/20 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${isActive
+                    ? 'bg-white text-[#407F3E] shadow-md font-bold scale-[1.02]'
+                    : 'text-white hover:bg-[#89B449]/20 hover:text-white'
+                    }`}
                 >
                   <div className="flex items-center gap-3">
                     <Icon className="w-[18px] h-[18px]" />
@@ -477,6 +545,7 @@ export default function Layout() {
           {/* Collapsible Groups */}
           {['DANH MỤC HỆ THỐNG', 'KẾ HOẠCH KIẾN TẬP', 'ĐĂNG KÝ & PHÂN CÔNG', 'ĐÁNH GIÁ & KẾT QUẢ', 'TÀI CHÍNH'].map((group) => {
             const items = khoaMenuItems.filter((item) => item.category === group);
+            if (items.length === 0) return null;
             const isCollapsed = collapsedGroups[group];
 
             return (
@@ -502,11 +571,10 @@ export default function Layout() {
                         <Link
                           key={item.to + '-' + item.label}
                           to={item.to}
-                          className={`w-full flex items-center justify-between px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${
-                            isActive
-                              ? 'bg-white text-[#407F3E] shadow-md font-bold scale-[1.02]'
-                              : 'text-white/80 hover:bg-[#89B449]/20 hover:text-white'
-                          }`}
+                          className={`w-full flex items-center justify-between px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${isActive
+                            ? 'bg-white text-[#407F3E] shadow-md font-bold scale-[1.02]'
+                            : 'text-white/80 hover:bg-[#89B449]/20 hover:text-white'
+                            }`}
                         >
                           <div className="flex items-center gap-3">
                             <Icon className="w-[18px] h-[18px]" />
@@ -532,11 +600,10 @@ export default function Layout() {
                   <Link
                     key={item.to + '-' + item.label}
                     to={item.to}
-                    className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${
-                      isActive
-                        ? 'bg-white text-[#407F3E] shadow-md font-bold scale-[1.02]'
-                        : 'text-white hover:bg-[#89B449]/20 hover:text-white'
-                    }`}
+                    className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${isActive
+                      ? 'bg-white text-[#407F3E] shadow-md font-bold scale-[1.02]'
+                      : 'text-white hover:bg-[#89B449]/20 hover:text-white'
+                      }`}
                   >
                     <div className="flex items-center gap-3">
                       <Icon className="w-[18px] h-[18px]" />
@@ -560,11 +627,11 @@ export default function Layout() {
             </div>
             <div className="flex flex-col min-w-0">
               <span className="text-white font-bold text-sm truncate">{fullName}</span>
-              <span className="text-[#e5ffdc]/60 text-xs">Quản lý Khoa</span>
+              <span className="text-[#e5ffdc]/60 text-xs">{roleName}</span>
             </div>
           </div>
-          <button 
-            onClick={handleLogout}
+          <button
+            onClick={confirmLogout}
             className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 text-red-300 hover:bg-red-500 hover:text-white transition-all text-sm font-bold border border-red-500/20 cursor-pointer"
           >
             <LogOut className="w-4 h-4" />
@@ -577,37 +644,55 @@ export default function Layout() {
       <div className="flex-1 flex flex-col pl-[264px] min-w-0">
         {/* Header */}
         <header className="fixed top-0 left-[264px] right-0 h-16 bg-white border-b border-[#E7E0C4] z-40 flex items-center justify-between px-6 shadow-sm">
-          <div className="flex items-center gap-4 min-w-0">
-            <img src="/huit-logo.png" alt="HUIT Logo" className="h-11 md:h-[46px] w-auto object-contain shrink-0 py-0.5" />
-            <div className="h-6 w-[1px] bg-slate-200 shrink-0"></div>
-            <div className="flex items-center gap-2 text-slate-600 font-medium text-sm truncate">
-              <Link to="/khoa" className="hover:text-[#407F3E] transition-colors flex items-center gap-1 font-semibold shrink-0">
-                <Home className="w-4 h-4" />
-                <span>IMS Portal</span>
-              </Link>
-              <ChevronRight className="w-3 h-3 text-slate-400 shrink-0" />
-              <span className="text-slate-800 font-semibold truncate">{getActiveViewLabel()}</span>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded bg-[#407F3E] flex items-center justify-center text-white">
+              <Layers className="w-5 h-5" />
             </div>
+            <span className="text-slate-800 font-bold text-lg">Quản lý Kiến tập</span>
           </div>
 
-          <div className="flex items-center gap-6">
-            <Link 
-              to="/khoa/notifications"
-              className="relative p-2 text-slate-600 hover:bg-[#E7E0C4]/30 hover:text-[#407F3E] rounded-full transition-all"
-              title="Thông báo"
-            >
+          <div className="flex items-center gap-4">
+            <Link to={`${rolePrefix}/notifications`} className="relative p-2 text-slate-600 hover:text-[#407F3E] transition-colors cursor-pointer">
               <Bell className="w-5 h-5" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#DBD468] rounded-full"></span>
+              <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-[#DBD468] rounded-full border-2 border-white"></span>
             </Link>
 
-            <div className="flex items-center gap-3 bg-[#E7E0C4]/30 pl-3 pr-1 py-1 rounded-full border border-[#E7E0C4]">
-              <div className="text-right hidden sm:block">
-                <p className="text-xs font-bold text-slate-800 leading-tight">{fullName}</p>
-                <p className="text-[10px] text-slate-500 font-semibold tracking-wider uppercase">Quản lý Khoa</p>
+            <div className="w-px h-6 bg-[#E7E0C4]"></div>
+
+            <div className="relative">
+              <div 
+                className="flex items-center gap-3 cursor-pointer"
+                onClick={(e) => { e.stopPropagation(); setIsUserMenuOpen(!isUserMenuOpen); }}
+              >
+                <div className="w-8 h-8 rounded-full overflow-hidden">
+                  <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=E7E0C4&color=407F3E`} alt="Avatar" className="w-full h-full object-cover" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-slate-800">{fullName}</span>
+                  <span className="px-2 py-0.5 bg-[#E7E0C4] text-[#407F3E] text-[10px] font-bold rounded-full uppercase tracking-wider">
+                    {roleName}
+                  </span>
+                  <ChevronDown className="w-4 h-4 text-slate-400" />
+                </div>
               </div>
-              <div className="w-8 h-8 rounded-full bg-[#407F3E] flex items-center justify-center text-white font-bold text-sm shadow-sm">
-                {fullName.charAt(0).toUpperCase()}
-              </div>
+
+              {isUserMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsUserMenuOpen(false)}></div>
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-100 py-1 z-50">
+                    <button
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        confirmLogout();
+                      }}
+                      className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 font-medium transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Đăng xuất
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </header>
@@ -616,6 +701,7 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
+      {renderLogoutModal()}
     </div>
   );
 }
@@ -645,7 +731,7 @@ function ForceChangePasswordView({ user, onPasswordChanged, onLogout }) {
     setLoading(true);
 
     try {
-      await authApi.changePassword(user.id, oldPass, newPass);
+      await authApi.changePassword(oldPass, newPass);
       setSuccess(true);
       setTimeout(() => {
         onPasswordChanged({ ...user, phai_doi_mat_khau: false });
@@ -661,7 +747,7 @@ function ForceChangePasswordView({ user, onPasswordChanged, onLogout }) {
   return (
     <div className="min-h-screen bg-[#f8faf1] flex flex-col justify-center items-center py-12 px-4 sm:px-6 lg:px-8 font-sans">
       <div className="max-w-md w-full bg-white rounded-3xl shadow-xl border border-slate-100 p-6 md:p-8 space-y-6">
-        
+
         {/* Header */}
         <div className="text-center">
           <div className="mx-auto w-14 h-14 bg-[#e5ffdc] text-[#407F3E] rounded-2xl flex items-center justify-center shadow-inner mb-4">

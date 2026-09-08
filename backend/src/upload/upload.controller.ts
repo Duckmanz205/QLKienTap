@@ -509,8 +509,8 @@ export class UploadController {
       } else {
         throw new ForbiddenException('Bạn không có quyền truy cập file này.');
       }
-    } else if (userRole === 'QuanLyKhoa' || userRole === 'Khoa') {
-      // QuanLyKhoa/Khoa có quyền tải file hợp lệ trong các bucket nghiệp vụ (bao gồm cả file legacy 'sv', 'general')
+    } else if (userRole === 'QuanLyKhoa' || userRole === 'Khoa' || userRole === 'QuanLyCLB') {
+      // QuanLyKhoa/Khoa/QuanLyCLB có quyền tải file hợp lệ trong các bucket nghiệp vụ (bao gồm cả file legacy 'sv', 'general')
     } else {
       throw new ForbiddenException(
         'Bạn không có quyền truy cập tài nguyên này.',
@@ -525,7 +525,7 @@ export class UploadController {
   //   SERVE FILE LOCAL (fallback khi không dùng R2)
   //   Bảo vệ theo ownership tương đương signed-url
   // ============================================================
-  // @Get('file/:type/:param1/:param2?')
+  // ============================================================
   @Get(['file/:type/:param1', 'file/:type/:param1/:param2'])
   async serveFile(
     @Param('type') type: string,
@@ -573,7 +573,12 @@ export class UploadController {
     }
 
     if (type === 'templates') {
-      const templatePath = join(process.cwd(), 'uploads', 'templates', filename);
+      const templatePath = join(
+        process.cwd(),
+        'uploads',
+        'templates',
+        filename,
+      );
       if (!existsSync(templatePath)) {
         throw new NotFoundException('Tệp không tồn tại.');
       }
@@ -618,7 +623,7 @@ export class UploadController {
       } else {
         throw new ForbiddenException('Bạn không có quyền truy cập file này.');
       }
-    } else if (userRole === 'QuanLyKhoa' || userRole === 'Khoa') {
+    } else if (userRole === 'QuanLyKhoa' || userRole === 'Khoa' || userRole === 'QuanLyCLB') {
     } else {
       throw new ForbiddenException(
         'Bạn không có quyền truy cập tài nguyên này.',
@@ -636,7 +641,3 @@ export class UploadController {
     return this.sendLocalFile(res, filePath, filename);
   }
 }
-
-
-
-

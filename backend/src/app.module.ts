@@ -30,6 +30,7 @@ import { QueueModule } from './queue/queue.module';
         database: configService.get<string>('DB_DATABASE', 'QLKienTap'),
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
         synchronize: false, // TAT trong production, dung migrations thay the
+        dropSchema: false,
         options: {
           encrypt: false, // Tat encrypt cho local development
           trustServerCertificate: true,

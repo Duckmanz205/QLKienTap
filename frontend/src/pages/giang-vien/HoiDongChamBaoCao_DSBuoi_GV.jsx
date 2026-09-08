@@ -171,7 +171,7 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
         <div className="space-y-6 relative z-10">
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-surface-variant/40">
             <h2 className="font-bold text-sm uppercase tracking-wider text-on-surface-variant mb-6 flex items-center gap-1.5">
-              <ClipboardList className="w-4.5 h-4.5 text-primary" />
+              <ClipboardList className="w-5 h-5 text-primary" />
               <span>Các hội đồng được phân công chấm điểm</span>
             </h2>
             
@@ -403,3 +403,4 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
     </div>
   );
 }
+

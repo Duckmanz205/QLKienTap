@@ -20,9 +20,26 @@ export class RegisterTripDto {
 }
 
 export class ProposeTripDto {
+  @IsOptional()
   @IsInt()
   @Min(1)
-  nhaMayId: number;
+  nhaMayId?: number;
+
+  @IsOptional()
+  @IsString()
+  tenNhaMayDeXuat?: string;
+
+  @IsOptional()
+  @IsString()
+  diaChiDeXuat?: string;
+
+  @IsOptional()
+  @IsString()
+  nguoiLienHeDeXuat?: string;
+
+  @IsOptional()
+  @IsString()
+  sdtLienHeDeXuat?: string;
 
   @Type(() => Date)
   @IsDate()
@@ -103,4 +120,3 @@ export class SelectRepresentativeTripsDto {
   @Min(1, { each: true })
   registrationIds: number[];
 }
-

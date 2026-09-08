@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
-import { KhoaController } from './khoa.controller';
-import { KhoaService } from './khoa.service';
+import { KhoaController } from './quan-ly-khoa/quan-ly-khoa.controller';
+import { ClbController } from './clb/clb.controller';
+import { QtvController } from './qtv/qtv.controller';
+import { KhoaService } from './shared/khoa.service';
 import {
   NamHoc,
   HocKy,
@@ -26,13 +28,16 @@ import {
   PhanCongGVHD,
   DiemDanh,
   BaiThuHoach,
-  DiemPhieuDangKy,
+  DiemPhieuThamQuan,
+  DiemChuanBi,
+  DiemBaiThuHoach,
+  PhieuThamQuan,
+  DeXuatChuyenThamQuan,
   HoiDongChamBaoCao,
   HoiDong_ThanhVien,
   DiemHoiDong_ChiTiet,
   BoChuyenBaoCao,
   BoChuyenBaoCao_Chuyen,
-  KetQuaHocPhan,
 } from '../entities/qlkt.entity';
 
 @Module({
@@ -60,17 +65,20 @@ import {
       PhanCongGVHD,
       DiemDanh,
       BaiThuHoach,
-      DiemPhieuDangKy,
+      DiemPhieuThamQuan,
+      DiemChuanBi,
+      DiemBaiThuHoach,
+      PhieuThamQuan,
+      DeXuatChuyenThamQuan,
       HoiDongChamBaoCao,
       HoiDong_ThanhVien,
       DiemHoiDong_ChiTiet,
       BoChuyenBaoCao,
       BoChuyenBaoCao_Chuyen,
-      KetQuaHocPhan,
     ]),
     AuthModule,
   ],
-  controllers: [KhoaController],
+  controllers: [KhoaController, ClbController, QtvController],
   providers: [KhoaService],
   exports: [KhoaService],
 })

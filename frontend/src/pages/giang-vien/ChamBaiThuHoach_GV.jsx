@@ -1,31 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import {
-  CheckSquare,
-  FileText,
-  Sparkles,
-  ArrowLeft,
-  Download,
-  Check,
-  AlertTriangle,
-  Info,
-  ExternalLink,
-  Search,
-  CheckCircle,
-  FileSpreadsheet,
-  Loader2,
-  Bot,
-  Building,
-  Laptop,
-  RefreshCw
+import { 
+  ArrowLeft, FileText, CheckCircle2, Save, Search, ChevronRight,
+  ZoomIn, ZoomOut, Download, Sparkles, MessageSquareWarning, User,
+  CheckSquare, Check, AlertTriangle, Info, ExternalLink, CheckCircle,
+  FileSpreadsheet, Loader2, Bot, Building, Laptop, RefreshCw
 } from 'lucide-react';
-import api, { giangVienApi } from '../../services/api';
+import { useNavigate } from 'react-router-dom';
+import { giangVienApi } from '../../services/api';
 
 export default function ChamBaiThuHoach_GV() {
+  const navigate = useNavigate();
+  
   const [lecturer, setLecturer] = useState(null);
   const [reports, setReports] = useState([]);
   const [selectedReport, setSelectedReport] = useState(null);
-
+  
   // Search & Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -33,6 +23,7 @@ export default function ChamBaiThuHoach_GV() {
   // Grading states
   const [score, setScore] = useState('');
   const [comments, setComments] = useState('');
+  const [zoomLevel, setZoomLevel] = useState(100);
 
   // STATE: Quản lý đoạn text OCR để giáo viên có thể chỉnh sửa/mồi dữ liệu test
   const [editableOcrText, setEditableOcrText] = useState('');
@@ -40,16 +31,18 @@ export default function ChamBaiThuHoach_GV() {
   // STATE TÍCH HỢP AI GRADER
   const [isAIGrading, setIsAIGrading] = useState(false);
   const [aiResult, setAiResult] = useState(null);
-
+  
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Pagination states
-  const [page, setPage] = useState(1);
-  const [limit] = useState(10);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
+  const TEMPLATE_COMMENT = `1. Giới thiệu tổng quan nhà máy: ...
+2. Thuyết minh quy trình công nghệ sản xuất: ...
+3. Đánh giá thực trạng điều kiện đảm bảo VSATTP: ...`;
+
+  const handleInsertTemplate = () => {
+    setComments(prev => prev ? prev + '\n\n' + TEMPLATE_COMMENT : TEMPLATE_COMMENT);
+  };
 
   useEffect(() => {
     const userJson = localStorage.getItem('user');
@@ -57,15 +50,13 @@ export default function ChamBaiThuHoach_GV() {
       const { user } = JSON.parse(userJson);
       giangVienApi.getProfile(user.id).then(res => {
         setLecturer(res.data);
-        fetchReports(res.data.id, 1, searchTerm, statusFilter);
+        fetchReports(res.data.id);
       }).catch(err => console.error(err));
     }
   }, []);
 
-  const fetchReports = async (gvId = lecturer?.id, pageVal = page, search = searchTerm, status = statusFilter) => {
+  const fetchReports = async (gvId) => {
     if (!gvId) return;
-
-    // 🚨 MOCK DATA: BÀI BÁO CÁO ẢO CHỨA "TEXT OCR" ĐỂ TEST AI
     const mockReport = {
       id: 8888,
       trang_thai: 'ChoCham',
@@ -79,41 +70,23 @@ export default function ChamBaiThuHoach_GV() {
         chuyenThamQuan: { nhaMay: { ten_nha_may: '🏭 [MOCK] Nhà máy Acecook' } }
       }
     };
-
     try {
-      const res = await giangVienApi.getGuidedReports(gvId, {
-        page: pageVal,
-        limit,
-        search: search || undefined,
-        status: status !== 'all' ? status : undefined
-      });
-
-      setReports([mockReport, ...(res.data.data || [])]);
-      setTotal((res.data.total || 0) + 1);
-      setTotalPages(res.data.totalPages || 1);
-      setPage(pageVal);
+      const res = await giangVienApi.getGuidedReports(gvId, { limit: 100 });
+      const data = res.data.data ? res.data.data : res.data;
+      setReports([mockReport, ...(data || [])]);
     } catch (err) {
       console.error("Lỗi lấy danh sách, ÉP HIỆN MOCK DATA", err);
       setReports([mockReport]);
     }
   };
 
-  useEffect(() => {
-    if (lecturer) {
-      const delayDebounceFn = setTimeout(() => {
-        fetchReports(lecturer.id, 1, searchTerm, statusFilter);
-      }, 300);
-      return () => clearTimeout(delayDebounceFn);
-    }
-  }, [searchTerm, statusFilter, lecturer]);
-
-  const handleSelectReport = (rep) => {
-    setSelectedReport(rep);
-    setScore(rep.diem_bai_thu_hoach !== null && rep.diem_bai_thu_hoach !== undefined ? rep.diem_bai_thu_hoach.toString() : '');
-    setComments(rep.nhan_xet_gv || '');
-
+  const handleSelectReport = (report) => {
+    setSelectedReport(report);
+    setScore(report.diem_bai_thu_hoach !== null && report.diem_bai_thu_hoach !== undefined ? report.diem_bai_thu_hoach : '');
+    setComments(report.nhan_xet_cua_giang_vien || report.nhan_xet_gv || '');
+    
     // Nạp dữ liệu vào ô Test
-    setEditableOcrText(rep.noi_dung_text || '');
+    setEditableOcrText(report.noi_dung_text || '');
 
     setMessage('');
     setError('');
@@ -121,9 +94,6 @@ export default function ChamBaiThuHoach_GV() {
     setIsAIGrading(false);
   };
 
-  // =========================================================================
-  // GỌI API HỘI ĐỒNG CHẤM ĐIỂM TỰ ĐỘNG (:8000/grade)
-  // =========================================================================
   const handleAIGrading = async () => {
     if (!editableOcrText || editableOcrText.trim() === '') {
       setError('Bạn cần cung cấp đoạn văn bản báo cáo để AI có thể chấm điểm!');
@@ -165,403 +135,369 @@ export default function ChamBaiThuHoach_GV() {
 
     const numScore = parseFloat(score);
     if (isNaN(numScore) || numScore < 0 || numScore > 10) {
-      alert('Vui lòng nhập điểm hợp lệ từ 0 đến 10.');
+      alert("Vui lòng nhập điểm hợp lệ (0-10)");
       return;
     }
-
-    setMessage('');
-    setError('');
     setLoading(true);
-
     try {
-      const res = await giangVienApi.gradeReport({
+      await giangVienApi.gradeReport({
         reportId: selectedReport.id,
         score: numScore,
         comment: comments
       });
-      setMessage(res.data.message);
-
-      fetchReports(lecturer.id);
-      setTimeout(() => {
-        setSelectedReport(null);
-      }, 1200);
+      alert('Đã lưu điểm thành công!');
+      setSelectedReport(null);
+      if (lecturer) fetchReports(lecturer.id);
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể lưu điểm báo cáo.');
+      alert(err.response?.data?.message || 'Có lỗi xảy ra khi chấm điểm');
     } finally {
       setLoading(false);
     }
   };
 
-  if (!lecturer) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px] text-slate-500 font-semibold">
-        Đang tải danh sách bài thu hoạch...
+  const renderReportList = () => (
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <div>
+          <button 
+            onClick={() => navigate('/giang-vien')}
+            className="flex items-center gap-1.5 text-slate-500 hover:text-[#407F3E] font-bold text-sm mb-2 transition-colors cursor-pointer w-fit"
+          >
+            <ArrowLeft className="w-4 h-4" /> Quay lại trang chủ
+          </button>
+          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-3">
+            Danh sách Bài thu hoạch
+          </h1>
+        </div>
       </div>
-    );
-  }
 
-  return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Title */}
-      {!selectedReport && (
-        <div className="relative z-10">
-          <h1 className="text-3xl font-black text-on-surface tracking-tight">Chấm bài thu hoạch</h1>
-          <p className="text-sm text-on-surface-variant font-medium mt-1">
-            Đánh giá, nhận xét các bài báo cáo thu hoạch kiến tập sau chuyến đi của sinh viên bạn hướng dẫn.
-          </p>
-        </div>
-      )}
-
-      {/* Messages */}
-      {message && (
-        <div className="bg-[#e5ffdc] border border-primary/20 text-[#476d01] px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2">
-          <Check className="w-4 h-4" />
-          <span>{message}</span>
-        </div>
-      )}
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-750 px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-red-650" />
-          <span>{error}</span>
-        </div>
-      )}
-
-      {/* List vs Detail View Toggle */}
-      {!selectedReport ? (
-        /* Report List View */
-        <div className="space-y-6 relative z-10">
-          {/* Filters Bar */}
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-surface-variant/40 flex flex-col md:flex-row gap-4 items-center justify-between">
-            <div className="relative w-full md:max-w-xs">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-              <input
-                type="text"
-                placeholder="Tìm sinh viên, MSSV..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-[#f8faf1] border border-surface-variant rounded-xl text-xs focus:border-primary focus:outline-none font-semibold text-on-surface"
-              />
-            </div>
-
-            <div className="flex gap-2 w-full md:w-auto">
-              <button
-                onClick={() => setStatusFilter('all')}
-                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer ${statusFilter === 'all' ? 'bg-primary text-white shadow-sm' : 'bg-[#f8faf1] border border-surface-variant text-slate-600 hover:bg-[#ecefe6]'}`}
-              >Tất cả</button>
-              <button
-                onClick={() => setStatusFilter('pending')}
-                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer ${statusFilter === 'pending' ? 'bg-primary text-white shadow-sm' : 'bg-[#f8faf1] border border-surface-variant text-slate-600 hover:bg-[#ecefe6]'}`}
-              >Chờ chấm</button>
-              <button
-                onClick={() => setStatusFilter('graded')}
-                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer ${statusFilter === 'graded' ? 'bg-primary text-white shadow-sm' : 'bg-[#f8faf1] border border-surface-variant text-slate-600 hover:bg-[#ecefe6]'}`}
-              >Đã chấm</button>
-            </div>
-          </div>
-
-          {/* Table list */}
-          <div className="bg-white rounded-2xl border border-surface-variant/40 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[700px]">
-                <thead>
-                  <tr className="bg-[#f8faf1] text-on-surface-variant font-bold text-xs uppercase tracking-wider border-b border-surface-variant">
-                    <th className="py-4 px-6">Sinh viên</th>
-                    <th className="py-4 px-6">MSSV / Lớp</th>
-                    <th className="py-4 px-6">Chuyến kiến tập</th>
-                    <th className="py-4 px-6">Tập tin</th>
-                    <th className="py-4 px-6">Ngày nộp</th>
-                    <th className="py-4 px-6">Trạng thái</th>
-                    <th className="py-4 px-6 text-right">Thao tác</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-sm font-semibold">
-                  {reports.length === 0 ? (
-                    <tr>
-                      <td colSpan="7" className="py-8 text-center text-slate-500">
-                        Không tìm thấy bài thu hoạch nào phù hợp.
-                      </td>
-                    </tr>
-                  ) : (
-                    reports.map((r) => {
-                      const isGraded = r.trang_thai === 'DaCham';
-                      return (
-                        <tr key={r.id} className="hover:bg-slate-50 transition-colors group">
-                          <td className="py-4 px-6">
-                            <span className="font-bold text-on-surface">{r.phieuDangKy?.sinhVien?.ho_ten}</span>
-                          </td>
-                          <td className="py-4 px-6 text-on-surface-variant font-mono text-xs">
-                            {r.phieuDangKy?.sinhVien?.mssv} | {r.phieuDangKy?.sinhVien?.lop}
-                          </td>
-                          <td className="py-4 px-6 font-bold text-on-surface group-hover:text-primary transition-colors">
-                            {r.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may}
-                          </td>
-                          <td className="py-4 px-6 text-xs text-primary font-mono truncate max-w-[150px]" title={r.file_bao_cao}>
-                            {r.file_bao_cao ? r.file_bao_cao.split('/').pop() : 'Báo cáo.pdf'}
-                          </td>
-                          <td className="py-4 px-6 text-on-surface-variant font-medium">
-                            {new Date(r.ngay_nop).toLocaleDateString('vi-VN')}
-                          </td>
-                          <td className="py-4 px-6">
-                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                              isGraded 
-                                ? 'bg-primary/10 text-primary border border-primary/20' 
-                                : 'bg-warning-yellow/15 text-yellow-750 border border-warning-yellow/30'
-                            }`}>
-                              <span>{isGraded ? `Đã chấm (${r.diem_bai_thu_hoach})` : 'Chờ chấm'}</span>
-                            </span>
-                          </td>
-                          <td className="py-4 px-6 text-right">
-                            <button
-                              onClick={() => handleSelectReport(r)}
-                              className="px-3.5 py-1.5 bg-primary text-white hover:bg-primary-container rounded-lg text-xs font-black uppercase tracking-wider cursor-pointer shadow-sm transition-all active:scale-95 flex items-center gap-1 inline-flex"
-                            >
-                              <span>{isGraded ? 'Xem lại' : 'Chấm bài'}</span>
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+      {reports.length === 0 ? (
+        <div className="p-8 text-center text-slate-500 bg-white rounded-2xl border border-[#E7E0C4]">
+          Không có bài thu hoạch nào.
         </div>
       ) : (
-        /* Report Grading Detail View */
-        <div className="space-y-6 animate-fade-in relative z-10">
-          {/* Breadcrumbs / Back navigation */}
-          <div className="flex items-center justify-between bg-white p-5 rounded-2xl shadow-sm border border-surface-variant/40">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-md border border-primary/20 shadow-inner">
-                {selectedReport.phieuDangKy?.sinhVien?.ho_ten?.charAt(0) || 'S'}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {reports.map((report) => {
+            const isGraded = report.diem_bai_thu_hoach !== null && report.diem_bai_thu_hoach !== undefined;
+            const sv = report.phieuDangKy?.sinhVien || {};
+            const nhaMay = report.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Chuyến đi';
+            
+            return (
+              <div 
+                key={report.id} 
+                onClick={() => handleSelectReport(report)}
+                className="bg-white border border-[#E7E0C4] rounded-2xl overflow-hidden shadow-sm hover:border-[#407F3E] hover:shadow-md transition-all cursor-pointer group flex flex-col h-full"
+              >
+                <div className={`px-6 py-4 border-b border-[#E7E0C4] flex items-center justify-between ${isGraded ? 'bg-slate-50/50' : 'bg-[#DBD468]/10'}`}>
+                  <div className="flex items-center gap-3 truncate">
+                    <h2 className="font-black text-slate-800 text-lg group-hover:text-[#407F3E] transition-colors truncate">{nhaMay}</h2>
+                  </div>
+                </div>
+                
+                <div className="p-6 flex-1 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-8 h-8 rounded-full bg-[#E7E0C4]/30 text-[#407F3E] font-bold border border-[#E7E0C4] flex items-center justify-center shrink-0">
+                        {sv.ho_ten?.charAt(0) || <User className="w-4 h-4"/>}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-slate-800 truncate">{sv.ho_ten}</p>
+                        <p className="text-[10px] font-medium text-slate-500">MSSV: {sv.mssv}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Trạng thái:</span>
+                      {isGraded ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-[#89B449]/10 text-[#407F3E]">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Đã chấm ({report.diem_bai_thu_hoach}/10)
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-[#DBD468] text-slate-800 shadow-sm">
+                          <div className="w-1.5 h-1.5 rounded-full bg-slate-800 animate-pulse"></div> Chờ chấm
+                        </span>
+                      )}
+                    </div>
+                    
+                    <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200 mb-6">
+                      <FileText className="w-8 h-8 text-[#407F3E]" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-slate-700 truncate">{report.file_url_bao_cao || 'BaoCao.pdf'}</p>
+                        <p className="text-[10px] font-medium text-slate-400 mt-0.5">{new Date(report.ngay_nop).toLocaleDateString('vi-VN')}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end text-[#407F3E] font-bold text-sm mt-4">
+                    {isGraded ? 'Xem lại bài làm' : 'Bắt đầu chấm bài'} <ChevronRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+
+  const renderGradingView = () => {
+    const sv = selectedReport.phieuDangKy?.sinhVien || {};
+    const nhaMay = selectedReport.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Chuyến đi';
+
+    return (
+      <div className="h-[calc(100vh-80px)] flex flex-col animate-in fade-in zoom-in-95 duration-300 -m-6">
+        
+        {/* Top Breadcrumb Bar */}
+        <div className="h-14 bg-white border-b border-[#E7E0C4] flex items-center justify-between px-6 shrink-0 z-10">
+          <div className="flex items-center gap-2 text-sm font-bold text-slate-600">
+            <button onClick={() => setSelectedReport(null)} className="hover:text-[#407F3E] transition-colors">
+              Bài thu hoạch
+            </button>
+            <ChevronRight className="w-4 h-4 text-slate-400" />
+            <span className="text-[#407F3E]">{nhaMay}</span>
+          </div>
+        </div>
+
+        <div className="flex-1 flex overflow-hidden bg-[#E7E0C4]/20">
+          
+          {/* Left Side: Document Viewer & OCR Editor */}
+          <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar relative space-y-4 p-4">
+            
+            {/* PDF Toolbar */}
+            <div className="bg-white/80 backdrop-blur-sm border border-[#E7E0C4] rounded-xl flex items-center justify-between p-2 shrink-0 shadow-sm z-10 sticky top-0">
+              <div className="flex items-center gap-3 text-slate-600">
+                <button 
+                  onClick={() => setZoomLevel(prev => Math.max(50, prev - 10))}
+                  className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                >
+                  <ZoomOut className="w-4 h-4" />
+                </button>
+                <span className="text-xs font-bold w-10 text-center">{zoomLevel}%</span>
+                <button 
+                  onClick={() => setZoomLevel(prev => Math.min(200, prev + 10))}
+                  className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                >
+                  <ZoomIn className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="flex items-center gap-4 text-xs font-bold text-slate-600">
+                <span>Trang 1 / 1</span>
+                <button className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"><Download className="w-4 h-4" /></button>
+              </div>
+            </div>
+
+            {/* PDF Canvas (Simulated) */}
+            <div className="flex justify-center">
+              <div 
+                className="bg-white w-full max-w-[700px] h-fit shadow-md text-slate-800 p-8 relative rounded-xl border border-slate-200"
+                style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center', transition: 'transform 0.15s ease' }}
+              >
+                <div className="text-center mb-6">
+                  <h3 className="font-bold text-xs uppercase tracking-widest mb-1">TRƯỜNG ĐẠI HỌC CÔNG THƯƠNG TP.HCM</h3>
+                  <p className="font-bold text-xs uppercase tracking-widest">KHOA CÔNG NGHỆ THỰC PHẨM</p>
+                  <div className="w-12 h-[1px] bg-slate-300 mx-auto my-4"></div>
+                  <h1 className="text-lg font-black uppercase tracking-wider mb-2">BÁO CÁO THU HOẠCH KIẾN TẬP</h1>
+                </div>
+                <div className="space-y-4 max-w-sm mx-auto mb-8 font-medium text-xs">
+                  <div className="flex"><span className="w-32 font-bold">Sinh viên:</span><span>{sv.ho_ten}</span></div>
+                  <div className="flex"><span className="w-32 font-bold">MSSV:</span><span>{sv.mssv}</span></div>
+                </div>
+                <div className="text-justify text-xs leading-relaxed whitespace-pre-wrap">
+                  {selectedReport.file_url_bao_cao 
+                    ? `[Hệ thống sẽ hiển thị file PDF thực tế ở đây: ${selectedReport.file_url_bao_cao}]\n\n(Nội dung mô phỏng bài thu hoạch...)` 
+                    : '(Không tìm thấy nội dung bài thu hoạch)'}
+                </div>
+              </div>
+            </div>
+
+            {/* OCR Textarea */}
+            <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] flex flex-col mt-6 max-w-[700px] mx-auto w-full">
+              <div className="bg-slate-800 text-white px-4 py-2 flex items-center justify-between text-xs font-semibold rounded-t-xl">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-[#89B449]" />
+                  <span className="uppercase tracking-wider">Trình mồi dữ liệu OCR (Dùng để Test AI)</span>
+                </div>
+              </div>
+              <textarea
+                value={editableOcrText}
+                onChange={(e) => setEditableOcrText(e.target.value)}
+                placeholder="Dán nội dung báo cáo của sinh viên vào đây để mô phỏng dữ liệu OCR..."
+                className="p-4 bg-slate-50 overflow-y-auto font-mono text-xs leading-relaxed text-slate-700 whitespace-pre-wrap w-full h-[200px] resize-none focus:outline-none focus:bg-white rounded-b-xl border-t-0"
+              />
+            </div>
+            
+          </div>
+
+          {/* Right Side: Grading Sidebar */}
+          <div className="w-full md:w-[350px] lg:w-[400px] bg-[#fdfcf8] border-l border-[#E7E0C4] flex flex-col shrink-0 shadow-[-4px_0_15px_-3px_rgba(0,0,0,0.05)] z-20 overflow-y-auto custom-scrollbar p-5 space-y-5">
+            
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-750 p-3 rounded-xl text-xs font-bold flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-red-650 shrink-0 mt-0.5" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            {/* Student Info Card */}
+            <div className="bg-white rounded-xl p-4 border border-[#E7E0C4] shadow-sm flex items-start gap-3">
+              <div className="w-12 h-12 rounded-full bg-[#E7E0C4]/30 text-[#407F3E] font-bold border border-[#E7E0C4] flex items-center justify-center shrink-0 text-lg">
+                {sv.ho_ten?.charAt(0) || 'S'}
               </div>
               <div>
-                <h2 className="font-bold text-base text-on-surface">{selectedReport.phieuDangKy?.sinhVien?.ho_ten}</h2>
-                <p className="text-xs text-on-surface-variant font-medium mt-0.5">
-                  MSSV: <span className="font-mono text-on-surface font-semibold">{selectedReport.phieuDangKy?.sinhVien?.mssv}</span> | Lớp: <span className="text-on-surface font-semibold">{selectedReport.phieuDangKy?.sinhVien?.lop}</span>
+                <h3 className="font-bold text-slate-800 text-sm leading-tight mb-1">{sv.ho_ten}</h3>
+                <p className="text-[11px] font-medium text-slate-500 mb-1">MSSV: {sv.mssv}</p>
+                <p className="text-[11px] font-medium text-[#407F3E] flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" /> {nhaMay}
                 </p>
               </div>
             </div>
 
-            <button
-              onClick={() => setSelectedReport(null)}
-              className="px-4 py-2 border border-slate-200 text-on-surface-variant hover:text-on-surface font-bold text-xs rounded-xl hover:bg-slate-50 transition-all flex items-center gap-1.5 cursor-pointer"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Quay lại</span>
-            </button>
-          </div>
-
-          {/* Grid: Document viewer vs Grade form */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-
-            {/* 🔴 CỘT TRÁI: Dữ liệu OCR (Textarea) và Bảng Rubric */}
-            <div className="lg:col-span-7 flex flex-col gap-6">
-
-              {/* Box Textarea */}
-              <div className="bg-white rounded-2xl shadow-sm border border-surface-variant/40 overflow-hidden flex flex-col">
-                <div className="bg-slate-800 text-white px-6 py-3 flex items-center justify-between text-xs font-semibold shrink-0">
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-emerald-400" />
-                    <span className="truncate max-w-[280px] uppercase tracking-wider">Trình mồi dữ liệu OCR (Dùng để Test)</span>
-                  </div>
-                </div>
-
-                {/* Textarea cố định chiều cao, cuộn nội bộ */}
-                <textarea
-                  value={editableOcrText}
-                  onChange={(e) => setEditableOcrText(e.target.value)}
-                  placeholder="Dán nội dung báo cáo của sinh viên vào đây để mô phỏng dữ liệu OCR..."
-                  className="p-6 bg-slate-50 overflow-y-auto font-mono text-xs leading-relaxed text-slate-700 whitespace-pre-wrap w-full h-[350px] resize-none focus:outline-none focus:bg-white focus:ring-inset focus:ring-2 focus:ring-primary/20"
-                />
+            {/* AI Suggestion Card (Active) */}
+            <div className="bg-gradient-to-br from-[#89B449]/10 to-[#407F3E]/10 rounded-xl p-5 border border-[#89B449]/30 shadow-sm relative overflow-hidden">
+              <div className="flex items-center gap-2 mb-3 relative z-10">
+                <Sparkles className="w-4 h-4 text-[#407F3E]" />
+                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Hội Đồng AI Chấm Điểm</h4>
               </div>
 
-              {/* Rubric Box (Sẽ hiện ra DƯỚI textarea khi chấm xong) */}
-              {aiResult && (
-                <div className="bg-white rounded-2xl shadow-sm border border-emerald-200 overflow-hidden flex flex-col animate-fade-in">
-                  <div className="bg-emerald-850 text-white px-6 py-3 flex items-center justify-between text-xs font-semibold shrink-0">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-emerald-300" />
-                      <span className="uppercase tracking-wider">Chi Tiết Bảng Điểm Rubric - Hội Đồng AI</span>
+              {isAIGrading ? (
+                <div className="flex flex-col items-center justify-center py-4 relative z-10">
+                  <Loader2 className="w-6 h-6 animate-spin text-[#407F3E] mb-2" />
+                  <p className="text-[10px] font-bold text-[#407F3E]">Đang phân tích...</p>
+                </div>
+              ) : !aiResult ? (
+                <div className="space-y-3 relative z-10">
+                  <p className="text-[#407F3E] text-xs font-medium">Sử dụng AI để đối chiếu Rubric tự động.</p>
+                  <button
+                    type="button"
+                    onClick={handleAIGrading}
+                    className="w-full py-2 bg-[#407F3E] hover:bg-[#346832] text-white rounded-lg text-xs font-bold shadow transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Bot className="w-3.5 h-3.5" /> Kích hoạt AI
+                  </button>
+                </div>
+              ) : (
+                <div className="relative z-10">
+                  <div className="flex items-baseline justify-between mb-2">
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-3xl font-black text-[#407F3E] leading-none">{aiResult.diem_bao_cao_cuoi_cung.toFixed(1)}</span>
+                      <span className="text-sm font-bold text-[#407F3E]/70">/ 10</span>
                     </div>
+                    <button
+                      type="button"
+                      onClick={handleAIGrading}
+                      className="px-2 py-1 bg-white hover:bg-slate-50 text-[#407F3E] rounded text-[10px] font-bold uppercase transition-colors flex items-center gap-1 shadow-sm border border-[#E7E0C4]"
+                    >
+                      <RefreshCw className="w-3 h-3" /> Thử lại
+                    </button>
                   </div>
-
-                  {/* Vùng cuộn cố định chiều cao cho các nhận xét Rubric */}
-                  <div className="p-6 space-y-4 max-h-[350px] overflow-y-auto bg-[#f8faf1]">
-                    {/* Card 1: Hình thức & Tổng quan */}
-                    <div className="p-4 bg-white border border-[#d1dec0] shadow-sm rounded-xl space-y-3">
-                      <div className="flex justify-between font-black text-sm text-on-surface border-b border-surface-variant/40 pb-2">
-                        <span className="flex items-center gap-2"><FileText className="w-4 h-4 text-[#89B449]"/>1. Hình thức & Cấu trúc</span>
-                        <span className="text-emerald-800 font-mono bg-emerald-100 px-2 py-0.5 rounded-md">
-                          {aiResult.hinh_thuc_tong_quan?.diem_hinh_thuc}/10 đ
-                        </span>
+                  
+                  {/* Mini Rubric Accordion / List */}
+                  <div className="space-y-2 mt-3 pt-3 border-t border-[#89B449]/20">
+                    <div className="text-[10px]">
+                      <div className="flex justify-between font-bold text-[#407F3E]">
+                        <span>Hình thức:</span>
+                        <span>{aiResult.hinh_thuc_tong_quan?.diem_hinh_thuc}/10 đ</span>
                       </div>
-                      <p className="text-xs text-on-surface-variant font-medium leading-relaxed italic border-l-2 border-emerald-300 pl-3">
-                        {aiResult.hinh_thuc_tong_quan?.ly_do_hinh_thuc}
-                      </p>
-
-                      <div className="flex justify-between font-black text-sm text-on-surface border-b border-surface-variant/40 pb-2 pt-2">
-                        <span className="flex items-center gap-2"><Building className="w-4 h-4 text-[#89B449]"/>2. Tổng quan doanh nghiệp</span>
-                        <span className="text-emerald-800 font-mono bg-emerald-100 px-2 py-0.5 rounded-md">
-                          {aiResult.hinh_thuc_tong_quan?.diem_tong_quan}/10 đ
-                        </span>
-                      </div>
-                      <p className="text-xs text-on-surface-variant font-medium leading-relaxed italic border-l-2 border-emerald-300 pl-3">
-                        {aiResult.hinh_thuc_tong_quan?.ly_do_tong_quan}
-                      </p>
+                      <p className="text-slate-600 line-clamp-1 italic">{aiResult.hinh_thuc_tong_quan?.ly_do_hinh_thuc}</p>
                     </div>
-
-                    {/* Card 2: Quy trình công nghệ */}
-                    <div className="p-4 bg-white border border-[#d1dec0] shadow-sm rounded-xl space-y-3">
-                      <div className="flex justify-between font-black text-sm text-on-surface border-b border-surface-variant/40 pb-2">
-                        <span className="flex items-center gap-2"><Laptop className="w-4 h-4 text-[#89B449]"/>3. Quy trình công nghệ quan sát</span>
-                        <span className="text-emerald-800 font-mono bg-emerald-100 px-2 py-0.5 rounded-md">
-                          {aiResult.quy_trinh_cong_nghe?.diem_quy_trinh}/10 đ
-                        </span>
+                    <div className="text-[10px]">
+                      <div className="flex justify-between font-bold text-[#407F3E]">
+                        <span>Quy trình:</span>
+                        <span>{aiResult.quy_trinh_cong_nghe?.diem_quy_trinh}/10 đ</span>
                       </div>
-                      <p className="text-xs text-on-surface-variant font-medium leading-relaxed italic border-l-2 border-emerald-300 pl-3">
-                        {aiResult.quy_trinh_cong_nghe?.ly_do_quy_trinh}
-                      </p>
+                      <p className="text-slate-600 line-clamp-1 italic">{aiResult.quy_trinh_cong_nghe?.ly_do_quy_trinh}</p>
                     </div>
-
-                    {/* Card 3: Đánh giá VSATTP */}
-                    <div className="p-4 bg-white border border-[#d1dec0] shadow-sm rounded-xl space-y-3">
-                      <div className="flex justify-between font-black text-sm text-on-surface border-b border-surface-variant/40 pb-2">
-                        <span className="flex items-center gap-2"><CheckSquare className="w-4 h-4 text-[#89B449]"/>4. Đánh giá thực trạng VSATTP</span>
-                        <span className="text-emerald-800 font-mono bg-emerald-100 px-2 py-0.5 rounded-md">
-                          {aiResult.vsattp?.diem_vsattp}/10 đ
-                        </span>
+                    <div className="text-[10px]">
+                      <div className="flex justify-between font-bold text-[#407F3E]">
+                        <span>VSATTP:</span>
+                        <span>{aiResult.vsattp?.diem_vsattp}/10 đ</span>
                       </div>
-                      <p className="text-xs text-on-surface-variant font-medium leading-relaxed italic border-l-2 border-emerald-300 pl-3">
-                        {aiResult.vsattp?.ly_do_vsattp}
-                      </p>
+                      <p className="text-slate-600 line-clamp-1 italic">{aiResult.vsattp?.ly_do_vsattp}</p>
                     </div>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* 🔴 CỘT PHẢI: Bảng điều khiển AI & Form Nhập điểm */}
-            <div className="lg:col-span-5 space-y-6">
-
-              <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-6 border border-emerald-200 shadow-sm relative overflow-hidden min-h-[160px] flex flex-col justify-center">
-                <div className="absolute right-0 top-0 opacity-10 translate-x-4 -translate-y-4">
-                  <Sparkles className="w-32 h-32 text-primary" />
-                </div>
-
-                <div className="flex items-center gap-2 mb-4 relative z-10">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-600/10 text-emerald-800 flex items-center justify-center shadow-inner">
-                    <Bot className="w-5 h-5 text-emerald-800" />
-                  </div>
-                  <h2 className="font-extrabold text-sm text-emerald-950 uppercase tracking-wider">Hội Đồng AI Chấm Điểm</h2>
-                </div>
-
-                {isAIGrading ? (
-                  <div className="flex flex-col items-center justify-center py-4 relative z-10">
-                    <Loader2 className="w-8 h-8 animate-spin text-emerald-600 mb-2" />
-                    <p className="text-xs font-bold text-emerald-800">🧠 Đang đối chiếu Rubric & Phân tích...</p>
-                    <p className="text-[10px] text-emerald-600 font-semibold mt-1">(Quá trình này mất khoảng 10 - 15 giây)</p>
-                  </div>
-                ) : !aiResult ? (
-                  <div className="relative z-10 space-y-4">
-                    <p className="text-emerald-900 text-xs font-semibold leading-relaxed">
-                      Sử dụng mô hình ngôn ngữ lớn (Qwen-Max) để tự động đối chiếu văn bản báo cáo với tiêu chuẩn Rubric của Khoa.
-                    </p>
-                    <button
-                      onClick={handleAIGrading}
-                      className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
-                    >
-                      <Sparkles className="w-4 h-4" />
-                      <span>Kích hoạt AI Đánh Giá</span>
-                    </button>
-                  </div>
-                ) : (
-                  <div className="relative z-10 animate-fade-in">
-                    <div className="flex items-baseline justify-between mb-3">
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-4xl font-black text-emerald-800 leading-none">{aiResult.diem_bao_cao_cuoi_cung.toFixed(1)}</span>
-                        <span className="text-emerald-600 text-sm font-bold">/ 10</span>
-                      </div>
-
-                      {/* NÚT CHẤM LẠI */}
-                      <button
-                        onClick={handleAIGrading}
-                        className="px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-lg text-[10px] font-black uppercase tracking-wider transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
-                      >
-                        <RefreshCw className="w-3 h-3" />
-                        <span>Chấm lại</span>
-                      </button>
-                    </div>
-
-                    <p className="text-emerald-900 text-xs font-semibold leading-relaxed mb-4">
-                      Phân tích hoàn tất. Hệ thống đã đánh giá đủ 3 tiêu chí: Hình thức, Công nghệ và VSATTP. Xem chi tiết nhận xét Rubric ở bên trái.
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Grading input form */}
-              <div className="bg-white rounded-2xl p-6 shadow-sm border border-surface-variant/40 space-y-6">
-                <h3 className="font-bold text-sm text-[#191d17] uppercase tracking-wider">Phiếu quyết định điểm</h3>
-
-                <form onSubmit={handleSaveGrade} className="space-y-4">
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider">
-                      Điểm báo cáo thu hoạch (0 - 10) <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative max-w-[140px]">
-                      <input
-                        type="number"
-                        min="0"
-                        max="10"
-                        step="0.1"
-                        value={score}
-                        onChange={(e) => setScore(e.target.value)}
-                        className="w-full px-4 py-3 font-mono font-black text-xl text-primary bg-[#f8faf1] border border-surface-variant rounded-xl focus:outline-none focus:border-primary/50 text-center"
-                        required
-                      />
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-xs">/ 10</span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider">
-                      Nhận xét (Sẽ gửi cho sinh viên)
-                    </label>
-                    <textarea
-                      rows={3}
-                      value={comments}
-                      onChange={(e) => setComments(e.target.value)}
-                      placeholder="Ghi chú thêm nếu bạn chỉnh sửa điểm do AI gợi ý..."
-                      className="w-full p-4 text-xs bg-[#f8faf1] border border-surface-variant rounded-xl focus:outline-none focus:border-primary/50 text-on-surface font-semibold leading-relaxed resize-none"
+            {/* Grading Form */}
+            <form onSubmit={handleSaveGrade} className="bg-white rounded-xl p-5 border border-[#E7E0C4] shadow-sm flex-1">
+              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-5 flex items-center gap-2">
+                <Edit3Icon className="w-4 h-4 text-[#407F3E]" /> Đánh giá & Chấm điểm
+              </h4>
+              
+              <div className="space-y-5">
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-wider">
+                    Điểm GVHD <span className="text-[#E68A8C]">*</span>
+                  </label>
+                  <div className="relative w-28">
+                    <input 
+                      type="number" min="0" max="10" step="0.1" 
+                      value={score}
+                      onChange={(e) => setScore(e.target.value)}
+                      placeholder="--"
+                      required
+                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-lg focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] font-black text-[#407F3E] transition-all text-center shadow-sm"
                     />
+                    <span className="absolute -right-8 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-sm">/ 10</span>
                   </div>
+                </div>
 
-                  <div className="pt-4 border-t border-slate-100 flex justify-end gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedReport(null)}
-                      className="px-4 py-2 text-xs font-bold text-on-surface-variant hover:bg-[#ecefe6] rounded-xl cursor-pointer"
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider">
+                      Nhận xét chi tiết
+                    </label>
+                    <button 
+                      type="button" 
+                      onClick={handleInsertTemplate}
+                      className="text-[10px] font-bold text-[#407F3E] bg-[#89B449]/10 px-2 py-0.5 rounded flex items-center gap-1 cursor-pointer hover:bg-[#89B449]/20 transition-colors"
                     >
-                      Hủy bỏ
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="px-5 py-2.5 bg-primary text-white text-xs font-bold rounded-xl hover:bg-primary-container shadow-md transition-all active:scale-95 cursor-pointer"
-                    >
-                      Xác nhận điểm số
+                      <Sparkles className="w-3 h-3" /> Chèn mẫu
                     </button>
                   </div>
-                </form>
+                  <textarea 
+                    rows={6}
+                    value={comments}
+                    onChange={(e) => setComments(e.target.value)}
+                    placeholder="Nhận xét về nội dung, hình thức và tính thực tiễn của bài thu hoạch..."
+                    className="w-full px-4 py-3 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-700 shadow-sm resize-none custom-scrollbar"
+                  />
+                </div>
               </div>
 
-            </div>
+              <div className="mt-8 space-y-3">
+                <button 
+                  type="submit"
+                  disabled={loading}
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-lg text-sm font-bold shadow-md hover:shadow-lg transition-all cursor-pointer disabled:opacity-50"
+                >
+                  <Save className="w-4 h-4" /> Lưu điểm
+                </button>
+                
+                <button type="button" className="w-full flex items-center justify-center gap-2 py-3 bg-white border border-[#407F3E] text-[#407F3E] hover:bg-[#407F3E]/5 rounded-lg text-sm font-bold transition-all cursor-pointer">
+                  <MessageSquareWarning className="w-4 h-4" /> Yêu cầu bổ sung
+                </button>
+              </div>
+
+            </form>
 
           </div>
         </div>
-      )}
+      </div>
+    );
+  };
+
+  return (
+    <div className={selectedReport ? '' : 'bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300'}>
+      {selectedReport ? renderGradingView() : renderReportList()}
     </div>
   );
 }
+
+const Edit3Icon = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M12 20h9"></path>
+    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+  </svg>
+);

@@ -1,0 +1,5 @@
+{
+  "message": "Error: Validation failed for parameter '2'. Invalid time.",
+  "stack": "QueryFailedError: Error: Validation failed for parameter '2'. Invalid time.\n    at <anonymous> (E:\\Khoa_Luan\\CodeDoAn\\backend\\node_modules\\typeorm\\driver\\src\\driver\\sqlserver\\SqlServerQueryRunner.ts:277:30)\n    at E:\\Khoa_Luan\\CodeDoAn\\backend\\node_modules\\mssql\\lib\\base\\request.js:496:25\n    at Request.userCallback (E:\\Khoa_Luan\\CodeDoAn\\backend\\node_modules\\mssql\\lib\\tedious\\request.js:507:15)\n    at Request.Request.callback (E:\\Khoa_Luan\\CodeDoAn\\backend\\node_modules\\tedious\\src\\request.ts:379:14)\n    at <anonymous> (E:\\Khoa_Luan\\CodeDoAn\\backend\\node_modules\\tedious\\src\\connection.ts:2680:17)\n    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)",
+  "name": "QueryFailedError"
+}

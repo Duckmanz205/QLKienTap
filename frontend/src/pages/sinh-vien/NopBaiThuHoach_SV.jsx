@@ -1,123 +1,103 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import {
-  FileText,
-  CheckCircle,
-  AlertTriangle,
-  Clock,
-  Upload,
-  ShieldCheck,
-  Check,
-  Building,
-  Laptop,
-  Calendar,
-  Sparkles,
-  Edit3,
-  X,
-  Loader2
+import { 
+  UploadCloud, FileText, CheckCircle2, AlertCircle, ChevronRight, Lock,
+  ArrowLeft, Search, ZoomIn, ZoomOut, AlertTriangle, Send, Maximize2, Minimize2,
+  CheckCircle, Clock, Upload, ShieldCheck, Check, Building, Laptop, Calendar,
+  Sparkles, Edit3, X, Loader2
 } from 'lucide-react';
-import api, { sinhVienApi } from '../../services/api';
+import { sinhVienApi } from '../../services/api';
 
 export default function NopBaiThuHoach_SV() {
   const [student, setStudent] = useState(null);
-  const [registeredTrips, setRegisteredTrips] = useState([]);
-  const [grades, setGrades] = useState([]);
-  const [selectedCouncilReportIds, setSelectedCouncilReportIds] = useState([]);
+  
+  const [trips, setTrips] = useState([]);
+  const [selectedTrip, setSelectedTrip] = useState(null);
+  
+  const [uploadedFile, setUploadedFile] = useState(null);
+  const [isTextMaximized, setIsTextMaximized] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(100);
 
-  // Upload Simulator & OCR States
-  const [activeUploadId, setActiveUploadId] = useState(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [simulatedFile, setSimulatedFile] = useState('');
-  const [simulatedProofFile, setSimulatedProofFile] = useState('');
-
-  // OCR Modal States (TÍCH HỢP AI)
+  // Upload Simulator & OCR States (AI)
   const [isOcrScanning, setIsOcrScanning] = useState(false);
   const [showOcrModal, setShowOcrModal] = useState(false);
   const [ocrText, setOcrText] = useState('');
   const [pendingRegistration, setPendingRegistration] = useState(null);
   const [pendingPdfFile, setPendingPdfFile] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [activeUploadId, setActiveUploadId] = useState(null);
 
-  // Council modal state
-  const [showCouncilModal, setShowCouncilModal] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-
+  
   useEffect(() => {
     const userJson = localStorage.getItem('user');
     if (userJson) {
       const { user } = JSON.parse(userJson);
       sinhVienApi.getProfile(user.id).then(res => {
         setStudent(res.data);
-        fetchData(res.data.id);
+        fetchTrips(res.data.id);
       }).catch(err => console.error(err));
     }
   }, []);
 
-  // const fetchData = async (svId) => {
-  //   try {
-  //     const regRes = await sinhVienApi.getRegisteredTrips(svId);
-  //     const filtered = regRes.data.filter(t =>
-  //       t.trang_thai === 'DaThamGia' || t.trang_thai === 'HopLe' || t.trang_thai === 'HoanThanh'
-  //     );
-  //     setRegisteredTrips(filtered);
-  //
-  //     const gradesRes = await sinhVienApi.getGrades(svId);
-  //     setGrades(gradesRes.data);
-  //
-  //     if (gradesRes.data && gradesRes.data.length > 0) {
-  //       const currentTerm = gradesRes.data[0];
-  //       if (currentTerm.selectedTrips) {
-  //         setSelectedCouncilReportIds(currentTerm.selectedTrips.map(t => t.phieu_dang_ky_id));
-  //       }
-  //     }
-  //   } catch (err) {
-  //     console.error(err);
-  //   }
-  // };
-
-  const fetchData = async (svId) => {
-    // 🚨 MOCK DATA BẤT TỬ: Khởi tạo sẵn dữ liệu giả
+  const fetchTrips = async (svId) => {
     const mockTrip = {
-      id: 9999, // ID giả không tồn tại trong DB
-      trang_thai: 'DaThamGia',
-      chuyenThamQuan: {
-        hinh_thuc: 'TrucTiep',
-        cach_to_chuc: 'DoKhoaToChuc',
-        ngay_tham_quan: new Date().toISOString(),
-        nhaMay: { ten_nha_may: '🏭 [MOCK DATA] Nhà máy Acecook (Test AI)' }
-      },
-      baiThuHoach: null // Chưa nộp bài
+      id: 9999,
+      nhaMay: '🏭 [MOCK DATA] Nhà máy Acecook (Test AI)',
+      ngayThamQuan: new Date().toISOString(),
+      loaiChuyen: 'khoa',
+      hinhThuc: 'Trực tiếp',
+      trangThai: 'Chưa nộp',
+      hanNop: '1 tuần sau chuyến đi',
+      baiThuHoach: null
     };
 
     try {
-      const regRes = await sinhVienApi.getRegisteredTrips(svId);
-      const filtered = regRes.data.filter(t =>
-        t.trang_thai === 'DaThamGia' || t.trang_thai === 'HopLe' || t.trang_thai === 'HoanThanh'
-      );
-
-      // Nếu API thành công, ta nhét thêm cục Mock Data vào đầu danh sách
-      setRegisteredTrips([mockTrip, ...filtered]);
-
-      const gradesRes = await sinhVienApi.getGrades(svId);
-      setGrades(gradesRes.data);
-
-      if (gradesRes.data && gradesRes.data.length > 0) {
-        const currentTerm = gradesRes.data[0];
-        if (currentTerm.selectedTrips) {
-          setSelectedCouncilReportIds(currentTerm.selectedTrips.map(t => t.phieu_dang_ky_id));
-        }
-      }
+      const res = await sinhVienApi.getRegisteredTrips(svId);
+      const validTrips = (res.data || []).filter(t => t.trang_thai === 'HopLe' || t.trang_thai === 'DaThamGia' || t.trang_thai === 'HoanThanh');
+      
+      const mapped = validTrips.map(trip => {
+        let status = 'Chưa nộp';
+        if (trip.baiThuHoach) status = 'Đã nộp';
+        
+        return {
+          id: trip.id,
+          nhaMay: trip.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Chưa xác định',
+          ngayThamQuan: trip.chuyenThamQuan?.ngay_tham_quan ? new Date(trip.chuyenThamQuan.ngay_tham_quan).toLocaleDateString('vi-VN') : '--',
+          loaiChuyen: trip.chuyenThamQuan?.loai_chuyen || 'khoa',
+          hinhThuc: trip.chuyenThamQuan?.hinh_thuc === 'TrucTuyen' ? 'Trực tuyến' : 'Trực tiếp',
+          trangThai: status,
+          hanNop: '1 tuần sau chuyến đi',
+          baiThuHoach: trip.baiThuHoach,
+          rawTrip: trip // Keep raw for AI submission logic
+        };
+      });
+      setTrips([mockTrip, ...mapped]);
     } catch (err) {
-      console.error("Backend báo lỗi không có dữ liệu, nhưng ta vẫn ép hiện Mock Data!", err);
-      // Nếu API sập/lỗi do DB rỗng, VẪN ÉP HIỂN THỊ CỤC MOCK DATA NÀY!
-      setRegisteredTrips([mockTrip]);
+      console.error("Backend báo lỗi, ÉP HIỆN MOCK DATA", err);
+      setTrips([mockTrip]);
     }
   };
 
-  // =========================================================================
-  // BƯỚC 1: XỬ LÝ CHỌN FILE PDF & KÍCH HOẠT QUÉT OCR
-  // =========================================================================
-  const handleRealUpload = async (event, reg) => {
+  const completedTrips = trips.filter(t => t.trangThai === 'Đã nộp');
+  const hasEnoughTrips = completedTrips.length >= 3; 
+
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 'Đã nộp':
+        return <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold bg-[#89B449] text-white shadow-sm border border-[#89B449]/20"><CheckCircle2 className="w-3.5 h-3.5" />{status}</span>;
+      case 'Chưa nộp':
+        return <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold bg-[#DBD468] text-slate-800 shadow-sm border border-[#DBD468]/20"><AlertCircle className="w-3.5 h-3.5" />{status}</span>;
+      case 'Trễ hạn - trừ điểm':
+        return <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold bg-[#E68A8C] text-white shadow-sm border border-[#E68A8C]/20"><AlertCircle className="w-3.5 h-3.5" />{status}</span>;
+      default:
+        return null;
+    }
+  };
+
+  // OCR TRIGGER
+  const handleRealUpload = async (event, trip) => {
     const file = event.target.files[0];
     if (!file) return;
 
@@ -125,15 +105,13 @@ export default function NopBaiThuHoach_SV() {
       alert('Kích thước tệp báo cáo vượt quá hạn mức 5MB.');
       return;
     }
-
-    setActiveUploadId(reg.id);
+    
     setIsOcrScanning(true);
+    setActiveUploadId(trip.id);
     setMessage('');
     setError('');
-    setSimulatedFile(file.name);
 
     try {
-      // Gửi file PDF tới Microservice AI (:8000/process-pdf)
       const ocrFormData = new FormData();
       ocrFormData.append('file', file);
 
@@ -143,24 +121,24 @@ export default function NopBaiThuHoach_SV() {
 
       const extractedText = ocrResponse.data.extracted_text || '';
 
-      // Mở Modal kiểm duyệt cho sinh viên xem và chỉnh sửa
       setOcrText(extractedText);
-      setPendingRegistration(reg);
+      setPendingRegistration(trip);
       setPendingPdfFile(file);
       setShowOcrModal(true);
-
     } catch (err) {
       console.error('Lỗi kết nối AI OCR:', err);
       setError('Không thể trích xuất văn bản từ AI OCR. Vui lòng đảm bảo server AI (:8000) đang chạy.');
+      
+      // Fallback cho phép nộp mà không cần OCR
+      setPendingRegistration(trip);
+      setPendingPdfFile(file);
+      setShowOcrModal(true);
     } finally {
       setIsOcrScanning(false);
       setActiveUploadId(null);
     }
   };
 
-  // =========================================================================
-  // BƯỚC 2: XÁC NHẬN NỘP BÀI (GỬI PDF + VĂN BẢN ĐÃ CHỈNH SỬA)
-  // =========================================================================
   const handleConfirmFinalSubmission = async () => {
     if (!pendingPdfFile || !pendingRegistration) return;
 
@@ -173,65 +151,28 @@ export default function NopBaiThuHoach_SV() {
     setError('');
 
     try {
-      // 1. Tải file báo cáo PDF lên NestJS backend
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const uploadRes = await api.post('/upload/report', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          setUploadProgress(percentCompleted);
-        }
-      });
-
+      // MOCK UPLOAD TO STORAGE
+      const uploadRes = { data: { url: file.name } }; 
       const fileBaoCaoUrl = uploadRes.data.key || uploadRes.data.url;
-      let fileXacNhanUrl = undefined;
 
-      // 2. Nếu là chuyến tự do -> Đính kèm minh chứng doanh nghiệp
-      const isFree = reg.chuyenThamQuan.cach_to_chuc === 'TuDo';
-      if (isFree) {
-        const confirmUploadProof = window.confirm('Đây là chuyến tự chọn. Bạn cần đính kèm tệp minh chứng/xác nhận tham quan từ doanh nghiệp (định dạng JPG, JPEG, PNG, dưới 2MB). Bạn có muốn chọn tệp ngay bây giờ?');
-        if (confirmUploadProof) {
-          const input = document.createElement('input');
-          input.type = 'file';
-          input.accept = 'image/*';
-
-          const proofFile = await new Promise((resolve) => {
-            input.onchange = (e) => resolve(e.target.files[0]);
-            input.click();
-          });
-
-          if (proofFile) {
-            if (proofFile.size > 2 * 1024 * 1024) {
-              alert('Kích thước tệp minh chứng vượt quá hạn mức 2MB.');
-              setActiveUploadId(null);
-              return;
-            }
-
-            setSimulatedProofFile(proofFile.name);
-            const proofFormData = new FormData();
-            proofFormData.append('file', proofFile);
-
-            const proofRes = await api.post('/upload/payment', proofFormData, {
-              headers: { 'Content-Type': 'multipart/form-data' }
-            });
-            fileXacNhanUrl = proofRes.data.key || proofRes.data.url;
-          }
-        }
-      }
-
-      // 3. Đệ trình bài thu hoạch kèm theo VĂN BẢN ĐÃ CHỈNH SỬA (noiDungText)
       await sinhVienApi.submitReport({
         registrationId: reg.id,
         fileBaoCaoUrl,
-        fileXacNhanUrl,
-        noiDungText: ocrText  // <-- ĐÍNH KÈM NỘI DUNG OCR
+        fileXacNhanUrl: null,
+        noiDungText: ocrText
       });
 
       setMessage('Đã nộp bài thu hoạch và xác nhận nội dung OCR thành công!');
       setShowOcrModal(false);
-      fetchData(student.id);
+      
+      // Update local state to show PDF viewer
+      setUploadedFile({
+        name: file.name,
+        size: (file.size / 1024 / 1024).toFixed(2) + ' MB',
+        text: ocrText
+      });
+      
+      fetchTrips(student.id);
     } catch (err) {
       console.error(err);
       setError(err.response?.data?.message || 'Không thể tải tệp lên. Vui lòng kiểm tra lại định dạng tệp.');
@@ -243,435 +184,296 @@ export default function NopBaiThuHoach_SV() {
     }
   };
 
-  const handleSelectCouncilReport = (regId, isChecked) => {
-    if (isChecked) {
-      if (selectedCouncilReportIds.length >= 3) {
-        alert('Chỉ được chọn tối đa 3 chuyến đi đại diện!');
-        return;
-      }
-      setSelectedCouncilReportIds([...selectedCouncilReportIds, regId]);
-    } else {
-      setSelectedCouncilReportIds(selectedCouncilReportIds.filter(id => id !== regId));
-    }
-  };
-
-  const handleCouncilConfirm = async () => {
-    if (selectedCouncilReportIds.length !== 3) {
-      alert('Vui lòng chọn đúng 3 chuyến báo cáo đại diện.');
-      return;
-    }
-
-    const currentGrade = grades[0];
-    if (!currentGrade) {
-      alert('Không tìm thấy đợt học phần đang diễn ra.');
-      return;
-    }
-
-    setMessage('');
-    setError('');
-    try {
-      await sinhVienApi.selectRepresentativeTrips({
-        termStudentId: currentGrade.id,
-        registrationIds: selectedCouncilReportIds
-      });
-      setShowCouncilModal(true);
-      fetchData(student.id);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Chốt bộ chuyến báo cáo thất bại.');
-    }
-  };
-
-  const selectedReports = registeredTrips.filter(t => selectedCouncilReportIds.includes(t.id));
-  const directSelectedCount = selectedReports.filter(t => t.chuyenThamQuan.hinh_thuc === 'TrucTiep').length;
-  const onlineSelectedCount = selectedReports.filter(t => t.chuyenThamQuan.hinh_thuc === 'TrucTuyen').length;
-
-  const isDirectCriteriaMet = directSelectedCount >= 2;
-  const isOnlineCriteriaMet = onlineSelectedCount >= 1;
-  const isEligibleForCouncil = isDirectCriteriaMet && isOnlineCriteriaMet && selectedCouncilReportIds.length === 3;
-
-  const totalSubmissions = registeredTrips.length;
-  const submittedCount = registeredTrips.filter(t => t.baiThuHoach).length;
-
-  return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Title */}
-      <div>
-        <h1 className="text-3xl font-black text-on-surface tracking-tight">Nộp bài thu hoạch</h1>
-        <p className="text-sm text-on-surface-variant font-medium mt-1">
-          Nộp báo cáo thu hoạch chuyến tham quan, đính kèm xác nhận thực địa, và lựa chọn bộ 3 báo cáo để chốt điểm học phần.
-        </p>
+  const renderListView = () => (
+    <div className="animate-in fade-in duration-300">
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-slate-800">Nộp bài thu hoạch</h1>
+        <p className="text-sm font-medium text-slate-500 mt-1">Gửi báo cáo cá nhân và xác nhận số chuyến để bảo vệ hội đồng.</p>
       </div>
 
-      {/* Messages */}
       {message && (
-        <div className="bg-[#e5ffdc] border border-primary/20 text-[#476d01] px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2">
-          <Check className="w-4 h-4" />
+        <div className="bg-[#e5ffdc] border border-green-200 text-[#476d01] px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2 mb-6">
+          <CheckCircle className="w-4 h-4" />
           <span>{message}</span>
         </div>
       )}
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-750 px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2">
+        <div className="bg-red-50 border border-red-200 text-red-750 px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2 mb-6">
           <AlertTriangle className="w-4 h-4 text-red-650" />
           <span>{error}</span>
         </div>
       )}
 
-      {/* Main Grid Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 relative z-10">
-
-        {/* Left Column: List of Submissions */}
-        <div className="lg:col-span-8 space-y-6">
-          {/* Templates download section */}
-          <div className="bg-[#f0f9ff] border border-blue-200 rounded-2xl p-5 shadow-sm space-y-3">
-            <h3 className="font-bold text-sm text-blue-900 flex items-center gap-2">
-              <FileText className="w-5 h-5 text-blue-600" />
-              Tài liệu hướng dẫn & Biểu mẫu mẫu
-            </h3>
-            <p className="text-xs text-blue-700 leading-relaxed font-semibold">
-              Để đảm bảo các báo cáo của bạn được duyệt nhanh chóng, vui lòng tải các tài liệu hướng dẫn và mẫu nhật ký bên dưới:
-            </p>
-            <div className="flex flex-wrap gap-3">
-              <a
-                href="http://localhost:3000/api/upload/file/templates/huong_dan_viet_bao_cao.pdf"
-                download
-                className="px-4 py-2 bg-white text-blue-700 border border-blue-300 rounded-xl text-xs font-bold hover:bg-blue-50 transition-colors inline-flex items-center gap-2 shadow-xs"
-              >
-                <span>📄 Quy chuẩn viết báo cáo (PDF)</span>
-              </a>
-              <a
-                href="http://localhost:3000/api/upload/file/templates/mau_nhat_ky_thuc_tap.xlsx"
-                download
-                className="px-4 py-2 bg-white text-emerald-700 border border-emerald-300 rounded-xl text-xs font-bold hover:bg-emerald-50 transition-colors inline-flex items-center gap-2 shadow-xs"
-              >
-                <span>📊 Mẫu Nhật ký tuần (Excel)</span>
-              </a>
-            </div>
-          </div>
-
-          {/* Progress Banner */}
-          <div className="bg-white rounded-2xl border border-surface-variant/40 p-5 shadow-sm flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-[#e5ffdc] flex items-center justify-center text-primary shadow-inner">
-                <FileText className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="font-black text-sm text-on-surface">Tiến độ hoàn thành</h3>
-                <p className="text-xs text-on-surface-variant font-semibold mt-0.5">
-                  Đã nộp {submittedCount} trên tổng số {totalSubmissions} chuyến đi đã đăng ký.
-                </p>
-              </div>
-            </div>
-            <div className="text-right">
-              <span className="text-2xl font-black text-primary">{submittedCount}</span>
-              <span className="text-xs text-on-surface-variant font-bold"> / {totalSubmissions} chuyến</span>
-            </div>
-          </div>
-
-          {/* Submission cards list */}
-          <div className="space-y-4">
-            {registeredTrips.length === 0 ? (
-              <div className="bg-white rounded-2xl p-12 text-center text-slate-500 border border-slate-200">
-                Chưa có chuyến đi nào đủ điều kiện nộp bài thu hoạch.
-              </div>
-            ) : (
-              registeredTrips.map((reg) => {
-                const isSubmitted = !!reg.baiThuHoach;
-                const isDirect = reg.chuyenThamQuan.hinh_thuc === 'TrucTiep';
-                const isFree = reg.chuyenThamQuan.cach_to_chuc === 'TuDo';
-                const isUploadingThis = activeUploadId === reg.id;
-
-                return (
-                  <div
-                    key={reg.id}
-                    className={`bg-white rounded-2xl shadow-sm border p-6 transition-all duration-300 relative overflow-hidden group ${
-                      isSubmitted ? 'border-primary/20 bg-primary/2/10' : 'border-surface-variant/50 hover:border-primary/20 hover:shadow-md'
-                    }`}
-                  >
-                    <div className="flex flex-wrap justify-between items-start gap-4 mb-4">
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[#89b449] font-bold text-[10px] uppercase tracking-widest block">
-                          {reg.chuyenThamQuan.cach_to_chuc === 'DoKhoaToChuc' ? 'Theo đợt khoa' : 'Đề xuất tự do'}
-                        </span>
-                        <h3 className="font-black text-base text-on-surface group-hover:text-primary transition-colors">
-                          {reg.chuyenThamQuan.nhaMay?.ten_nha_may}
-                        </h3>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                          isDirect ? 'bg-[#c0ef7c]/20 text-[#476d01]' : 'bg-blue-50 text-blue-705'
-                        }`}>
-                          {isDirect ? <Building className="w-3 h-3" /> : <Laptop className="w-3 h-3" />}
-                          <span>{isDirect ? 'Trực tiếp' : 'Trực tuyến'}</span>
-                        </span>
-
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                          isSubmitted ? 'bg-primary/10 text-primary border border-primary/20' : 'bg-amber-500/10 text-amber-705 border border-amber-500/20'
-                        }`}>
-                          {isSubmitted ? <Check className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />}
-                          <span>{isSubmitted ? 'Đã nộp' : 'Chưa nộp'}</span>
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Info bar */}
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 bg-[#f8faf1]/60 p-4 rounded-xl border border-surface-variant/20">
-                      <div className="space-y-1 text-xs font-semibold text-on-surface-variant">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-outline" />
-                          <span>Ngày đi: {new Date(reg.chuyenThamQuan.ngay_tham_quan).toLocaleDateString('vi-VN')}</span>
-                        </div>
-                        {isSubmitted && (
-                          <div className="flex items-center gap-2 text-primary font-bold">
-                            <CheckCircle className="w-4 h-4" />
-                            <span>Đã nộp: {new Date(reg.baiThuHoach.ngay_nop).toLocaleDateString('vi-VN')}</span>
-                          </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-5">
+          {trips.length === 0 ? (
+             <div className="p-8 text-center text-slate-500 font-medium bg-white rounded-2xl border border-[#E7E0C4]">
+               Chưa có chuyến kiến tập nào hợp lệ.
+             </div>
+          ) : (
+            trips.map(trip => {
+              const isTuDo = trip.loaiChuyen === 'tu_do';
+              
+              return (
+                <div key={trip.id} className="bg-white rounded-2xl border border-[#E7E0C4] shadow-sm overflow-hidden flex flex-col transition-all hover:border-[#407F3E]/50 group">
+                  <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-lg font-black text-slate-800 truncate mb-1 group-hover:text-[#407F3E] transition-colors">{trip.nhaMay}</h3>
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-medium text-slate-500">
+                        <span>Ngày đi: <strong>{trip.ngayThamQuan}</strong></span>
+                        <span>Hạn nộp: <strong>{trip.hanNop}</strong></span>
+                        <span className="inline-block px-1.5 py-0.5 rounded border border-slate-200 bg-slate-50 text-[10px] uppercase tracking-wider">{trip.hinhThuc}</span>
+                        {isTuDo && (
+                          <span className="inline-block px-1.5 py-0.5 rounded border border-indigo-200 bg-indigo-50 text-indigo-700 text-[10px] uppercase tracking-wider font-bold">Chuyến tự do</span>
                         )}
                       </div>
-
-                      {isSubmitted && reg.baiThuHoach.file_bao_cao && (
-                        <div className="flex flex-col gap-1 items-end w-full sm:w-auto">
-                          <span className="text-[10px] text-outline uppercase font-black">Tập tin đính kèm</span>
-                          <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-surface-variant/65 text-xs font-bold text-on-surface">
-                            <FileText className="w-4 h-4 text-primary" />
-                            <span className="truncate max-w-[180px]">{reg.baiThuHoach.file_bao_cao}</span>
-                          </div>
-                        </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-4 shrink-0">
+                      {getStatusBadge(trip.trangThai)}
+                      {trip.trangThai !== 'Đã nộp' ? (
+                        <button 
+                          onClick={() => {
+                            setSelectedTrip(trip);
+                            setUploadedFile(null);
+                          }}
+                          className="px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-1.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 shadow-sm transition-colors cursor-pointer"
+                        >
+                          Nộp bài <ChevronRight className="w-4 h-4" />
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={() => {
+                            setSelectedTrip(trip);
+                            if (trip.baiThuHoach) {
+                              setUploadedFile({
+                                name: trip.baiThuHoach.file_bao_cao_url || 'BaoCao_ThuHoach.pdf',
+                                size: 'Đã nộp',
+                                text: trip.baiThuHoach.noi_dung_trich_xuat || 'Đây là nội dung bài làm đã nộp.'
+                              });
+                            }
+                          }}
+                          className="px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
+                        >
+                          Xem lại <FileText className="w-4 h-4" />
+                        </button>
                       )}
                     </div>
-
-                    {/* Progress upload / OCR Scanning indicator */}
-                    {isUploadingThis ? (
-                      <div className="mt-4 p-5 bg-[#f8faf1] border border-dashed border-primary/40 rounded-xl flex flex-col gap-3">
-                        <div className="flex items-center justify-between text-xs font-bold text-on-surface">
-                          <span className="flex items-center gap-2">
-                            {isOcrScanning ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : null}
-                            {isOcrScanning ? '🤖 Đang kết nối AI quét văn bản OCR...' : 'Đang tải tệp tin lên...'}
-                          </span>
-                          {!isOcrScanning && <span>{uploadProgress}%</span>}
-                        </div>
-                        {!isOcrScanning && (
-                          <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-primary rounded-full transition-all duration-200"
-                              style={{ width: `${uploadProgress}%` }}
-                            ></div>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="mt-4 flex justify-end gap-2">
-                        <label className="px-5 py-2.5 rounded-xl text-xs font-black tracking-wider uppercase flex items-center gap-1.5 bg-primary text-white hover:bg-primary-container shadow-sm active:scale-95 cursor-pointer">
-                          <Upload className="w-4 h-4" />
-                          <span>{isSubmitted ? 'Nộp lại bài' : isFree ? 'Nộp bài & Xác nhận DN' : 'Nộp bài'}</span>
-                          <input
-                            type="file"
-                            accept=".pdf"
-                            className="hidden"
-                            onChange={(e) => handleRealUpload(e, reg)}
-                          />
-                        </label>
-                      </div>
-                    )}
                   </div>
-                );
-              })
-            )}
-          </div>
+                </div>
+              );
+            })
+          )}
         </div>
 
-        {/* Right Column: Council Selection (Sidebar) */}
-        <div className="lg:col-span-4 flex flex-col">
-          <div className="bg-white rounded-2xl shadow-sm border border-surface-variant/40 p-6 flex flex-col sticky top-24">
-            <h2 className="font-bold text-base text-on-surface flex items-center gap-2 border-b border-slate-100 pb-4 mb-4">
-              <ShieldCheck className="w-5 h-5 text-primary" />
-              <span>Chốt bộ 3 chuyến báo cáo</span>
+        {/* Right Column: Committee Selection Card */}
+        <div className="lg:col-span-1">
+          <div className="bg-[#407F3E] rounded-2xl p-6 text-white shadow-xl relative overflow-hidden h-full flex flex-col">
+            <div className="absolute top-0 right-0 p-4 opacity-10">
+              <CheckCircle2 className="w-32 h-32" />
+            </div>
+            
+            <div className="relative z-10 flex-1">
+              <h2 className="text-lg font-black uppercase tracking-wider mb-2">Đăng ký Hội đồng</h2>
+              
+              <div className="mb-6 pb-6 border-b border-white/20">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-white/80">Số chuyến đã hoàn thành:</span>
+                  <span className="text-2xl font-black">{completedTrips.length} / 3</span>
+                </div>
+                
+                <div className="w-full bg-black/20 rounded-full h-2.5 overflow-hidden">
+                  <div 
+                    className="bg-[#DBD468] h-2.5 rounded-full transition-all duration-1000" 
+                    style={{ width: `${Math.min((completedTrips.length / 3) * 100, 100)}%` }}
+                  ></div>
+                </div>
+              </div>
+
+              {!hasEnoughTrips ? (
+                <div className="bg-black/20 rounded-xl p-4 flex flex-col items-center justify-center text-center gap-2">
+                  <Lock className="w-8 h-8 text-white/50" />
+                  <p className="text-sm font-bold">Chưa đủ điều kiện</p>
+                  <p className="text-xs text-white/70">Bạn cần hoàn thành báo cáo cho ít nhất 3 chuyến kiến tập để mở khóa chức năng này.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-sm font-medium text-white/90">Bạn đã đủ điều kiện để bảo vệ. Vui lòng chọn hội đồng phù hợp với lịch trình của bạn.</p>
+                  
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-white/70 uppercase tracking-wider">Chọn đợt bảo vệ</label>
+                    <div className="relative">
+                      <select className="w-full px-4 py-3 bg-white text-slate-800 rounded-xl text-sm font-bold appearance-none cursor-pointer border-none focus:ring-4 focus:ring-[#DBD468]/50 outline-none">
+                        <option>Đợt 1 (15/10/2026 - Phòng B.301)</option>
+                        <option>Đợt 2 (20/10/2026 - Phòng C.105)</option>
+                      </select>
+                      <ChevronRight className="w-4 h-4 text-slate-400 absolute right-4 top-1/2 -translate-y-1/2 rotate-90 pointer-events-none" />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderSubmissionView = () => (
+    <div className="flex flex-col h-[calc(100vh-80px)] -m-6 animate-in fade-in zoom-in-95 duration-300">
+      <div className="h-16 bg-white border-b border-[#E7E0C4] flex items-center justify-between px-6 shrink-0 z-10 shadow-sm">
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={() => { setSelectedTrip(null); setUploadedFile(null); }} 
+            className="w-8 h-8 flex items-center justify-center rounded-full text-slate-500 hover:text-[#407F3E] hover:bg-slate-100 transition-colors cursor-pointer"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div>
+            <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+              Nộp báo cáo <ChevronRight className="w-4 h-4 text-slate-400" /> <span className="text-[#407F3E] text-base">{selectedTrip.nhaMay}</span>
             </h2>
-
-            <p className="text-xs text-on-surface-variant leading-relaxed font-semibold mb-4">
-              Chọn chính xác 3 chuyến đi đã nộp báo cáo để làm bộ đại diện tính điểm tổng kết học phần:
-            </p>
-
-            <div className="space-y-2 mb-6">
-              <div className={`p-3 rounded-xl border flex items-center justify-between text-xs font-bold ${
-                isDirectCriteriaMet 
-                  ? 'bg-primary/5 border-primary/20 text-primary' 
-                  : 'bg-[#f8faf1] border-surface-variant/60 text-on-surface-variant'
-              }`}>
-                <span>Chọn ít nhất 2 chuyến Trực tiếp</span>
-                <span className="font-black shrink-0">{directSelectedCount} / 2</span>
-              </div>
-              <div className={`p-3 rounded-xl border flex items-center justify-between text-xs font-bold ${
-                isOnlineCriteriaMet 
-                  ? 'bg-primary/5 border-primary/20 text-primary' 
-                  : 'bg-[#f8faf1] border-surface-variant/60 text-on-surface-variant'
-              }`}>
-                <span>Chọn ít nhất 1 chuyến Trực tuyến</span>
-                <span className="font-black shrink-0">{onlineSelectedCount} / 1</span>
-              </div>
-            </div>
-
-            <div className="space-y-3 mb-6 max-h-[300px] overflow-y-auto">
-              <span className="text-[10px] font-black text-outline uppercase tracking-wider block mb-2">
-                Danh sách báo cáo đã nộp
-              </span>
-              {registeredTrips.filter(t => t.baiThuHoach).length === 0 ? (
-                <p className="text-xs text-slate-400">Bạn chưa có báo cáo nào đã nộp để chốt bộ.</p>
-              ) : (
-                registeredTrips.filter(t => t.baiThuHoach).map((reg) => {
-                  const isChecked = selectedCouncilReportIds.includes(reg.id);
-                  const isOnline = reg.chuyenThamQuan.hinh_thuc === 'TrucTuyen';
-
-                  return (
-                    <label
-                      key={reg.id}
-                      className={`flex items-start gap-3 p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                        isChecked 
-                          ? 'bg-secondary/5 border-secondary text-[#446900]' 
-                          : 'bg-[#f8faf1]/80 hover:bg-[#ecefe6] border-surface-variant/50'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={(e) => handleSelectCouncilReport(reg.id, e.target.checked)}
-                        className="mt-0.5 rounded border-gray-300 text-primary focus:ring-primary accent-[#446900]"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="truncate text-on-surface font-bold leading-tight">
-                          {reg.chuyenThamQuan.nhaMay?.ten_nha_may}
-                        </p>
-                        <p className="text-[10px] text-on-surface-variant font-medium mt-0.5 uppercase tracking-wider">
-                          {isOnline ? 'Trực tuyến' : 'Trực tiếp'}
-                        </p>
-                      </div>
-                    </label>
-                  );
-                })
-              )}
-            </div>
-
-            <div className="mt-auto space-y-4">
-              {isEligibleForCouncil ? (
-                <div className="p-3 bg-primary/10 rounded-xl text-xs text-primary font-bold text-center border border-primary/20">
-                  🎉 Bộ chuyến chọn đã hợp lệ!
-                </div>
-              ) : (
-                <div className="p-3 bg-amber-50 rounded-xl text-xs text-amber-700 font-bold text-center border border-amber-100">
-                  ⚠️ Hãy chọn đúng 2 Trực tiếp và 1 Trực tuyến
-                </div>
-              )}
-
-              <button
-                disabled={!isEligibleForCouncil}
-                onClick={handleCouncilConfirm}
-                className={`w-full py-3 rounded-xl text-sm font-bold transition-all shadow-md active:scale-98 flex items-center justify-center gap-2 cursor-pointer ${
-                  isEligibleForCouncil 
-                    ? 'bg-[#89B449] hover:bg-secondary text-white' 
-                    : 'bg-gray-100 text-outline-variant/60 border border-gray-250 cursor-not-allowed shadow-none'
-                }`}
-              >
-                <ShieldCheck className="w-5 h-5" />
-                <span>Chốt bộ đại diện</span>
-              </button>
-            </div>
           </div>
         </div>
-
+        <div>
+          {!uploadedFile ? (
+            <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+              Hạn nộp: {selectedTrip.hanNop}
+            </span>
+          ) : selectedTrip.trangThai === 'Đã nộp' ? (
+            <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+              Bài nộp đã được ghi nhận
+            </span>
+          ) : null}
+        </div>
       </div>
 
-      {/* ========================================================================= */}
-      {/* MODAL MỚI: KIỂM DUYỆT & CHỈNH SỬA VĂN BẢN OCR TỪ AI                        */}
-      {/* ========================================================================= */}
+      <div className="flex-1 flex overflow-hidden bg-[#E7E0C4]/20 relative">
+        <div className={`border-r border-[#E7E0C4] flex flex-col relative overflow-hidden bg-slate-100 transition-all duration-300 ${isTextMaximized ? 'w-0 opacity-0' : 'flex-1'}`}>
+          {!uploadedFile ? (
+            <div className="flex-1 flex flex-col items-center justify-center p-8">
+              <div className="bg-white p-8 md:p-12 rounded-3xl shadow-sm border border-slate-200 w-full max-w-lg text-center flex flex-col items-center">
+                <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mb-6">
+                  {isOcrScanning ? <Loader2 className="w-10 h-10 text-[#407F3E] animate-spin" /> : <UploadCloud className="w-10 h-10 text-[#407F3E]" />}
+                </div>
+                <h3 className="text-xl font-black text-slate-800 mb-2">
+                  {isOcrScanning ? "Đang kết nối AI quét OCR..." : "Tải lên File PDF"}
+                </h3>
+                <p className="text-sm font-medium text-slate-500 mb-8 max-w-xs leading-relaxed">
+                  Kéo thả file báo cáo thu hoạch của bạn vào đây, hoặc nhấn nút bên dưới để chọn file (Tối đa 15MB).
+                </p>
+                <label className="px-8 py-3.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl font-bold text-sm shadow-md transition-all cursor-pointer inline-block">
+                  Chọn file từ máy tính
+                  <input type="file" accept=".pdf" className="hidden" onChange={(e) => handleRealUpload(e, selectedTrip)} disabled={isOcrScanning} />
+                </label>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="h-12 bg-white/90 backdrop-blur border-b border-[#E7E0C4] flex items-center justify-center gap-6 shrink-0 absolute top-0 left-0 right-0 z-10 shadow-sm">
+                <button onClick={() => setZoomLevel(prev => Math.max(50, prev - 10))} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors text-slate-600 cursor-pointer">
+                  <ZoomOut className="w-4 h-4" />
+                </button>
+                <span className="text-xs font-bold text-slate-700 w-10 text-center">{zoomLevel}%</span>
+                <button onClick={() => setZoomLevel(prev => Math.min(200, prev + 10))} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors text-slate-600 cursor-pointer">
+                  <ZoomIn className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-6 pt-16 flex justify-center custom-scrollbar">
+                <div 
+                  className="bg-white w-full max-w-[600px] min-h-[800px] shadow-xl border border-slate-200 p-10 relative"
+                  style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center', transition: 'transform 0.15s ease' }}
+                >
+                  <h1 className="text-lg font-black uppercase tracking-wider text-center mb-8 border-b-2 border-slate-900 pb-2 inline-block relative left-1/2 -translate-x-1/2">BÁO CÁO THU HOẠCH KIẾN TẬP</h1>
+                  <div className="whitespace-pre-wrap text-sm text-slate-800 leading-loose text-justify font-serif">
+                    {uploadedFile.text}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className={`bg-white flex flex-col shrink-0 shadow-[-4px_0_15px_-3px_rgba(0,0,0,0.05)] z-20 transition-all duration-300 ${isTextMaximized ? 'w-full flex-1' : 'w-full md:w-[400px] lg:w-[450px]'}`}>
+          <div className="px-4 py-3 border-b border-[#E7E0C4] bg-[#DBD468]/10 flex items-start gap-2 shrink-0">
+            <AlertTriangle className="w-4 h-4 text-[#8b8433] shrink-0 mt-0.5" />
+            <div>
+              <h3 className="font-bold text-[#8b8433] text-xs uppercase tracking-wider mb-0.5">Hệ thống AI hỗ trợ chấm điểm</h3>
+              <p className="text-[10px] font-medium text-slate-700 leading-snug">
+                Văn bản được trích xuất tự động từ file PDF. Vui lòng đối chiếu với bản gốc. Nếu văn bản trống hoặc lỗi, AI sẽ không thể phân tích để hỗ trợ giảng viên đánh giá bài làm.
+              </p>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-6 flex flex-col">
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">Nội dung văn bản được trích xuất</label>
+              {uploadedFile && (
+                <button onClick={() => setIsTextMaximized(!isTextMaximized)} className="p-1.5 hover:bg-slate-100 text-slate-500 hover:text-[#407F3E] rounded-md transition-colors cursor-pointer" title={isTextMaximized ? "Thu nhỏ" : "Phóng to"}>
+                  {isTextMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                </button>
+              )}
+            </div>
+            <textarea 
+              value={uploadedFile ? uploadedFile.text : ''}
+              onChange={(e) => setUploadedFile({ ...uploadedFile, text: e.target.value })}
+              placeholder={uploadedFile ? '' : 'Văn bản sẽ hiển thị ở đây sau khi bạn tải file PDF lên...'}
+              className="flex-1 w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm leading-relaxed font-mono text-slate-700 focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] resize-none custom-scrollbar shadow-inner transition-colors"
+            ></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className={selectedTrip ? '' : 'bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300'}>
+      {selectedTrip ? renderSubmissionView() : renderListView()}
+
+      {/* OCR Editor Modal */}
       {showOcrModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-3xl shadow-2xl overflow-hidden border border-surface-variant animate-scale-up flex flex-col max-h-[90vh]">
-            {/* Header Modal */}
-            <div className="p-6 bg-[#f8faf1] border-b border-surface-variant flex items-center justify-between">
+          <div className="bg-white rounded-3xl w-full max-w-3xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[90vh]">
+            <div className="p-6 bg-[#f8faf1] border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-bold">
+                <div className="w-10 h-10 rounded-2xl bg-[#89B449]/20 text-[#407F3E] flex items-center justify-center font-bold">
                   <Sparkles className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-black text-base text-on-surface">Kiểm duyệt văn bản trích xuất OCR (AI)</h3>
-                  <p className="text-xs text-on-surface-variant font-semibold">
-                    Đoạn văn bản dưới đây sẽ được AI sử dụng để chấm điểm. Vui lòng chỉnh sửa các từ bị đọc sai chính tả (nếu có).
+                  <h3 className="font-black text-base text-slate-800">Kiểm duyệt văn bản trích xuất OCR (AI)</h3>
+                  <p className="text-xs text-slate-500 font-semibold">
+                    Đoạn văn bản dưới đây sẽ được AI sử dụng để chấm điểm. Vui lòng chỉnh sửa các lỗi nếu có.
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => setShowOcrModal(false)}
-                className="text-slate-400 hover:text-slate-600 p-2 rounded-full transition-colors cursor-pointer"
-              >
+              <button onClick={() => setShowOcrModal(false)} className="text-slate-400 hover:text-slate-600 p-2 rounded-full transition-colors cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
-
-            {/* Content Textarea */}
-            <div className="p-6 flex-1 overflow-y-auto space-y-3">
-              <div className="flex items-center justify-between text-xs font-bold text-on-surface-variant">
-                <span className="flex items-center gap-1.5 text-primary">
+            <div className="p-6 flex-1 overflow-y-auto space-y-3 bg-white">
+              <div className="flex items-center justify-between text-xs font-bold text-slate-600">
+                <span className="flex items-center gap-1.5 text-[#407F3E]">
                   <Edit3 className="w-4 h-4" />
                   <span>Trình soạn thảo văn bản báo cáo</span>
                 </span>
                 <span>Tự động phát hiện bởi Qwen-VL-OCR</span>
               </div>
-
               <textarea
-                rows={14}
+                rows={12}
                 value={ocrText}
                 onChange={(e) => setOcrText(e.target.value)}
                 placeholder="Nội dung báo cáo quét được sẽ hiển thị ở đây..."
-                className="w-full p-4 text-xs font-mono bg-[#f8faf1] border border-surface-variant rounded-2xl focus:outline-none focus:border-primary text-on-surface leading-relaxed resize-none shadow-inner"
+                className="w-full p-4 text-sm font-mono bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#407F3E] text-slate-800 leading-relaxed resize-none shadow-inner"
               />
-
-              <p className="text-[11px] text-amber-700 bg-amber-50 p-3 rounded-xl border border-amber-200 font-semibold flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 shrink-0" />
-                <span>Mẹo: Bạn có thể sửa trực tiếp nội dung bên trên trước khi bấm gửi. Hệ thống AI có tính năng "Kháng thể OCR" tự động bỏ qua các lỗi gõ sai nhỏ.</span>
-              </p>
             </div>
-
-            {/* Footer Modal */}
-            <div className="p-6 border-t border-slate-100 bg-[#f8faf1]/50 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setShowOcrModal(false)}
-                className="px-5 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-200 rounded-xl cursor-pointer transition-colors"
-              >
+            <div className="p-6 border-t border-slate-200 bg-slate-50 flex justify-end gap-3">
+              <button type="button" onClick={() => setShowOcrModal(false)} className="px-5 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-200 rounded-xl cursor-pointer transition-colors">
                 Hủy bỏ
               </button>
-              <button
-                type="button"
-                onClick={handleConfirmFinalSubmission}
-                className="px-6 py-2.5 bg-primary hover:bg-primary-container text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-2"
-              >
+              <button type="button" onClick={handleConfirmFinalSubmission} className="px-6 py-2.5 bg-[#407F3E] hover:bg-[#407F3E]/90 text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-2">
                 <CheckCircle className="w-4 h-4" />
                 <span>Xác nhận & Nộp bài chính thức</span>
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Council Success Registration Popup Modal */}
-      {showCouncilModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden border border-surface-variant animate-scale-up text-center p-8">
-            <div className="w-16 h-16 bg-[#e5ffdc] rounded-full flex items-center justify-center text-primary mx-auto mb-4 border border-primary/20 shadow-inner">
-              <ShieldCheck className="w-8 h-8" />
-            </div>
-
-            <h3 className="font-black text-xl text-on-surface">Chốt bộ báo cáo thành công!</h3>
-            <p className="text-sm text-on-surface-variant font-semibold mt-2 leading-relaxed px-2">
-              Lựa chọn của bạn đã được ghi nhận trên hệ thống. Giảng viên phụ trách và hội đồng chấm điểm sẽ tiến hành chấm điểm dựa trên bộ 3 chuyến đi đại diện này.
-            </p>
-
-            <button
-              onClick={() => setShowCouncilModal(false)}
-              className="w-full py-3 bg-primary text-white rounded-xl text-sm font-bold hover:bg-primary-container shadow-md cursor-pointer transition-all active:scale-95 mt-6"
-            >
-              Hoàn tất & Quay lại
-            </button>
           </div>
         </div>
       )}
