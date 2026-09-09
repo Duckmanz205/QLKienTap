@@ -449,6 +449,14 @@ export class GetStudentsQueryDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @IsOptional()
+  @IsString()
+  ten_khoa?: string;
+
+  @IsOptional()
+  @IsString()
+  ten_lop?: string;
 }
 
 export class GetRegistrationsQueryDto {

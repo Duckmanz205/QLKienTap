@@ -10,6 +10,11 @@ export default function QuanLyLePhi_Khoa() {
   const [fees, setFees] = useState([]);
   const [viewingDetail, setViewingDetail] = useState(null);
   const fileInputRef = useRef(null);
+
+  // Pagination & Search States
+  const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(15);
   
   // Dropdown States for Filters
   const [isLichDropdownOpen, setIsLichDropdownOpen] = useState(false);
@@ -50,16 +55,47 @@ export default function QuanLyLePhi_Khoa() {
     }
   };
 
+  // Khóa & Lớp filter states
+  const [filterKhoa, setFilterKhoa] = useState('All');
+  const [isKhoaDropdownOpen, setIsKhoaDropdownOpen] = useState(false);
+  const [filterClass, setFilterClass] = useState('All');
+  const [isClassDropdownOpen, setIsClassDropdownOpen] = useState(false);
+
+  const normalizeKhoa = (str) => {
+    if (!str) return '';
+    const match = String(str).match(/\d+/);
+    return match ? match[0] : String(str).trim().toLowerCase();
+  };
+
+  const extractKhoa = (ten_lop, sv) => {
+    if (sv && sv.ten_khoa) return sv.ten_khoa;
+    if (sv && sv.khoa && sv.khoa.ten_khoa) return sv.khoa.ten_khoa;
+    if (!ten_lop || ten_lop === '--') return 'Khác';
+    const match = String(ten_lop).match(/^(\d+)/);
+    return match ? `Khóa ${match[1]}` : 'Khác';
+  };
+
+  const uniqueKhoaList = Array.from(new Set(fees.map(f => extractKhoa(f.sinhVien?.ten_lop || f.sinhVien?.lop, f.sinhVien)).filter(Boolean)));
+  const uniqueClassList = Array.from(new Set(fees.map(f => f.sinhVien?.ten_lop || f.sinhVien?.lop).filter(l => l && l !== '--')));
+
+  const khoaOptions = ["Tất cả khóa", ...uniqueKhoaList];
+  const lopOptions = ["Tất cả lớp", ...uniqueClassList];
+
   // Close all dropdowns
   const closeAllDropdowns = () => {
     setIsLichDropdownOpen(false);
     setIsStatusDropdownOpen(false);
+    setIsKhoaDropdownOpen(false);
+    setIsClassDropdownOpen(false);
   };
 
   const handleDropdownClick = (e, setter) => {
     e.stopPropagation();
+    const wasOpen = setter === setIsLichDropdownOpen ? isLichDropdownOpen :
+                    setter === setIsStatusDropdownOpen ? isStatusDropdownOpen :
+                    setter === setIsKhoaDropdownOpen ? isKhoaDropdownOpen : isClassDropdownOpen;
     closeAllDropdowns();
-    setter(true);
+    setter(!wasOpen);
   };
 
   // Status Badge Helper
@@ -79,6 +115,7 @@ export default function QuanLyLePhi_Khoa() {
   };
 
   const filteredFees = fees.filter(f => {
+    const sv = f.sinhVien || {};
     const statusMap = {
       'PENDING': 'Chưa đóng',
       'PAID': 'Đã đóng',
@@ -87,6 +124,26 @@ export default function QuanLyLePhi_Khoa() {
     };
     const currentStatus = statusMap[f.trang_thai_thanh_toan] || 'Chưa đóng';
     if (selectedStatus && selectedStatus !== 'Tất cả' && currentStatus !== selectedStatus) return false;
+
+    // Search filter
+    if (searchTerm) {
+      const q = searchTerm.toLowerCase();
+      const matchSearch = (sv.mssv && sv.mssv.toLowerCase().includes(q)) ||
+                          (sv.ho_ten && sv.ho_ten.toLowerCase().includes(q));
+      if (!matchSearch) return false;
+    }
+
+    // Khóa & Lớp filter
+    const lop = sv.ten_lop || sv.lop;
+    const k = extractKhoa(lop, sv);
+    const matchesKhoa = filterKhoa === 'All' || filterKhoa === "Tất cả khóa" || 
+      normalizeKhoa(k) === normalizeKhoa(filterKhoa) ||
+      (filterKhoa && k && String(k).toLowerCase().includes(String(filterKhoa).toLowerCase()));
+    if (!matchesKhoa) return false;
+
+    const matchesClass = filterClass === 'All' || filterClass === "Tất cả lớp" || lop === filterClass;
+    if (!matchesClass) return false;
+
     return true;
   });
 
@@ -137,9 +194,9 @@ export default function QuanLyLePhi_Khoa() {
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-[#E7E0C4] flex items-center gap-4 relative z-20 mb-6">
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-[#E7E0C4] flex items-center gap-4 relative z-20 mb-6 flex-wrap">
         {/* Lịch Dropdown */}
-        <div className="relative min-w-[300px]">
+        <div className="relative min-w-[260px] flex-1">
           <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Lịch kiến tập</label>
           <div 
             onClick={(e) => handleDropdownClick(e, setIsLichDropdownOpen)}
@@ -168,8 +225,64 @@ export default function QuanLyLePhi_Khoa() {
           )}
         </div>
 
+        {/* Khóa Dropdown */}
+        <div className="relative min-w-[160px] flex-1">
+          <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Khóa</label>
+          <div 
+            onClick={(e) => handleDropdownClick(e, setIsKhoaDropdownOpen)}
+            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isKhoaDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+          >
+            <span className="truncate pr-2 font-medium text-slate-700">{filterKhoa === 'All' ? 'Tất cả khóa' : filterKhoa}</span>
+            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+          </div>
+          {isKhoaDropdownOpen && (
+            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 max-h-48 overflow-y-auto animate-in slide-in-from-top-1">
+              {khoaOptions.map(opt => (
+                <div 
+                  key={opt}
+                  onClick={() => { setFilterKhoa(opt); setIsKhoaDropdownOpen(false); }}
+                  className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                    (filterKhoa === opt || (filterKhoa === 'All' && opt === 'Tất cả khóa')) ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                  }`}
+                >
+                  <span className="truncate pr-2">{opt}</span>
+                  {(filterKhoa === opt || (filterKhoa === 'All' && opt === 'Tất cả khóa')) && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Lớp Dropdown */}
+        <div className="relative min-w-[160px] flex-1">
+          <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Lớp</label>
+          <div 
+            onClick={(e) => handleDropdownClick(e, setIsClassDropdownOpen)}
+            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isClassDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+          >
+            <span className="truncate pr-2 font-medium text-slate-700">{filterClass === 'All' ? 'Tất cả lớp' : filterClass}</span>
+            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+          </div>
+          {isClassDropdownOpen && (
+            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 max-h-48 overflow-y-auto animate-in slide-in-from-top-1">
+              {lopOptions.map(opt => (
+                <div 
+                  key={opt}
+                  onClick={() => { setFilterClass(opt); setIsClassDropdownOpen(false); }}
+                  className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                    (filterClass === opt || (filterClass === 'All' && opt === 'Tất cả lớp')) ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                  }`}
+                >
+                  <span className="truncate pr-2">{opt}</span>
+                  {(filterClass === opt || (filterClass === 'All' && opt === 'Tất cả lớp')) && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Trạng thái Dropdown */}
-        <div className="relative min-w-[200px]">
+        <div className="relative min-w-[160px] flex-1">
           <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Trạng thái</label>
           <div 
             onClick={(e) => handleDropdownClick(e, setIsStatusDropdownOpen)}
@@ -260,6 +373,58 @@ export default function QuanLyLePhi_Khoa() {
             </tbody>
           </table>
         </div>
+        {/* Pagination Controls */}
+        {filteredFees.length > 0 && (
+          <div className="p-4 border-t border-[#E7E0C4] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-semibold text-slate-500 bg-slate-50/50">
+            <div className="flex items-center gap-2">
+              <span>Hiển thị</span>
+              <select 
+                value={limit}
+                onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
+                className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
+              >
+                <option value={10}>10</option>
+                <option value={15}>15</option>
+                <option value={30}>30</option>
+                <option value={50}>50</option>
+              </select>
+              <span>/ {filteredFees.length} mục</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button 
+                disabled={page <= 1}
+                onClick={() => setPage(1)}
+                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Trang đầu
+              </button>
+              <button 
+                disabled={page <= 1}
+                onClick={() => setPage(prev => Math.max(prev - 1, 1))}
+                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Trước
+              </button>
+              <span className="px-4 py-1.5 rounded-lg bg-[#407F3E] text-white text-sm font-bold shadow-sm cursor-default mx-1">
+                Trang {page} / {Math.ceil(filteredFees.length / limit) || 1}
+              </span>
+              <button 
+                disabled={page >= Math.ceil(filteredFees.length / limit)}
+                onClick={() => setPage(prev => Math.min(prev + 1, Math.ceil(filteredFees.length / limit)))}
+                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Sau
+              </button>
+              <button 
+                disabled={page >= Math.ceil(filteredFees.length / limit)}
+                onClick={() => setPage(Math.ceil(filteredFees.length / limit))}
+                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Trang cuối
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Modal - Xem chi tiết */}

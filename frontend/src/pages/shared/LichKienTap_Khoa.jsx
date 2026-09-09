@@ -108,10 +108,6 @@ export default function LichKienTap_Khoa() {
   const [isKhoaDropdownOpen, setIsKhoaDropdownOpen] = useState(false);
   const [khoaSearchTerm, setKhoaSearchTerm] = useState('');
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
   const fetchData = async () => {
     try {
       const [schRes, campRes, courseRes] = await Promise.all([
@@ -126,6 +122,10 @@ export default function LichKienTap_Khoa() {
       console.error(err);
     }
   };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const handleViewDetail = async (schedule) => {
     const rawSchedule = schedules.find(s => s.id === schedule.id) || schedule;

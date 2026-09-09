@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   ChevronDown, Check, ChevronRight, Paperclip, 
-  CheckCircle2, XCircle, Filter, Download
+  CheckCircle2, XCircle, Filter, Download, Search
 } from 'lucide-react';
 import { khoaApi } from '../../services/api';
 
@@ -11,6 +11,11 @@ export default function RegistrationManagement_Khoa() {
   const [registrations, setRegistrations] = useState([]);
   const [cancelRequests, setCancelRequests] = useState([]);
   const [viewingDetail, setViewingDetail] = useState(null);
+
+  // Pagination & Search States
+  const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(15);
 
   // Dropdown States for Filters
   const [isLichDropdownOpen, setIsLichDropdownOpen] = useState(false);
@@ -128,20 +133,31 @@ export default function RegistrationManagement_Khoa() {
   };
 
   const filteredRegistrations = registrations.filter(r => {
-    const chuyenName = r.chuyenKienTap?.nhaMay?.ten_nha_may;
+    const chuyenName = r.chuyenThamQuan?.nhaMay?.ten_nha_may || r.chuyenKienTap?.nhaMay?.ten_nha_may;
     if (selectedChuyen && selectedChuyen !== 'Tất cả chuyến' && chuyenName !== selectedChuyen) return false;
     
     const statusMap = {
       'PENDING': 'Chờ duyệt',
+      'ChoDuyet': 'Chờ duyệt',
       'APPROVED': 'Hợp lệ',
+      'HopLe': 'Hợp lệ',
       'REJECTED': 'Bị loại',
+      'BiLoai': 'Bị loại',
       'CANCELLED': 'Đã hủy',
+      'DaHuy': 'Đã hủy',
       'CANCELLED_WAITING_REFUND': 'Đã hủy',
       'REFUNDED': 'Đã hủy'
     };
-    const currentStatus = statusMap[r.trang_thai] || 'Chờ duyệt';
+    const currentStatus = statusMap[r.trang_thai] || r.trang_thai || 'Chờ duyệt';
     if (selectedStatus && selectedStatus !== 'Tất cả' && currentStatus !== selectedStatus) return false;
     
+    if (searchTerm) {
+      const query = searchTerm.toLowerCase();
+      const svName = (r.sinhVien?.ho_ten || '').toLowerCase();
+      const svMssv = (r.sinhVien?.mssv || '').toLowerCase();
+      if (!svName.includes(query) && !svMssv.includes(query)) return false;
+    }
+
     return true;
   });
 
@@ -288,6 +304,20 @@ export default function RegistrationManagement_Khoa() {
                 </div>
               )}
             </div>
+            {/* Search input */}
+            <div className="relative min-w-[200px] flex-1">
+              <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Tìm kiếm</label>
+              <div className="relative">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input 
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Tìm MSSV, tên SV..."
+                  className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-[#E7E0C4] rounded-lg text-sm font-medium focus:outline-none focus:border-[#407F3E]"
+                />
+              </div>
+            </div>
           </>
         )}
       </div>
@@ -347,6 +377,58 @@ export default function RegistrationManagement_Khoa() {
                 </tbody>
               </table>
             </div>
+            {/* Pagination Controls */}
+            {filteredRegistrations.length > 0 && (
+              <div className="p-4 border-t border-[#E7E0C4] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-semibold text-slate-500 bg-slate-50/50">
+                <div className="flex items-center gap-2">
+                  <span>Hiển thị</span>
+                  <select 
+                    value={limit}
+                    onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
+                    className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
+                  >
+                    <option value={10}>10</option>
+                    <option value={15}>15</option>
+                    <option value={30}>30</option>
+                    <option value={50}>50</option>
+                  </select>
+                  <span>/ {filteredRegistrations.length} mục</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button 
+                    disabled={page <= 1}
+                    onClick={() => setPage(1)}
+                    className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+                  >
+                    Trang đầu
+                  </button>
+                  <button 
+                    disabled={page <= 1}
+                    onClick={() => setPage(prev => Math.max(prev - 1, 1))}
+                    className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+                  >
+                    Trước
+                  </button>
+                  <span className="px-4 py-1.5 rounded-lg bg-[#407F3E] text-white text-sm font-bold shadow-sm cursor-default mx-1">
+                    Trang {page} / {Math.ceil(filteredRegistrations.length / limit) || 1}
+                  </span>
+                  <button 
+                    disabled={page >= Math.ceil(filteredRegistrations.length / limit)}
+                    onClick={() => setPage(prev => Math.min(prev + 1, Math.ceil(filteredRegistrations.length / limit)))}
+                    className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+                  >
+                    Sau
+                  </button>
+                  <button 
+                    disabled={page >= Math.ceil(filteredRegistrations.length / limit)}
+                    onClick={() => setPage(Math.ceil(filteredRegistrations.length / limit))}
+                    className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+                  >
+                    Trang cuối
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

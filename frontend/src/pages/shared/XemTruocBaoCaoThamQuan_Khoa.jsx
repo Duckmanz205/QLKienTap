@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Building2, CheckCircle, Clock, XCircle, FileSpreadsheet, Award, Users, Percent } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { khoaApi } from '../../services/api';
+import Toast from '../../components/Toast';
 
 export default function XemTruocBaoCaoThamQuan_Khoa() {
   const navigate = useNavigate();
@@ -9,6 +10,7 @@ export default function XemTruocBaoCaoThamQuan_Khoa() {
   const [tripsData, setTripsData] = useState([]);
   const [topFactoriesData, setTopFactoriesData] = useState([]);
   const [timeSeriesData, setTimeSeriesData] = useState([]);
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   const [stats, setStats] = useState({ 
     totalTrips: 0, 
     totalStudents: 0, 
@@ -155,6 +157,7 @@ export default function XemTruocBaoCaoThamQuan_Khoa() {
     link.download = `BaoCaoTongHopKienTap_${new Date().toISOString().slice(0,10)}.csv`;
     link.click();
     URL.revokeObjectURL(url);
+    setToast({ show: true, message: 'Đã xuất file báo cáo CSV thành công!', type: 'success' });
   };
 
   // Custom Line Chart Component
@@ -375,6 +378,11 @@ export default function XemTruocBaoCaoThamQuan_Khoa() {
           </div>
         </div>
       </div>
+      <Toast 
+        message={toast.show ? toast.message : ''} 
+        type={toast.type} 
+        onClose={() => setToast({ show: false, message: '', type: 'success' })} 
+      />
     </div>
   );
 }

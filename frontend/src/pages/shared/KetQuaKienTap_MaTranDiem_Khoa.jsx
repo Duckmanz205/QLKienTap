@@ -4,6 +4,7 @@ import {
   CheckCircle2, XCircle, Clock, Ban, Award
 } from 'lucide-react';
 import { khoaApi } from '../../services/api';
+import Toast from '../../components/Toast';
 
 export default function KetQuaKienTap_Khoa() {
   const [schedules, setSchedules] = useState([]);
@@ -13,6 +14,11 @@ export default function KetQuaKienTap_Khoa() {
   const [results, setResults] = useState([]);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+
+  // Pagination states
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(15);
 
   useEffect(() => {
     fetchSchedules();
@@ -58,21 +64,63 @@ export default function KetQuaKienTap_Khoa() {
     }
   };
 
+  // Filter States
+  const [filterKhoa, setFilterKhoa] = useState('All');
+  const [isKhoaDropdownOpen, setIsKhoaDropdownOpen] = useState(false);
+  const [filterClass, setFilterClass] = useState('All');
+  const [isClassDropdownOpen, setIsClassDropdownOpen] = useState(false);
+
+  const normalizeKhoa = (str) => {
+    if (!str) return '';
+    const match = String(str).match(/\d+/);
+    return match ? match[0] : String(str).trim().toLowerCase();
+  };
+
+  const extractKhoa = (ten_lop, sv) => {
+    if (sv && sv.ten_khoa) return sv.ten_khoa;
+    if (sv && sv.khoa && sv.khoa.ten_khoa) return sv.khoa.ten_khoa;
+    if (!ten_lop || ten_lop === '--') return 'Khác';
+    const match = String(ten_lop).match(/^(\d+)/);
+    return match ? `Khóa ${match[1]}` : 'Khác';
+  };
+
+  const uniqueKhoaList = Array.from(new Set(results.map(r => extractKhoa(r.sinhVien?.ten_lop || r.sinhVien?.lop, r.sinhVien)).filter(Boolean)));
+  const uniqueClassList = Array.from(new Set(results.map(r => r.sinhVien?.ten_lop || r.sinhVien?.lop).filter(l => l && l !== '--')));
+
+  const khoaOptions = ["Tất cả khóa", ...uniqueKhoaList];
+  const lopOptions = ["Tất cả lớp", ...uniqueClassList];
+
+  const filteredResults = results.filter(r => {
+    const sv = r.sinhVien || {};
+    const lop = sv.ten_lop || sv.lop;
+    const k = extractKhoa(lop, sv);
+
+    const matchesKhoa = filterKhoa === 'All' || filterKhoa === "Tất cả khóa" || 
+      normalizeKhoa(k) === normalizeKhoa(filterKhoa) ||
+      (filterKhoa && k && String(k).toLowerCase().includes(String(filterKhoa).toLowerCase()));
+    
+    const matchesClass = filterClass === 'All' || filterClass === "Tất cả lớp" || lop === filterClass;
+    return matchesKhoa && matchesClass;
+  });
+
   // Close all dropdowns
   const closeAllDropdowns = () => {
     setIsLichDropdownOpen(false);
+    setIsKhoaDropdownOpen(false);
+    setIsClassDropdownOpen(false);
   };
 
   const handleDropdownClick = (e, setter) => {
     e.stopPropagation();
+    const wasOpen = setter === setIsLichDropdownOpen ? isLichDropdownOpen : (setter === setIsKhoaDropdownOpen ? isKhoaDropdownOpen : isClassDropdownOpen);
     closeAllDropdowns();
-    setter(!isLichDropdownOpen);
+    setter(!wasOpen);
   };
 
   // Stats calculation
-  const statDaDat = results.filter(r => r.trang_thai === 'Đạt').length;
-  const statKhongDat = results.filter(r => r.trang_thai === 'Không đạt').length;
-  const statDangThucHien = results.filter(r => !r.trang_thai).length; // or mapped by other logic
+  const statDaDat = filteredResults.filter(r => r.trang_thai === 'Đạt').length;
+  const statKhongDat = filteredResults.filter(r => r.trang_thai === 'Không đạt').length;
+  const statDangThucHien = filteredResults.filter(r => !r.trang_thai).length; // or mapped by other logic
 
   const getStatusBadge = (status) => {
     switch (status) {
@@ -100,9 +148,9 @@ export default function KetQuaKienTap_Khoa() {
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-[#E7E0C4] flex items-center gap-4 relative z-20 mb-6">
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-[#E7E0C4] flex items-center gap-4 relative z-20 mb-6 flex-wrap">
         {/* Lịch Dropdown */}
-        <div className="relative min-w-[350px]">
+        <div className="relative min-w-[280px] flex-1">
           <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Lịch kiến tập</label>
           <div 
             onClick={(e) => handleDropdownClick(e, setIsLichDropdownOpen)}
@@ -143,6 +191,62 @@ export default function KetQuaKienTap_Khoa() {
                   <div className="px-4 py-3 text-sm text-slate-400 italic text-center">Không tìm thấy lịch kiến tập</div>
                 )}
               </div>
+            </div>
+          )}
+        </div>
+
+        {/* Khóa Dropdown */}
+        <div className="relative min-w-[180px] flex-1">
+          <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Khóa</label>
+          <div 
+            onClick={(e) => handleDropdownClick(e, setIsKhoaDropdownOpen)}
+            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isKhoaDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+          >
+            <span className="truncate pr-2 font-medium text-slate-700">{filterKhoa === 'All' ? 'Tất cả khóa' : filterKhoa}</span>
+            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+          </div>
+          {isKhoaDropdownOpen && (
+            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 max-h-48 overflow-y-auto animate-in slide-in-from-top-1">
+              {khoaOptions.map(opt => (
+                <div 
+                  key={opt}
+                  onClick={() => { setFilterKhoa(opt); setIsKhoaDropdownOpen(false); }}
+                  className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                    (filterKhoa === opt || (filterKhoa === 'All' && opt === 'Tất cả khóa')) ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                  }`}
+                >
+                  <span className="truncate pr-2">{opt}</span>
+                  {(filterKhoa === opt || (filterKhoa === 'All' && opt === 'Tất cả khóa')) && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Lớp Dropdown */}
+        <div className="relative min-w-[180px] flex-1">
+          <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Lớp</label>
+          <div 
+            onClick={(e) => handleDropdownClick(e, setIsClassDropdownOpen)}
+            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isClassDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+          >
+            <span className="truncate pr-2 font-medium text-slate-700">{filterClass === 'All' ? 'Tất cả lớp' : filterClass}</span>
+            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+          </div>
+          {isClassDropdownOpen && (
+            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 max-h-48 overflow-y-auto animate-in slide-in-from-top-1">
+              {lopOptions.map(opt => (
+                <div 
+                  key={opt}
+                  onClick={() => { setFilterClass(opt); setIsClassDropdownOpen(false); }}
+                  className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                    (filterClass === opt || (filterClass === 'All' && opt === 'Tất cả lớp')) ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                  }`}
+                >
+                  <span className="truncate pr-2">{opt}</span>
+                  {(filterClass === opt || (filterClass === 'All' && opt === 'Tất cả lớp')) && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -235,12 +339,12 @@ export default function KetQuaKienTap_Khoa() {
               </tr>
             </thead>
             <tbody className="text-xs text-slate-700">
-              {results.length === 0 ? (
+              {filteredResults.length === 0 ? (
                 <tr>
                   <td colSpan={21} className="p-8 text-center text-slate-500 font-medium border-b border-[#E7E0C4]/50">Không có kết quả nào.</td>
                 </tr>
               ) : (
-                results.map((r, index) => {
+                filteredResults.map((r, index) => {
                   const sv = r.sinhVien || {};
                   const trips = r.trips || [];
                   const t1 = trips[0] || {};
@@ -301,7 +405,65 @@ export default function KetQuaKienTap_Khoa() {
             </tbody>
           </table>
         </div>
+        {/* Pagination Controls */}
+        {results.length > 0 && (
+          <div className="p-4 border-t border-[#E7E0C4] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-semibold text-slate-500 bg-slate-50/50">
+            <div className="flex items-center gap-2">
+              <span>Hiển thị</span>
+              <select 
+                value={limit}
+                onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
+                className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
+              >
+                <option value={10}>10</option>
+                <option value={15}>15</option>
+                <option value={30}>30</option>
+                <option value={50}>50</option>
+              </select>
+              <span>/ {results.length} mục</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button 
+                disabled={page <= 1}
+                onClick={() => setPage(1)}
+                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Trang đầu
+              </button>
+              <button 
+                disabled={page <= 1}
+                onClick={() => setPage(prev => Math.max(prev - 1, 1))}
+                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Trước
+              </button>
+              <span className="px-4 py-1.5 rounded-lg bg-[#407F3E] text-white text-sm font-bold shadow-sm cursor-default mx-1">
+                Trang {page} / {Math.ceil(results.length / limit) || 1}
+              </span>
+              <button 
+                disabled={page >= Math.ceil(results.length / limit)}
+                onClick={() => setPage(prev => Math.min(prev + 1, Math.ceil(results.length / limit)))}
+                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Sau
+              </button>
+              <button 
+                disabled={page >= Math.ceil(results.length / limit)}
+                onClick={() => setPage(Math.ceil(results.length / limit))}
+                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Trang cuối
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
+      <Toast 
+        message={toast.show ? toast.message : ''} 
+        type={toast.type} 
+        onClose={() => setToast({ show: false, message: '', type: 'success' })} 
+      />
 
       {/* Grade Detail Modal */}
       {selectedStudent && (

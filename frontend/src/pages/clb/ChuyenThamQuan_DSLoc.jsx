@@ -64,11 +64,6 @@ export default function ChuyenThamQuan_DSLoc() {
   };
   const closeConfirm = () => setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: null });
 
-  useEffect(() => {
-    fetchInitialData();
-    fetchTrips();
-  }, []);
-
   const fetchInitialData = async () => {
     try {
       const [facRes, schRes] = await Promise.all([
@@ -98,6 +93,11 @@ export default function ChuyenThamQuan_DSLoc() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchInitialData();
+    fetchTrips();
+  }, []);
 
   const resetForm = () => {
     setSelectedNhaMay('');

@@ -265,16 +265,33 @@ export class KhoaService {
       return { message: 'Cập nhật giảng viên thành công', data: gv };
     });
   }
-  async getStudents(page: number = 1, limit: number = 10, search?: string) {
+  async getStudents(page: number = 1, limit: number = 10, search?: string, ten_khoa?: string, ten_lop?: string) {
     const queryBuilder = this.svRepo
       .createQueryBuilder('sinhVien')
       .leftJoinAndSelect('sinhVien.khoa', 'khoa');
 
     if (search) {
-      queryBuilder.where(
-        'sinhVien.mssv LIKE :search OR sinhVien.ho_ten LIKE :search',
+      queryBuilder.andWhere(
+        '(sinhVien.mssv LIKE :search OR sinhVien.ho_ten LIKE :search OR sinhVien.ten_lop LIKE :search)',
         { search: `%${search}%` },
       );
+    }
+
+    if (ten_lop && ten_lop !== 'All' && ten_lop !== 'Tất cả lớp') {
+      queryBuilder.andWhere('sinhVien.ten_lop = :ten_lop', { ten_lop });
+    }
+
+    if (ten_khoa && ten_khoa !== 'All' && ten_khoa !== 'Tất cả khóa') {
+      const match = ten_khoa.match(/\d+/);
+      if (match) {
+        const digit = match[0];
+        queryBuilder.andWhere('(sinhVien.ten_khoa LIKE :kDigit OR sinhVien.ten_lop LIKE :kLopDigit)', {
+          kDigit: `%${digit}%`,
+          kLopDigit: `${digit}%`,
+        });
+      } else {
+        queryBuilder.andWhere('sinhVien.ten_khoa = :ten_khoa', { ten_khoa });
+      }
     }
 
     const take = limit;
@@ -532,7 +549,7 @@ export class KhoaService {
         noti.tieu_de = 'Yêu cầu lập lịch kiến tập';
         noti.noi_dung = `Khoa đã khởi tạo đợt kiến tập "${campaign.ten_dot}". Vui lòng tiến hành xếp lịch kiến tập cho đợt này.`;
         noti.nguoi_gui_id = admin.id;
-        noti.doi_tuong_nhan = 'CLB';
+        // noti.doi_tuong_nhan = 'CLB';
         await manager.save(ThongBao, noti);
       }
 
@@ -584,7 +601,7 @@ export class KhoaService {
         noi_dung: `Câu lạc bộ đã gửi yêu cầu duyệt cho lịch kiến tập "${lich.ten_lich}". Vui lòng kiểm tra và phản hồi.`,
         nguoi_gui_id: userId,
         khoa_id: lich.khoa_id,
-        doi_tuong_nhan: 'KHOA'
+        // doi_tuong_nhan: 'KHOA'
       });
     }
 
@@ -1926,9 +1943,9 @@ export class KhoaService {
     if (data.khoa_id) {
       notif.khoa_id = data.khoa_id;
     }
-    if (data.doi_tuong_nhan) {
-      notif.doi_tuong_nhan = data.doi_tuong_nhan;
-    }
+    // if (data.doi_tuong_nhan) {
+    //   notif.doi_tuong_nhan = data.doi_tuong_nhan;
+    // }
     notif.ngay_gui = new Date();
     notif.da_chinh_sua = false;
 

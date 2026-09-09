@@ -12,10 +12,12 @@ import {
   ClipboardList
 } from 'lucide-react';
 import { giangVienApi } from '../../services/api';
+import Toast from '../../components/Toast';
 
 export default function HoiDongChamBaoCao_DSBuoi_GV() {
   const [lecturer, setLecturer] = useState(null);
   const [boards, setBoards] = useState([]);
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   
   // Scoring state
   const [activeTab, setActiveTab] = useState('list');
@@ -138,7 +140,7 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
           <button
             onClick={() => {
               if (!selectedReg) {
-                alert('Vui lòng chọn sinh viên cần chấm điểm từ danh sách hội đồng trước.');
+                setToast({ show: true, message: 'Vui lòng chọn sinh viên cần chấm điểm từ danh sách hội đồng trước.', type: 'error' });
                 return;
               }
               setActiveTab('grading');
@@ -400,6 +402,12 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
           </div>
         </div>
       )}
+
+      <Toast 
+        message={toast.show ? toast.message : ''} 
+        type={toast.type} 
+        onClose={() => setToast({ show: false, message: '', type: 'success' })} 
+      />
     </div>
   );
 }

@@ -94,10 +94,6 @@ export default function PlanManagement_Khoa() {
   const [selectedTerm, setSelectedTerm] = useState('');
   const [isTermDropdownOpen, setIsTermDropdownOpen] = useState(false);
 
-  useEffect(() => {
-    fetchInitialData();
-  }, []);
-
   const fetchInitialData = async () => {
     try {
       const [campRes, yearsRes, termsRes] = await Promise.all([
@@ -112,6 +108,10 @@ export default function PlanManagement_Khoa() {
       console.error(err);
     }
   };
+
+  useEffect(() => {
+    fetchInitialData();
+  }, []);
 
   const resetForm = () => {
     setIsModalOpen(false);

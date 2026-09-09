@@ -5,12 +5,14 @@ import {
   MessageSquare
 } from 'lucide-react';
 import api, { khoaApi } from '../../services/api';
+import Toast from '../../components/Toast';
 
 export default function ThongBao_Khoa() {
   const [notifications, setNotifications] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDoiTuongDropdownOpen, setIsDoiTuongDropdownOpen] = useState(false);
   const [viewingDetail, setViewingDetail] = useState(null);
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   
   // Compose form states
   const [title, setTitle] = useState('');
@@ -45,7 +47,7 @@ export default function ThongBao_Khoa() {
   const handleComposeSubmit = async (e) => {
     e.preventDefault();
     if (!title || !content || !selectedDoiTuong) {
-      alert('Vui lòng nhập đầy đủ tiêu đề, nội dung và đối tượng nhận');
+      setToast({ show: true, message: 'Vui lòng nhập đầy đủ tiêu đề, nội dung và đối tượng nhận', type: 'error' });
       return;
     }
 
@@ -70,7 +72,7 @@ export default function ThongBao_Khoa() {
         file_url: fileUrl,
         file_name: fileName
       });
-      alert('Gửi thông báo thành công');
+      setToast({ show: true, message: 'Gửi thông báo thành công', type: 'success' });
       setIsModalOpen(false);
       setTitle('');
       setContent('');
@@ -80,7 +82,7 @@ export default function ThongBao_Khoa() {
     } catch (err) {
       console.error(err);
       setIsUploadingAttachment(false);
-      alert('Gửi thông báo thất bại');
+      setToast({ show: true, message: err.response?.data?.message || 'Gửi thông báo thất bại', type: 'error' });
     }
   };
 
@@ -360,6 +362,12 @@ export default function ThongBao_Khoa() {
           </div>
         </div>
       )}
+
+      <Toast 
+        message={toast.show ? toast.message : ''} 
+        type={toast.type} 
+        onClose={() => setToast({ show: false, message: '', type: 'success' })} 
+      />
     </div>
   );
 }

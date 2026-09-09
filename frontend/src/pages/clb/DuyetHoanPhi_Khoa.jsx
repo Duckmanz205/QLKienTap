@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Paperclip, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
 import { khoaApi } from '../../services/api';
+import Toast from '../../components/Toast';
 
 export default function DuyetHoanPhi_Khoa() {
   const [refunds, setRefunds] = useState([]);
   const [rejectionTarget, setRejectionTarget] = useState(null);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
   useEffect(() => {
     fetchRefunds();
@@ -14,19 +16,22 @@ export default function DuyetHoanPhi_Khoa() {
   const fetchRefunds = async () => {
     try {
       const res = await khoaApi.getRefundRequests();
-      setRefunds(res.data);
+      const list = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+      setRefunds(list);
     } catch (err) {
       console.error(err);
+      setToast({ show: true, message: 'Có lỗi khi tải danh sách hoàn phí', type: 'error' });
     }
   };
 
   const handleApprove = async (id) => {
     try {
       await khoaApi.approveRefund({ request_id: id, status: 'Approved' });
+      setToast({ show: true, message: 'Đã hoàn tiền thành công', type: 'success' });
       fetchRefunds();
     } catch (err) {
       console.error(err);
-      alert('Có lỗi xảy ra');
+      setToast({ show: true, message: err.response?.data?.message || 'Có lỗi xảy ra khi hoàn tiền', type: 'error' });
     }
   };
 
@@ -38,12 +43,13 @@ export default function DuyetHoanPhi_Khoa() {
         status: 'Rejected', 
         reason: rejectionReason 
       });
+      setToast({ show: true, message: 'Đã từ chối yêu cầu hoàn phí', type: 'success' });
       setRejectionTarget(null);
       setRejectionReason('');
       fetchRefunds();
     } catch (err) {
       console.error(err);
-      alert('Có lỗi xảy ra');
+      setToast({ show: true, message: err.response?.data?.message || 'Có lỗi xảy ra khi từ chối', type: 'error' });
     }
   };
 
@@ -196,6 +202,11 @@ export default function DuyetHoanPhi_Khoa() {
           </div>
         </div>
       )}
+      <Toast 
+        message={toast.show ? toast.message : ''} 
+        type={toast.type} 
+        onClose={() => setToast({ show: false, message: '', type: 'success' })} 
+      />
     </div>
   );
 }

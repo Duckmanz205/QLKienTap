@@ -10,6 +10,10 @@ export default function SupervisorAssignment_Khoa() {
   const [lecturers, setLecturers] = useState([]);
   const [loading, setLoading] = useState(false);
 
+  // Pagination states
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(15);
+  
   // Dropdown States for Filters
   const [isLichDropdownOpen, setIsLichDropdownOpen] = useState(false);
   const [selectedLich, setSelectedLich] = useState('');
@@ -280,6 +284,58 @@ export default function SupervisorAssignment_Khoa() {
             </table>
           )}
         </div>
+        {/* Pagination Controls */}
+        {enrollments.length > 0 && (
+          <div className="p-4 border-t border-[#E7E0C4] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-semibold text-slate-500 bg-slate-50/50">
+            <div className="flex items-center gap-2">
+              <span>Hiển thị</span>
+              <select 
+                value={limit}
+                onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
+                className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
+              >
+                <option value={10}>10</option>
+                <option value={15}>15</option>
+                <option value={30}>30</option>
+                <option value={50}>50</option>
+              </select>
+              <span>/ {enrollments.length} mục</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button 
+                disabled={page <= 1}
+                onClick={() => setPage(1)}
+                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Trang đầu
+              </button>
+              <button 
+                disabled={page <= 1}
+                onClick={() => setPage(prev => Math.max(prev - 1, 1))}
+                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Trước
+              </button>
+              <span className="px-4 py-1.5 rounded-lg bg-[#407F3E] text-white text-sm font-bold shadow-sm cursor-default mx-1">
+                Trang {page} / {Math.ceil(enrollments.length / limit) || 1}
+              </span>
+              <button 
+                disabled={page >= Math.ceil(enrollments.length / limit)}
+                onClick={() => setPage(prev => Math.min(prev + 1, Math.ceil(enrollments.length / limit)))}
+                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Sau
+              </button>
+              <button 
+                disabled={page >= Math.ceil(enrollments.length / limit)}
+                onClick={() => setPage(Math.ceil(enrollments.length / limit))}
+                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Trang cuối
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

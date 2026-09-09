@@ -125,6 +125,7 @@ export default function App() {
             <Route path="khoa/lecturers" element={<DanhMuc_GiangVien_Khoa />} />
             <Route path="khoa/students" element={<DanhMuc_SinhVien_Khoa />} />
             <Route path="khoa/boards" element={<HoiDongChamBaoCao_Khoa />} />
+            <Route path="khoa/refund-approval" element={<DuyetHoanPhi_Khoa />} />
 
             <Route path="khoa/results" element={<KetQuaKienTap_MaTranDiem_Khoa />} />
             <Route path="khoa/notifications" element={<ThongBao_Khoa />} />

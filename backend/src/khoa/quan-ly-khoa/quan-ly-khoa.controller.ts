@@ -193,6 +193,8 @@ export class KhoaController {
       query.page || 1,
       query.limit || 10,
       query.search,
+      query.ten_khoa,
+      query.ten_lop,
     );
   }
 

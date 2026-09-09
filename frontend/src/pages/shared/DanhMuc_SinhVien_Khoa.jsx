@@ -46,10 +46,13 @@ export default function DanhMuc_SinhVien_Khoa() {
   const [lopList, setLopList] = useState([]);
 
   useEffect(() => {
-    fetchData(1);
     fetchCourses();
     fetchClasses();
   }, []);
+
+  useEffect(() => {
+    fetchData(1, limit, filterKhoa, filterClass);
+  }, [filterKhoa, filterClass]);
 
   const fetchClasses = async () => {
     try {
@@ -69,9 +72,15 @@ export default function DanhMuc_SinhVien_Khoa() {
     }
   };
 
-  const fetchData = async (targetPage = page, targetLimit = limit) => {
+  const fetchData = async (targetPage = page, targetLimit = limit, selKhoa = filterKhoa, selClass = filterClass) => {
     try {
-      const svRes = await khoaApi.getStudents({ page: targetPage, limit: targetLimit, search: searchTerm });
+      const svRes = await khoaApi.getStudents({ 
+        page: targetPage, 
+        limit: targetLimit, 
+        search: searchTerm,
+        ten_khoa: (selKhoa === 'All' || selKhoa === 'Tất cả khóa') ? undefined : selKhoa,
+        ten_lop: (selClass === 'All' || selClass === 'Tất cả lớp') ? undefined : selClass,
+      });
       setStudents(svRes.data.data || []);
       setTotalStudents(svRes.data.total || 0);
       setTotalPages(svRes.data.totalPages || 1);
@@ -160,9 +169,17 @@ export default function DanhMuc_SinhVien_Khoa() {
     setConfirmModal({ show: false, action: null, stud: null, title: '', message: '' });
   };
 
-  const extractKhoa = (ten_lop) => {
+  const normalizeKhoa = (str) => {
+    if (!str) return '';
+    const match = String(str).match(/\d+/);
+    return match ? match[0] : String(str).trim().toLowerCase();
+  };
+
+  const extractKhoa = (ten_lop, stud) => {
+    if (stud && stud.ten_khoa) return stud.ten_khoa;
+    if (stud && stud.khoa && stud.khoa.ten_khoa) return stud.khoa.ten_khoa;
     if (!ten_lop) return 'Khác';
-    const match = ten_lop.match(/^(\d+)/);
+    const match = String(ten_lop).match(/^(\d+)/);
     return match ? `Khóa ${match[1]}` : 'Khác';
   };
 
@@ -171,8 +188,11 @@ export default function DanhMuc_SinhVien_Khoa() {
   const lopOptions = ["Tất cả lớp", ...lopList];
 
   const filteredStudents = students.filter(s => {
-    const k = extractKhoa(s.ten_lop);
-    const matchesKhoa = filterKhoa === 'All' || k === filterKhoa || filterKhoa === "Tất cả khóa" || filterKhoa.includes(k);
+    const studentKhoaStr = s.ten_khoa || s.khoa?.ten_khoa || extractKhoa(s.ten_lop, s);
+    const matchesKhoa = filterKhoa === 'All' || filterKhoa === "Tất cả khóa" || 
+      normalizeKhoa(studentKhoaStr) === normalizeKhoa(filterKhoa) ||
+      (filterKhoa && studentKhoaStr && String(studentKhoaStr).toLowerCase().includes(String(filterKhoa).toLowerCase()));
+    
     const matchesClass = filterClass === 'All' || filterClass === "Tất cả lớp" || s.ten_lop === filterClass;
     const matchesHocLai = !filterHocLai || s.hoc_lai === true;
     return matchesKhoa && matchesClass && matchesHocLai;
