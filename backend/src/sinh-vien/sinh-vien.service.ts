@@ -348,6 +348,14 @@ export class SinhVienService {
     };
   }
 
+  async getStudentProposals(studentId: number) {
+    return this.deXuatRepo.find({
+      where: { sinh_vien_id: studentId },
+      relations: { nhaMay: true },
+      order: { id: 'DESC' },
+    });
+  }
+
   // Yeu cau huy dang ky
   async requestCancel(
     studentId: number,

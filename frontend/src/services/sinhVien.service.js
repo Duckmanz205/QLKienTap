@@ -7,6 +7,7 @@ export const sinhVienApi = {
   getRegisteredTrips: (studentId) => api.get(`/sinh-vien/registered-trips/${studentId}`),
   registerTrip: (tripId) => api.post('/sinh-vien/register', { tripId }),
   proposeTrip: (data) => api.post('/sinh-vien/propose-trip', data),
+  getProposals: () => api.get('/sinh-vien/proposals'),
   requestCancel: (data) => api.post('/sinh-vien/request-cancel', data),
   getInvoices: (studentId) => api.get(`/sinh-vien/invoices/${studentId}`),
   payInvoice: (invoiceId) => api.post(`/sinh-vien/pay-invoice/${invoiceId}`),

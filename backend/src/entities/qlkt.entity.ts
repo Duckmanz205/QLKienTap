@@ -429,6 +429,12 @@ export class ChuyenThamQuan {
   @Column()
   suc_chua: number;
 
+  @Column({ type: 'int', default: 0 })
+  le_phi: number;
+
+  @Column({ nullable: true })
+  dia_diem_tap_trung: string;
+
   @Column({ default: 'Nhap' })
   trang_thai: string; // 'Nhap' | 'MoDangKy' | 'DaChotDanhSach' | 'DaDienRa' | 'DaHuy'
 

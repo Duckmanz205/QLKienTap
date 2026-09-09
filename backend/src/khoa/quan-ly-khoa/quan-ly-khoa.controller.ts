@@ -294,7 +294,21 @@ export class KhoaController {
       body.lichId,
       body.studentIds,
     );
-  }@Roles('QuanLyCLB')
+  }
+
+  @Roles('QuanLyKhoa', 'QuanLyCLB')
+  @Get('trips')
+  async getTrips() {
+    return this.khoaService.getTrips();
+  }
+
+  @Roles('QuanLyKhoa', 'QuanLyCLB')
+  @Get('proposals')
+  async getProposals() {
+    return this.khoaService.getProposals();
+  }
+
+  @Roles('QuanLyCLB')
   @Post('trips')
   async createTrip(@Body() body: CreateTripDto) {
     return this.khoaService.createTrip(body);
