@@ -3,10 +3,12 @@ import {
   Info, ChevronDown, Check, Save, Plus, Minus
 } from 'lucide-react';
 import { giangVienApi } from '../../services/api';
+import Toast from '../../components/Toast';
 
 export default function DiemChuanBi_DiemCong_GV() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   
   const [lecturer, setLecturer] = useState(null);
   const [trips, setTrips] = useState([]);
@@ -103,9 +105,9 @@ export default function DiemChuanBi_DiemCong_GV() {
         });
       });
       await Promise.all(promises);
-      alert('Đã lưu điểm chuẩn bị & điểm cộng thành công!');
+      setToast({ show: true, message: 'Đã lưu điểm chuẩn bị & điểm cộng thành công!', type: 'success' });
     } catch (err) {
-      alert('Có lỗi xảy ra khi lưu điểm');
+      setToast({ show: true, message: err.response?.data?.message || 'Có lỗi xảy ra khi lưu điểm', type: 'error' });
       console.error(err);
     } finally {
       setLoading(false);
@@ -262,6 +264,11 @@ export default function DiemChuanBi_DiemCong_GV() {
         </button>
       </div>
 
+      <Toast 
+        message={toast.show ? toast.message : ''} 
+        type={toast.type} 
+        onClose={() => setToast({ show: false, message: '', type: 'success' })} 
+      />
     </div>
   );
 }

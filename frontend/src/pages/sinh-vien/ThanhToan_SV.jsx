@@ -4,6 +4,7 @@ import {
   CreditCard, Copy, CheckCircle2, Eye
 } from 'lucide-react';
 import { sinhVienApi } from '../../services/api';
+import Toast from '../../components/Toast';
 
 export default function ThanhToan_SV() {
   const navigate = useNavigate();
@@ -13,6 +14,7 @@ export default function ThanhToan_SV() {
   const [student, setStudent] = useState(null);
   const [invoices, setInvoices] = useState([]);
   const [viewingPayment, setViewingPayment] = useState(null);
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
   useEffect(() => {
     const userJson = localStorage.getItem('user');
@@ -21,22 +23,28 @@ export default function ThanhToan_SV() {
       sinhVienApi.getProfile(user.id).then(res => {
         setStudent(res.data);
         fetchInvoices(res.data.id);
-      }).catch(err => console.error(err));
+      }).catch(err => {
+        console.error(err);
+        setToast({ show: true, message: 'Lỗi tải thông tin sinh viên', type: 'error' });
+      });
     }
   }, []);
 
   const fetchInvoices = async (svId) => {
     try {
       const res = await sinhVienApi.getInvoices(svId);
-      setInvoices(res.data || []);
+      const list = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+      setInvoices(list);
     } catch (err) {
       console.error(err);
+      setToast({ show: true, message: 'Lỗi tải hóa đơn thanh toán', type: 'error' });
     }
   };
 
   const handleCopy = (text, id) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
+    setToast({ show: true, message: 'Đã sao chép nội dung chuyển khoản!', type: 'success' });
     setTimeout(() => setCopiedId(null), 2000);
   };
 
@@ -214,6 +222,11 @@ export default function ThanhToan_SV() {
           </div>
         </div>
       )}
+      <Toast 
+        message={toast.show ? toast.message : ''} 
+        type={toast.type} 
+        onClose={() => setToast({ show: false, message: '', type: 'success' })} 
+      />
     </div>
   );
 }

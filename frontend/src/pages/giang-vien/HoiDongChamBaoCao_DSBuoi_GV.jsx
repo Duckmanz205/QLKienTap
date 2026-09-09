@@ -12,10 +12,12 @@ import {
   ClipboardList
 } from 'lucide-react';
 import { giangVienApi } from '../../services/api';
+import Toast from '../../components/Toast';
 
 export default function HoiDongChamBaoCao_DSBuoi_GV() {
   const [lecturer, setLecturer] = useState(null);
   const [boards, setBoards] = useState([]);
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   
   // Scoring state
   const [activeTab, setActiveTab] = useState('list');
@@ -138,7 +140,7 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
           <button
             onClick={() => {
               if (!selectedReg) {
-                alert('Vui lòng chọn sinh viên cần chấm điểm từ danh sách hội đồng trước.');
+                setToast({ show: true, message: 'Vui lòng chọn sinh viên cần chấm điểm từ danh sách hội đồng trước.', type: 'error' });
                 return;
               }
               setActiveTab('grading');
@@ -171,7 +173,7 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
         <div className="space-y-6 relative z-10">
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-surface-variant/40">
             <h2 className="font-bold text-sm uppercase tracking-wider text-on-surface-variant mb-6 flex items-center gap-1.5">
-              <ClipboardList className="w-4.5 h-4.5 text-primary" />
+              <ClipboardList className="w-5 h-5 text-primary" />
               <span>Các hội đồng được phân công chấm điểm</span>
             </h2>
             
@@ -400,6 +402,13 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
           </div>
         </div>
       )}
+
+      <Toast 
+        message={toast.show ? toast.message : ''} 
+        type={toast.type} 
+        onClose={() => setToast({ show: false, message: '', type: 'success' })} 
+      />
     </div>
   );
 }
+
