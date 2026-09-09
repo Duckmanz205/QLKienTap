@@ -117,9 +117,32 @@ export class ClbController {
     return this.khoaService.getTrips();
   }
 
+  @Get('proposals')
+  async getProposals() {
+    return this.khoaService.getProposals();
+  }
+
   @Post('trips')
   async createTrip(@Body() body: CreateTripDto) {
     return this.khoaService.createTrip(body);
+  }
+
+  @Put('trips/:id')
+  async updateTrip(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: any,
+  ) {
+    return this.khoaService.updateTrip(id, body);
+  }
+
+  @Delete('trips/:id')
+  async deleteTrip(@Param('id', ParseIntPipe) id: number) {
+    return this.khoaService.deleteTrip(id);
+  }
+
+  @Patch('trips/:id/start-registration')
+  async startTripRegistration(@Param('id', ParseIntPipe) id: number) {
+    return this.khoaService.startTripRegistration(id);
   }
 
   @Post('approve-trip')

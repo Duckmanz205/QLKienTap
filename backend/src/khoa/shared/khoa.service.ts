@@ -10,6 +10,7 @@ import {
   LessThanOrEqual,
   DataSource,
   EntityManager,
+  Not,
 } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { TaskQueueService } from '../../queue/task-queue.service';
@@ -647,6 +648,13 @@ export class KhoaService {
     });
   }
 
+  async getProposals() {
+    return this.deXuatRepo.find({
+      relations: { nhaMay: true, lichKienTap: true, sinhVien: true },
+      order: { ngay_de_xuat: 'DESC' },
+    });
+  }
+
   async updateDotKienTapStatus(dotId: number) {
     const dot = await this.dotRepo.findOne({ where: { id: dotId } });
     if (!dot) return;
@@ -797,8 +805,9 @@ export class KhoaService {
       const endStr = data.gio_ket_thuc;
 
       // TypeORM mssql driver (tedious) requires a Date object for TIME columns
-      const startDate = new Date(`1970-01-01T${startStr.length === 5 ? startStr + ':00' : startStr}Z`);
-      const endDate = new Date(`1970-01-01T${endStr.length === 5 ? endStr + ':00' : endStr}Z`);
+      // Bỏ đuôi Z để hệ thống hiểu đây là Local Time, tránh bị lệch +7 tiếng (11h thành 18h)
+      const startDate = new Date(`1970-01-01T${startStr.length === 5 ? startStr + ':00' : startStr}`);
+      const endDate = new Date(`1970-01-01T${endStr.length === 5 ? endStr + ':00' : endStr}`);
 
       // Ghi đè bằng Date object
       data.gio_bat_dau = startDate as any;
@@ -848,6 +857,74 @@ export class KhoaService {
     }
   }
 
+  async updateTrip(id: number, data: any) {
+    const trip = await this.chuyenRepo.findOne({ where: { id } });
+    if (!trip) throw new NotFoundException('Không tìm thấy chuyến tham quan');
+    if (trip.trang_thai !== 'Nhap') {
+      throw new BadRequestException('Chỉ có thể cập nhật thông tin khi chuyến tham quan ở trạng thái Nháp');
+    }
+
+    try {
+      if (data.gio_bat_dau && data.gio_ket_thuc && data.ngay_tham_quan) {
+        const date = new Date(data.ngay_tham_quan);
+        const startStr = typeof data.gio_bat_dau === 'string' ? data.gio_bat_dau : null;
+        const endStr = typeof data.gio_ket_thuc === 'string' ? data.gio_ket_thuc : null;
+        
+        if (startStr && endStr) {
+          // Bỏ đuôi Z để không bị parse nhầm thành UTC (gây lệch múi giờ +7 tiếng)
+          const startDate = new Date(`1970-01-01T${startStr.length === 5 ? startStr + ':00' : startStr}`);
+          const endDate = new Date(`1970-01-01T${endStr.length === 5 ? endStr + ':00' : endStr}`);
+          
+          data.gio_bat_dau = startDate as any;
+          data.gio_ket_thuc = endDate as any;
+
+          const overlap = await this.chuyenRepo.findOne({
+            where: {
+              nha_may_id: data.nha_may_id || trip.nha_may_id,
+              ngay_tham_quan: date,
+              gio_bat_dau: startDate as any,
+              gio_ket_thuc: endDate as any,
+              id: Not(id),
+            }
+          });
+            
+          if (overlap) {
+            throw new BadRequestException('Đã tồn tại chuyến tham quan trùng khung giờ');
+          }
+        }
+      }
+
+      Object.assign(trip, data);
+      return await this.chuyenRepo.save(trip);
+    } catch (error: any) {
+      if (error instanceof BadRequestException) throw error;
+      throw new BadRequestException(`Chi tiết lỗi: ${error.message}`);
+    }
+  }
+
+  async deleteTrip(id: number) {
+    const trip = await this.chuyenRepo.findOne({ where: { id } });
+    if (!trip) throw new NotFoundException('Không tìm thấy chuyến tham quan');
+
+    if (trip.trang_thai !== 'Nhap') {
+      throw new BadRequestException('Chỉ có thể xóa chuyến tham quan ở trạng thái Nháp');
+    }
+
+    return await this.chuyenRepo.remove(trip);
+  }
+  
+  async startTripRegistration(id: number) {
+    const trip = await this.chuyenRepo.findOne({ where: { id } });
+    if (!trip) throw new NotFoundException('Không tìm thấy chuyến tham quan');
+    
+    if (trip.trang_thai !== 'Nhap') {
+      throw new BadRequestException('Chỉ có thể mở đăng ký cho chuyến tham quan ở trạng thái Nháp');
+    }
+    
+    trip.trang_thai = 'MoDangKy';
+    return await this.chuyenRepo.save(trip);
+  }
+
   // Duyet de xuat chuyen tu do cua Sinh Vien
   async approveProposeTrip(
     deXuatId: number,
@@ -861,16 +938,21 @@ export class KhoaService {
       throw new NotFoundException('Không tìm thấy đề xuất chuyến đi tự do');
     }
 
-    dexuat.nguoi_duyet_id = approverId;
-    dexuat.ngay_duyet = new Date();
-    dexuat.trang_thai_duyet = isApproved ? 'DaDuyet' : 'TuChoi';
-    
-    await this.deXuatRepo.save(dexuat);
-
     if (isApproved) {
+      let finalNhaMayId = dexuat.nha_may_id;
+      if (!finalNhaMayId && dexuat.ten_nha_may_de_xuat) {
+        const newNhaMay = new NhaMay();
+        newNhaMay.ten_nha_may = dexuat.ten_nha_may_de_xuat;
+        newNhaMay.dia_chi = dexuat.dia_chi_de_xuat;
+        newNhaMay.ho_tro_truc_tiep = dexuat.hinh_thuc === 'TrucTiep';
+        newNhaMay.ho_tro_truc_tuyen = dexuat.hinh_thuc === 'TrucTuyen';
+        const savedNhaMay = await this.nhaMayRepo.save(newNhaMay);
+        finalNhaMayId = savedNhaMay.id;
+      }
+
       // Create ChuyenThamQuan
       const trip = new ChuyenThamQuan();
-      trip.nha_may_id = dexuat.nha_may_id;
+      trip.nha_may_id = finalNhaMayId;
       trip.lich_kien_tap_id = dexuat.lich_kien_tap_id;
       trip.ngay_tham_quan = dexuat.ngay_tham_quan_de_xuat;
       trip.gio_bat_dau = dexuat.gio_bat_dau_de_xuat;
@@ -879,7 +961,14 @@ export class KhoaService {
       trip.cach_to_chuc = 'TuDo';
       trip.suc_chua = 1;
       trip.trang_thai = 'MoDangKy';
+      trip.le_phi = 0;
       const savedTrip = await this.chuyenRepo.save(trip);
+
+      dexuat.nguoi_duyet_id = approverId;
+      dexuat.ngay_duyet = new Date();
+      dexuat.trang_thai_duyet = 'DaDuyet';
+      dexuat.chuyen_tham_quan_id = savedTrip.id;
+      await this.deXuatRepo.save(dexuat);
 
       // Tu dong dang ky luon cho SV nay
       const phieu = new PhieuDangKy();
@@ -924,6 +1013,11 @@ export class KhoaService {
           }
         }
       }
+    } else {
+      dexuat.nguoi_duyet_id = approverId;
+      dexuat.ngay_duyet = new Date();
+      dexuat.trang_thai_duyet = 'TuChoi';
+      await this.deXuatRepo.save(dexuat);
     }
 
     return {
