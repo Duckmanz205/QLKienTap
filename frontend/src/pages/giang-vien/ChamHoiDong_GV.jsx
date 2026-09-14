@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Users, MapPin, Calendar, Clock, ChevronRight, CheckCircle2, Save, ArrowRight
+  Users, MapPin, Calendar, Clock, ChevronRight, CheckCircle2, Save, ArrowRight, Search
 } from 'lucide-react';
 import { giangVienApi } from '../../services/api';
+import Toast from '../../components/Toast';
 
 export default function ChamHoiDong_GV() {
   const [activeTab, setActiveTab] = useState('danh_sach'); // 'danh_sach' or 'cham_diem'
   const [selectedSessionId, setSelectedSessionId] = useState(null);
   const [selectedStudentId, setSelectedStudentId] = useState(null);
+  const [studentSearchTerm, setStudentSearchTerm] = useState('');
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -165,7 +168,7 @@ export default function ChamHoiDong_GV() {
         }
       }
       
-      alert('Đã lưu điểm thành công!');
+      setToast({ show: true, message: 'Đã lưu điểm thành công!', type: 'success' });
       
       // Update student status to graded
       const updatedStudents = students.map(s => 
@@ -180,7 +183,7 @@ export default function ChamHoiDong_GV() {
       }
       
     } catch (err) {
-      alert('Có lỗi xảy ra khi lưu điểm');
+      setToast({ show: true, message: err.response?.data?.message || 'Có lỗi xảy ra khi lưu điểm', type: 'error' });
       console.error(err);
     } finally {
       setSaving(false);
@@ -287,9 +290,25 @@ export default function ChamHoiDong_GV() {
               <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2"><Users className="w-4 h-4 text-[#407F3E]" /> Sinh viên báo cáo</h3>
               <span className="text-xs font-bold text-slate-500">{students.findIndex(s => s.id === selectedStudentId) + 1} / {students.length}</span>
             </div>
+
+            {/* Search Input for Students */}
+            <div className="p-2 border-b border-[#E7E0C4] bg-white">
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input 
+                  type="text"
+                  value={studentSearchTerm}
+                  onChange={(e) => setStudentSearchTerm(e.target.value)}
+                  placeholder="Tìm MSSV, họ tên..."
+                  className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-lg text-xs font-medium focus:outline-none focus:border-[#407F3E]"
+                />
+              </div>
+            </div>
             
             <div className="flex-1 overflow-y-auto custom-scrollbar">
-              {students.map(std => (
+              {students
+                .filter(std => !studentSearchTerm || std.name.toLowerCase().includes(studentSearchTerm.toLowerCase()) || std.mssv.toLowerCase().includes(studentSearchTerm.toLowerCase()))
+                .map(std => (
                 <div 
                   key={std.id}
                   onClick={() => handleSelectStudent(std)}
@@ -405,6 +424,11 @@ export default function ChamHoiDong_GV() {
         </div>
       )}
 
+      <Toast 
+        message={toast.show ? toast.message : ''} 
+        type={toast.type} 
+        onClose={() => setToast({ show: false, message: '', type: 'success' })} 
+      />
     </div>
   );
 }

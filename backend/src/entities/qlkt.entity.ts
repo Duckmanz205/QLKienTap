@@ -210,6 +210,9 @@ export class ThongBao {
 
   @Column({ default: false })
   da_chinh_sua: boolean;
+
+  // @Column({ nullable: true })
+  // doi_tuong_nhan: string;
 }
 
 @Entity('ThongBaoFile')
@@ -353,8 +356,11 @@ export class LichKienTap {
   @Column({ type: 'datetime2' })
   han_chot_diem: Date;
 
+  @Column({ nullable: true })
+  ly_do_tu_choi: string;
+
   @Column({ default: 'Nhap' })
-  trang_thai: string; // 'Nhap' | 'MoDangKy' | 'DangDienRa' | 'DaKetThuc' | 'DaKhoa'
+  trang_thai: string; // 'Nhap' | 'ChoDuyet' | 'DaDuyet' | 'TuChoi' | 'MoDangKy' | 'DangDienRa' | 'DaKetThuc' | 'DaKhoa'
 }
 
 @Entity('LichKienTap_SinhVien')
@@ -422,6 +428,12 @@ export class ChuyenThamQuan {
 
   @Column()
   suc_chua: number;
+
+  @Column({ type: 'int', default: 0 })
+  le_phi: number;
+
+  @Column({ nullable: true })
+  dia_diem_tap_trung: string;
 
   @Column({ default: 'Nhap' })
   trang_thai: string; // 'Nhap' | 'MoDangKy' | 'DaChotDanhSach' | 'DaDienRa' | 'DaHuy'

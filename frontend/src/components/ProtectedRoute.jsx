@@ -1,5 +1,5 @@
 import React from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { getValidSession, getDashboardPathForRole } from '../utils/auth';
 
 /**
@@ -11,12 +11,17 @@ import { getValidSession, getDashboardPathForRole } from '../utils/auth';
  */
 export default function ProtectedRoute({ allowedRoles }) {
   const session = getValidSession();
+  const location = useLocation();
 
   if (!session) {
     return <Navigate to="/login" replace />;
   }
 
   const { vai_tro } = session.user;
+
+  if (vai_tro === 'QuanTriVienHeThong' && location.pathname !== '/qtv/accounts') {
+    return <Navigate to="/qtv/accounts" replace />;
+  }
 
   if (allowedRoles && !allowedRoles.includes(vai_tro)) {
     const targetDashboard = getDashboardPathForRole(vai_tro);

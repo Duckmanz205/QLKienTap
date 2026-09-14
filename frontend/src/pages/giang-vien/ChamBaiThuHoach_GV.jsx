@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { giangVienApi } from '../../services/api';
+import Toast from '../../components/Toast';
 
 export default function ChamBaiThuHoach_GV() {
   const navigate = useNavigate();
@@ -12,6 +13,13 @@ export default function ChamBaiThuHoach_GV() {
   const [lecturer, setLecturer] = useState(null);
   const [reports, setReports] = useState([]);
   const [selectedReport, setSelectedReport] = useState(null);
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+  
+  // Pagination States
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(15);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
   
   // Grading states
   const [score, setScore] = useState('');
@@ -37,14 +45,16 @@ export default function ChamBaiThuHoach_GV() {
     }
   }, []);
 
-  const fetchReports = async (gvId) => {
+  const fetchReports = async (gvId, targetPage = page, targetLimit = limit) => {
     try {
-      const res = await giangVienApi.getGuidedReports(gvId, { limit: 100 });
-      // Depending on API, reports are in res.data or res.data.data
-      const data = res.data.data ? res.data.data : res.data;
+      const res = await giangVienApi.getGuidedReports(gvId, { page: targetPage, limit: targetLimit });
+      const data = res.data.data ? res.data.data : (Array.isArray(res.data) ? res.data : []);
       setReports(data || []);
+      setTotalPages(res.data.totalPages || 1);
+      setTotal(res.data.total || data.length || 0);
     } catch (err) {
       console.error(err);
+      setToast({ show: true, message: 'Có lỗi khi tải danh sách bài thu hoạch', type: 'error' });
     }
   };
 
@@ -57,20 +67,21 @@ export default function ChamBaiThuHoach_GV() {
   const handleSaveGrade = async (e) => {
     e.preventDefault();
     if (!score || score < 0 || score > 10) {
-      alert("Vui lòng nhập điểm hợp lệ (0-10)");
+      setToast({ show: true, message: 'Vui lòng nhập điểm hợp lệ (0-10)', type: 'error' });
       return;
     }
+
     try {
       await giangVienApi.gradeReport({
         reportId: selectedReport.id,
         score: parseFloat(score),
         comment: comments
       });
-      alert('Đã lưu điểm thành công!');
-      setSelectedReport(null);
-      if (lecturer) fetchReports(lecturer.id);
+      setToast({ show: true, message: 'Đã lưu điểm bài thu hoạch thành công!', type: 'success' });
+      fetchReports(lecturer.id);
     } catch (err) {
-      alert(err.response?.data?.message || 'Có lỗi xảy ra khi chấm điểm');
+      console.error(err);
+      setToast({ show: true, message: err.response?.data?.message || 'Có lỗi xảy ra khi lưu điểm', type: 'error' });
     }
   };
 
@@ -369,6 +380,11 @@ export default function ChamBaiThuHoach_GV() {
   return (
     <div className={selectedReport ? '' : 'bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300'}>
       {selectedReport ? renderGradingView() : renderReportList()}
+      <Toast 
+        message={toast.show ? toast.message : ''} 
+        type={toast.type} 
+        onClose={() => setToast({ show: false, message: '', type: 'success' })} 
+      />
     </div>
   );
 }

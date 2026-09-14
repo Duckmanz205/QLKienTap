@@ -3,11 +3,13 @@ import {
   GraduationCap, BookOpen, AlertCircle, CheckCircle2, XCircle
 } from 'lucide-react';
 import { sinhVienApi } from '../../services/api';
+import Toast from '../../components/Toast';
 
 export default function KetQua_Diem_SV() {
   const [student, setStudent] = useState(null);
   const [termGrade, setTermGrade] = useState(null);
   const [grades, setGrades] = useState([]);
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
   useEffect(() => {
     const userJson = localStorage.getItem('user');
@@ -16,20 +18,25 @@ export default function KetQua_Diem_SV() {
       sinhVienApi.getProfile(user.id).then(res => {
         setStudent(res.data);
         fetchGrades(res.data.id);
-      }).catch(err => console.error(err));
+      }).catch(err => {
+        console.error(err);
+        setToast({ show: true, message: 'Lỗi tải thông tin sinh viên', type: 'error' });
+      });
     }
   }, []);
 
   const fetchGrades = async (svId) => {
     try {
       const res = await sinhVienApi.getGrades(svId);
-      if (res.data && res.data.length > 0) {
-        setTermGrade(res.data[0]);
-        const trips = res.data[0].selectedTrips || [];
+      const dataList = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+      if (dataList.length > 0) {
+        setTermGrade(dataList[0]);
+        const trips = dataList[0].selectedTrips || [];
         setGrades(trips);
       }
     } catch (err) {
       console.error(err);
+      setToast({ show: true, message: 'Lỗi khi tải kết quả điểm', type: 'error' });
     }
   };
 
@@ -184,6 +191,11 @@ export default function KetQua_Diem_SV() {
         )}
       </div>
 
+      <Toast 
+        message={toast.show ? toast.message : ''} 
+        type={toast.type} 
+        onClose={() => setToast({ show: false, message: '', type: 'success' })} 
+      />
     </div>
   );
 }

@@ -223,7 +223,7 @@ export default function LichDanDoan_GV() {
                             </td>
                             <td className="p-4 text-right pr-6">
                               <button 
-                                onClick={() => navigate('/giang-vien')}
+                                onClick={() => navigate('/giang-vien/attendance')}
                                 className="text-xs font-bold text-[#407F3E] hover:text-[#407F3E]/80 hover:underline transition-colors cursor-pointer inline-flex items-center gap-1"
                               >
                                 <Eye className="w-3.5 h-3.5" /> Chi tiết

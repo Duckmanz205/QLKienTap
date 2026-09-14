@@ -3,11 +3,17 @@ import {
   Search, ChevronDown, Check, CheckCircle2, XCircle, FileWarning, Save
 } from 'lucide-react';
 import { giangVienApi } from '../../services/api';
+import Toast from '../../components/Toast';
 
 export default function DiemDanhSV_GV() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+
+  // Pagination states
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(15);
   
   const [lecturer, setLecturer] = useState(null);
   const [trips, setTrips] = useState([]);
@@ -102,9 +108,9 @@ export default function DiemDanhSV_GV() {
         tripId: selectedTrip.id,
         records
       });
-      alert('Đã lưu điểm danh thành công!');
+      setToast({ show: true, message: 'Đã lưu điểm danh thành công!', type: 'success' });
     } catch (err) {
-      alert('Có lỗi xảy ra khi lưu điểm danh');
+      setToast({ show: true, message: err.response?.data?.message || 'Có lỗi xảy ra khi lưu điểm danh', type: 'error' });
       console.error(err);
     } finally {
       setLoading(false);
@@ -287,6 +293,58 @@ export default function DiemDanhSV_GV() {
             </tbody>
           </table>
         </div>
+        {/* Pagination Controls */}
+        {filteredStudents.length > 0 && (
+          <div className="p-4 border-t border-[#E7E0C4] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-semibold text-slate-500 bg-slate-50/50">
+            <div className="flex items-center gap-2">
+              <span>Hiển thị</span>
+              <select 
+                value={limit}
+                onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
+                className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
+              >
+                <option value={10}>10</option>
+                <option value={15}>15</option>
+                <option value={30}>30</option>
+                <option value={50}>50</option>
+              </select>
+              <span>/ {filteredStudents.length} sinh viên</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button 
+                disabled={page <= 1}
+                onClick={() => setPage(1)}
+                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Trang đầu
+              </button>
+              <button 
+                disabled={page <= 1}
+                onClick={() => setPage(prev => Math.max(prev - 1, 1))}
+                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Trước
+              </button>
+              <span className="px-4 py-1.5 rounded-lg bg-[#407F3E] text-white text-sm font-bold shadow-sm cursor-default mx-1">
+                Trang {page} / {Math.ceil(filteredStudents.length / limit) || 1}
+              </span>
+              <button 
+                disabled={page >= Math.ceil(filteredStudents.length / limit)}
+                onClick={() => setPage(prev => Math.min(prev + 1, Math.ceil(filteredStudents.length / limit)))}
+                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Sau
+              </button>
+              <button 
+                disabled={page >= Math.ceil(filteredStudents.length / limit)}
+                onClick={() => setPage(Math.ceil(filteredStudents.length / limit))}
+                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Trang cuối
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Floating Save Button */}
@@ -301,6 +359,11 @@ export default function DiemDanhSV_GV() {
         </button>
       </div>
 
+      <Toast 
+        message={toast.show ? toast.message : ''} 
+        type={toast.type} 
+        onClose={() => setToast({ show: false, message: '', type: 'success' })} 
+      />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import {
   ArrowLeft, Search, ZoomIn, ZoomOut, AlertTriangle, Send, Maximize2, Minimize2
 } from 'lucide-react';
 import { sinhVienApi } from '../../services/api';
+import Toast from '../../components/Toast';
 
 export default function NopBaiThuHoach_SV() {
   const [student, setStudent] = useState(null);
@@ -12,6 +13,11 @@ export default function NopBaiThuHoach_SV() {
   const [uploadedFile, setUploadedFile] = useState(null);
   const [isTextMaximized, setIsTextMaximized] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(100);
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+
+  // Pagination States
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(15);
 
   useEffect(() => {
     const userJson = localStorage.getItem('user');
@@ -375,6 +381,11 @@ export default function NopBaiThuHoach_SV() {
   return (
     <div className={selectedTrip ? '' : 'bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300'}>
       {selectedTrip ? renderSubmissionView() : renderListView()}
+      <Toast 
+        message={toast.show ? toast.message : ''} 
+        type={toast.type} 
+        onClose={() => setToast({ show: false, message: '', type: 'success' })} 
+      />
     </div>
   );
 }

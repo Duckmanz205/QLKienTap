@@ -15,6 +15,10 @@ export default function SinhVienHuongDan_GV() {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(false);
 
+  // Pagination states
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(15);
+
   // Semesters/Schedules (Mock for now, or extracted from students)
   const semesters = [
     { id: 'all', name: 'Tất cả sinh viên' }
@@ -82,26 +86,64 @@ export default function SinhVienHuongDan_GV() {
     }
   };
 
-  const filteredStudents = students.filter(s => 
-    (s.name && s.name.toLowerCase().includes(searchQuery.toLowerCase())) || 
-    (s.mssv && s.mssv.includes(searchQuery))
-  );
+  // Filter states
+  const [filterKhoa, setFilterKhoa] = useState('All');
+  const [isKhoaDropdownOpen, setIsKhoaDropdownOpen] = useState(false);
+  const [filterClass, setFilterClass] = useState('All');
+  const [isClassDropdownOpen, setIsClassDropdownOpen] = useState(false);
+
+  const normalizeKhoa = (str) => {
+    if (!str) return '';
+    const match = String(str).match(/\d+/);
+    return match ? match[0] : String(str).trim().toLowerCase();
+  };
+
+  const extractKhoa = (ten_lop, rawSv) => {
+    if (rawSv && rawSv.ten_khoa) return rawSv.ten_khoa;
+    if (rawSv && rawSv.khoa && rawSv.khoa.ten_khoa) return rawSv.khoa.ten_khoa;
+    if (!ten_lop || ten_lop === '--') return 'Khác';
+    const match = String(ten_lop).match(/^(\d+)/);
+    return match ? `Khóa ${match[1]}` : 'Khác';
+  };
+
+  const uniqueKhoaList = Array.from(new Set(students.map(s => extractKhoa(s.lop, s.rawSv)).filter(Boolean)));
+  const uniqueClassList = Array.from(new Set(students.map(s => s.lop).filter(l => l && l !== '--')));
+
+  const khoaOptions = ["Tất cả khóa", ...uniqueKhoaList];
+  const lopOptions = ["Tất cả lớp", ...uniqueClassList];
+
+  const filteredStudents = students.filter(s => {
+    const matchesSearch = (s.name && s.name.toLowerCase().includes(searchQuery.toLowerCase())) || 
+                          (s.mssv && s.mssv.includes(searchQuery));
+    const k = extractKhoa(s.lop, s.rawSv);
+    const matchesKhoa = filterKhoa === 'All' || filterKhoa === "Tất cả khóa" || 
+      normalizeKhoa(k) === normalizeKhoa(filterKhoa) ||
+      (filterKhoa && k && String(k).toLowerCase().includes(String(filterKhoa).toLowerCase()));
+    const matchesClass = filterClass === 'All' || filterClass === "Tất cả lớp" || s.lop === filterClass;
+    return matchesSearch && matchesKhoa && matchesClass;
+  });
+
+  const closeAllDropdowns = () => {
+    setIsDropdownOpen(false);
+    setIsKhoaDropdownOpen(false);
+    setIsClassDropdownOpen(false);
+  };
 
   return (
-    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300 relative" onClick={() => setIsDropdownOpen(false)}>
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300 relative" onClick={closeAllDropdowns}>
       
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-800">Sinh viên hướng dẫn</h1>
       </div>
 
       {/* Filter Bar */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 flex-wrap">
         
         {/* Semester Selector */}
-        <div className="relative w-full md:w-[350px]">
+        <div className="relative min-w-[200px] flex-1">
           <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Lịch kiến tập</label>
           <div 
-            onClick={(e) => { e.stopPropagation(); setIsDropdownOpen(!isDropdownOpen); }}
+            onClick={(e) => { e.stopPropagation(); closeAllDropdowns(); setIsDropdownOpen(!isDropdownOpen); }}
             className={`w-full px-4 py-2.5 bg-white border rounded-xl text-sm flex justify-between items-center cursor-pointer transition-all shadow-sm ${isDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
           >
             <span className="font-bold text-slate-800 truncate pr-2">{selectedSemester.name}</span>
@@ -125,8 +167,64 @@ export default function SinhVienHuongDan_GV() {
           )}
         </div>
 
+        {/* Khóa Filter Dropdown */}
+        <div className="relative min-w-[180px] flex-1">
+          <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Khóa</label>
+          <div 
+            onClick={(e) => { e.stopPropagation(); closeAllDropdowns(); setIsKhoaDropdownOpen(!isKhoaDropdownOpen); }}
+            className={`w-full px-4 py-2.5 bg-white border rounded-xl text-sm flex justify-between items-center cursor-pointer transition-all shadow-sm ${isKhoaDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+          >
+            <span className="font-medium text-slate-700 truncate pr-2">{filterKhoa === 'All' ? 'Tất cả khóa' : filterKhoa}</span>
+            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+          </div>
+          {isKhoaDropdownOpen && (
+            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-50 py-1 max-h-48 overflow-y-auto animate-in slide-in-from-top-1">
+              {khoaOptions.map(opt => (
+                <div 
+                  key={opt}
+                  onClick={() => { setFilterKhoa(opt); setIsKhoaDropdownOpen(false); }}
+                  className={`px-4 py-2.5 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                    (filterKhoa === opt || (filterKhoa === 'All' && opt === 'Tất cả khóa')) ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50 font-medium'
+                  }`}
+                >
+                  <span className="truncate pr-2">{opt}</span>
+                  {(filterKhoa === opt || (filterKhoa === 'All' && opt === 'Tất cả khóa')) && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Lớp Filter Dropdown */}
+        <div className="relative min-w-[180px] flex-1">
+          <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Lớp</label>
+          <div 
+            onClick={(e) => { e.stopPropagation(); closeAllDropdowns(); setIsClassDropdownOpen(!isClassDropdownOpen); }}
+            className={`w-full px-4 py-2.5 bg-white border rounded-xl text-sm flex justify-between items-center cursor-pointer transition-all shadow-sm ${isClassDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+          >
+            <span className="font-medium text-slate-700 truncate pr-2">{filterClass === 'All' ? 'Tất cả lớp' : filterClass}</span>
+            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+          </div>
+          {isClassDropdownOpen && (
+            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-50 py-1 max-h-48 overflow-y-auto animate-in slide-in-from-top-1">
+              {lopOptions.map(opt => (
+                <div 
+                  key={opt}
+                  onClick={() => { setFilterClass(opt); setIsClassDropdownOpen(false); }}
+                  className={`px-4 py-2.5 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                    (filterClass === opt || (filterClass === 'All' && opt === 'Tất cả lớp')) ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50 font-medium'
+                  }`}
+                >
+                  <span className="truncate pr-2">{opt}</span>
+                  {(filterClass === opt || (filterClass === 'All' && opt === 'Tất cả lớp')) && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Search */}
-        <div className="w-full md:w-[300px] mt-0 md:mt-5 relative">
+        <div className="min-w-[220px] flex-1 mt-0 md:mt-5 relative">
           <input 
             type="text" 
             placeholder="Tìm theo MSSV/họ tên..." 
@@ -230,6 +328,58 @@ export default function SinhVienHuongDan_GV() {
             </tbody>
           </table>
         </div>
+        {/* Pagination Controls */}
+        {filteredStudents.length > 0 && (
+          <div className="p-4 border-t border-[#E7E0C4] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-semibold text-slate-500 bg-slate-50/50">
+            <div className="flex items-center gap-2">
+              <span>Hiển thị</span>
+              <select 
+                value={limit}
+                onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
+                className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
+              >
+                <option value={10}>10</option>
+                <option value={15}>15</option>
+                <option value={30}>30</option>
+                <option value={50}>50</option>
+              </select>
+              <span>/ {filteredStudents.length} sinh viên</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button 
+                disabled={page <= 1}
+                onClick={() => setPage(1)}
+                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Trang đầu
+              </button>
+              <button 
+                disabled={page <= 1}
+                onClick={() => setPage(prev => Math.max(prev - 1, 1))}
+                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Trước
+              </button>
+              <span className="px-4 py-1.5 rounded-lg bg-[#407F3E] text-white text-sm font-bold shadow-sm cursor-default mx-1">
+                Trang {page} / {Math.ceil(filteredStudents.length / limit) || 1}
+              </span>
+              <button 
+                disabled={page >= Math.ceil(filteredStudents.length / limit)}
+                onClick={() => setPage(prev => Math.min(prev + 1, Math.ceil(filteredStudents.length / limit)))}
+                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Sau
+              </button>
+              <button 
+                disabled={page >= Math.ceil(filteredStudents.length / limit)}
+                onClick={() => setPage(Math.ceil(filteredStudents.length / limit))}
+                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Trang cuối
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
     </div>

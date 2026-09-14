@@ -55,8 +55,10 @@ export default function Login() {
         navigate('/sinh-vien');
       } else if (user.vai_tro === 'GiangVien') {
         navigate('/giang-vien');
-      } else if (user.vai_tro === 'QuanLyKhoa' || user.vai_tro === 'QuanTriVienHeThong') {
+      } else if (user.vai_tro === 'QuanLyKhoa') {
         navigate('/khoa');
+      } else if (user.vai_tro === 'QuanTriVienHeThong') {
+        navigate('/qtv/accounts');
       } else if (user.vai_tro === 'QuanLyCLB') {
         navigate('/clb');
       } else {
