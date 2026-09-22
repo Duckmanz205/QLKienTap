@@ -54,13 +54,13 @@ export default function BaoCao_SVKhongThucHien_Khoa() {
       const uniqueClasses = [...new Set(retakeData.map(s => s.lop || s.ten_lop).filter(Boolean))];
       setClasses(uniqueClasses);
 
-      const uniqueKhoas = [...new Set(retakeData.map(s => s.khoa?.ten_khoa).filter(Boolean))];
+      const uniqueKhoas = [...new Set(retakeData.map(s => s.khoaHoc?.ten_khoa_hoc).filter(Boolean))];
       setKhoas(uniqueKhoas);
 
       // Aggregate by Khoa for mini bar chart
       const khoaMap = {};
       retakeData.forEach(s => {
-        const kName = s.khoa?.ten_khoa || 'Chưa rõ';
+        const kName = s.khoaHoc?.ten_khoa_hoc || 'Chưa rõ';
         khoaMap[kName] = (khoaMap[kName] || 0) + 1;
       });
       
@@ -89,7 +89,7 @@ export default function BaoCao_SVKhongThucHien_Khoa() {
       s.email?.toLowerCase().includes(term)
     );
     const matchClass = selectedClass === 'All' || (s.lop || s.ten_lop) === selectedClass;
-    const matchKhoa = selectedKhoaFilter === 'All' || (s.khoa?.ten_khoa) === selectedKhoaFilter;
+    const matchKhoa = selectedKhoaFilter === 'All' || (s.khoaHoc?.ten_khoa_hoc) === selectedKhoaFilter;
     
     return matchSearch && matchClass && matchKhoa;
   });
@@ -101,7 +101,7 @@ export default function BaoCao_SVKhongThucHien_Khoa() {
     let csvContent = '\uFEFF';
     csvContent += 'STT,MSSV,Họ và tên,Lớp,Khóa,Email,Lý do\n';
     filteredStudents.forEach((s, idx) => {
-      csvContent += `"${idx + 1}","${s.mssv}","${s.ho_ten}","${s.lop || s.ten_lop || ''}","${s.khoa?.ten_khoa || ''}","${s.email || ''}","Không đủ chuyến"\n`;
+      csvContent += `"${idx + 1}","${s.mssv}","${s.ho_ten}","${s.lop || s.ten_lop || ''}","${s.khoaHoc?.ten_khoa_hoc || ''}","${s.email || ''}","Không đủ chuyến"\n`;
     });
     
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -327,7 +327,7 @@ export default function BaoCao_SVKhongThucHien_Khoa() {
                     <td className="p-4 font-mono font-bold text-slate-800">{s.mssv}</td>
                     <td className="p-4 font-bold text-slate-800">{s.ho_ten}</td>
                     <td className="p-4 font-medium text-slate-600">{s.lop || s.ten_lop}</td>
-                    <td className="p-4 font-medium text-slate-600">{s.khoa?.ten_khoa}</td>
+                    <td className="p-4 font-medium text-slate-600">{s.khoaHoc?.ten_khoa_hoc}</td>
                     <td className="p-4">
                       {s.email ? (
                         <a href={`mailto:${s.email}`} className="inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-700 hover:underline">

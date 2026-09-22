@@ -50,7 +50,7 @@ export default function ChamBaiThuHoach_GV() {
 
   const handleSelectReport = (report) => {
     setSelectedReport(report);
-    setScore(report.diem_bai_thu_hoach !== null ? report.diem_bai_thu_hoach : '');
+    setScore(report.diem_thu_hoach !== null ? report.diem_thu_hoach : '');
     setComments(report.nhan_xet_cua_giang_vien || '');
   };
 
@@ -102,7 +102,7 @@ export default function ChamBaiThuHoach_GV() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {reports.map((report) => {
-            const isGraded = report.diem_bai_thu_hoach !== null;
+            const isGraded = report.diem_thu_hoach !== null;
             const sv = report.phieuDangKy?.sinhVien || {};
             const nhaMay = report.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Chuyến đi';
             
@@ -136,7 +136,7 @@ export default function ChamBaiThuHoach_GV() {
                       <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Trạng thái:</span>
                       {isGraded ? (
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-[#89B449]/10 text-[#407F3E]">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Đã chấm ({report.diem_bai_thu_hoach}/10)
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Đã chấm ({report.diem_thu_hoach}/10)
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-[#DBD468] text-slate-800 shadow-sm">

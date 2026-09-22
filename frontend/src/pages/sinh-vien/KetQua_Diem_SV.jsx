@@ -35,10 +35,10 @@ export default function KetQua_Diem_SV() {
 
   const calculateTripScore = (trip) => {
     if (!trip) return 0;
-    const score = (Number(trip.diem_chuan_bi || 0) * 0.3) + 
-                  (Number(trip.diem_bai_thu_hoach || 0) * 0.3) + 
-                  (Number(trip.diem_bao_cao_tqnm || 0) * 0.4) + 
-                  Number(trip.diem_cong || 0);
+    const score = (Number(trip.diem_chuan_bi || 0) * 0.1) + 
+                  (Number(trip.diem_thu_hoach || 0) * 0.4) + 
+                  (Number(trip.diem_hoi_dong_final || 0) * 0.5) + 
+                  Number(trip.diem_cong_final_final || 0);
     return Math.min(10, score).toFixed(1);
   };
 
@@ -154,13 +154,13 @@ export default function KetQua_Diem_SV() {
                       {trip.diem_chuan_bi !== null && trip.diem_chuan_bi !== undefined ? Number(trip.diem_chuan_bi).toFixed(1) : '-'}
                     </td>
                     <td className="p-4 text-center font-medium">
-                      {trip.diem_bai_thu_hoach !== null && trip.diem_bai_thu_hoach !== undefined ? Number(trip.diem_bai_thu_hoach).toFixed(1) : '-'}
+                      {trip.diem_thu_hoach !== null && trip.diem_thu_hoach !== undefined ? Number(trip.diem_thu_hoach).toFixed(1) : '-'}
                     </td>
                     <td className="p-4 text-center font-medium">
-                      {trip.diem_bao_cao_tqnm !== null && trip.diem_bao_cao_tqnm !== undefined ? Number(trip.diem_bao_cao_tqnm).toFixed(1) : '-'}
+                      {trip.diem_hoi_dong_final !== null && trip.diem_hoi_dong_final !== undefined ? Number(trip.diem_hoi_dong_final).toFixed(1) : '-'}
                     </td>
                     <td className="p-4 text-center font-medium text-[#89B449]">
-                      {trip.diem_cong > 0 ? `+${Number(trip.diem_cong).toFixed(1)}` : (trip.diem_cong === 0 ? '0' : '-')}
+                      {trip.diem_cong_final > 0 ? `+${Number(trip.diem_cong_final).toFixed(1)}` : (trip.diem_cong_final === 0 ? '0' : '-')}
                     </td>
                     <td className="p-4 text-center pr-6 bg-slate-50 group-hover:bg-slate-100 transition-colors">
                       <span className="text-xl font-black text-[#407F3E]">

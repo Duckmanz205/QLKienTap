@@ -7,7 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
-import { TaiKhoan, SinhVien, GiangVien } from '../entities/qlkt.entity';
+import { TaiKhoan, SinhVien, GiangVien, VaiTro } from '../entities/qlkt.entity';
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
@@ -24,8 +24,16 @@ export class AuthService {
     private sinhVienRepo: Repository<SinhVien>,
     @InjectRepository(GiangVien)
     private giangVienRepo: Repository<GiangVien>,
+    @InjectRepository(VaiTro)
+    private vaiTroRepo: Repository<VaiTro>,
     private jwtService: JwtService,
   ) {}
+
+  // Helper: resolve ma_vai_tro từ vai_tro_id
+  private async resolveMaVaiTro(vaiTroId: number): Promise<string> {
+    const vt = await this.vaiTroRepo.findOne({ where: { id: vaiTroId } });
+    return vt?.ma_vai_tro || '';
+  }
 
   async login(ten_dang_nhap: string, mat_khau: string) {
     if (!ten_dang_nhap || !mat_khau) {
@@ -91,13 +99,16 @@ export class AuthService {
     user.lan_dang_nhap_cuoi = new Date();
     await this.taiKhoanRepo.save(user);
 
+    // (v8) Resolve ma_vai_tro từ VaiTro table
+    const maVaiTro = await this.resolveMaVaiTro(user.vai_tro_id);
+
     let details: any = null;
-    if (user.vai_tro === 'SinhVien') {
+    if (maVaiTro === 'SinhVien') {
       details = await this.sinhVienRepo.findOne({
         where: { taikhoan_id: user.id },
-        relations: { khoa: true },
+        relations: { khoaHoc: true },
       });
-    } else if (user.vai_tro === 'GiangVien') {
+    } else if (maVaiTro === 'GiangVien') {
       details = await this.giangVienRepo.findOne({
         where: { taikhoan_id: user.id },
       });
@@ -106,7 +117,7 @@ export class AuthService {
     const payload = {
       sub: user.id,
       username: user.ten_dang_nhap,
-      role: user.vai_tro,
+      role: maVaiTro,
     };
     const token = this.jwtService.sign(payload);
 
@@ -115,7 +126,7 @@ export class AuthService {
       user: {
         id: user.id,
         ten_dang_nhap: user.ten_dang_nhap,
-        vai_tro: user.vai_tro,
+        vai_tro: maVaiTro,
         phai_doi_mat_khau: user.phai_doi_mat_khau,
         details,
       },
@@ -160,13 +171,15 @@ export class AuthService {
       throw new NotFoundException('Không tìm thấy tài khoản');
     }
 
+    const maVaiTro = await this.resolveMaVaiTro(user.vai_tro_id);
+
     let details: any = null;
-    if (user.vai_tro === 'SinhVien') {
+    if (maVaiTro === 'SinhVien') {
       details = await this.sinhVienRepo.findOne({
         where: { taikhoan_id: user.id },
-        relations: { khoa: true },
+        relations: { khoaHoc: true },
       });
-    } else if (user.vai_tro === 'GiangVien') {
+    } else if (maVaiTro === 'GiangVien') {
       details = await this.giangVienRepo.findOne({
         where: { taikhoan_id: user.id },
       });
@@ -175,7 +188,7 @@ export class AuthService {
     return {
       id: user.id,
       ten_dang_nhap: user.ten_dang_nhap,
-      vai_tro: user.vai_tro,
+      vai_tro: maVaiTro,
       details,
     };
   }
@@ -186,7 +199,9 @@ export class AuthService {
       throw new NotFoundException('Không tìm thấy tài khoản');
     }
 
-    if (user.vai_tro === 'SinhVien') {
+    const maVaiTro = await this.resolveMaVaiTro(user.vai_tro_id);
+
+    if (maVaiTro === 'SinhVien') {
       const sv = await this.sinhVienRepo.findOne({
         where: { taikhoan_id: userId },
       });
@@ -199,7 +214,7 @@ export class AuthService {
         }
         await this.sinhVienRepo.save(sv);
       }
-    } else if (user.vai_tro === 'GiangVien') {
+    } else if (maVaiTro === 'GiangVien') {
       const gv = await this.giangVienRepo.findOne({
         where: { taikhoan_id: userId },
       });

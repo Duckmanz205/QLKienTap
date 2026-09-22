@@ -16,6 +16,7 @@ export default function LichKienTap_Khoa() {
   const [schedules, setSchedules] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   const [courses, setCourses] = useState([]);
+  const [factories, setFactories] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [openDropdownId, setOpenDropdownId] = useState(null);
@@ -74,28 +75,22 @@ export default function LichKienTap_Khoa() {
   const [createForm, setCreateForm] = useState({
     ten_lich: '',
     dot_kien_tap_id: '',
-    khoa_hoc_id: '',
+    so_luong_du_kien: '',
     tg_mo_dang_ky_tu: '',
     tg_mo_dang_ky_den: '',
-    tg_dien_ra_tu: '',
-    tg_dien_ra_den: '',
-    han_chot_nop_bao_cao: '',
-    han_chot_diem: '',
-  });
-  const [uploadedStudents, setUploadedStudents] = useState([]);
-  const [selectedFileInfo, setSelectedFileInfo] = useState(null);
-  const [fileError, setFileError] = useState('');
+  });  // Trip Table States for Modal
+  const [tripPage, setTripPage] = useState(1);
+  const [tripPageSize, setTripPageSize] = useState(15);
+  const [tripFilterNhaMay, setTripFilterNhaMay] = useState('');
+  const [tripFilterHinhThuc, setTripFilterHinhThuc] = useState('');
+  const [viewingTripDetail, setViewingTripDetail] = useState(null);
+  const [isTripFactoryDropdownOpen, setIsTripFactoryDropdownOpen] = useState(false);
+  const [tripFactorySearchTerm, setTripFactorySearchTerm] = useState('');
+
   const [isCreating, setIsCreating] = useState(false);
-  const fileInputRef = useRef(null);
 
   // Detail Modal States
   const [viewingDetail, setViewingDetail] = useState(null);
-  const [activeDetailTab, setActiveDetailTab] = useState('thong_tin');
-  const [enrollments, setEnrollments] = useState([]);
-  const [isLoadingEnrollments, setIsLoadingEnrollments] = useState(false);
-
-  const [importingLich, setImportingLich] = useState(null);
-  const [isLoadingStudents, setIsLoadingStudents] = useState(false);
 
   // Filter States
   const [filterDot, setFilterDot] = useState('');
@@ -107,6 +102,8 @@ export default function LichKienTap_Khoa() {
   const [dotSearchTermModal, setDotSearchTermModal] = useState('');
   const [isKhoaDropdownOpen, setIsKhoaDropdownOpen] = useState(false);
   const [khoaSearchTerm, setKhoaSearchTerm] = useState('');
+  const [unassignedTrips, setUnassignedTrips] = useState([]);
+  const [selectedTripIds, setSelectedTripIds] = useState([]);
 
   useEffect(() => {
     fetchData();
@@ -114,14 +111,18 @@ export default function LichKienTap_Khoa() {
 
   const fetchData = async () => {
     try {
-      const [schRes, campRes, courseRes] = await Promise.all([
+      const [schRes, campRes, courseRes, tripRes, factoryRes] = await Promise.all([
         khoaApi.getSchedules(),
         khoaApi.getCampaigns(),
-        khoaApi.getCourses()
+        khoaApi.getCourses(),
+        khoaApi.getTrips({ status: 'Nhap' }),
+        khoaApi.getFactories()
       ]);
-      setSchedules(schRes.data);
-      setCampaigns(campRes.data);
-      setCourses(courseRes.data);
+      setSchedules(schRes.data?.data || schRes.data || []);
+      setCampaigns(campRes.data?.data || campRes.data || []);
+      setCourses(courseRes.data?.data || courseRes.data || []);
+      setFactories(factoryRes.data?.data || factoryRes.data || []);
+      setUnassignedTrips(tripRes.data?.data || tripRes.data || []);
     } catch (err) {
       console.error(err);
     }
@@ -130,65 +131,9 @@ export default function LichKienTap_Khoa() {
   const handleViewDetail = async (schedule) => {
     const rawSchedule = schedules.find(s => s.id === schedule.id) || schedule;
     setViewingDetail(rawSchedule);
-    setActiveDetailTab('thong_tin');
-
-    setIsLoadingEnrollments(true);
-    try {
-      const res = await khoaApi.getEnrollments({ lichKienTapId: schedule.id, limit: 1000 });
-      setEnrollments(res.data?.data || res.data || []);
-    } catch (err) {
-      console.error(err);
-      setEnrollments([]);
-    } finally {
-      setIsLoadingEnrollments(false);
-    }
   };
 
-  const handleOpenImport = (schedule) => {
-    setImportingLich(schedule);
-    setUploadedStudents([]);
-    setFileError('');
-  };
 
-  const handleImportSubmit = async () => {
-    if (uploadedStudents.length === 0) {
-      showToast("Vui lòng tải lên danh sách sinh viên", 'error');
-      return;
-    }
-    
-    setIsLoadingStudents(true);
-    try {
-      // Find IDs for the uploaded students by mapping MSSV
-      const stRes = await khoaApi.getStudents({ limit: 10000 });
-      const allStData = stRes.data?.data || stRes.data || [];
-      const mssvToId = {};
-      allStData.forEach(st => {
-        mssvToId[st.mssv] = st.id;
-      });
-      
-      const studentIds = uploadedStudents.map(st => mssvToId[st.mssv]).filter(id => id);
-      
-      if (studentIds.length === 0) {
-        showToast("Không tìm thấy sinh viên hợp lệ trong hệ thống khớp với file", 'error');
-        setIsLoadingStudents(false);
-        return;
-      }
-      
-      await khoaApi.importStudents({
-        lichId: importingLich.id,
-        studentIds: studentIds
-      });
-      await fetchData();
-      showToast(`Tải danh sách SV thành công. Đã gán ${studentIds.length}/${uploadedStudents.length} sinh viên.`, 'success');
-      setImportingLich(null);
-      setUploadedStudents([]);
-    } catch (err) {
-      console.error(err);
-      showToast("Lỗi tải danh sách SV: " + (err.response?.data?.message || err.message), 'error');
-    } finally {
-      setIsLoadingStudents(false);
-    }
-  };
 
   const handleApprove = (id) => {
     showConfirm('Xác nhận duyệt', 'Bạn có chắc chắn muốn duyệt lịch này?', async () => {
@@ -229,71 +174,16 @@ export default function LichKienTap_Khoa() {
     });
   };
 
-  const handleFileSelect = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      try {
-        const wb = XLSX.read(evt.target.result, { type: 'binary' });
-        const sheet = wb.Sheets[wb.SheetNames[0]];
-        const data = XLSX.utils.sheet_to_json(sheet);
-        const formatted = data.map(row => ({
-          mssv: String(row['MSSV'] || row['mssv'] || ''),
-          ho_ten: String(row['Họ tên'] || row['ho_ten'] || ''),
-          ten_lop: String(row['Lớp'] || row['ten_lop'] || ''),
-        })).filter(r => r.mssv);
-        if (formatted.length === 0) {
-          setFileError('File không có dữ liệu hợp lệ hoặc sai định dạng mẫu.');
-          setUploadedStudents([]);
-          setSelectedFileInfo(null);
-        } else {
-          setFileError('');
-          setUploadedStudents(formatted);
-          setSelectedFileInfo({
-            name: file.name,
-            size: (file.size / 1024).toFixed(1) + ' KB'
-          });
-        }
-      } catch (err) {
-        setFileError('Đã xảy ra lỗi khi đọc file.');
-        setUploadedStudents([]);
-        setSelectedFileInfo(null);
-      }
-    };
-    reader.readAsBinaryString(file);
-    e.target.value = null;
-  };
 
-  const handleResetFile = () => {
-    setUploadedStudents([]);
-    setSelectedFileInfo(null);
-    setFileError('');
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const handleDownloadSampleFile = () => {
-    const ws = XLSX.utils.json_to_sheet([
-      { 'MSSV': '2001202244', 'Họ tên': 'Nguyễn Văn A', 'Lớp': '11DHTP1' },
-      { 'MSSV': '2001202245', 'Họ tên': 'Trần Thị B', 'Lớp': '11DHTP2' }
-    ]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "DanhSachSinhVien");
-    XLSX.writeFile(wb, "Mau_DanhSachSinhVien.xlsx");
-  };
 
   const handleEditSchedule = (s) => {
     setEditingId(s.id);
     setCreateForm({
       ten_lich: s.ten_lich,
       dot_kien_tap_id: s.dot_kien_tap_id,
-      khoa_hoc_id: s.khoa_id, // Vì khoa_id đang map với khóa học
-      tg_mo_dang_ky_tu: new Date(new Date(s.tg_mo_dang_ky_tu).getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 16),
-      tg_mo_dang_ky_den: new Date(new Date(s.tg_mo_dang_ky_den).getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 16),
-      tg_dien_ra_tu: s.tg_dien_ra_tu.split('T')[0],
-      tg_dien_ra_den: s.tg_dien_ra_den.split('T')[0],
-      han_chot_nop_bao_cao: s.han_chot_nop_bao_cao.split('T')[0],
-      han_chot_diem: s.han_chot_diem.split('T')[0]
+      so_luong_du_kien: s.so_luong_du_kien || '',
+      tg_mo_dang_ky_tu: new Date(new Date(s.tg_mo_dang_ky_tu).getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 10),
+      tg_mo_dang_ky_den: new Date(new Date(s.tg_mo_dang_ky_den).getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 10),
     });
     setOpenDropdownId(null);
     setDropdownConfig(null);
@@ -316,37 +206,17 @@ export default function LichKienTap_Khoa() {
   };
 
   const handleFinalSubmit = async () => {
-    if (!createForm.ten_lich || !createForm.dot_kien_tap_id || !createForm.tg_mo_dang_ky_tu || !createForm.tg_mo_dang_ky_den || !createForm.tg_dien_ra_tu || !createForm.tg_dien_ra_den || !createForm.han_chot_nop_bao_cao || !createForm.han_chot_diem) {
+    if (!createForm.ten_lich || !createForm.dot_kien_tap_id || !createForm.tg_mo_dang_ky_tu || !createForm.tg_mo_dang_ky_den || !createForm.so_luong_du_kien) {
       showToast('Vui lòng điền đầy đủ các thông tin lịch (có dấu *)', 'error');
       return;
     }
-    
-    const t1 = new Date(createForm.tg_mo_dang_ky_tu);
-    const t2 = new Date(createForm.tg_mo_dang_ky_den);
-    const t3 = new Date(createForm.tg_dien_ra_tu);
-    const t4 = new Date(createForm.tg_dien_ra_den);
-    const t5 = new Date(createForm.han_chot_nop_bao_cao);
-    const t6 = new Date(createForm.han_chot_diem);
+    const tuString = createForm.tg_mo_dang_ky_tu + 'T00:00:00';
+    const denString = createForm.tg_mo_dang_ky_den + 'T23:59:59';
+    const t1 = new Date(tuString);
+    const t2 = new Date(denString);
 
     if (t1 >= t2) {
       showToast('Thời gian Mở đăng ký (từ) phải TRƯỚC Mở đăng ký (đến)', 'error');
-      return;
-    }
-    if (t2 > t3) {
-      showToast('Thời gian Mở đăng ký (đến) phải TRƯỚC HOẶC BẰNG ngày Diễn ra (từ)', 'error');
-      return;
-    }
-    if (t3 >= t4) {
-      showToast('Ngày Diễn ra (từ) phải TRƯỚC ngày Diễn ra (đến)', 'error');
-      return;
-    }
-    if (t5 >= t6) {
-      showToast('Hạn nộp báo cáo phải TRƯỚC Hạn chốt điểm', 'error');
-      return;
-    }
-
-    if (!createForm.khoa_hoc_id) {
-      showToast('Vui lòng chọn Khóa trước khi tiếp tục.', 'error');
       return;
     }
 
@@ -355,17 +225,16 @@ export default function LichKienTap_Khoa() {
       const payload = {
         ...createForm,
         dot_kien_tap_id: Number(createForm.dot_kien_tap_id),
-        khoa_id: Number(createForm.khoa_hoc_id),
+        so_luong_du_kien: Number(createForm.so_luong_du_kien),
+        tg_mo_dang_ky_tu: tuString,
+        tg_mo_dang_ky_den: denString,
       };
-      delete payload.khoa_hoc_id;
+
+      payload.chuyen_tham_quan_ids = selectedTripIds;
 
       // Convert empty date strings to undefined to prevent invalid date errors
       if (!payload.tg_mo_dang_ky_tu) delete payload.tg_mo_dang_ky_tu;
       if (!payload.tg_mo_dang_ky_den) delete payload.tg_mo_dang_ky_den;
-      if (!payload.tg_dien_ra_tu) delete payload.tg_dien_ra_tu;
-      if (!payload.tg_dien_ra_den) delete payload.tg_dien_ra_den;
-      if (!payload.han_chot_nop_bao_cao) delete payload.han_chot_nop_bao_cao;
-      if (!payload.han_chot_diem) delete payload.han_chot_diem;
 
       if (editingId) {
         await khoaApi.updateSchedule(editingId, payload);
@@ -491,12 +360,11 @@ export default function LichKienTap_Khoa() {
     return {
       id: s.id,
       ten_lich: s.ten_lich,
-      khoa: s.khoa?.ten_khoa || '14ĐHTP',
-      tg_mo_dang_ky: `${new Date(s.tg_mo_dang_ky_tu).toLocaleDateString('vi-VN')} - ${new Date(s.tg_mo_dang_ky_den).toLocaleDateString('vi-VN')}`,
-      tg_dien_ra: `${new Date(s.tg_dien_ra_tu).toLocaleDateString('vi-VN')} - ${new Date(s.tg_dien_ra_den).toLocaleDateString('vi-VN')}`,
-      han_bao_cao: new Date(s.han_chot_nop_bao_cao).toLocaleDateString('vi-VN'),
-      han_diem: new Date(s.han_chot_diem).toLocaleDateString('vi-VN'),
-      trang_thai: mockStatus
+      dot_kien_tap: s.dotKienTap?.ten_dot || `Đợt ${s.dot_kien_tap_id}`,
+      tg_mo_dang_ky: s.tg_mo_dang_ky_tu && s.tg_mo_dang_ky_den ? `${new Date(s.tg_mo_dang_ky_tu).toLocaleDateString('vi-VN')} - ${new Date(s.tg_mo_dang_ky_den).toLocaleDateString('vi-VN')}` : 'Chưa thiết lập',
+      so_luong_du_kien: s.so_luong_du_kien || 0,
+      trang_thai: s.trang_thai || 'Nhap',
+      ly_do_tu_choi: s.ly_do_tu_choi
     };
   });
 
@@ -509,6 +377,45 @@ export default function LichKienTap_Khoa() {
     setCurrentPage(1);
   }, [filterDot]);
 
+  // Trip Table Logic
+  const filteredTrips = unassignedTrips.filter(t => {
+    const matchNhaMay = !tripFilterNhaMay || t.nhaMay?.ten_nha_may?.toLowerCase().includes(tripFilterNhaMay.toLowerCase());
+    const matchHinhThuc = !tripFilterHinhThuc || t.hinh_thuc === tripFilterHinhThuc;
+    return matchNhaMay && matchHinhThuc;
+  });
+
+  const tripTotalPages = Math.ceil(filteredTrips.length / tripPageSize) || 1;
+  const paginatedTrips = filteredTrips.slice((tripPage - 1) * tripPageSize, tripPage * tripPageSize);
+
+  useEffect(() => {
+    setTripPage(1);
+  }, [tripFilterNhaMay, tripFilterHinhThuc, tripPageSize]);
+
+  const handleToggleTrip = (id) => {
+    const trip = unassignedTrips.find(t => t.id === id);
+    if (!selectedTripIds.includes(id)) {
+      if (!trip.giaoVienDanDoan || trip.giaoVienDanDoan.length === 0) {
+        showToast("Chuyến tham quan này chưa có giảng viên dẫn đoàn. Vui lòng sang tab Phân công GV dẫn đoàn để phân công trước khi chọn.", "error");
+        return;
+      }
+    }
+    setSelectedTripIds(prev => 
+      prev.includes(id) ? prev.filter(tid => tid !== id) : [...prev, id]
+    );
+  };
+
+  const handleToggleAllTrips = () => {
+    if (selectedTripIds.length === filteredTrips.length && filteredTrips.length > 0) {
+      setSelectedTripIds([]); // uncheck all
+    } else {
+      const validTrips = filteredTrips.filter(t => t.giaoVienDanDoan && t.giaoVienDanDoan.length > 0);
+      if (validTrips.length < filteredTrips.length) {
+        showToast(`Có ${filteredTrips.length - validTrips.length} chuyến chưa có giảng viên dẫn đoàn bị bỏ qua. Vui lòng phân công trước.`, "error");
+      }
+      setSelectedTripIds(validTrips.map(t => t.id)); // check all valid
+    }
+  };
+
   return (
     <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300 relative">
       {/* Header section */}
@@ -519,12 +426,9 @@ export default function LichKienTap_Khoa() {
             onClick={() => {
               setEditingId(null);
               setCreateForm({
-                ten_lich: '', dot_kien_tap_id: '', khoa_id: '', 
-                tg_mo_dang_ky_tu: '', tg_mo_dang_ky_den: '', tg_dien_ra_tu: '', tg_dien_ra_den: '', 
-                han_chot_nop_bao_cao: '', han_chot_diem: ''
+                ten_lich: '', dot_kien_tap_id: '', so_luong_du_kien: '', 
+                tg_mo_dang_ky_tu: '', tg_mo_dang_ky_den: ''
               });
-              setUploadedStudents([]);
-              setFileError('');
               setIsModalOpen(true);
             }}
             className="px-4 py-2 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors shadow-sm cursor-pointer"
@@ -638,15 +542,13 @@ export default function LichKienTap_Khoa() {
       {/* Main Table */}
       <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[1000px]">
+          <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-[#E7E0C4] text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
                 <th className="p-4 pl-6">Tên lịch</th>
-                <th className="p-4">Khóa</th>
+                <th className="p-4">Đợt kiến tập</th>
                 <th className="p-4">Thời gian mở đăng ký</th>
-                <th className="p-4">Thời gian diễn ra</th>
-                <th className="p-4">Hạn nộp báo cáo</th>
-                <th className="p-4">Hạn chốt điểm</th>
+                <th className="p-4 text-center">Số lượng SV</th>
                 <th className="p-4 text-center">Trạng thái</th>
                 <th className="p-4 text-right pr-6">Thao tác</th>
               </tr>
@@ -664,11 +566,9 @@ export default function LichKienTap_Khoa() {
                     onClick={() => handleViewDetail(s)}
                   >
                     <td className="p-4 pl-6 font-bold text-slate-800">{s.ten_lich}</td>
-                    <td className="p-4 font-bold text-slate-600">{s.khoa}</td>
+                    <td className="p-4 font-bold text-slate-600">{s.dot_kien_tap}</td>
                     <td className="p-4 text-xs font-medium text-slate-600">{s.tg_mo_dang_ky}</td>
-                    <td className="p-4 text-xs font-medium text-slate-600">{s.tg_dien_ra}</td>
-                    <td className="p-4 text-xs font-medium text-[#E68A8C]">{s.han_bao_cao}</td>
-                    <td className="p-4 text-xs font-medium text-[#E68A8C]">{s.han_diem}</td>
+                    <td className="p-4 text-center font-bold text-slate-700">{s.so_luong_du_kien}</td>
                     <td className="p-4 text-center" onClick={(e) => e.stopPropagation()}>
                       <div className="flex flex-col items-center gap-1">
                         {getStatusBadge(s.trang_thai)}
@@ -679,16 +579,6 @@ export default function LichKienTap_Khoa() {
                     </td>
                     <td className="p-4 text-right pr-6" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-2 relative">
-                        {(s.trang_thai === 'DaDuyet' || s.trang_thai === 'MoDangKy' || s.trang_thai === 'DangDienRa') && (
-                          <button 
-                            className="p-1.5 text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer" 
-                            title="Tải danh sách SV"
-                            onClick={(e) => { e.stopPropagation(); handleOpenImport(s); }}
-                          >
-                            <Upload className="w-4 h-4" />
-                          </button>
-                        )}
-
                         {isCLB && s.trang_thai === 'Nhap' && (
                           <button 
                             className="p-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer" 
@@ -789,7 +679,7 @@ export default function LichKienTap_Khoa() {
             onClick={() => { setIsModalOpen(false); setEditingId(null); }}
           ></div>
           
-          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-xl relative z-10 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+          <div className="bg-white w-full max-w-5xl rounded-2xl shadow-xl relative z-10 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
             <div className="px-6 py-4 border-b border-[#E7E0C4] flex items-center justify-between">
               <h2 className="text-xl font-bold text-slate-800">
                 {editingId ? 'Cập nhật lịch kiến tập' : 'Tạo lịch kiến tập mới'}
@@ -855,73 +745,199 @@ export default function LichKienTap_Khoa() {
                         )}
                       </div>
                     </div>
-                    <div className="col-span-2">
-                      <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Khóa <span className="text-red-500">*</span></label>
-                      <div className="relative">
-                        <div 
-                          onClick={() => setIsKhoaDropdownOpen(!isKhoaDropdownOpen)}
-                          className={`w-full px-4 py-2 border rounded-xl text-sm flex justify-between items-center cursor-pointer bg-white transition-colors ${isKhoaDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-                        >
-                          <span className={createForm.khoa_hoc_id ? 'text-slate-800 font-medium' : 'text-slate-500'}>
-                            {createForm.khoa_hoc_id ? courses.find(c => c.id === Number(createForm.khoa_hoc_id))?.ten_khoa : 'Chọn khóa'}
-                          </span>
-                          <ChevronDown className="w-4 h-4 text-slate-400" />
-                        </div>
-                        {isKhoaDropdownOpen && (
-                          <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-50 overflow-hidden animate-in slide-in-from-top-1">
-                            <div className="p-2 border-b border-slate-100">
-                              <input 
-                                type="text" 
-                                placeholder="Tìm kiếm khóa..."
-                                value={khoaSearchTerm}
-                                onChange={e => setKhoaSearchTerm(e.target.value)}
-                                className="w-full px-3 py-2 bg-slate-50 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E]"
-                              />
-                            </div>
-                            <div className="max-h-48 overflow-y-auto">
-                              {courses
-                                .filter(c => c.ten_khoa?.toLowerCase().includes(khoaSearchTerm.toLowerCase()))
-                                .map(c => (
-                                  <div 
-                                    key={c.id}
-                                    onClick={() => { setCreateForm({...createForm, khoa_hoc_id: c.id}); setIsKhoaDropdownOpen(false); setKhoaSearchTerm(''); }}
-                                    className={`px-4 py-2.5 text-sm cursor-pointer hover:bg-[#E7E0C4]/50 transition-colors ${createForm.khoa_hoc_id === c.id ? 'bg-[#E7E0C4] font-bold text-slate-800' : 'text-slate-700'}`}
-                                  >
-                                    {c.ten_khoa}
-                                  </div>
-                              ))}
-                              {courses.filter(c => c.ten_khoa?.toLowerCase().includes(khoaSearchTerm.toLowerCase())).length === 0 && (
-                                <div className="px-4 py-3 text-sm text-slate-500 text-center">Không tìm thấy khóa nào</div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
+
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Mở đăng ký (từ) <span className="text-red-500">*</span></label>
-                      <input type="datetime-local" value={createForm.tg_mo_dang_ky_tu} onChange={e => setCreateForm({...createForm, tg_mo_dang_ky_tu: e.target.value})} className="w-full px-4 py-2 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E]" />
+                      <input type="date" value={createForm.tg_mo_dang_ky_tu} onChange={e => setCreateForm({...createForm, tg_mo_dang_ky_tu: e.target.value})} className="w-full px-4 py-2 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E]" />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Mở đăng ký (đến) <span className="text-red-500">*</span></label>
-                      <input type="datetime-local" value={createForm.tg_mo_dang_ky_den} onChange={e => setCreateForm({...createForm, tg_mo_dang_ky_den: e.target.value})} className="w-full px-4 py-2 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E]" />
+                      <input type="date" value={createForm.tg_mo_dang_ky_den} onChange={e => setCreateForm({...createForm, tg_mo_dang_ky_den: e.target.value})} className="w-full px-4 py-2 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E]" />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Diễn ra (từ) <span className="text-red-500">*</span></label>
-                      <input type="date" value={createForm.tg_dien_ra_tu} onChange={e => setCreateForm({...createForm, tg_dien_ra_tu: e.target.value})} className="w-full px-4 py-2 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E]" />
+                      <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Số lượng sinh viên kiến tập <span className="text-red-500">*</span></label>
+                      <input type="number" min="1" value={createForm.so_luong_du_kien} onChange={e => setCreateForm({...createForm, so_luong_du_kien: e.target.value})} className="w-full px-4 py-2 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E]" />
                     </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Diễn ra (đến) <span className="text-red-500">*</span></label>
-                      <input type="date" value={createForm.tg_dien_ra_den} onChange={e => setCreateForm({...createForm, tg_dien_ra_den: e.target.value})} className="w-full px-4 py-2 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E]" />
+                  </div>
+                  
+                  {/* Bảng Danh sách Chuyến tham quan */}
+                    <div className="border border-[#E7E0C4] rounded-xl overflow-hidden mt-6">
+                      <div className="bg-[#E7E0C4]/30 px-4 py-3 flex items-center justify-between border-b border-[#E7E0C4]">
+                      <h3 className="text-sm font-bold text-slate-800">Danh sách Chuyến tham quan khả dụng</h3>
+                      <div className="flex items-center gap-3">
+                        <div className="relative">
+                          <div 
+                            onClick={() => setIsTripFactoryDropdownOpen(!isTripFactoryDropdownOpen)}
+                            className={`min-w-[200px] px-3 py-1.5 border rounded-lg text-sm flex justify-between items-center cursor-pointer bg-white transition-colors ${isTripFactoryDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+                          >
+                            <span className={tripFilterNhaMay ? 'text-slate-800' : 'text-slate-600'}>
+                              {tripFilterNhaMay || 'Tất cả Nhà máy'}
+                            </span>
+                            <ChevronDown className="w-4 h-4 text-slate-400" />
+                          </div>
+                          {isTripFactoryDropdownOpen && (
+                            <div className="absolute top-full right-0 w-64 mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-50 overflow-hidden animate-in slide-in-from-top-1">
+                              <div className="p-2 border-b border-slate-100">
+                                <input 
+                                  type="text" 
+                                  placeholder="Tìm kiếm nhà máy..."
+                                  value={tripFactorySearchTerm}
+                                  onChange={e => setTripFactorySearchTerm(e.target.value)}
+                                  className="w-full px-3 py-2 bg-slate-50 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E]"
+                                />
+                              </div>
+                              <div className="max-h-48 overflow-y-auto">
+                                <div 
+                                  onClick={() => { setTripFilterNhaMay(''); setIsTripFactoryDropdownOpen(false); setTripFactorySearchTerm(''); }}
+                                  className={`px-4 py-2.5 text-sm cursor-pointer hover:bg-[#E7E0C4]/50 transition-colors ${tripFilterNhaMay === '' ? 'bg-[#E7E0C4] font-bold text-slate-800' : 'text-slate-700'}`}
+                                >
+                                  Tất cả Nhà máy
+                                </div>
+                                {[...new Set(factories.map(f => f.ten_nha_may).filter(Boolean))]
+                                  .filter(nm => nm.toLowerCase().includes(tripFactorySearchTerm.toLowerCase()))
+                                  .map((nm, idx) => (
+                                    <div 
+                                      key={idx}
+                                      onClick={() => { setTripFilterNhaMay(nm); setIsTripFactoryDropdownOpen(false); setTripFactorySearchTerm(''); }}
+                                      className={`px-4 py-2.5 text-sm cursor-pointer hover:bg-[#E7E0C4]/50 transition-colors ${tripFilterNhaMay === nm ? 'bg-[#E7E0C4] font-bold text-slate-800' : 'text-slate-700'}`}
+                                    >
+                                      {nm}
+                                    </div>
+                                ))}
+                                {[...new Set(factories.map(f => f.ten_nha_may).filter(Boolean))].filter(nm => nm.toLowerCase().includes(tripFactorySearchTerm.toLowerCase())).length === 0 && (
+                                  <div className="px-4 py-3 text-sm text-slate-500 text-center">Không tìm thấy nhà máy</div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <select
+                          className="px-3 py-1.5 border border-[#E7E0C4] rounded-lg text-sm bg-white focus:outline-none focus:border-[#407F3E]"
+                          value={tripFilterHinhThuc}
+                          onChange={e => setTripFilterHinhThuc(e.target.value)}
+                        >
+                          <option value="">Hình thức: Tất cả</option>
+                          <option value="TrucTiep">Trực tiếp</option>
+                          <option value="TrucTuyen">Trực tuyến</option>
+                        </select>
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Hạn nộp báo cáo <span className="text-red-500">*</span></label>
-                      <input type="date" value={createForm.han_chot_nop_bao_cao} onChange={e => setCreateForm({...createForm, han_chot_nop_bao_cao: e.target.value})} className="w-full px-4 py-2 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E]" />
+                    
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse min-w-[700px]">
+                        <thead>
+                          <tr className="bg-slate-50 text-slate-600 text-xs font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
+                            <th className="p-3 pl-4 w-12">
+                              <input 
+                                type="checkbox" 
+                                className="w-4 h-4 text-[#407F3E] rounded border-gray-300 focus:ring-[#407F3E] cursor-pointer"
+                                checked={selectedTripIds.length === filteredTrips.length && filteredTrips.length > 0}
+                                onChange={handleToggleAllTrips}
+                              />
+                            </th>
+                            <th className="p-3">Nhà máy</th>
+                            <th className="p-3">Hình thức</th>
+                            <th className="p-3">Ngày & Giờ</th>
+                            <th className="p-3 text-center">Sức chứa</th>
+                            <th className="p-3 pr-4 text-right">Chi tiết</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#E7E0C4]/50">
+                          {paginatedTrips.map(trip => (
+                            <tr key={trip.id} className={`hover:bg-[#E7E0C4]/10 transition-colors ${selectedTripIds.includes(trip.id) ? 'bg-[#E7E0C4]/20' : ''}`}>
+                              <td className="p-3 pl-4">
+                                <input 
+                                  type="checkbox" 
+                                  className="w-4 h-4 text-[#407F3E] rounded border-gray-300 focus:ring-[#407F3E] cursor-pointer"
+                                  checked={selectedTripIds.includes(trip.id)}
+                                  onChange={() => handleToggleTrip(trip.id)}
+                                />
+                              </td>
+                              <td className="p-3 font-semibold text-slate-800 text-sm">
+                                {trip.nhaMay?.ten_nha_may || 'Nhà máy chưa rõ'}
+                              </td>
+                              <td className="p-3">
+                                <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${trip.hinh_thuc === 'TrucTiep' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                                  {trip.hinh_thuc === 'TrucTiep' ? 'Trực tiếp' : 'Trực tuyến'}
+                                </span>
+                              </td>
+                              <td className="p-3 text-sm text-slate-600">
+                                <div className="font-medium text-slate-800">{new Date(trip.ngay_tham_quan).toLocaleDateString('vi-VN')}</div>
+                                <div className="text-xs">{trip.gio_bat_dau?.substring(0, 5)} - {trip.gio_ket_thuc?.substring(0, 5)}</div>
+                              </td>
+                              <td className="p-3 text-center text-sm font-semibold text-slate-700">
+                                {trip.suc_chua}
+                              </td>
+                              <td className="p-3 pr-4 text-right">
+                                <button 
+                                  onClick={(e) => { e.preventDefault(); setViewingTripDetail(trip); }}
+                                  className="p-1.5 text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center"
+                                >
+                                  <Search className="w-4 h-4" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                          {filteredTrips.length === 0 && (
+                            <tr>
+                              <td colSpan="6" className="text-center py-8 text-slate-500 font-medium">Không tìm thấy chuyến tham quan nào</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
                     </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Hạn chốt điểm <span className="text-red-500">*</span></label>
-                      <input type="date" value={createForm.han_chot_diem} onChange={e => setCreateForm({...createForm, han_chot_diem: e.target.value})} className="w-full px-4 py-2 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E]" />
-                    </div>
+                    
+                    {/* Pagination */}
+                    {filteredTrips.length > 0 && (
+                      <div className="px-4 py-3 border-t border-[#E7E0C4] bg-slate-50 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-slate-600">Hiển thị</span>
+                          <select 
+                            className="px-2 py-1 border border-[#E7E0C4] rounded-lg text-sm bg-white focus:outline-none focus:border-[#407F3E]"
+                            value={tripPageSize}
+                            onChange={e => setTripPageSize(Number(e.target.value))}
+                          >
+                            <option value={15}>15</option>
+                            <option value={30}>30</option>
+                            <option value={50}>50</option>
+                          </select>
+                          <span className="text-sm text-slate-600">chuyến</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button 
+                            disabled={tripPage === 1} 
+                            onClick={(e) => { e.preventDefault(); setTripPage(1); }}
+                            className="px-2.5 py-1 text-sm border border-[#E7E0C4] rounded-lg text-slate-600 hover:bg-white disabled:opacity-50 cursor-pointer font-medium transition-colors"
+                          >
+                            Trang đầu
+                          </button>
+                          <button 
+                            disabled={tripPage === 1} 
+                            onClick={(e) => { e.preventDefault(); setTripPage(prev => prev - 1); }}
+                            className="px-2.5 py-1 text-sm border border-[#E7E0C4] rounded-lg text-slate-600 hover:bg-white disabled:opacity-50 cursor-pointer font-medium transition-colors"
+                          >
+                            Trước
+                          </button>
+                          <span className="px-3 py-1 text-sm font-bold text-[#407F3E]">
+                            Trang {tripPage} / {tripTotalPages}
+                          </span>
+                          <button 
+                            disabled={tripPage === tripTotalPages} 
+                            onClick={(e) => { e.preventDefault(); setTripPage(prev => prev + 1); }}
+                            className="px-2.5 py-1 text-sm border border-[#E7E0C4] rounded-lg text-slate-600 hover:bg-white disabled:opacity-50 cursor-pointer font-medium transition-colors"
+                          >
+                            Sau
+                          </button>
+                          <button 
+                            disabled={tripPage === tripTotalPages} 
+                            onClick={(e) => { e.preventDefault(); setTripPage(tripTotalPages); }}
+                            className="px-2.5 py-1 text-sm border border-[#E7E0C4] rounded-lg text-slate-600 hover:bg-white disabled:opacity-50 cursor-pointer font-medium transition-colors"
+                          >
+                            Trang cuối
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
             </div>
@@ -972,23 +988,9 @@ export default function LichKienTap_Khoa() {
               </button>
             </div>
             
-            <div className="flex border-b border-[#E7E0C4] px-6 mt-2 gap-6 bg-white">
-               <button 
-                 onClick={(e) => { e.stopPropagation(); setActiveDetailTab('thong_tin'); }}
-                 className={`pb-3 text-sm font-bold border-b-2 transition-colors cursor-pointer ${activeDetailTab === 'thong_tin' ? 'border-[#407F3E] text-[#407F3E]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-               >
-                 1. Thông tin lịch
-               </button>
-               <button 
-                 onClick={(e) => { e.stopPropagation(); setActiveDetailTab('sinh_vien'); }}
-                 className={`pb-3 text-sm font-bold border-b-2 transition-colors cursor-pointer ${activeDetailTab === 'sinh_vien' ? 'border-[#407F3E] text-[#407F3E]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-               >
-                 2. Danh sách sinh viên
-               </button>
-            </div>
+
 
             <div className="p-6 overflow-y-auto flex-1 bg-slate-50">
-              {activeDetailTab === 'thong_tin' ? (
                 <div className="bg-white p-6 rounded-xl border border-[#E7E0C4] shadow-sm animate-in fade-in zoom-in-95 duration-200">
                   <div className="grid grid-cols-2 gap-6">
                     <div className="col-span-2">
@@ -1000,217 +1002,62 @@ export default function LichKienTap_Khoa() {
                       <div className="text-sm font-semibold text-slate-700">{campaigns.find(c => c.id === viewingDetail.dot_kien_tap_id)?.ten_dot || 'Không xác định'}</div>
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Khóa</label>
-                      <div className="text-sm font-semibold text-slate-700">{courses.find(c => c.id === viewingDetail.khoa_id)?.ten_khoa || 'Không xác định'}</div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Số lượng sinh viên kiến tập</label>
+                      <div className="text-sm font-semibold text-slate-700">{viewingDetail.so_luong_du_kien || 0}</div>
                     </div>
-                    <div>
+                    <div className="col-span-2">
                       <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Mở đăng ký (Từ - Đến)</label>
                       <div className="text-sm font-semibold text-[#407F3E]">
-                        {new Date(viewingDetail.tg_mo_dang_ky_tu).toLocaleString('vi-VN')} <br/><span className="text-slate-400 font-medium text-xs">đến</span> {new Date(viewingDetail.tg_mo_dang_ky_den).toLocaleString('vi-VN')}
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Thời gian diễn ra (Từ - Đến)</label>
-                      <div className="text-sm font-semibold text-[#407F3E]">
-                        {new Date(viewingDetail.tg_dien_ra_tu).toLocaleDateString('vi-VN')} <br/><span className="text-slate-400 font-medium text-xs">đến</span> {new Date(viewingDetail.tg_dien_ra_den).toLocaleDateString('vi-VN')}
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Hạn nộp báo cáo</label>
-                      <div className="text-sm font-bold text-[#E68A8C]">
-                        {new Date(viewingDetail.han_chot_nop_bao_cao).toLocaleDateString('vi-VN')}
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Hạn chốt điểm</label>
-                      <div className="text-sm font-bold text-[#E68A8C]">
-                        {new Date(viewingDetail.han_chot_diem).toLocaleDateString('vi-VN')}
+                        {viewingDetail.tg_mo_dang_ky_tu ? new Date(viewingDetail.tg_mo_dang_ky_tu).toLocaleString('vi-VN') : '---'} <br/><span className="text-slate-400 font-medium text-xs">đến</span> {viewingDetail.tg_mo_dang_ky_den ? new Date(viewingDetail.tg_mo_dang_ky_den).toLocaleString('vi-VN') : '---'}
                       </div>
                     </div>
                   </div>
                 </div>
-              ) : (
-                <div className="animate-in fade-in zoom-in-95 duration-200">
-                  {isLoadingEnrollments ? (
-                    <div className="text-center py-8 text-slate-500 font-medium">Đang tải dữ liệu...</div>
-                  ) : enrollments.length === 0 ? (
-                    <div className="text-center py-8 text-slate-500 font-medium">Chưa có sinh viên nào trong lịch này.</div>
-                  ) : (
-                    <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-hidden">
-                      <table className="w-full text-left border-collapse min-w-[600px]">
-                        <thead>
-                          <tr className="bg-[#E7E0C4] text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
-                            <th className="p-4 pl-6">MSSV</th>
-                            <th className="p-4">Họ và tên</th>
-                            <th className="p-4">Lớp</th>
-                            <th className="p-4">Email</th>
-                            <th className="p-4">SĐT</th>
-                          </tr>
-                        </thead>
-                        <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
-                          {enrollments.map((en, idx) => (
-                            <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                              <td className="p-4 pl-6 font-bold text-[#407F3E]">{en.sinhVien?.mssv}</td>
-                              <td className="p-4 font-bold text-slate-800">{en.sinhVien?.ho_ten}</td>
-                              <td className="p-4 font-medium text-slate-600">{en.sinhVien?.ten_lop || '-'}</td>
-                              <td className="p-4 font-medium text-slate-600">{en.sinhVien?.email || '-'}</td>
-                              <td className="p-4 font-medium text-slate-600">{en.sinhVien?.sdt || '-'}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* Import Students Modal */}
-      {importingLich && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div 
-            className="absolute inset-0 bg-slate-900/40  animate-in fade-in duration-200"
-            onClick={(e) => { e.stopPropagation(); setImportingLich(null); }}
-          ></div>
-          <div 
-            className="bg-white w-full max-w-4xl rounded-2xl shadow-xl relative z-10 animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="px-6 py-4 border-b border-[#E7E0C4] flex items-center justify-between">
-              <h2 className="text-xl font-bold text-slate-800">
-                Tải danh sách SV - {importingLich.ten_lich}
-              </h2>
-              <button 
-                type="button"
-                onClick={(e) => { e.stopPropagation(); setImportingLich(null); }}
-                className="p-1.5 text-slate-400 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg transition-colors cursor-pointer"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            
-            <div className="p-6 flex-1 flex flex-col min-h-0 bg-slate-50">
-              <div className="mb-6 shrink-0">
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">Tải lên file danh sách sinh viên</label>
-                  <button 
-                    type="button"
-                    onClick={handleDownloadSampleFile}
-                    className="text-xs font-bold text-[#407F3E] hover:underline hover:text-[#89B449] transition-colors"
-                  >
-                    Tải file mẫu (.xlsx)
-                  </button>
-                </div>
-                <input type="file" accept=".xlsx,.xls" className="hidden" ref={fileInputRef} onChange={handleFileSelect} />
-                
-                {!selectedFileInfo ? (
-                  <div 
-                    onClick={() => fileInputRef.current?.click()}
-                    className="border-2 border-dashed border-[#E7E0C4] rounded-xl p-8 bg-white flex flex-col items-center justify-center text-center hover:bg-slate-50 hover:border-[#89B449] transition-colors cursor-pointer group"
-                  >
-                    <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center shadow-sm mb-3 group-hover:scale-110 transition-transform">
-                      <CloudUpload className="w-6 h-6 text-[#89B449]" />
-                    </div>
-                    <p className="text-sm font-semibold text-slate-600 mb-1">
-                      Bấm hoặc kéo thả file Excel để tải lên danh sách sinh viên
-                    </p>
-                    <p className="text-xs text-slate-400">Hỗ trợ định dạng .xlsx, .xls</p>
+                <div className="mt-6 border border-[#E7E0C4] rounded-xl overflow-hidden shadow-sm bg-white animate-in fade-in zoom-in-95 duration-200">
+                  <div className="bg-[#E7E0C4]/30 px-4 py-3 flex items-center justify-between border-b border-[#E7E0C4]">
+                    <h3 className="text-sm font-bold text-slate-800">Danh sách Chuyến tham quan đã gắn</h3>
                   </div>
-                ) : (
-                  <div className="bg-white border border-[#E7E0C4] rounded-xl p-3 flex items-center justify-between transition-all duration-300">
-                    <div className="flex items-center gap-4 flex-1 min-w-0">
-                      <div className="relative">
-                        <FileSpreadsheet className="w-10 h-10 text-[#407F3E]" />
-                        <span className="absolute -bottom-1 -right-1 bg-white border border-[#407F3E] text-[#407F3E] text-[10px] font-bold px-1 rounded">
-                          XLSX
-                        </span>
-                      </div>
-                      <div className="flex flex-col min-w-0 pr-4">
-                        <span className="text-sm font-bold text-slate-800 truncate">{selectedFileInfo.name}</span>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-xs text-slate-500">{selectedFileInfo.size}</span>
-                          <span className="text-xs text-slate-300">•</span>
-                          <span className="text-xs font-bold text-[#407F3E] flex items-center gap-0.5">
-                            <Check className="w-3 h-3" /> {uploadedStudents.length} hợp lệ
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <button 
-                      onClick={handleResetFile}
-                      className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 border border-[#E7E0C4] rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
-                    >
-                      <RefreshCw className="w-4 h-4" /> Đổi file
-                    </button>
-                  </div>
-                )}
-                {fileError && <p className="text-red-500 text-xs mt-2 font-semibold">{fileError}</p>}
-              </div>
-
-              {uploadedStudents.length > 0 && (
-                <div className="bg-white border border-[#E7E0C4] rounded-xl overflow-hidden shadow-sm flex-1 flex flex-col min-h-0">
-                  <div className="px-4 py-3 bg-slate-50 border-b border-[#E7E0C4] flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">Xem trước danh sách tải lên</span>
-                    <span className="text-xs font-bold text-[#89B449] flex items-center gap-1">
-                      <Check className="w-3 h-3" /> {uploadedStudents.length} hợp lệ
-                    </span>
-                  </div>
-                  <div className="flex-1 overflow-y-auto">
-                    <table className="w-full text-left text-sm">
-                      <thead className="sticky top-0 bg-white shadow-sm z-10">
-                        <tr className="bg-white border-b border-slate-100 text-slate-500 font-medium">
-                          <th className="px-4 py-3">STT</th>
-                          <th className="px-4 py-3">MSSV</th>
-                          <th className="px-4 py-3">Họ tên</th>
-                          <th className="px-4 py-3">Lớp</th>
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-[#F8F5E9] text-slate-700 text-[10px] font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
+                        <th className="p-3 pl-4">Nhà máy</th>
+                        <th className="p-3 text-center">Hình thức</th>
+                        <th className="p-3 text-center">Ngày & Giờ</th>
+                        <th className="p-3 text-center">Sức chứa</th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
+                      {unassignedTrips.filter(t => t.lich_kien_tap_id === viewingDetail.id).length === 0 ? (
+                        <tr>
+                          <td colSpan="4" className="text-center py-6 text-slate-500 font-medium">Chưa có chuyến tham quan nào được gắn</td>
                         </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-50 text-slate-700 font-medium">
-                        {uploadedStudents.map((st, i) => (
-                          <tr key={i} className="hover:bg-slate-50">
-                            <td className="px-4 py-2 text-slate-400">{i + 1}</td>
-                            <td className="px-4 py-2 text-[#407F3E] font-bold">{st.mssv}</td>
-                            <td className="px-4 py-2 text-slate-800">{st.ho_ten}</td>
-                            <td className="px-4 py-2">{st.ten_lop}</td>
+                      ) : (
+                        unassignedTrips.filter(t => t.lich_kien_tap_id === viewingDetail.id).map(t => (
+                          <tr key={t.id} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="p-3 pl-4 font-bold text-slate-800">{t.nhaMay?.ten_nha_may}</td>
+                            <td className="p-3 text-center">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${t.hinh_thuc === 'TrucTiep' ? 'bg-[#407F3E]/20 text-[#407F3E]' : 'bg-blue-100 text-blue-700'}`}>
+                                {t.hinh_thuc === 'TrucTiep' ? 'Trực tiếp' : 'Trực tuyến'}
+                              </span>
+                            </td>
+                            <td className="p-3 text-center text-xs font-medium text-slate-600">
+                              <span className="text-[#407F3E] font-bold block">{new Date(t.ngay_tham_quan).toLocaleDateString('vi-VN')}</span>
+                              {t.gio_bat_dau} - {t.gio_ket_thuc}
+                            </td>
+                            <td className="p-3 text-center font-bold text-slate-700">{t.suc_chua}</td>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
                 </div>
-              )}
-            </div>
-
-            <div className="px-6 py-4 border-t border-[#E7E0C4] bg-slate-50/50 flex items-center justify-between rounded-b-2xl">
-              <div className="text-sm font-bold text-[#407F3E]">
-                {uploadedStudents.length > 0 ? `Đã tải lên: ${uploadedStudents.length} sinh viên` : 'Chưa tải file'}
-              </div>
-              <div className="flex gap-3">
-                <button 
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); setImportingLich(null); }}
-                  disabled={isLoadingStudents}
-                  className="px-5 py-2.5 border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-bold transition-colors cursor-pointer disabled:opacity-50"
-                >
-                  Hủy
-                </button>
-                <button 
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); handleImportSubmit(); }}
-                  disabled={isLoadingStudents || uploadedStudents.length === 0}
-                  className="px-6 py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl text-sm font-bold transition-colors shadow-sm cursor-pointer disabled:opacity-50 flex items-center gap-2"
-                >
-                  {isLoadingStudents ? 'Đang tải lên...' : 'Xác nhận tải'}
-                  {!isLoadingStudents && <Check className="w-4 h-4" />}
-                </button>
-              </div>
             </div>
           </div>
         </div>
       )}
+
+
       {/* Toast Notification */}
       {toastMessage && (
         <div className={`fixed top-6 right-6 z-[9999] px-6 py-4 rounded-xl shadow-2xl border animate-in slide-in-from-right-8 fade-in duration-300 font-semibold text-sm flex items-center gap-3 ${
@@ -1267,6 +1114,69 @@ export default function LichKienTap_Khoa() {
               >
                 Xác nhận
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Trip Detail Modal */}
+      {viewingTripDetail && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center">
+          <div 
+            className="absolute inset-0 bg-slate-900/40 animate-in fade-in duration-200"
+            onClick={() => setViewingTripDetail(null)}
+          ></div>
+          <div className="bg-white w-full max-w-xl rounded-2xl shadow-xl relative z-10 animate-in zoom-in-95 duration-200 overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="px-6 py-4 border-b border-[#E7E0C4] flex items-center justify-between">
+              <h2 className="text-xl font-bold text-slate-800">Chi tiết chuyến tham quan</h2>
+              <button 
+                onClick={() => setViewingTripDetail(null)}
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Nhà máy</label>
+                  <p className="text-sm font-semibold text-slate-800">{viewingTripDetail.nhaMay?.ten_nha_may}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Ngày tham quan</label>
+                    <p className="text-sm font-medium text-slate-800">
+                      {new Date(viewingTripDetail.ngay_tham_quan).toLocaleDateString('vi-VN')}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Hình thức</label>
+                    <p className="text-sm font-medium text-slate-800">
+                      {viewingTripDetail.hinh_thuc === 'TrucTiep' ? 'Trực tiếp' : 'Trực tuyến'}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Giờ bắt đầu - kết thúc</label>
+                    <p className="text-sm font-medium text-slate-800">
+                      {viewingTripDetail.gio_bat_dau?.substring(0, 5)} - {viewingTripDetail.gio_ket_thuc?.substring(0, 5)}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Sức chứa</label>
+                    <p className="text-sm font-medium text-slate-800">
+                      {viewingTripDetail.suc_chua}
+                    </p>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Địa điểm / Link meeting</label>
+                  <p className="text-sm text-slate-800 break-words">{viewingTripDetail.dia_diem_tap_trung || 'Không có'}</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Mô tả</label>
+                  <p className="text-sm text-slate-800 whitespace-pre-wrap">{viewingTripDetail.mo_ta || 'Không có'}</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -130,7 +130,7 @@ export default function LichTrinhDoan_SV() {
                   </div>
                   <div className="flex items-center gap-2.5">
                     <Clock className="w-4 h-4 text-slate-500 shrink-0" />
-                    <span>{selectedTrip.chuyenThamQuan?.gio_bat_dau?.slice(0, 5) || '--'} - {selectedTrip.chuyenThamQuan?.gio_ket_thuc?.slice(0, 5) || '--'}</span>
+                    <span>{selectedTrip.chuyenThamQuan?.gio_bat_dau?.slice(0, 5) || '--'}</span>
                   </div>
                 </div>
               </div>

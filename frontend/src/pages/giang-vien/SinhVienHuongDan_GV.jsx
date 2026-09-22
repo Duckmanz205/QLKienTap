@@ -51,7 +51,7 @@ export default function SinhVienHuongDan_GV() {
         
         // Find reports for this student
         const studentReports = rpData.filter(r => r.phieuDangKy?.sinhVien?.id === sv.id);
-        const pendingReports = studentReports.filter(r => r.diem_bai_thu_hoach === null);
+        const pendingReports = studentReports.filter(r => r.diem_thu_hoach === null);
         
         return {
           id: st.id,

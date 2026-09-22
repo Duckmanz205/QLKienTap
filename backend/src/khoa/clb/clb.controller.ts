@@ -11,7 +11,11 @@ import {
   UseGuards,
   Patch,
   Req,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { KhoaService } from '../shared/khoa.service';
 import { AuthGuard } from '../../auth/guards/auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
@@ -35,6 +39,7 @@ import {
   CreateStudentDto,
   UpdateStudentDto,
   GetEnrollmentsQueryDto,
+  AssignGvddDto,
   LockGradesDto,
 } from '../shared/dto/khoa.dto';
 
@@ -104,13 +109,7 @@ export class ClbController {
     return this.khoaService.deleteStudent(+id);
   }
 
-  @Post('import-students')
-  async importStudents(@Body() body: ImportStudentsDto) {
-    return this.khoaService.importStudentsToSchedule(
-      body.lichId,
-      body.studentIds,
-    );
-  }
+
 
   @Get('trips')
   async getTrips() {
@@ -139,11 +138,11 @@ export class ClbController {
   async deleteTrip(@Param('id', ParseIntPipe) id: number) {
     return this.khoaService.deleteTrip(id);
   }
-
-  @Patch('trips/:id/start-registration')
-  async startTripRegistration(@Param('id', ParseIntPipe) id: number) {
-    return this.khoaService.startTripRegistration(id);
+  @Patch('trips/:id/reopen')
+  async reopenTripRegistration(@Param('id', ParseIntPipe) id: number) {
+    return this.khoaService.reopenTripRegistration(id);
   }
+
 
   @Post('approve-trip')
   async approveTrip(@Body() body: ApproveTripDto) {
@@ -161,6 +160,33 @@ export class ClbController {
     );
   }
 
+  @Get('lecturers')
+  async getLecturers() {
+    return this.khoaService.getLecturers();
+  }
+
+  @Post('assign-gvdd')
+  async assignGvdd(@Body() body: AssignGvddDto) {
+    return this.khoaService.assignTourLeader(
+      body.tripId,
+      body.lecturerId,
+      body.laTruongDoan,
+    );
+  }
+
+  @Delete('assign-gvdd/:tripId/:lecturerId')
+  async unassignGvdd(
+    @Param('tripId', ParseIntPipe) tripId: number,
+    @Param('lecturerId', ParseIntPipe) lecturerId: number,
+  ) {
+    return this.khoaService.unassignTourLeader(tripId, lecturerId);
+  }
+
+  @Post('auto-assign-gvdd')
+  async autoAssignGvdd() {
+    return this.khoaService.autoAssignGvdd();
+  }
+
   @Post('approve-cancel')
   async approveCancel(@Body() body: ApproveCancelDto) {
     return this.khoaService.approveCancelRequest(
@@ -170,9 +196,14 @@ export class ClbController {
     );
   }
 
-  @Post('filter-assign-students')
-  async filterAssignStudents(@Body() body: FilterAssignStudentsDto) {
-    return this.khoaService.filterAndAssignStudents(body.tripId);
+  @Post('preview-assign-students')
+  async previewAssignStudents(@Body() body: FilterAssignStudentsDto) {
+    return this.khoaService.previewAssignStudents(body.tripId);
+  }
+
+  @Post('confirm-assign-students')
+  async confirmAssignStudents(@Body() body: { tripId: number, acceptedStudentIds: number[], deadlineDate?: string }) {
+    return this.khoaService.confirmAssignStudents(body.tripId, body.acceptedStudentIds, body.deadlineDate);
   }
 
   @Get('retake-students-report')
@@ -222,6 +253,7 @@ export class ClbController {
       query.status,
       query.lichKienTapId,
       query.chuyenThamQuanId,
+      query.hasCancelRequest,
     );
   }
 
@@ -273,6 +305,29 @@ export class ClbController {
   @Post('bulk-confirm-payments')
   async bulkConfirmPayments(@Body('records') records: any[]) {
     return this.khoaService.bulkConfirmPayments(records);
+  }
+
+  @Post('confirm-payment/:id')
+  async confirmManualPayment(@Param('id') id: number) {
+    return this.khoaService.confirmManualPayment(id);
+  }
+
+
+  @Get('config')
+  async getConfig() {
+    return this.khoaService.getTaiKhoanThuHuong();
+  }
+
+  @Post('config')
+  async saveConfig(@Body() body: any) {
+    return this.khoaService.saveTaiKhoanThuHuong(body);
+  }
+
+  @Post('upload-payments')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadPayments(@UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('File is required');
+    return this.khoaService.uploadPaidStudents(file.buffer);
   }
 
   @Get('schedules')

@@ -3,13 +3,18 @@ import { createPortal } from 'react-dom';
 import { 
   Plus, ChevronDown, Check, X, Calendar, Clock, MapPin, 
   ChevronRight, Users, CheckCircle2, XCircle, RefreshCw, Search,
-  MoreVertical, Edit, PlayCircle, Trash2
+  MoreVertical, Edit, PlayCircle, Trash2, CheckCircle, RotateCcw, Download
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { khoaApi } from '../../services/api';
 import { getValidSession } from '../../utils/auth';
 
 export default function ChuyenThamQuan_DSLoc() {
   const [activeTab, setActiveTab] = useState('khoa'); // 'khoa' | 'tudo'
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailBody, setEmailBody] = useState('');
+  const [deadlineDate, setDeadlineDate] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [currentEditingTrip, setCurrentEditingTrip] = useState(null);
@@ -64,6 +69,17 @@ export default function ChuyenThamQuan_DSLoc() {
   };
   const closeConfirm = () => setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: null });
 
+  // Preview Modal State
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+  const [previewData, setPreviewData] = useState({
+    tripId: null,
+    tripCapacity: 0,
+    suggestedAccepted: [],
+    suggestedRejected: []
+  });
+  const [selectedStudentIds, setSelectedStudentIds] = useState([]);
+
+
   useEffect(() => {
     fetchInitialData();
     fetchTrips();
@@ -101,11 +117,9 @@ export default function ChuyenThamQuan_DSLoc() {
 
   const resetForm = () => {
     setSelectedNhaMay('');
-    setSelectedLich('');
     setSelectedHinhThuc('');
     setNgay('');
     setGioBatDau('');
-    setGioKetThuc('');
     setSucChua('');
     setLePhi(0);
     setDiaDiemTapTrung('');
@@ -122,11 +136,9 @@ export default function ChuyenThamQuan_DSLoc() {
     setIsEditMode(true);
     setCurrentEditingTrip(t);
     setSelectedNhaMay(t.nha_may_id);
-    setSelectedLich(t.lich_kien_tap_id);
     setSelectedHinhThuc(t.hinh_thuc === 'TrucTiep' ? 'Trực tiếp' : 'Trực tuyến');
     setNgay(t.ngay_tham_quan ? new Date(t.ngay_tham_quan).toISOString().split('T')[0] : '');
     setGioBatDau(t.gio_bat_dau ? t.gio_bat_dau.substring(0, 5) : '');
-    setGioKetThuc(t.gio_ket_thuc ? t.gio_ket_thuc.substring(0, 5) : '');
     setSucChua(t.suc_chua);
     setLePhi(t.le_phi || 0);
     setDiaDiemTapTrung(t.dia_diem_tap_trung || '');
@@ -135,17 +147,15 @@ export default function ChuyenThamQuan_DSLoc() {
 
   const handleSubmitTrip = async (e) => {
     e.preventDefault();
-    if (!selectedNhaMay || !selectedLich || !selectedHinhThuc || !ngay || !gioBatDau || !gioKetThuc || !sucChua) {
+    if (!selectedNhaMay || !selectedHinhThuc || !ngay || !gioBatDau || !sucChua) {
       showPopup("Vui lòng điền đầy đủ thông tin", "error");
       return;
     }
 
     const payload = {
       nha_may_id: selectedNhaMay,
-      lich_kien_tap_id: selectedLich,
       ngay_tham_quan: ngay,
       gio_bat_dau: gioBatDau,
-      gio_ket_thuc: gioKetThuc,
       hinh_thuc: selectedHinhThuc === 'Trực tuyến' ? 'TrucTuyen' : 'TrucTiep',
       suc_chua: Number(sucChua),
       le_phi: Number(lePhi),
@@ -181,11 +191,46 @@ export default function ChuyenThamQuan_DSLoc() {
     });
   };
 
-  const handleStartRegistration = (id) => {
-    showConfirm("Mở đăng ký", "Bạn có chắc chắn muốn mở đăng ký cho chuyến tham quan này? Hành động này sẽ thay đổi trạng thái sang Mở đăng ký.", async () => {
+  const handlePreviewAssignStudents = async (tripId) => {
+    try {
+      const res = await khoaApi.previewAssignStudents({ tripId });
+      setPreviewData({
+        tripId,
+        tripCapacity: res.data.tripCapacity,
+        suggestedAccepted: res.data.suggestedAccepted,
+        suggestedRejected: res.data.suggestedRejected
+      });
+      setSelectedStudentIds(res.data.suggestedAccepted.map(p => p.sinh_vien_id));
+      setIsPreviewModalOpen(true);
+    } catch (err) {
+      showPopup(err.response?.data?.message || 'Lỗi khi lấy danh sách dự kiến', 'error');
+    }
+  };
+
+  const handleConfirmAssignStudents = async () => {
+    if (!deadlineDate) {
+      showPopup('Vui lòng chọn hạn chót nộp lệ phí', 'error');
+      return;
+    }
+    try {
+      await khoaApi.confirmAssignStudents({ 
+        tripId: previewData.tripId, 
+        acceptedStudentIds: selectedStudentIds,
+        deadlineDate 
+      });
+      showPopup('Chốt danh sách thành công', 'success');
+      setIsPreviewModalOpen(false);
+      fetchTrips();
+    } catch (err) {
+      showPopup(err.response?.data?.message || 'Lỗi khi chốt danh sách', 'error');
+    }
+  };
+
+  const handleReopenRegistration = (tripId) => {
+    showConfirm("Mở đăng ký bổ sung", "Bạn có chắc chắn muốn mở lại cổng đăng ký cho chuyến này để tuyển thêm sinh viên?", async () => {
       try {
-        await khoaApi.startTripRegistration(id);
-        showPopup('Mở đăng ký thành công', 'success');
+        await khoaApi.reopenTripRegistration(tripId);
+        showPopup('Đã mở đăng ký bổ sung', 'success');
         fetchTrips();
       } catch (err) {
         showPopup(err.response?.data?.message || 'Lỗi khi mở đăng ký', 'error');
@@ -411,7 +456,7 @@ export default function ChuyenThamQuan_DSLoc() {
                           <td className="p-4 font-medium text-slate-600">
                             {new Date(t.ngay_tham_quan).toLocaleDateString('vi-VN')}
                           </td>
-                          <td className="p-4 font-medium text-slate-600">{formatTime(t.gio_bat_dau)} - {formatTime(t.gio_ket_thuc)}</td>
+                          <td className="p-4 font-medium text-slate-600">{formatTime(t.gio_bat_dau)}</td>
                           <td className="p-4 text-center">
                             <span className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-bold border ${
                               t.hinh_thuc === 'TrucTiep' ? 'bg-[#89B449]/10 text-[#407F3E] border-[#89B449]/20' : 'bg-slate-100 text-slate-600 border-slate-200'
@@ -458,15 +503,47 @@ export default function ChuyenThamQuan_DSLoc() {
                                 style={{ top: dropdownPosition.top, right: dropdownPosition.right }}
                                 onClick={(e) => e.stopPropagation()}
                               >
-                                <button onClick={(e) => { e.stopPropagation(); handleEditClick(t); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors">
-                                  <Edit className="w-4 h-4 text-[#89B449]" /> Cập nhật
-                                </button>
-                                <button onClick={(e) => { e.stopPropagation(); handleStartRegistration(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors">
-                                  <PlayCircle className="w-4 h-4 text-[#407F3E]" /> Bắt đầu đăng ký
-                                </button>
-                                <button onClick={(e) => { e.stopPropagation(); handleDeleteTrip(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#E68A8C] hover:bg-red-50 flex items-center gap-2 transition-colors border-t border-slate-100">
-                                  <Trash2 className="w-4 h-4" /> Xóa
-                                </button>
+                                {t.trang_thai === 'Nhap' && (
+                                  <>
+                                    <button onClick={(e) => { e.stopPropagation(); handleEditClick(t); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors">
+                                      <Edit className="w-4 h-4 text-[#89B449]" /> Cập nhật
+                                    </button>
+                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteTrip(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#E68A8C] hover:bg-red-50 flex items-center gap-2 transition-colors border-t border-slate-100">
+                                      <Trash2 className="w-4 h-4" /> Xóa
+                                    </button>
+                                  </>
+                                )}
+
+                                {t.trang_thai === 'MoDangKy' && (
+                                  <>
+                                    <button onClick={(e) => { e.stopPropagation(); handlePreviewAssignStudents(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#407F3E] hover:bg-green-50 flex items-center gap-2 transition-colors">
+                                      <CheckCircle className="w-4 h-4" /> Xét duyệt danh sách
+                                    </button>
+                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteTrip(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#E68A8C] hover:bg-red-50 flex items-center gap-2 transition-colors border-t border-slate-100">
+                                      <Trash2 className="w-4 h-4" /> Hủy chuyến
+                                    </button>
+                                  </>
+                                )}
+
+                                {t.trang_thai === 'DaChotDanhSach' && (
+                                  <>
+                                    <button onClick={(e) => { e.stopPropagation(); handleReopenRegistration(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-orange-600 hover:bg-orange-50 flex items-center gap-2 transition-colors">
+                                      <RotateCcw className="w-4 h-4" /> Mở đăng ký bổ sung
+                                    </button>
+                                  </>
+                                )}
+
+                                {t.trang_thai === 'DaDuyet' && (
+                                  <button onClick={(e) => { e.stopPropagation(); handleDeleteTrip(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#E68A8C] hover:bg-red-50 flex items-center gap-2 transition-colors border-t border-slate-100">
+                                    <Trash2 className="w-4 h-4" /> Hủy chuyến
+                                  </button>
+                                )}
+
+                                {t.trang_thai !== 'Nhap' && t.trang_thai !== 'MoDangKy' && t.trang_thai !== 'DaDuyet' && t.trang_thai !== 'DaChotDanhSach' && (
+                                  <div className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-400">
+                                    Không có thao tác
+                                  </div>
+                                )}
                               </div>,
                               document.body
                             )}
@@ -589,8 +666,8 @@ export default function ChuyenThamQuan_DSLoc() {
             {/* Body */}
             <div className="p-6 space-y-5 overflow-visible">
               
-              {/* Row 1: Nhà máy & Lịch */}
-              <div className="grid grid-cols-2 gap-5 relative">
+              {/* Row 1: Nhà máy */}
+              <div className="grid grid-cols-1 gap-5 relative">
                 {/* Nhà máy */}
                 <div className="relative">
                   <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Nhà máy</label>
@@ -620,40 +697,10 @@ export default function ChuyenThamQuan_DSLoc() {
                     </div>
                   )}
                 </div>
-
-                {/* Lịch kiến tập */}
-                <div className="relative">
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Lịch kiến tập</label>
-                  <div 
-                    onClick={(e) => handleDropdownClick(e, setIsLichDropdownOpen)}
-                    className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-sm flex justify-between items-center cursor-pointer transition-all ${isLichDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-                  >
-                    <span className={`font-medium truncate pr-2 ${selectedLich ? 'text-slate-800' : 'text-slate-400'}`}>
-                      {lichOptions.find(o => o.id === selectedLich)?.ten_lich || 'Chọn lịch kiến tập'}
-                    </span>
-                    <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-                  </div>
-                  {isLichDropdownOpen && (
-                    <div className="absolute top-[70px] left-0 w-full bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-50 py-1 overflow-hidden max-h-48 overflow-y-auto animate-in slide-in-from-top-1">
-                      {lichOptions.map(opt => (
-                        <div 
-                          key={opt.id}
-                          onClick={(e) => { e.stopPropagation(); setSelectedLich(opt.id); setIsLichDropdownOpen(false); }}
-                          className={`px-4 py-2.5 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                            selectedLich === opt.id ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
-                          }`}
-                        >
-                          <span className="truncate pr-2">{opt.ten_lich}</span>
-                          {selectedLich === opt.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
               </div>
 
               {/* Row 2: Date & Time */}
-              <div className="grid grid-cols-3 gap-5 relative z-40">
+              <div className="grid grid-cols-2 gap-5 relative z-40">
                 <div className="col-span-1">
                   <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Ngày tham quan</label>
                   <div className="relative">
@@ -667,25 +714,13 @@ export default function ChuyenThamQuan_DSLoc() {
                   </div>
                 </div>
                 <div className="col-span-1">
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Giờ bắt đầu</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Giờ tham quan</label>
                   <div className="relative">
                     <Clock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
                       type="time"
                       value={gioBatDau}
                       onChange={(e) => setGioBatDau(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-800 font-medium cursor-pointer"
-                    />
-                  </div>
-                </div>
-                <div className="col-span-1">
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Giờ kết thúc</label>
-                  <div className="relative">
-                    <Clock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    <input
-                      type="time"
-                      value={gioKetThuc}
-                      onChange={(e) => setGioKetThuc(e.target.value)}
                       className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-800 font-medium cursor-pointer"
                     />
                   </div>
@@ -791,69 +826,130 @@ export default function ChuyenThamQuan_DSLoc() {
 
       {/* Modal - Xem chi tiết */}
       {viewingDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
           <div 
-            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200"
+            className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200"
             onClick={(e) => { e.stopPropagation(); setViewingDetail(null); }}
           ></div>
           
           <div 
-            className="bg-white w-full max-w-2xl rounded-2xl shadow-xl relative z-10 animate-in zoom-in-95 duration-200 flex flex-col"
+            className="bg-white w-full max-w-4xl rounded-2xl shadow-xl relative z-10 animate-in zoom-in-95 duration-200 flex flex-col overflow-hidden max-h-[90vh]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-6 py-4 border-b border-[#E7E0C4] flex items-center justify-between">
-              <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-[#E7E0C4]/40 to-transparent">
+              <h2 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-[#89B449]" />
                 Chi tiết chuyến tham quan
               </h2>
               <button 
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setViewingDetail(null); }}
-                className="p-1.5 text-slate-400 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg transition-colors cursor-pointer"
+                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
               >
-                <X className="w-6 h-6" />
+                <X className="w-5 h-5" />
               </button>
             </div>
             
-            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-              <div className="flex flex-col border-b border-slate-100 pb-2">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nhà máy</span>
-                <span className="text-sm font-medium text-slate-800 break-words">{viewingDetail.nhaMay?.ten_nha_may || viewingDetail.ten_nha_may_de_xuat || 'N/A'}</span>
+            {/* Body */}
+            <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+              {/* Factory Name */}
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Tên nhà máy</label>
+                <p className="font-black text-slate-800 text-lg">
+                  {viewingDetail.nhaMay?.ten_nha_may || viewingDetail.ten_nha_may_de_xuat || 'N/A'}
+                </p>
               </div>
-              <div className="flex flex-col border-b border-slate-100 pb-2">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Ngày tham quan</span>
-                <span className="text-sm font-medium text-slate-800 break-words">{viewingDetail.ngay_tham_quan ? new Date(viewingDetail.ngay_tham_quan).toLocaleDateString('vi-VN') : (viewingDetail.ngay_tham_quan_de_xuat ? new Date(viewingDetail.ngay_tham_quan_de_xuat).toLocaleDateString('vi-VN') : '')}</span>
-              </div>
-              <div className="flex flex-col border-b border-slate-100 pb-2">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Thời gian</span>
-                <span className="text-sm font-medium text-slate-800 break-words">{(viewingDetail.gio_bat_dau || viewingDetail.gio_bat_dau_de_xuat || '').substring(0, 5)} - {(viewingDetail.gio_ket_thuc || viewingDetail.gio_ket_thuc_de_xuat || '').substring(0, 5)}</span>
-              </div>
-              <div className="flex flex-col border-b border-slate-100 pb-2">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Hình thức</span>
-                <span className="text-sm font-medium text-slate-800 break-words">{viewingDetail.hinh_thuc === 'TrucTiep' ? 'Trực tiếp' : 'Trực tuyến'}</span>
-              </div>
-              <div className="flex flex-col border-b border-slate-100 pb-2">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Cách tổ chức</span>
-                <span className="text-sm font-medium text-slate-800 break-words">{viewingDetail.cach_to_chuc === 'DoKhoaToChuc' ? 'Khoa tổ chức' : 'Tự do'}</span>
-              </div>
-              {viewingDetail.cach_to_chuc === 'DoKhoaToChuc' && (
-                <div className="flex flex-col border-b border-slate-100 pb-2">
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Sức chứa</span>
-                  <span className="text-sm font-medium text-slate-800 break-words">{viewingDetail.dang_ky_count || 0} / {viewingDetail.suc_chua || 0}</span>
+
+              {/* Grid Details */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
+                <div className="flex gap-3">
+                  <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center shrink-0">
+                    <Calendar className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Ngày tham quan</label>
+                    <p className="text-sm font-medium text-slate-700 mt-0.5">
+                      {viewingDetail.ngay_tham_quan ? new Date(viewingDetail.ngay_tham_quan).toLocaleDateString('vi-VN') : (viewingDetail.ngay_tham_quan_de_xuat ? new Date(viewingDetail.ngay_tham_quan_de_xuat).toLocaleDateString('vi-VN') : '--')}
+                    </p>
+                  </div>
                 </div>
-              )}
-              <div className="flex flex-col border-b border-slate-100 pb-2">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Trạng thái</span>
-                <span className="text-sm font-medium text-slate-800 break-words">{
-                  viewingDetail.trang_thai_duyet ? (viewingDetail.trang_thai_duyet === 'ChoDuyet' ? 'Chờ duyệt' : viewingDetail.trang_thai_duyet) :
-                  (viewingDetail.trang_thai === 'MoDangKy' ? 'Mở đăng ký' : 
-                  viewingDetail.trang_thai === 'DaChotDanhSach' ? 'Đã chốt danh sách' : 
-                  viewingDetail.trang_thai === 'DaDienRa' ? 'Đã diễn ra' : 
-                  viewingDetail.trang_thai === 'DaHuy' ? 'Đã huỷ' : 'Nháp')
-                }</span>
+
+                <div className="flex gap-3">
+                  <div className="w-8 h-8 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center shrink-0">
+                    <Clock className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Thời gian</label>
+                    <p className="text-sm font-medium text-slate-700 mt-0.5">
+                      {(viewingDetail.gio_bat_dau || viewingDetail.gio_bat_dau_de_xuat || '--').substring(0, 5)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-500 flex items-center justify-center shrink-0">
+                    <MapPin className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Hình thức</label>
+                    <p className="text-sm font-medium text-slate-700 mt-0.5">
+                      {viewingDetail.hinh_thuc === 'TrucTiep' ? 'Trực tiếp' : 'Trực tuyến'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <div className="w-8 h-8 rounded-full bg-purple-50 text-purple-500 flex items-center justify-center shrink-0">
+                    <Users className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Cách tổ chức</label>
+                    <p className="text-sm font-medium text-slate-700 mt-0.5">
+                      {viewingDetail.cach_to_chuc === 'DoKhoaToChuc' ? 'Khoa tổ chức' : 'Tự do'}
+                    </p>
+                  </div>
+                </div>
+
+                {viewingDetail.cach_to_chuc === 'DoKhoaToChuc' && (
+                  <div className="flex gap-3">
+                    <div className="w-8 h-8 rounded-full bg-cyan-50 text-cyan-500 flex items-center justify-center shrink-0">
+                      <Users className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Sức chứa (Đã ĐK / Tổng)</label>
+                      <p className="text-sm font-medium text-slate-700 mt-0.5">
+                        <span className="text-[#407F3E] font-bold">{viewingDetail.dang_ky_count || 0}</span> / {viewingDetail.suc_chua || 0}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-3">
+                  <div className="w-8 h-8 rounded-full bg-green-50 text-green-600 flex items-center justify-center shrink-0">
+                    <CheckCircle2 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Trạng thái</label>
+                    <p className="text-sm font-medium text-slate-700 mt-0.5">
+                      {
+                        viewingDetail.trang_thai_duyet ? (viewingDetail.trang_thai_duyet === 'ChoDuyet' ? 'Chờ duyệt' : viewingDetail.trang_thai_duyet) :
+                        (viewingDetail.trang_thai === 'MoDangKy' ? 'Mở đăng ký' : 
+                        viewingDetail.trang_thai === 'DaChotDanhSach' ? 'Đã chốt danh sách' : 
+                        viewingDetail.trang_thai === 'DaDienRa' ? 'Đã diễn ra' : 
+                        viewingDetail.trang_thai === 'DaHuy' ? 'Đã huỷ' : 'Nháp')
+                      }
+                    </p>
+                  </div>
+                </div>
+
               </div>
+
             </div>
             
-            <div className="px-6 py-4 border-t border-[#E7E0C4] bg-slate-50/50 flex items-center justify-end rounded-b-2xl">
+            {/* Footer */}
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end">
               <button 
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setViewingDetail(null); }}
@@ -861,6 +957,185 @@ export default function ChuyenThamQuan_DSLoc() {
               >
                 Đóng
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Preview Modal for Assigning Students */}
+      {isPreviewModalOpen && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setIsPreviewModalOpen(false)}
+        >
+          <div 
+            className="bg-white rounded-2xl shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="px-6 py-5 border-b border-[#E7E0C4] bg-slate-50/50 flex justify-between items-center shrink-0">
+              <div>
+                <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-[#407F3E]" />
+                  Xét duyệt danh sách tham quan
+                </h3>
+                <p className="text-sm text-slate-500 mt-1">
+                  Đã chọn: <span className="font-bold text-[#407F3E]">{selectedStudentIds.length}</span> / {previewData.tripCapacity} sinh viên (Sức chứa tối đa)
+                </p>
+                <div className="w-64 h-1.5 bg-slate-200 rounded-full mt-2 overflow-hidden">
+                  <div 
+                    className={`h-full rounded-full transition-all ${selectedStudentIds.length > previewData.tripCapacity ? 'bg-red-500' : 'bg-[#407F3E]'}`} 
+                    style={{ width: `${Math.min((selectedStudentIds.length / previewData.tripCapacity) * 100, 100)}%` }}
+                  ></div>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsPreviewModalOpen(false)}
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            {/* Body */}
+            <div className="p-6 overflow-y-auto flex-1 bg-white">
+              <div className="space-y-6">
+                <div>
+                  <h4 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-[#407F3E]"></span>
+                    Danh sách ĐƯỢC CHỌN (Gợi ý bởi hệ thống)
+                  </h4>
+                  <div className="border border-[#E7E0C4] rounded-xl overflow-hidden">
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-slate-50 text-slate-600 font-bold border-b border-[#E7E0C4]">
+                        <tr>
+                          <th className="p-3 w-12 text-center">Chọn</th>
+                          <th className="p-3">MSSV</th>
+                          <th className="p-3">Họ tên</th>
+                          <th className="p-3">Khóa</th>
+                          <th className="p-3">Ngày ĐK</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#E7E0C4]">
+                        {previewData.suggestedAccepted.map(p => (
+                          <tr key={p.id} className="hover:bg-slate-50">
+                            <td className="p-3 text-center">
+                              <input 
+                                type="checkbox" 
+                                className="w-4 h-4 text-[#407F3E] rounded border-slate-300 focus:ring-[#407F3E] cursor-pointer"
+                                checked={selectedStudentIds.includes(p.sinh_vien_id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedStudentIds(prev => [...prev, p.sinh_vien_id]);
+                                  } else {
+                                    setSelectedStudentIds(prev => prev.filter(id => id !== p.sinh_vien_id));
+                                  }
+                                }}
+                              />
+                            </td>
+                            <td className="p-3 font-mono font-bold text-slate-700">{p.sinhVien?.mssv}</td>
+                            <td className="p-3 text-slate-800 font-medium">{p.sinhVien?.ho_ten}</td>
+                            <td className="p-3 text-slate-600">{p.sinhVien?.khoaHoc?.ten_khoa_hoc}</td>
+                            <td className="p-3 text-slate-500 text-xs">{new Date(p.ngay_dang_ky).toLocaleDateString('vi-VN')}</td>
+                          </tr>
+                        ))}
+                        {previewData.suggestedAccepted.length === 0 && (
+                          <tr><td colSpan="5" className="p-4 text-center text-slate-500 italic">Không có ai.</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-red-400"></span>
+                    Danh sách BỊ LOẠI (Gợi ý bởi hệ thống)
+                  </h4>
+                  <div className="border border-[#E7E0C4] rounded-xl overflow-hidden">
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-slate-50 text-slate-600 font-bold border-b border-[#E7E0C4]">
+                        <tr>
+                          <th className="p-3 w-12 text-center">Chọn</th>
+                          <th className="p-3">MSSV</th>
+                          <th className="p-3">Họ tên</th>
+                          <th className="p-3">Khóa</th>
+                          <th className="p-3">Lý do</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#E7E0C4]">
+                        {previewData.suggestedRejected.map(p => (
+                          <tr key={p.id} className="hover:bg-slate-50">
+                            <td className="p-3 text-center">
+                              <input 
+                                type="checkbox" 
+                                className="w-4 h-4 text-[#407F3E] rounded border-slate-300 focus:ring-[#407F3E] cursor-pointer"
+                                checked={selectedStudentIds.includes(p.sinh_vien_id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedStudentIds(prev => [...prev, p.sinh_vien_id]);
+                                  } else {
+                                    setSelectedStudentIds(prev => prev.filter(id => id !== p.sinh_vien_id));
+                                  }
+                                }}
+                              />
+                            </td>
+                            <td className="p-3 font-mono font-bold text-slate-700">{p.sinhVien?.mssv}</td>
+                            <td className="p-3 text-slate-800 font-medium">{p.sinhVien?.ho_ten}</td>
+                            <td className="p-3 text-slate-600">{p.sinhVien?.khoaHoc?.ten_khoa_hoc}</td>
+                            <td className="p-3 text-red-500 text-xs font-medium">
+                              {p.trang_thai === 'BiLoai' ? 'Vi phạm/Không đủ ĐK' : 'Hết chỗ (Thuật toán)'}
+                            </td>
+                          </tr>
+                        ))}
+                        {previewData.suggestedRejected.length === 0 && (
+                          <tr><td colSpan="5" className="p-4 text-center text-slate-500 italic">Không có ai.</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 bg-red-50 border-t border-[#E7E0C4]">
+              <label className="block text-sm font-bold text-slate-700 mb-1">
+                Hạn chót nộp lệ phí <span className="text-red-500">*</span>
+              </label>
+              <input 
+                type="datetime-local" 
+                value={deadlineDate}
+                onChange={(e) => setDeadlineDate(e.target.value)}
+                className="w-full sm:w-1/2 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-[#407F3E]"
+              />
+              <p className="text-xs text-slate-500 mt-1">Sau thời gian này, các sinh viên chưa đóng lệ phí sẽ tự động bị hệ thống đánh dấu vi phạm.</p>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 bg-slate-50 border-t border-[#E7E0C4] flex items-center justify-between shrink-0">
+              <p className="text-xs text-slate-500">
+                <span className="text-red-500 font-bold">* Lưu ý:</span> Nếu bạn xác nhận, hệ thống sẽ chốt cứng danh sách và xuất hóa đơn lệ phí ngay lập tức.
+              </p>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setIsPreviewModalOpen(false)}
+                  className="px-6 py-2.5 text-slate-600 hover:bg-slate-200 rounded-xl text-sm font-bold transition-colors cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button 
+                  onClick={handleConfirmAssignStudents}
+                  disabled={selectedStudentIds.length > previewData.tripCapacity}
+                  className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-colors shadow-sm flex items-center gap-2 ${
+                    selectedStudentIds.length > previewData.tripCapacity 
+                      ? 'bg-slate-300 text-slate-500 cursor-not-allowed' 
+                      : 'bg-[#407F3E] text-white hover:bg-[#407F3E]/90 cursor-pointer'
+                  }`}
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  Xác nhận chốt danh sách
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -71,26 +71,32 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
     try {
       if (activeTab === 'nam-hoc') {
         if (!tenNamHoc) { setToast({ show: true, message: 'Vui lòng nhập tên năm học', type: 'error' }); return; }
+        if (!ngayBatDau || !ngayKetThuc) { setToast({ show: true, message: 'Vui lòng chọn ngày bắt đầu và kết thúc', type: 'error' }); return; }
+        if (new Date(ngayKetThuc) <= new Date(ngayBatDau)) { setToast({ show: true, message: 'Ngày kết thúc phải lớn hơn ngày bắt đầu', type: 'error' }); return; }
+        
         await khoaApi.createYear({
           ten_nam_hoc: tenNamHoc,
-          ngay_bat_dau: ngayBatDau || null,
-          ngay_ket_thuc: ngayKetThuc || null
+          ngay_bat_dau: ngayBatDau,
+          ngay_ket_thuc: ngayKetThuc
         });
         setToast({ show: true, message: 'Thêm mới năm học thành công!', type: 'success' });
       } else if (activeTab === 'hoc-ky') {
         if (!tenHocKy || !selectedNamHoc) { setToast({ show: true, message: 'Vui lòng nhập tên học kỳ và chọn năm học', type: 'error' }); return; }
+        if (!ngayBatDau || !ngayKetThuc) { setToast({ show: true, message: 'Vui lòng chọn ngày bắt đầu và kết thúc', type: 'error' }); return; }
+        if (new Date(ngayKetThuc) <= new Date(ngayBatDau)) { setToast({ show: true, message: 'Ngày kết thúc phải lớn hơn ngày bắt đầu', type: 'error' }); return; }
+
         await khoaApi.createTerm({
           ten_hoc_ky: tenHocKy,
           nam_hoc_id: selectedNamHoc,
-          ngay_bat_dau: ngayBatDau || null,
-          ngay_ket_thuc: ngayKetThuc || null
+          ngay_bat_dau: ngayBatDau,
+          ngay_ket_thuc: ngayKetThuc
         });
         setToast({ show: true, message: 'Thêm mới học kỳ thành công!', type: 'success' });
       } else if (activeTab === 'khoa') {
         if (!maKhoa || !tenKhoa) { setToast({ show: true, message: 'Vui lòng nhập mã khóa và tên khóa', type: 'error' }); return; }
         await khoaApi.createCourse({
-          ma_khoa: maKhoa,
-          ten_khoa: tenKhoa,
+          ma_khoa_hoc: maKhoa,
+          ten_khoa_hoc: tenKhoa,
           nam_nhap_hoc: namNhapHoc ? parseInt(namNhapHoc) : null
         });
         setToast({ show: true, message: 'Thêm mới khóa thành công!', type: 'success' });
@@ -116,7 +122,7 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
     } else if (type === 'hoc-ky') {
       setEditFormData({ ten_hoc_ky: item.ten_hoc_ky, nam_hoc_id: item.nam_hoc_id, ngay_bat_dau: item.ngay_bat_dau ? item.ngay_bat_dau.substring(0, 10) : '', ngay_ket_thuc: item.ngay_ket_thuc ? item.ngay_ket_thuc.substring(0, 10) : '' });
     } else if (type === 'khoa') {
-      setEditFormData({ ma_khoa: item.ma_khoa, ten_khoa: item.ten_khoa, nam_nhap_hoc: item.nam_nhap_hoc });
+      setEditFormData({ ma_khoa_hoc: item.ma_khoa_hoc, ten_khoa_hoc: item.ten_khoa_hoc, nam_nhap_hoc: item.nam_nhap_hoc });
     }
     setShowEditModal(true);
   };
@@ -125,8 +131,12 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
     e.preventDefault();
     try {
       if (editingItem.type === 'nam-hoc') {
+        if (!editFormData.ngay_bat_dau || !editFormData.ngay_ket_thuc) { setToast({ show: true, message: 'Vui lòng chọn ngày bắt đầu và kết thúc', type: 'error' }); return; }
+        if (new Date(editFormData.ngay_ket_thuc) <= new Date(editFormData.ngay_bat_dau)) { setToast({ show: true, message: 'Ngày kết thúc phải lớn hơn ngày bắt đầu', type: 'error' }); return; }
         await khoaApi.updateYear(editingItem.id, editFormData);
       } else if (editingItem.type === 'hoc-ky') {
+        if (!editFormData.ngay_bat_dau || !editFormData.ngay_ket_thuc) { setToast({ show: true, message: 'Vui lòng chọn ngày bắt đầu và kết thúc', type: 'error' }); return; }
+        if (new Date(editFormData.ngay_ket_thuc) <= new Date(editFormData.ngay_bat_dau)) { setToast({ show: true, message: 'Ngày kết thúc phải lớn hơn ngày bắt đầu', type: 'error' }); return; }
         await khoaApi.updateTerm(editingItem.id, editFormData);
       } else if (editingItem.type === 'khoa') {
         await khoaApi.updateCourse(editingItem.id, editFormData);
@@ -163,8 +173,8 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
   const filteredYears = years.filter(y => y.ten_nam_hoc.toLowerCase().includes(searchTerm.toLowerCase()));
   const filteredTerms = terms.filter(t => t.ten_hoc_ky.toLowerCase().includes(searchTerm.toLowerCase()) || (t.namHoc && t.namHoc.ten_nam_hoc.toLowerCase().includes(searchTerm.toLowerCase())));
   const filteredCourses = courses.filter(c => 
-    (c.ma_khoa && c.ma_khoa.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (c.ten_khoa && c.ten_khoa.toLowerCase().includes(searchTerm.toLowerCase()))
+    (c.ma_khoa_hoc && c.ma_khoa_hoc.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (c.ten_khoa_hoc && c.ten_khoa_hoc.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   // Pagination logic
@@ -304,8 +314,8 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
 
             {activeTab === 'khoa' && paginatedCourses.map(c => (
               <tr key={c.id} className="hover:bg-slate-50 transition-colors">
-                <td className="p-4 text-slate-600 font-mono font-medium">{c.ma_khoa || '-'}</td>
-                <td className="p-4 font-semibold">{c.ten_khoa}</td>
+                <td className="p-4 text-slate-600 font-mono font-medium">{c.ma_khoa_hoc || '-'}</td>
+                <td className="p-4 font-semibold">{c.ten_khoa_hoc}</td>
                 <td className="p-4 text-slate-600">{c.nam_nhap_hoc}</td>
                 <td className="p-4 text-right">
                   <div className="flex justify-end gap-2 text-slate-400">
@@ -421,7 +431,6 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
                         onChange={(e) => setNgayBatDau(e.target.value)}
                         className="w-full pl-4 pr-10 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all cursor-pointer" 
                       />
-                      <Calendar className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
                     </div>
                   </div>
                   <div>
@@ -433,7 +442,6 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
                         onChange={(e) => setNgayKetThuc(e.target.value)}
                         className="w-full pl-4 pr-10 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all cursor-pointer" 
                       />
-                      <Calendar className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
                     </div>
                   </div>
                 </>
@@ -496,7 +504,6 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
                         onChange={(e) => setNgayBatDau(e.target.value)}
                         className="w-full pl-4 pr-10 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all cursor-pointer" 
                       />
-                      <Calendar className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
                     </div>
                   </div>
 
@@ -509,7 +516,6 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
                         onChange={(e) => setNgayKetThuc(e.target.value)}
                         className="w-full pl-4 pr-10 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all cursor-pointer" 
                       />
-                      <Calendar className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
                     </div>
                   </div>
                 </>
@@ -688,8 +694,8 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">Mã khóa <span className="text-[#E68A8C]">*</span></label>
                     <input 
                       type="text" 
-                      value={editFormData.ma_khoa}
-                      onChange={(e) => setEditFormData({...editFormData, ma_khoa: e.target.value})}
+                      value={editFormData.ma_khoa_hoc}
+                      onChange={(e) => setEditFormData({...editFormData, ma_khoa_hoc: e.target.value})}
                       required
                       className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:border-[#407F3E]" 
                     />
@@ -698,8 +704,8 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">Tên khóa <span className="text-[#E68A8C]">*</span></label>
                     <input 
                       type="text" 
-                      value={editFormData.ten_khoa}
-                      onChange={(e) => setEditFormData({...editFormData, ten_khoa: e.target.value})}
+                      value={editFormData.ten_khoa_hoc}
+                      onChange={(e) => setEditFormData({...editFormData, ten_khoa_hoc: e.target.value})}
                       required
                       className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:border-[#407F3E]" 
                     />

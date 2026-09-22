@@ -64,8 +64,8 @@ export default function DashBoard_SV() {
         avgScore: '8.5'
       });
       setTrips([
-        { id: 1, trang_thai: 'HopLe', chuyenThamQuan: { hinh_thuc: 'TrucTiep', nhaMay: { ten_nha_may: 'Yakult HCM' }, ngay_tham_quan: '2026-09-10', gio_bat_dau: '08:00', gio_ket_thuc: '11:00' } },
-        { id: 2, trang_thai: 'HopLe', chuyenThamQuan: { hinh_thuc: 'TrucTuyen', nhaMay: { ten_nha_may: 'Vinamilk Bình Dương' }, ngay_tham_quan: '2026-09-15', gio_bat_dau: '13:00', gio_ket_thuc: '16:00' } }
+        { id: 1, trang_thai: 'HopLe', chuyenThamQuan: { hinh_thuc: 'TrucTiep', nhaMay: { ten_nha_may: 'Yakult HCM' }, ngay_tham_quan: '2026-09-10', gio_bat_dau: '08:00' } },
+        { id: 2, trang_thai: 'HopLe', chuyenThamQuan: { hinh_thuc: 'TrucTuyen', nhaMay: { ten_nha_may: 'Vinamilk Bình Dương' }, ngay_tham_quan: '2026-09-15', gio_bat_dau: '13:00' } }
       ]);
       setNotifications([
         { id: 1, da_doc: false, tieu_de: 'Nhắc nhở nộp bài thu hoạch chuyến đi Yakult', ngay_gui: '2026-08-19' },
@@ -194,7 +194,7 @@ export default function DashBoard_SV() {
                           </div>
                           <div className="flex items-center gap-1.5">
                             <Clock className="w-3.5 h-3.5" />
-                            {trip.chuyenThamQuan?.gio_bat_dau?.slice(0, 5) || '--'} - {trip.chuyenThamQuan?.gio_ket_thuc?.slice(0, 5) || '--'}
+                            {trip.chuyenThamQuan?.gio_bat_dau?.slice(0, 5) || '--'}
                           </div>
                         </div>
                       </div>

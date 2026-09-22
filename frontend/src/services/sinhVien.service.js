@@ -19,4 +19,5 @@ export const sinhVienApi = {
   selectRepresentativeTrips: (data) => api.post('/sinh-vien/select-representative-trips', data),
   getGrades: (studentId) => api.get(`/sinh-vien/grades/${studentId}`),
   getDashboardStats: (studentId) => api.get(`/sinh-vien/dashboard-stats/${studentId}`),
+  getPaymentConfig: () => api.get('/sinh-vien/payment-config'),
 };
