@@ -93,7 +93,7 @@ export default function DanhMuc_SinhVien_Khoa() {
           email: newEmail,
           sdt: newPhone,
           ten_lop: newClass,
-          ten_khoa: autoTenKhoa
+          ten_khoa_hoc: autoTenKhoa
         });
         setToast({ show: true, message: 'Cập nhật sinh viên thành công', type: 'success' });
       } else {
@@ -103,7 +103,7 @@ export default function DanhMuc_SinhVien_Khoa() {
           ten_lop: newClass,
           email: newEmail,
           sdt: newPhone,
-          ten_khoa: autoTenKhoa
+          ten_khoa_hoc: autoTenKhoa
         });
         setToast({ show: true, message: 'Thêm sinh viên thành công', type: 'success' });
       }
@@ -167,7 +167,7 @@ export default function DanhMuc_SinhVien_Khoa() {
   };
 
   // Dropdown Lists
-  const khoaOptions = ["Tất cả khóa", ...khoaList.map(k => k.ten_khoa)];
+  const khoaOptions = ["Tất cả khóa", ...khoaList.map(k => k.ten_khoa_hoc)];
   const lopOptions = ["Tất cả lớp", ...lopList];
 
   const filteredStudents = students.filter(s => {
@@ -221,16 +221,16 @@ export default function DanhMuc_SinhVien_Khoa() {
       const formattedData = data.map(row => {
         const tenLop = String(row['Lớp'] || row['ten_lop'] || '').trim();
         const autoTenKhoa = extractKhoa(tenLop);
-        const tenKhoa = String(row['Khóa'] || row['ten_khoa'] || autoTenKhoa).trim();
-        const matchedKhoa = khoaList.find(k => k.ten_khoa === tenKhoa);
+        const tenKhoa = String(row['Khóa'] || row['ten_khoa_hoc'] || autoTenKhoa).trim();
+        const matchedKhoa = khoaList.find(k => k.ten_khoa_hoc === tenKhoa);
         return {
           mssv: String(row['MSSV'] || row['mssv'] || ''),
           ho_ten: String(row['Họ tên'] || row['ho_ten'] || ''),
           email: String(row['Email'] || row['email'] || ''),
           sdt: String(row['SĐT'] || row['sdt'] || ''),
           ten_lop: tenLop,
-          khoa_id: matchedKhoa ? matchedKhoa.id : undefined,
-          ten_khoa: tenKhoa,
+          khoa_hoc_id: matchedKhoa ? matchedKhoa.id : undefined,
+          ten_khoa_hoc: tenKhoa,
         };
       }).filter(r => r.mssv && r.ho_ten);
 
@@ -722,12 +722,12 @@ export default function DanhMuc_SinhVien_Khoa() {
                             <td className="px-4 py-2">{row.email}</td>
                             <td className="px-4 py-2">{row.sdt}</td>
                             <td className="px-4 py-2">
-                              {row.khoa_id === undefined && row.ten_khoa !== 'Khác' && (
+                              {row.khoa_hoc_id === undefined && row.ten_khoa_hoc !== 'Khác' && (
                                 <span className="text-[#407F3E] text-xs italic font-semibold">
-                                  Sẽ tự tạo {row.ten_khoa}
+                                  Sẽ tự tạo {row.ten_khoa_hoc}
                                 </span>
                               )}
-                              {row.khoa_id === undefined && row.ten_khoa === 'Khác' && (
+                              {row.khoa_hoc_id === undefined && row.ten_khoa_hoc === 'Khác' && (
                                 <span className="text-[#E68A8C] text-xs italic">
                                   Không xác định được khóa
                                 </span>

@@ -46,7 +46,7 @@ export default function BaoCao_SVDatKhongDat_Khoa() {
       const rawData = reportRes.data || [];
       
       const processed = rawData.map(r => {
-        const sv = r.lichKienTapSinhVien?.sinhVien || {};
+        const sv = r.sinhVien || {};
         let resultLabel = 'Đang học';
         let resultValue = 'DangHoc';
         if (r.ket_qua === 'Dat') {
@@ -62,7 +62,7 @@ export default function BaoCao_SVDatKhongDat_Khoa() {
           mssv: sv.mssv,
           ho_ten: sv.ho_ten,
           lop: sv.lop || sv.ten_lop,
-          khoa: sv.khoa?.ten_khoa,
+          khoa: sv.khoaHoc?.ten_khoa_hoc,
           diem: r.diem_tong_ket !== null ? Number(r.diem_tong_ket) : null,
           resultLabel,
           resultValue

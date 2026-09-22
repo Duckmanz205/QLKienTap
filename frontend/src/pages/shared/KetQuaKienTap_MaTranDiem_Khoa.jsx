@@ -198,54 +198,37 @@ export default function KetQuaKienTap_Khoa() {
       {/* Main Table */}
       <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-visible">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[1400px]">
+          <table className="w-full text-left border-collapse min-w-[1000px]">
             <thead>
               <tr className="bg-[#E7E0C4] text-slate-800 text-[10px] font-bold uppercase tracking-wider border-b border-white">
                 <th className="p-2 pl-4 border-r border-white text-center" rowSpan={2}>MSSV</th>
                 <th className="p-2 border-r border-white text-center" rowSpan={2}>Họ tên</th>
                 <th className="p-2 border-r border-white text-center" rowSpan={2}>Lớp</th>
                 
-                <th className="p-2 border-r border-white text-center bg-[#FCE4D6]" colSpan={5}>NM1</th>
-                <th className="p-2 border-r border-white text-center bg-[#DDEBF7]" colSpan={5}>NM2</th>
-                <th className="p-2 border-r border-white text-center bg-[#E2EFDA]" colSpan={5}>NM3</th>
+                <th className="p-2 border-r border-white text-center bg-[#FCE4D6]" colSpan={5}>ĐIỂM CHUYẾN KIẾN TẬP</th>
 
                 <th className="p-2 text-center bg-[#FFF2CC] text-[#407F3E]" rowSpan={2}>Tổng kết</th>
                 <th className="p-2 text-center border-l border-white" rowSpan={2}>Kết quả</th>
                 <th className="p-2 pr-4 text-center border-l border-white" rowSpan={2}>Chi tiết</th>
               </tr>
               <tr className="bg-[#E7E0C4] text-slate-800 text-[9px] font-bold uppercase tracking-tighter border-b border-white">
-                {/* NM1 */}
+                {/* Điểm Chuyến */}
                 <th className="p-1 border-r border-white text-center bg-[#FCE4D6]">Chuẩn bị</th>
-                <th className="p-1 border-r border-white text-center bg-[#FCE4D6]">Báo cáo</th>
-                <th className="p-1 border-r border-white text-center bg-[#FCE4D6]">Vấn đáp</th>
+                <th className="p-1 border-r border-white text-center bg-[#FCE4D6]">Thu hoạch</th>
+                <th className="p-1 border-r border-white text-center bg-[#FCE4D6]">Hội đồng</th>
                 <th className="p-1 border-r border-white text-center bg-[#FCE4D6]">Cộng</th>
-                <th className="p-1 border-r border-white text-center bg-[#FCE4D6]">Tổng NM1</th>
-                {/* NM2 */}
-                <th className="p-1 border-r border-white text-center bg-[#DDEBF7]">Chuẩn bị</th>
-                <th className="p-1 border-r border-white text-center bg-[#DDEBF7]">Báo cáo</th>
-                <th className="p-1 border-r border-white text-center bg-[#DDEBF7]">Vấn đáp</th>
-                <th className="p-1 border-r border-white text-center bg-[#DDEBF7]">Cộng</th>
-                <th className="p-1 border-r border-white text-center bg-[#DDEBF7]">Tổng NM2</th>
-                {/* NM3 */}
-                <th className="p-1 border-r border-white text-center bg-[#E2EFDA]">Chuẩn bị</th>
-                <th className="p-1 border-r border-white text-center bg-[#E2EFDA]">Báo cáo</th>
-                <th className="p-1 border-r border-white text-center bg-[#E2EFDA]">Vấn đáp</th>
-                <th className="p-1 border-r border-white text-center bg-[#E2EFDA]">Cộng</th>
-                <th className="p-1 border-r border-white text-center bg-[#E2EFDA]">Tổng NM3</th>
+                <th className="p-1 border-r border-white text-center bg-[#FCE4D6]">Tổng chuyến</th>
               </tr>
             </thead>
             <tbody className="text-xs text-slate-700">
               {results.length === 0 ? (
                 <tr>
-                  <td colSpan={21} className="p-8 text-center text-slate-500 font-medium border-b border-[#E7E0C4]/50">Không có kết quả nào.</td>
+                  <td colSpan={11} className="p-8 text-center text-slate-500 font-medium border-b border-[#E7E0C4]/50">Không có kết quả nào.</td>
                 </tr>
               ) : (
                 results.map((r, index) => {
                   const sv = r.sinhVien || {};
-                  const trips = r.trips || [];
-                  const t1 = trips[0] || {};
-                  const t2 = trips[1] || {};
-                  const t3 = trips[2] || {};
+                  const grade = r || {};
                   
                   return (
                     <tr key={r.id} className={`hover:bg-slate-50 transition-colors border-b border-[#E7E0C4]/50 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
@@ -253,26 +236,12 @@ export default function KetQuaKienTap_Khoa() {
                       <td className="p-2 font-bold text-slate-800 border-r border-[#E7E0C4]/50 whitespace-nowrap">{sv.ho_ten}</td>
                       <td className="p-2 text-center border-r border-[#E7E0C4]/50 text-[10px] text-slate-500">{sv.ten_lop || '--'}</td>
 
-                      {/* NM1 */}
-                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono">{t1.diem_chuan_bi ?? '--'}</td>
-                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono text-blue-600">{t1.diem_bao_cao ?? '--'}</td>
-                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono text-red-600">{t1.diem_van_dap ?? '--'}</td>
-                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono text-green-600">{t1.diem_cong ?? '--'}</td>
-                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono font-bold">{t1.diem_tong_nm ?? '--'}</td>
-                      
-                      {/* NM2 */}
-                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono">{t2.diem_chuan_bi ?? '--'}</td>
-                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono text-blue-600">{t2.diem_bao_cao ?? '--'}</td>
-                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono text-red-600">{t2.diem_van_dap ?? '--'}</td>
-                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono text-green-600">{t2.diem_cong ?? '--'}</td>
-                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono font-bold">{t2.diem_tong_nm ?? '--'}</td>
-
-                      {/* NM3 */}
-                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono">{t3.diem_chuan_bi ?? '--'}</td>
-                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono text-blue-600">{t3.diem_bao_cao ?? '--'}</td>
-                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono text-red-600">{t3.diem_van_dap ?? '--'}</td>
-                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono text-green-600">{t3.diem_cong ?? '--'}</td>
-                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono font-bold">{t3.diem_tong_nm ?? '--'}</td>
+                      {/* ĐIỂM */}
+                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono">{grade.diem_chuan_bi ?? '--'}</td>
+                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono text-blue-600">{grade.diem_thu_hoach ?? '--'}</td>
+                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono text-red-600">{grade.diem_hoi_dong_final ?? '--'}</td>
+                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono text-green-600">{grade.diem_cong_final ?? '--'}</td>
+                      <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono font-bold">{grade.diem_tong_chuyen ?? '--'}</td>
 
                       {/* TỔNG */}
                       <td className="p-2 text-center border-r border-[#E7E0C4]/50 bg-[#FFF2CC]/30">

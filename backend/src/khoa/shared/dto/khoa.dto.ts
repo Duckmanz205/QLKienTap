@@ -52,22 +52,24 @@ export class CreateTermDto {
   ngay_ket_thuc?: Date;
 }
 
+// (v11) Đổi tên trường: ma_khoa → ma_khoa_hoc, ten_khoa → ten_khoa_hoc
 export class CreateCourseDto {
   @IsString()
-  @IsNotEmpty({ message: 'Mã khoa không được để trống' })
+  @IsNotEmpty({ message: 'Mã khóa học không được để trống' })
   @Length(1, 50)
-  ma_khoa: string;
+  ma_khoa_hoc: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'Tên khoa không được để trống' })
+  @IsNotEmpty({ message: 'Tên khóa học không được để trống' })
   @Length(1, 200)
-  ten_khoa: string;
+  ten_khoa_hoc: string;
 
   @IsOptional()
   @IsInt()
   nam_nhap_hoc?: number;
 }
 
+// (v10) Thêm nguoi_lien_he, sdt_lien_he
 export class CreateFactoryDto {
   @IsString()
   @IsNotEmpty({ message: 'Tên nhà máy không được để trống' })
@@ -80,6 +82,14 @@ export class CreateFactoryDto {
   @IsOptional()
   @IsString()
   nhom_nganh?: string;
+
+  @IsOptional()
+  @IsString()
+  nguoi_lien_he?: string;
+
+  @IsOptional()
+  @IsString()
+  sdt_lien_he?: string;
 
   @IsOptional()
   @IsBoolean()
@@ -110,6 +120,14 @@ export class UpdateFactoryDto {
   nhom_nganh?: string;
 
   @IsOptional()
+  @IsString()
+  nguoi_lien_he?: string;
+
+  @IsOptional()
+  @IsString()
+  sdt_lien_he?: string;
+
+  @IsOptional()
   @IsBoolean()
   ho_tro_truc_tiep?: boolean;
 
@@ -123,6 +141,7 @@ export class UpdateFactoryDto {
   trang_thai?: string;
 }
 
+// (v6) khoa_id → khoa_hoc_id
 export class CreateCampaignDto {
   @IsString()
   @IsNotEmpty({ message: 'Tên đợt kiến tập không được để trống' })
@@ -131,6 +150,40 @@ export class CreateCampaignDto {
   @IsInt()
   @Min(1)
   hoc_ky_id: number;
+
+  @IsInt()
+  @Min(1)
+  khoa_hoc_id: number;
+
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  ngay_bat_dau?: Date;
+
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  ngay_ket_thuc?: Date;
+
+  @IsOptional()
+  @IsArray()
+  danh_sach_sinh_vien?: any[];
+}
+
+export class UpdateCampaignDto {
+  @IsOptional()
+  @IsString()
+  ten_dot?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  hoc_ky_id?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  khoa_hoc_id?: number;
 
   @IsOptional()
   @Type(() => Date)
@@ -146,29 +199,14 @@ export class CreateCampaignDto {
   @IsString()
   @IsIn(['Nhap', 'DangTrienKhai', 'DaKetThuc', 'DaKhoa', 'DaHuy'])
   trang_thai?: string;
+
+  @IsOptional()
+  @IsArray()
+  danh_sach_sinh_vien?: any[];
 }
 
-export class UpdateCampaignDto {
-  @IsOptional()
-  @IsString()
-  ten_dot?: string;
-
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  hoc_ky_id?: number;
-
-  @IsOptional()
-  @Type(() => Date)
-  @IsDate()
-  ngay_bat_dau?: Date;
-
-  @IsOptional()
-  @Type(() => Date)
-  @IsDate()
-  ngay_ket_thuc?: Date;
-}
-
+// (v12) Bỏ tg_dien_ra_tu/den, han_chot_nop_bao_cao, han_chot_diem
+// (v6) Thêm so_luong_du_kien
 export class CreateScheduleDto {
   @IsString()
   @IsNotEmpty({ message: 'Tên lịch không được để trống' })
@@ -178,10 +216,9 @@ export class CreateScheduleDto {
   @Min(1)
   dot_kien_tap_id: number;
 
-  @IsOptional()
   @IsInt()
   @Min(1)
-  khoa_id?: number;
+  so_luong_du_kien: number;
 
   @IsOptional()
   @Type(() => Date)
@@ -194,29 +231,18 @@ export class CreateScheduleDto {
   tg_mo_dang_ky_den?: Date;
 
   @IsOptional()
-  @Type(() => Date)
-  @IsDate()
-  tg_dien_ra_tu?: Date;
-
-  @IsOptional()
-  @Type(() => Date)
-  @IsDate()
-  tg_dien_ra_den?: Date;
-
-  @IsOptional()
-  @Type(() => Date)
-  @IsDate()
-  han_chot_nop_bao_cao?: Date;
-
-  @IsOptional()
-  @Type(() => Date)
-  @IsDate()
-  han_chot_diem?: Date;
-
-  @IsOptional()
   @IsString()
   @IsIn(['Nhap', 'MoDangKy', 'DangDienRa', 'DaKetThuc', 'DaKhoa'])
   trang_thai?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  chuyen_tham_quan_ids?: number[];
+
+  @IsOptional()
+  @IsBoolean()
+  isSubmit?: boolean;
 }
 
 export class ImportStudentsDto {
@@ -231,47 +257,53 @@ export class ImportStudentsDto {
   studentIds: number[];
 }
 
+// (v6) lich_kien_tap_id nay optional (nullable)
 export class CreateTripDto {
-  @IsInt()
-  @Min(1)
+  @IsInt({ message: 'Nhà máy không hợp lệ' })
+  @Min(1, { message: 'Nhà máy không hợp lệ' })
   nha_may_id: number;
 
-  @IsInt()
-  @Min(1)
-  lich_kien_tap_id: number;
+  @IsOptional()
+  @IsInt({ message: 'Lịch kiến tập không hợp lệ' })
+  @Min(1, { message: 'Lịch kiến tập không hợp lệ' })
+  lich_kien_tap_id?: number;
 
   @Type(() => Date)
-  @IsDate()
+  @IsDate({ message: 'Ngày tham quan không hợp lệ' })
   ngay_tham_quan: Date;
 
-  @IsString()
+  @IsString({ message: 'Giờ bắt đầu phải là chuỗi' })
   @Matches(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/, {
     message: 'Giờ bắt đầu phải theo định dạng HH:mm',
   })
   gio_bat_dau: string;
 
-  @IsString()
-  @Matches(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/, {
-    message: 'Giờ kết thúc phải theo định dạng HH:mm',
-  })
-  gio_ket_thuc: string;
 
-  @IsString()
-  @IsIn(['TrucTiep', 'TrucTuyen'])
+  @IsString({ message: 'Hình thức không hợp lệ' })
+  @IsIn(['TrucTiep', 'TrucTuyen'], { message: 'Hình thức phải là TrucTiep hoặc TrucTuyen' })
   hinh_thuc: string;
 
   @IsOptional()
-  @IsString()
-  @IsIn(['DoKhoaToChuc', 'TuDo'])
+  @IsString({ message: 'Cách tổ chức không hợp lệ' })
+  @IsIn(['DoKhoaToChuc', 'TuDo'], { message: 'Cách tổ chức phải là DoKhoaToChuc hoặc TuDo' })
   cach_to_chuc?: string;
 
-  @IsInt()
-  @Min(1)
+  @IsInt({ message: 'Sức chứa phải là số' })
+  @Min(1, { message: 'Sức chứa tối thiểu là 1' })
   suc_chua: number;
 
   @IsOptional()
-  @IsString()
-  @IsIn(['Nhap', 'MoDangKy', 'DaChotDanhSach', 'DaDienRa', 'DaHuy'])
+  @IsInt({ message: 'Lệ phí phải là số nguyên' })
+  @Min(0, { message: 'Lệ phí không được âm' })
+  le_phi?: number;
+
+  @IsOptional()
+  @IsString({ message: 'Địa điểm tập trung phải là chuỗi' })
+  dia_diem_tap_trung?: string;
+
+  @IsOptional()
+  @IsString({ message: 'Trạng thái không hợp lệ' })
+  @IsIn(['Nhap', 'ChoDuyet', 'DaDuyet', 'MoDangKy', 'DaChotDanhSach', 'DaDienRa', 'DaHuy'], { message: 'Trạng thái phải thuộc danh sách hợp lệ' })
   trang_thai?: string;
 }
 
@@ -399,6 +431,7 @@ export class ApproveRefundDto {
   isApproved: boolean;
 }
 
+// (v11) khoa_id → khoa_hoc_id
 export class CreateKhoaNotificationDto {
   @IsString()
   @IsNotEmpty({ message: 'Tiêu đề thông báo không được để trống' })
@@ -415,7 +448,7 @@ export class CreateKhoaNotificationDto {
   @IsOptional()
   @IsInt()
   @Min(1)
-  khoa_id?: number;
+  khoa_hoc_id?: number;
 
   @IsOptional()
   @IsString()
@@ -483,6 +516,10 @@ export class GetRegistrationsQueryDto {
   @IsInt()
   @Min(1)
   chuyenThamQuanId?: number;
+
+  @IsOptional()
+  @IsString()
+  hasCancelRequest?: string;
 }
 
 export class GetRefundRequestsQueryDto {
@@ -527,6 +564,7 @@ export class GetEnrollmentsQueryDto {
   lichKienTapId?: number;
 }
 
+// (v11) khoa_id → khoa_hoc_id, ten_khoa → ten_khoa_hoc
 export class CreateStudentDto {
   @IsString()
   @IsNotEmpty({ message: 'MSSV không được để trống' })
@@ -550,11 +588,11 @@ export class CreateStudentDto {
 
   @IsOptional()
   @IsInt()
-  khoa_id?: number;
+  khoa_hoc_id?: number;
 
   @IsOptional()
   @IsString()
-  ten_khoa?: string;
+  ten_khoa_hoc?: string;
 }
 
 export class UpdateStudentDto {
@@ -563,7 +601,7 @@ export class UpdateStudentDto {
   @IsOptional() @IsString() email?: string;
   @IsOptional() @IsString() sdt?: string;
   @IsOptional() @IsString() ten_lop?: string;
-  @IsOptional() @IsString() ten_khoa?: string;
+  @IsOptional() @IsString() ten_khoa_hoc?: string;
 }
 
 export class GetAccountsQueryDto {

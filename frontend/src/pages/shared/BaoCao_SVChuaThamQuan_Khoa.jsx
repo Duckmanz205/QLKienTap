@@ -124,7 +124,7 @@ export default function BaoCao_SVChuaThamQuan_Khoa() {
     let csvContent = '\uFEFF';
     csvContent += 'STT,MSSV,Họ và tên,Lớp,Khóa,Trạng thái\n';
     filteredStudents.forEach((s, idx) => {
-      csvContent += `"${idx + 1}","${s.mssv}","${s.ho_ten}","${s.lop || s.ten_lop || ''}","${s.khoa?.ten_khoa || ''}","Chưa tham quan"\n`;
+      csvContent += `"${idx + 1}","${s.mssv}","${s.ho_ten}","${s.lop || s.ten_lop || ''}","${s.khoaHoc?.ten_khoa_hoc || ''}","Chưa tham quan"\n`;
     });
     
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -313,7 +313,7 @@ export default function BaoCao_SVChuaThamQuan_Khoa() {
                     <td className="p-4 font-mono font-bold text-slate-800">{s.mssv}</td>
                     <td className="p-4 font-bold text-slate-800">{s.ho_ten}</td>
                     <td className="p-4 font-medium text-slate-600">{s.lop || s.ten_lop}</td>
-                    <td className="p-4 font-medium text-slate-600">{s.khoa?.ten_khoa}</td>
+                    <td className="p-4 font-medium text-slate-600">{s.khoaHoc?.ten_khoa_hoc}</td>
                     <td className="p-4">
                       <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
                         Chưa tham quan

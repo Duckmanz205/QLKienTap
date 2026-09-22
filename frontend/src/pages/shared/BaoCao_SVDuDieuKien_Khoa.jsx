@@ -103,7 +103,7 @@ export default function BaoCao_SVDuDieuKien_Khoa() {
     let csvContent = '\uFEFF';
     csvContent += 'STT,MSSV,Họ và tên,Lớp,Khóa,Đã đóng phí,Đã tham quan,Trạng thái\n';
     filteredStudents.forEach((s, idx) => {
-      csvContent += `"${idx + 1}","${s.mssv}","${s.ho_ten}","${s.lop || s.ten_lop || ''}","${s.khoa?.ten_khoa || ''}","Có","Có","Đủ điều kiện"\n`;
+      csvContent += `"${idx + 1}","${s.mssv}","${s.ho_ten}","${s.lop || s.ten_lop || ''}","${s.khoaHoc?.ten_khoa_hoc || ''}","Có","Có","Đủ điều kiện"\n`;
     });
     
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });

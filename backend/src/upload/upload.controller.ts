@@ -76,11 +76,11 @@ export class UploadController {
       where: {
         giang_vien_id: gv.id,
         trang_thai: 'DangHoatDong',
-        lichKienTapSinhVien: {
+        dotKienTapSinhVien: {
           sinh_vien_id: sv.id,
         },
       },
-      relations: { lichKienTapSinhVien: true },
+      relations: { dotKienTapSinhVien: true },
     });
 
     return !!assignment;

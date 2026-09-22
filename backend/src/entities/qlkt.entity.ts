@@ -8,6 +8,30 @@ import {
   OneToOne,
 } from 'typeorm';
 
+@Entity('TaiKhoanThuHuong')
+export class TaiKhoanThuHuong {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @Column({ length: 20 })
+  ma_ngan_hang: string; // Mã BIN của VietQR (vd: 970436 cho Vietcombank)
+
+  @Column({ length: 100 })
+  ten_ngan_hang: string; // Tên hiển thị (vd: Vietcombank)
+
+  @Column({ length: 50 })
+  so_tai_khoan: string;
+
+  @Column({ length: 100 })
+  ten_chu_tai_khoan: string; // Tên in hoa không dấu
+
+  @Column({ length: 255, nullable: true })
+  ghi_chu: string;
+
+  @Column({ length: 20, default: 'HoatDong' })
+  trang_thai: string; // 'HoatDong' | 'NgungSuDung'
+}
+
 @Entity('NamHoc')
 export class NamHoc {
   @PrimaryGeneratedColumn()
@@ -45,19 +69,36 @@ export class HocKy {
   ngay_ket_thuc: Date;
 }
 
-@Entity('Khoa')
-export class Khoa {
+// (v11) Đổi tên từ Khoa → KhoaHoc để tránh nhầm lẫn với vai trò QuanLyKhoa
+@Entity('KhoaHoc')
+export class KhoaHoc {
   @PrimaryGeneratedColumn()
   id: number;
 
   @Column({ unique: true, nullable: true })
-  ma_khoa: string;
+  ma_khoa_hoc: string;
 
   @Column({ unique: true })
-  ten_khoa: string;
+  ten_khoa_hoc: string;
 
   @Column()
   nam_nhap_hoc: number;
+}
+
+// (v8) Bảng tra cứu vai trò — thay thế enum chuỗi trên TaiKhoan.vai_tro
+@Entity('VaiTro')
+export class VaiTro {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @Column({ unique: true })
+  ma_vai_tro: string; // 'QuanLyKhoa' | 'QuanLyCLB' | 'GiangVien' | 'SinhVien' | 'QuanTriVienHeThong'
+
+  @Column()
+  ten_vai_tro: string;
+
+  @Column({ nullable: true })
+  mo_ta: string;
 }
 
 @Entity('TaiKhoan')
@@ -71,8 +112,13 @@ export class TaiKhoan {
   @Column()
   mat_khau_hash: string;
 
+  // (v8) FK vào bảng VaiTro thay vì enum chuỗi
+  @ManyToOne(() => VaiTro)
+  @JoinColumn({ name: 'vai_tro_id' })
+  vaiTro: VaiTro;
+
   @Column()
-  vai_tro: string; // 'QuanLyKhoa' | 'QuanLyCLB' | 'GiangVien' | 'SinhVien'
+  vai_tro_id: number;
 
   @Column({ default: 'HoatDong' })
   trang_thai: string; // 'HoatDong' | 'KhoaTaiKhoan'
@@ -105,12 +151,13 @@ export class SinhVien {
   @Column()
   taikhoan_id: number;
 
-  @ManyToOne(() => Khoa)
-  @JoinColumn({ name: 'khoa_id' })
-  khoa: Khoa;
+  // (v11) khoa_id → khoa_hoc_id
+  @ManyToOne(() => KhoaHoc)
+  @JoinColumn({ name: 'khoa_hoc_id' })
+  khoaHoc: KhoaHoc;
 
   @Column()
-  khoa_id: number;
+  khoa_hoc_id: number;
 
   @Column({ nullable: true })
   ten_lop: string;
@@ -156,6 +203,7 @@ export class GiangVien {
   so_sv_toi_da_huong_dan: number;
 }
 
+// (v10) Thêm nguoi_lien_he/sdt_lien_he
 @Entity('NhaMay')
 export class NhaMay {
   @PrimaryGeneratedColumn()
@@ -170,6 +218,12 @@ export class NhaMay {
   @Column({ nullable: true })
   nhom_nganh: string;
 
+  @Column({ nullable: true })
+  nguoi_lien_he: string;
+
+  @Column({ nullable: true })
+  sdt_lien_he: string;
+
   @Column({ default: true })
   ho_tro_truc_tiep: boolean;
 
@@ -180,6 +234,46 @@ export class NhaMay {
   trang_thai: string; // 'HoatDong' | 'NgungHopTac'
 }
 
+// (v7) Hệ thống phân quyền
+@Entity('Quyen')
+export class Quyen {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @Column({ unique: true })
+  ma_quyen: string;
+
+  @Column()
+  ten_quyen: string;
+
+  @Column()
+  nhom_chuc_nang: string;
+
+  @Column({ nullable: true })
+  mo_ta: string;
+}
+
+@Entity('VaiTro_Quyen')
+export class VaiTro_Quyen {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @ManyToOne(() => VaiTro)
+  @JoinColumn({ name: 'vai_tro_id' })
+  vaiTro: VaiTro;
+
+  @Column()
+  vai_tro_id: number;
+
+  @ManyToOne(() => Quyen)
+  @JoinColumn({ name: 'quyen_id' })
+  quyen: Quyen;
+
+  @Column()
+  quyen_id: number;
+}
+
+// (v13) Bảng ThongBaoDaDoc đã bị XÓA — chuyển sang mô hình newsfeed
 @Entity('ThongBao')
 export class ThongBao {
   @PrimaryGeneratedColumn()
@@ -198,12 +292,13 @@ export class ThongBao {
   @Column()
   nguoi_gui_id: number;
 
-  @ManyToOne(() => Khoa, { nullable: true })
-  @JoinColumn({ name: 'khoa_id' })
-  khoa: Khoa;
+  // (v11) khoa_id → khoa_hoc_id
+  @ManyToOne(() => KhoaHoc, { nullable: true })
+  @JoinColumn({ name: 'khoa_hoc_id' })
+  khoaHoc: KhoaHoc;
 
   @Column({ nullable: true })
-  khoa_id: number;
+  khoa_hoc_id: number;
 
   @Column({ type: 'datetime2', default: () => 'SYSDATETIME()' })
   ngay_gui: Date;
@@ -211,8 +306,9 @@ export class ThongBao {
   @Column({ default: false })
   da_chinh_sua: boolean;
 
-  @Column({ nullable: true })
-  doi_tuong_nhan: string;
+  // (v6) Thêm ngay_chinh_sua
+  @Column({ type: 'datetime2', nullable: true })
+  ngay_chinh_sua: Date;
 }
 
 @Entity('ThongBaoFile')
@@ -237,60 +333,7 @@ export class ThongBaoFile {
   dung_luong_kb: number;
 }
 
-@Entity('ThongBaoDaDoc')
-export class ThongBaoDaDoc {
-  @PrimaryGeneratedColumn()
-  id: number;
-
-  @ManyToOne(() => ThongBao)
-  @JoinColumn({ name: 'thongbao_id' })
-  thongBao: ThongBao;
-
-  @Column()
-  thongbao_id: number;
-
-  @ManyToOne(() => TaiKhoan)
-  @JoinColumn({ name: 'taikhoan_id' })
-  taiKhoan: TaiKhoan;
-
-  @Column()
-  taikhoan_id: number;
-
-  @Column({ type: 'datetime2', default: () => 'SYSDATETIME()' })
-  ngay_doc: Date;
-}
-
-@Entity('NhacNho')
-export class NhacNho {
-  @PrimaryGeneratedColumn()
-  id: number;
-
-  @ManyToOne(() => TaiKhoan)
-  @JoinColumn({ name: 'taikhoan_id' })
-  taiKhoan: TaiKhoan;
-
-  @Column()
-  taikhoan_id: number;
-
-  @Column()
-  loai: string; // 'HanNopBaoCao' | 'HanDongPhi' | 'HanBaoLuu18Thang' | ...
-
-  @Column()
-  noi_dung: string;
-
-  @Column({ nullable: true })
-  doi_tuong_id: number;
-
-  @Column({ type: 'datetime2' })
-  ngay_du_kien_gui: Date;
-
-  @Column({ default: false })
-  da_gui: boolean;
-
-  @Column({ type: 'datetime2', nullable: true })
-  ngay_gui_thuc_te: Date;
-}
-
+// (v6) DotKienTap thêm khoa_hoc_id
 @Entity('DotKienTap')
 export class DotKienTap {
   @PrimaryGeneratedColumn()
@@ -306,6 +349,14 @@ export class DotKienTap {
   @Column()
   hoc_ky_id: number;
 
+  // (v6) Khóa sinh viên áp dụng
+  @ManyToOne(() => KhoaHoc)
+  @JoinColumn({ name: 'khoa_hoc_id' })
+  khoaHoc: KhoaHoc;
+
+  @Column()
+  khoa_hoc_id: number;
+
   @Column({ type: 'date' })
   ngay_bat_dau: Date;
 
@@ -316,6 +367,8 @@ export class DotKienTap {
   trang_thai: string; // 'Nhap' | 'DangTrienKhai' | 'DaKetThuc' | 'DaKhoa' | 'DaHuy'
 }
 
+// (v12) Bỏ tg_dien_ra_tu/den, han_chot_nop_bao_cao, han_chot_diem
+// (v6) Bỏ khoa_id. Thêm so_luong_du_kien
 @Entity('LichKienTap')
 export class LichKienTap {
   @PrimaryGeneratedColumn()
@@ -328,33 +381,17 @@ export class LichKienTap {
   @Column()
   dot_kien_tap_id: number;
 
-  @ManyToOne(() => Khoa)
-  @JoinColumn({ name: 'khoa_id' })
-  khoa: Khoa;
-
-  @Column()
-  khoa_id: number;
-
   @Column()
   ten_lich: string;
+
+  @Column()
+  so_luong_du_kien: number;
 
   @Column({ type: 'datetime2' })
   tg_mo_dang_ky_tu: Date;
 
   @Column({ type: 'datetime2' })
   tg_mo_dang_ky_den: Date;
-
-  @Column({ type: 'date' })
-  tg_dien_ra_tu: Date;
-
-  @Column({ type: 'date' })
-  tg_dien_ra_den: Date;
-
-  @Column({ type: 'datetime2' })
-  han_chot_nop_bao_cao: Date;
-
-  @Column({ type: 'datetime2' })
-  han_chot_diem: Date;
 
   @Column({ nullable: true })
   ly_do_tu_choi: string;
@@ -363,17 +400,17 @@ export class LichKienTap {
   trang_thai: string; // 'Nhap' | 'ChoDuyet' | 'DaDuyet' | 'TuChoi' | 'MoDangKy' | 'DangDienRa' | 'DaKetThuc' | 'DaKhoa'
 }
 
-@Entity('LichKienTap_SinhVien')
-export class LichKienTap_SinhVien {
+@Entity('DotKienTap_SinhVien')
+export class DotKienTap_SinhVien {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => LichKienTap)
-  @JoinColumn({ name: 'lich_kien_tap_id' })
-  lichKienTap: LichKienTap;
+  @ManyToOne(() => DotKienTap)
+  @JoinColumn({ name: 'dot_kien_tap_id' })
+  dotKienTap: DotKienTap;
 
   @Column()
-  lich_kien_tap_id: number;
+  dot_kien_tap_id: number;
 
   @ManyToOne(() => SinhVien)
   @JoinColumn({ name: 'sinh_vien_id' })
@@ -392,6 +429,7 @@ export class LichKienTap_SinhVien {
   ngay_them: Date;
 }
 
+// (v6) lich_kien_tap_id nay là nullable
 @Entity('ChuyenThamQuan')
 export class ChuyenThamQuan {
   @PrimaryGeneratedColumn()
@@ -404,23 +442,20 @@ export class ChuyenThamQuan {
   @Column()
   nha_may_id: number;
 
-  @ManyToOne(() => LichKienTap)
+  @ManyToOne(() => LichKienTap, { nullable: true })
   @JoinColumn({ name: 'lich_kien_tap_id' })
   lichKienTap: LichKienTap;
 
-  @Column()
+  @Column({ nullable: true })
   lich_kien_tap_id: number;
 
   @Column({ type: 'date' })
   ngay_tham_quan: Date;
 
-  @Column({ type: 'time' })
+  @Column({ type: 'time', name: 'gio_bat_dau' })
   gio_bat_dau: string;
 
-  @Column({ type: 'time' })
-  gio_ket_thuc: string;
-
-  @Column()
+  @Column({ type: 'nvarchar', length: 15, name: 'hinh_thuc' })
   hinh_thuc: string; // 'TrucTiep' | 'TrucTuyen'
 
   @Column({ default: 'DoKhoaToChuc' })
@@ -435,13 +470,13 @@ export class ChuyenThamQuan {
   @Column({ nullable: true })
   dia_diem_tap_trung: string;
 
-  @Column({ default: 'Nhap' })
-  trang_thai: string; // 'Nhap' | 'MoDangKy' | 'DaChotDanhSach' | 'DaDienRa' | 'DaHuy'
-
+  @Column({ length: 50, default: 'Nhap' })
+  trang_thai: string; // 'Nhap' | 'ChoDuyet' | 'DaDuyet' | 'MoDangKy' | 'DaChotDanhSach' | 'DaDienRa' | 'DaHuy'
 }
 
-@Entity('ChuyenThamQuan_GiangVienDanDoan')
-export class ChuyenThamQuan_GiangVienDanDoan {
+// (v11) Đổi tên từ ChuyenThamQuan_GiangVienDanDoan → PhanCongGiangVienDanDoan
+@Entity('PhanCongGiangVienDanDoan')
+export class PhanCongGiangVienDanDoan {
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -463,75 +498,10 @@ export class ChuyenThamQuan_GiangVienDanDoan {
   la_truong_doan: boolean;
 }
 
-@Entity('PhieuDangKy')
-export class PhieuDangKy {
-  @PrimaryGeneratedColumn()
-  id: number;
-
-  @ManyToOne(() => SinhVien)
-  @JoinColumn({ name: 'sinh_vien_id' })
-  sinhVien: SinhVien;
-
-  @Column()
-  sinh_vien_id: number;
-
-  @ManyToOne(() => ChuyenThamQuan)
-  @JoinColumn({ name: 'chuyen_tham_quan_id' })
-  chuyenThamQuan: ChuyenThamQuan;
-
-  @Column()
-  chuyen_tham_quan_id: number;
-
-  @Column({ type: 'datetime2', default: () => 'SYSDATETIME()' })
-  ngay_dang_ky: Date;
-
-  @Column({ default: 'ChoDuyet' })
-  trang_thai: string; // 'ChoDuyet' | 'HopLe' | 'BiLoai' | 'DaHuy'
-
-  @OneToOne(() => PhieuThamQuan, (p) => p.phieuDangKy)
-  phieuThamQuan: any;
-
-  @OneToOne(() => YeuCauHuyDangKy, (y) => y.phieuDangKy)
-  yeuCauHuy: any;
-
-  @OneToOne(() => HoaDonLePhi, (h) => h.phieuDangKy)
-  hoaDon: any;
-}
-
-@Entity('PhieuThamQuan')
-export class PhieuThamQuan {
-  @PrimaryGeneratedColumn()
-  id: number;
-
-  @OneToOne(() => PhieuDangKy, (p) => p.phieuThamQuan)
-  @JoinColumn({ name: 'phieu_dang_ky_id' })
-  phieuDangKy: PhieuDangKy;
-
-  @Column()
-  phieu_dang_ky_id: number;
-
-  @Column({ type: 'datetime2', default: () => 'SYSDATETIME()' })
-  ngay_cap: Date;
-
-  @Column({ default: 'HopLe' })
-  trang_thai: string; // 'HopLe' | 'DaHuy'
-
-  @ManyToOne(() => TaiKhoan, { nullable: true })
-  @JoinColumn({ name: 'nguoi_cap_id' })
-  nguoiCap: TaiKhoan;
-
-  @Column({ nullable: true })
-  nguoi_cap_id: number;
-
-  @OneToOne(() => BaiThuHoach, (b) => b.phieuThamQuan)
-  baiThuHoach: any;
-
-  @OneToOne(() => DiemPhieuThamQuan, (d) => d.phieuThamQuan)
-  diemPhieuThamQuan: any;
-}
-
-@Entity('DeXuatChuyenThamQuan')
-export class DeXuatChuyenThamQuan {
+// (v7) Đổi tên từ DeXuatChuyenThamQuan → PhieuDeXuatChuyenThamQuan
+// (v9) Bỏ nguoi_duyet_id
+@Entity('PhieuDeXuatChuyenThamQuan')
+export class PhieuDeXuatChuyenThamQuan {
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -571,13 +541,10 @@ export class DeXuatChuyenThamQuan {
   @Column({ type: 'date' })
   ngay_tham_quan_de_xuat: Date;
 
-  @Column({ type: 'time' })
+  @Column({ type: 'time', name: 'gio_bat_dau_de_xuat' })
   gio_bat_dau_de_xuat: string;
 
-  @Column({ type: 'time' })
-  gio_ket_thuc_de_xuat: string;
-
-  @Column()
+  @Column({ type: 'nvarchar', length: 15, name: 'hinh_thuc' })
   hinh_thuc: string; // 'TrucTiep' | 'TrucTuyen'
 
   @Column({ type: 'datetime2', default: () => 'SYSDATETIME()' })
@@ -585,13 +552,6 @@ export class DeXuatChuyenThamQuan {
 
   @Column({ default: 'ChoDuyet' })
   trang_thai_duyet: string; // 'ChoDuyet' | 'DaDuyet' | 'TuChoi'
-
-  @ManyToOne(() => TaiKhoan, { nullable: true })
-  @JoinColumn({ name: 'nguoi_duyet_id' })
-  nguoiDuyet: TaiKhoan;
-
-  @Column({ nullable: true })
-  nguoi_duyet_id: number;
 
   @Column({ type: 'datetime2', nullable: true })
   ngay_duyet: Date;
@@ -604,6 +564,80 @@ export class DeXuatChuyenThamQuan {
   chuyen_tham_quan_id: number;
 }
 
+@Entity('PhieuDangKy')
+export class PhieuDangKy {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @ManyToOne(() => SinhVien)
+  @JoinColumn({ name: 'sinh_vien_id' })
+  sinhVien: SinhVien;
+
+  @Column()
+  sinh_vien_id: number;
+
+  @ManyToOne(() => ChuyenThamQuan)
+  @JoinColumn({ name: 'chuyen_tham_quan_id' })
+  chuyenThamQuan: ChuyenThamQuan;
+
+  @Column()
+  chuyen_tham_quan_id: number;
+
+  @Column({ type: 'datetime2', default: () => 'SYSDATETIME()' })
+  ngay_dang_ky: Date;
+
+  @Column({ default: 'ChoDuyet' })
+  trang_thai: string; // 'ChoDuyet' | 'HopLe' | 'BiLoai' | 'DaHuy'
+
+  @OneToOne(() => PhieuThamQuan, (p) => p.phieuDangKy)
+  phieuThamQuan: any;
+
+  @OneToOne(() => YeuCauHuyDangKy, (y) => y.phieuDangKy)
+  yeuCauHuy: any;
+
+  @OneToOne(() => HoaDonLePhi, (h) => h.phieuDangKy)
+  hoaDon: any;
+}
+
+// (v9) Bỏ nguoi_cap_id
+// (v11) Thêm bo_chuyen_bao_cao_id (gộp từ BoChuyenBaoCao_Chuyen)
+// (v12) Thêm han_nop_bao_cao
+@Entity('PhieuThamQuan')
+export class PhieuThamQuan {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @OneToOne(() => PhieuDangKy, (p) => p.phieuThamQuan)
+  @JoinColumn({ name: 'phieu_dang_ky_id' })
+  phieuDangKy: PhieuDangKy;
+
+  @Column()
+  phieu_dang_ky_id: number;
+
+  @Column({ type: 'datetime2', default: () => 'SYSDATETIME()' })
+  ngay_cap: Date;
+
+  @Column({ default: 'HopLe' })
+  trang_thai: string; // 'HopLe' | 'DaHuy'
+
+  @ManyToOne(() => BoChuyenBaoCao, { nullable: true })
+  @JoinColumn({ name: 'bo_chuyen_bao_cao_id' })
+  boChuyenBaoCao: any;
+
+  @Column({ nullable: true })
+  bo_chuyen_bao_cao_id: number;
+
+  @Column({ type: 'datetime2', nullable: true })
+  han_nop_bao_cao: Date;
+
+  @OneToOne(() => BaiThuHoach, (b) => b.phieuThamQuan)
+  baiThuHoach: any;
+
+  @OneToOne(() => DiemPhieuThamQuan, (d) => d.phieuThamQuan)
+  diemPhieuThamQuan: any;
+}
+
+// (v9) Bỏ nguoi_duyet_id
 @Entity('YeuCauHuyDangKy')
 export class YeuCauHuyDangKy {
   @PrimaryGeneratedColumn()
@@ -627,13 +661,6 @@ export class YeuCauHuyDangKy {
 
   @Column({ default: 'ChoDuyet' })
   trang_thai_duyet: string; // 'ChoDuyet' | 'DaDuyet' | 'TuChoi'
-
-  @ManyToOne(() => TaiKhoan, { nullable: true })
-  @JoinColumn({ name: 'nguoi_duyet_id' })
-  nguoiDuyet: TaiKhoan;
-
-  @Column({ nullable: true })
-  nguoi_duyet_id: number;
 
   @Column({ type: 'datetime2', nullable: true })
   ngay_duyet: Date;
@@ -702,6 +729,7 @@ export class HoaDonLePhi {
   trang_thai: string; // 'ChuaDong' | 'DaDongDungHan' | 'ViPham' | 'DaHoanPhi'
 }
 
+// (v9) Bỏ nguoi_xu_ly_id
 @Entity('DonHoanPhi')
 export class DonHoanPhi {
   @PrimaryGeneratedColumn()
@@ -723,13 +751,6 @@ export class DonHoanPhi {
   @Column({ default: 'ChoXuLy' })
   trang_thai: string; // 'ChoXuLy' | 'DaHoanTien' | 'TuChoi'
 
-  @ManyToOne(() => TaiKhoan, { nullable: true })
-  @JoinColumn({ name: 'nguoi_xu_ly_id' })
-  nguoiXuLy: TaiKhoan;
-
-  @Column({ nullable: true })
-  nguoi_xu_ly_id: number;
-
   @Column({ type: 'datetime2', nullable: true })
   ngay_xu_ly: Date;
 }
@@ -739,12 +760,12 @@ export class PhanCongGVHD {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => LichKienTap_SinhVien)
-  @JoinColumn({ name: 'lich_kien_tap_sinh_vien_id' })
-  lichKienTapSinhVien: LichKienTap_SinhVien;
+  @ManyToOne(() => DotKienTap_SinhVien)
+  @JoinColumn({ name: 'dot_kien_tap_sinh_vien_id' })
+  dotKienTapSinhVien: DotKienTap_SinhVien;
 
   @Column()
-  lich_kien_tap_sinh_vien_id: number;
+  dot_kien_tap_sinh_vien_id: number;
 
   @ManyToOne(() => GiangVien)
   @JoinColumn({ name: 'giang_vien_id' })
@@ -794,8 +815,6 @@ export class BaiThuHoach {
   @PrimaryGeneratedColumn()
   id: number;
 
-
-
   @Column()
   phieu_tham_quan_id: number;
 
@@ -817,90 +836,6 @@ export class BaiThuHoach {
   @OneToOne(() => PhieuThamQuan, (p) => p.baiThuHoach)
   @JoinColumn({ name: 'phieu_tham_quan_id' })
   phieuThamQuan: PhieuThamQuan;
-}
-
-@Entity('DiemChuanBi')
-export class DiemChuanBi {
-  @PrimaryGeneratedColumn()
-  id: number;
-
-  @OneToOne(() => PhieuThamQuan)
-  @JoinColumn({ name: 'phieu_tham_quan_id' })
-  phieuThamQuan: PhieuThamQuan;
-
-  @Column()
-  phieu_tham_quan_id: number;
-
-  @ManyToOne(() => GiangVien)
-  @JoinColumn({ name: 'giang_vien_dan_doan_id' })
-  giangVienDanDoan: GiangVien;
-
-  @Column()
-  giang_vien_dan_doan_id: number;
-
-  @Column({ type: 'decimal', precision: 4, scale: 2 })
-  diem_chuan_bi: number;
-
-  @Column({ type: 'datetime2', default: () => 'SYSDATETIME()' })
-  ngay_cham: Date;
-}
-
-@Entity('NhatKyDiemCong')
-export class NhatKyDiemCong {
-  @PrimaryGeneratedColumn()
-  id: number;
-
-  @ManyToOne(() => PhieuThamQuan)
-  @JoinColumn({ name: 'phieu_tham_quan_id' })
-  phieuThamQuan: PhieuThamQuan;
-
-  @Column()
-  phieu_tham_quan_id: number;
-
-  @Column({ type: 'decimal', precision: 3, scale: 2, default: 0.5 })
-  diem: number;
-
-  @ManyToOne(() => GiangVien)
-  @JoinColumn({ name: 'giang_vien_ghi_nhan_id' })
-  giangVienGhiNhan: GiangVien;
-
-  @Column()
-  giang_vien_ghi_nhan_id: number;
-
-  @Column({ type: 'datetime2', default: () => 'SYSDATETIME()' })
-  ngay_ghi_nhan: Date;
-}
-
-@Entity('DiemBaiThuHoach')
-export class DiemBaiThuHoach {
-  @PrimaryGeneratedColumn()
-  id: number;
-
-  @OneToOne(() => PhieuThamQuan)
-  @JoinColumn({ name: 'phieu_tham_quan_id' })
-  phieuThamQuan: PhieuThamQuan;
-
-  @Column()
-  phieu_tham_quan_id: number;
-
-  @ManyToOne(() => GiangVien)
-  @JoinColumn({ name: 'giang_vien_hd_id' })
-  giangVienHD: GiangVien;
-
-  @Column()
-  giang_vien_hd_id: number;
-
-  @Column({ type: 'decimal', precision: 4, scale: 2, nullable: true })
-  diem_ai_de_xuat: number | null;
-
-  @Column({ type: 'decimal', precision: 4, scale: 2 })
-  diem_chinh_thuc: number;
-
-  @Column({ type: 'nvarchar', length: 'MAX', nullable: true })
-  nhan_xet: string;
-
-  @Column({ type: 'datetime2', default: () => 'SYSDATETIME()' })
-  ngay_cham: Date;
 }
 
 @Entity('HoiDongChamBaoCao')
@@ -974,6 +909,8 @@ export class DiemHoiDong_ChiTiet {
   ngay_cham: Date;
 }
 
+// (v10) "Phiếu điểm" — gộp DiemChuanBi + DiemBaiThuHoach + NhatKyDiemCong
+// vào một bảng duy nhất. Dòng được tự động tạo bởi trigger khi PhieuThamQuan được cấp.
 @Entity('DiemPhieuThamQuan')
 export class DiemPhieuThamQuan {
   @PrimaryGeneratedColumn()
@@ -986,15 +923,45 @@ export class DiemPhieuThamQuan {
   @Column()
   phieu_tham_quan_id: number;
 
-  @Column({ type: 'decimal', precision: 4, scale: 2, nullable: true })
-  diem_chuan_bi_final: number;
+  // Điểm chuẩn bị (30%) — GVDĐ chấm (gộp từ DiemChuanBi cũ)
+  @ManyToOne(() => GiangVien, { nullable: true })
+  @JoinColumn({ name: 'giang_vien_dan_doan_id' })
+  giangVienDanDoan: GiangVien;
+
+  @Column({ nullable: true })
+  giang_vien_dan_doan_id: number;
 
   @Column({ type: 'decimal', precision: 4, scale: 2, nullable: true })
-  diem_thu_hoach_final: number;
+  diem_chuan_bi: number;
 
+  @Column({ type: 'datetime2', nullable: true })
+  ngay_cham_chuan_bi: Date;
+
+  // Điểm bài thu hoạch (30%) — GVHD chấm (gộp từ DiemBaiThuHoach cũ)
+  @ManyToOne(() => GiangVien, { nullable: true })
+  @JoinColumn({ name: 'giang_vien_hd_id' })
+  giangVienHD: GiangVien;
+
+  @Column({ nullable: true })
+  giang_vien_hd_id: number;
+
+  @Column({ type: 'decimal', precision: 4, scale: 2, nullable: true })
+  diem_ai_de_xuat: number;
+
+  @Column({ type: 'decimal', precision: 4, scale: 2, nullable: true })
+  diem_thu_hoach: number;
+
+  @Column({ type: 'nvarchar', length: 'MAX', nullable: true })
+  nhan_xet_thu_hoach: string;
+
+  @Column({ type: 'datetime2', nullable: true })
+  ngay_cham_thu_hoach: Date;
+
+  // Điểm hội đồng (40%) — tổng hợp từ DiemHoiDong_ChiTiet
   @Column({ type: 'decimal', precision: 4, scale: 2, nullable: true })
   diem_hoi_dong_final: number;
 
+  // Điểm cộng — GVDĐ UPDATE trực tiếp (thay cho NhatKyDiemCong cũ)
   @Column({ type: 'decimal', precision: 4, scale: 2, default: 0 })
   diem_cong_final: number;
 
@@ -1008,41 +975,22 @@ export class DiemPhieuThamQuan {
   ngay_khoa: Date;
 }
 
+// (v11) BoChuyenBaoCao_Chuyen đã bị XÓA — quan hệ gộp vào PhieuThamQuan.bo_chuyen_bao_cao_id
 @Entity('BoChuyenBaoCao')
 export class BoChuyenBaoCao {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @OneToOne(() => LichKienTap_SinhVien)
-  @JoinColumn({ name: 'lich_kien_tap_sinh_vien_id' })
-  lichKienTapSinhVien: LichKienTap_SinhVien;
+  @OneToOne(() => DotKienTap_SinhVien)
+  @JoinColumn({ name: 'dot_kien_tap_sinh_vien_id' })
+  dotKienTapSinhVien: DotKienTap_SinhVien;
 
   @Column()
-  lich_kien_tap_sinh_vien_id: number;
+  dot_kien_tap_sinh_vien_id: number;
 
   @Column({ type: 'datetime2', default: () => 'SYSDATETIME()' })
   ngay_chon: Date;
 
   @Column({ nullable: true })
   ghi_chu: string;
-}
-
-@Entity('BoChuyenBaoCao_Chuyen')
-export class BoChuyenBaoCao_Chuyen {
-  @PrimaryGeneratedColumn()
-  id: number;
-
-  @ManyToOne(() => BoChuyenBaoCao)
-  @JoinColumn({ name: 'bo_chuyen_bao_cao_id' })
-  boChuyenBaoCao: BoChuyenBaoCao;
-
-  @Column()
-  bo_chuyen_bao_cao_id: number;
-
-  @ManyToOne(() => PhieuThamQuan)
-  @JoinColumn({ name: 'phieu_tham_quan_id' })
-  phieuThamQuan: PhieuThamQuan;
-
-  @Column()
-  phieu_tham_quan_id: number;
 }

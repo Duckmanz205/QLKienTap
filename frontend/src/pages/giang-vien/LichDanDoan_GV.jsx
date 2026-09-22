@@ -204,7 +204,7 @@ export default function LichDanDoan_GV() {
                           <tr key={trip.id} className="hover:bg-slate-50 transition-colors">
                             <td className="p-4 pl-6 font-bold text-slate-800">{trip.nhaMay?.ten_nha_may || 'Chuyến tham quan'}</td>
                             <td className="p-4 font-medium text-slate-600">{dateText}</td>
-                            <td className="p-4 font-medium text-slate-600">{trip.gio_bat_dau ? trip.gio_bat_dau.slice(0, 5) : '--:--'} - {trip.gio_ket_thuc ? trip.gio_ket_thuc.slice(0, 5) : '--:--'}</td>
+                            <td className="p-4 font-medium text-slate-600">{trip.gio_bat_dau ? trip.gio_bat_dau.slice(0, 5) : '--:--'}</td>
                             <td className="p-4 text-center">
                               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shrink-0 ${
                                 isOnline ? 'bg-slate-100 text-slate-600' : 'bg-[#89B449]/10 text-[#407F3E]'
