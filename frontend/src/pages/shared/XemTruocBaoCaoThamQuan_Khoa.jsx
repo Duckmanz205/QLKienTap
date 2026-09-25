@@ -15,6 +15,10 @@ export default function XemTruocBaoCaoThamQuan_Khoa() {
     totalCompanies: 0, 
     attendanceRate: 0 
   });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [limit, setLimit] = useState(15);
+  const totalPages = Math.ceil(tripsData.length / limit) || 1;
+  const paginatedTrips = tripsData.slice((currentPage - 1) * limit, currentPage * limit);
 
   useEffect(() => {
     fetchData();
@@ -347,12 +351,12 @@ export default function XemTruocBaoCaoThamQuan_Khoa() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700 text-sm font-semibold print:divide-slate-300 print:text-black">
-                {tripsData.length === 0 && (
+                {paginatedTrips.length === 0 && (
                   <tr>
                     <td colSpan={6} className="px-6 py-8 text-center text-slate-400 font-medium">Không có dữ liệu chuyến tham quan</td>
                   </tr>
                 )}
-                {tripsData.map((trip, idx) => {
+                {paginatedTrips.map((trip, idx) => {
                   const rate = trip.registeredCount > 0 ? ((trip.actualCount / trip.registeredCount) * 100).toFixed(1) : 0;
                   return (
                     <tr key={trip.rawId} className="hover:bg-slate-50 transition-colors print:break-inside-avoid">
@@ -372,6 +376,61 @@ export default function XemTruocBaoCaoThamQuan_Khoa() {
                 })}
               </tbody>
             </table>
+          </div>
+
+          {/* Pagination Footer */}
+          <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4 print:hidden">
+            <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
+              <span>Hiển thị</span>
+              <select 
+                value={limit}
+                onChange={(e) => {
+                  const newLimit = Number(e.target.value);
+                  setLimit(newLimit);
+                  setCurrentPage(1);
+                }}
+                className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
+              >
+                <option value={15}>15</option>
+                <option value={30}>30</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+              <span>/ {tripsData.length} chuyến</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button 
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage(1)}
+                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Trang đầu
+              </button>
+              <button 
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Trước
+              </button>
+              <span className="px-4 py-1.5 rounded-lg bg-[#407F3E] text-white text-sm font-bold shadow-sm cursor-default mx-1">
+                Trang {currentPage} / {totalPages}
+              </span>
+              <button 
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Sau
+              </button>
+              <button 
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage(totalPages)}
+                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Trang cuối
+              </button>
+            </div>
           </div>
         </div>
       </div>

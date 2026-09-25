@@ -616,8 +616,8 @@ export default function LichKienTap_Khoa() {
         </div>
 
         {/* Pagination Section */}
-        <div className="px-6 py-4 border-t border-[#E7E0C4] flex items-center justify-between bg-white rounded-b-2xl">
-          <div className="flex items-center text-sm text-slate-600">
+        <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
             <span>Hiển thị</span>
             <select 
               value={itemsPerPage}
@@ -625,12 +625,12 @@ export default function LichKienTap_Khoa() {
                 setItemsPerPage(Number(e.target.value));
                 setCurrentPage(1);
               }}
-              className="mx-2 px-2 py-1 border border-[#E7E0C4] rounded-lg bg-white focus:outline-none focus:border-[#407F3E] cursor-pointer"
+              className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
             >
-              <option value={10}>10</option>
               <option value={15}>15</option>
-              <option value={20}>20</option>
+              <option value={30}>30</option>
               <option value={50}>50</option>
+              <option value={100}>100</option>
             </select>
             <span>/ {displayData.length} lịch kiến tập</span>
           </div>
@@ -639,31 +639,31 @@ export default function LichKienTap_Khoa() {
             <button 
               onClick={() => setCurrentPage(1)}
               disabled={currentPage === 1}
-              className="px-3 py-1.5 text-sm border border-[#E7E0C4] rounded-lg bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
             >
               Trang đầu
             </button>
             <button 
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="px-3 py-1.5 text-sm border border-[#E7E0C4] rounded-lg bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
             >
               Trước
             </button>
-            <div className="px-4 py-1.5 text-sm font-bold bg-[#407F3E] text-white rounded-lg shadow-sm">
+            <span className="px-4 py-1.5 rounded-lg bg-[#407F3E] text-white text-sm font-bold shadow-sm cursor-default mx-1">
               Trang {currentPage} / {totalPages}
-            </div>
+            </span>
             <button 
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              className="px-3 py-1.5 text-sm border border-[#E7E0C4] rounded-lg bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
             >
               Sau
             </button>
             <button 
               onClick={() => setCurrentPage(totalPages)}
               disabled={currentPage === totalPages}
-              className="px-3 py-1.5 text-sm border border-[#E7E0C4] rounded-lg bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
             >
               Trang cuối
             </button>
