@@ -1,12 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Bell, FileText, CheckCircle2, AlertTriangle, 
-  Paperclip, Clock, Trash2, Check
+  Paperclip, Clock, Trash2, Check, Search, ChevronDown
 } from 'lucide-react';
 import { giangVienApi } from '../../services/api';
 
 export default function ThongBao_GV() {
   const [activeFilter, setActiveFilter] = useState('all'); // 'all' or 'unread'
+  const [selectedType, setSelectedType] = useState('ALL');
+  const [searchTypeDropdown, setSearchTypeDropdown] = useState('');
+  const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [limit, setLimit] = useState(15);
+
   const [notifications, setNotifications] = useState([]);
   const [lecturer, setLecturer] = useState(null);
   const [dismissedIds, setDismissedIds] = useState([]);
@@ -60,9 +67,20 @@ export default function ThongBao_GV() {
 
   const visibleNotifications = notifications.filter(n => !dismissedIds.includes(n.id));
 
-  const filteredNotifications = visibleNotifications.filter(
-    n => activeFilter === 'all' || (activeFilter === 'unread' && !n.da_doc)
-  );
+  const filteredNotifications = useMemo(() => {
+    return visibleNotifications.filter(n => {
+      const q = searchQuery.toLowerCase();
+      const matchSearch = !searchQuery || 
+        (n.tieu_de && n.tieu_de.toLowerCase().includes(q)) ||
+        (n.noi_dung && n.noi_dung.toLowerCase().includes(q));
+      const matchFilter = activeFilter === 'all' || (activeFilter === 'unread' && !n.da_doc);
+      const matchType = selectedType === 'ALL' || n.loai_thong_bao === selectedType;
+      return matchSearch && matchFilter && matchType;
+    });
+  }, [visibleNotifications, searchQuery, activeFilter, selectedType]);
+
+  const totalPages = Math.ceil(filteredNotifications.length / limit) || 1;
+  const paginatedNotifications = filteredNotifications.slice((currentPage - 1) * limit, currentPage * limit);
 
   const unreadCount = visibleNotifications.filter(n => !n.da_doc).length;
 
@@ -76,37 +94,14 @@ export default function ThongBao_GV() {
   };
 
   return (
-    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300">
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300 relative" onClick={() => setIsTypeDropdownOpen(false)}>
       
       <div className="max-w-4xl mx-auto">
-        {/* Header & Filters */}
+        {/* Header & Quick Actions */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-          <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-              <Bell className="w-6 h-6 text-[#407F3E]" /> Thông báo
-            </h1>
-            
-            {/* Filter Pills */}
-            <div className="flex bg-[#E7E0C4]/50 p-1 rounded-lg border border-[#E7E0C4]">
-              <button 
-                onClick={() => setActiveFilter('all')}
-                className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
-                  activeFilter === 'all' ? 'bg-[#407F3E] text-white shadow-sm' : 'text-slate-600 hover:text-slate-800'
-                }`}
-              >
-                Tất cả
-              </button>
-              <button 
-                onClick={() => setActiveFilter('unread')}
-                className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  activeFilter === 'unread' ? 'bg-[#407F3E] text-white shadow-sm' : 'text-slate-600 hover:text-slate-800'
-                }`}
-              >
-                Chưa đọc
-                {unreadCount > 0 && <span className="w-4 h-4 rounded-full bg-[#DBD468] text-slate-800 text-[9px] flex items-center justify-center">{unreadCount}</span>}
-              </button>
-            </div>
-          </div>
+          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+            <Bell className="w-6 h-6 text-[#407F3E]" /> Thông báo
+          </h1>
 
           <button 
             onClick={handleMarkAllRead}
@@ -116,24 +111,137 @@ export default function ThongBao_GV() {
           </button>
         </div>
 
+        {/* Filter Bar */}
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-[#E7E0C4] mb-6 flex flex-wrap gap-4 items-center justify-between relative z-20">
+          
+          {/* Search Input */}
+          <div className="relative flex-1 min-w-[240px]">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input 
+              type="text" 
+              placeholder="Tìm theo tiêu đề, nội dung..." 
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E] transition-all text-slate-800 font-medium"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Filter Pills */}
+            <div className="flex bg-[#E7E0C4]/50 p-1 rounded-lg border border-[#E7E0C4]">
+              <button 
+                onClick={() => {
+                  setActiveFilter('all');
+                  setCurrentPage(1);
+                }}
+                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                  activeFilter === 'all' ? 'bg-[#407F3E] text-white shadow-sm' : 'text-slate-600 hover:text-slate-800'
+                }`}
+              >
+                Tất cả
+              </button>
+              <button 
+                onClick={() => {
+                  setActiveFilter('unread');
+                  setCurrentPage(1);
+                }}
+                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  activeFilter === 'unread' ? 'bg-[#407F3E] text-white shadow-sm' : 'text-slate-600 hover:text-slate-800'
+                }`}
+              >
+                Chưa đọc
+                {unreadCount > 0 && <span className="w-4 h-4 rounded-full bg-[#DBD468] text-slate-800 text-[9px] flex items-center justify-center">{unreadCount}</span>}
+              </button>
+            </div>
+
+            {/* Type Popover Dropdown */}
+            <div className="relative min-w-[170px]" onClick={(e) => e.stopPropagation()}>
+              <div 
+                onClick={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)}
+                className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs font-medium flex justify-between items-center cursor-pointer transition-all ${isTypeDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+              >
+                <span className="truncate pr-2 text-slate-700">
+                  {selectedType === 'ALL' && 'Tất cả loại'}
+                  {selectedType === 'PhanCong' && 'Phân công'}
+                  {selectedType === 'CanhBao' && 'Cảnh báo'}
+                  {selectedType === 'ThanhCong' && 'Thành công'}
+                </span>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              </div>
+              {isTypeDropdownOpen && (
+                <div className="absolute top-full right-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-50 py-1 overflow-hidden animate-in slide-in-from-top-1">
+                  <div className="p-2 border-b border-[#E7E0C4]">
+                    <input
+                      type="text"
+                      placeholder="Tìm loại..."
+                      value={searchTypeDropdown}
+                      onChange={(e) => setSearchTypeDropdown(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-full px-2.5 py-1 text-xs bg-slate-50 border border-[#E7E0C4] rounded-md focus:outline-none focus:border-[#407F3E]"
+                    />
+                  </div>
+                  <div className="max-h-60 overflow-y-auto">
+                    {[
+                      { id: 'ALL', label: 'Tất cả loại' },
+                      { id: 'PhanCong', label: 'Phân công' },
+                      { id: 'CanhBao', label: 'Cảnh báo' },
+                      { id: 'ThanhCong', label: 'Thành công' },
+                    ]
+                      .filter(opt => !searchTypeDropdown || opt.label.toLowerCase().includes(searchTypeDropdown.toLowerCase()))
+                      .map(opt => (
+                        <div 
+                          key={opt.id}
+                          onClick={() => {
+                            setSelectedType(opt.id);
+                            setIsTypeDropdownOpen(false);
+                            setSearchTypeDropdown('');
+                            setCurrentPage(1);
+                          }}
+                          className={`px-3 py-2 text-xs cursor-pointer flex justify-between items-center transition-colors ${
+                            selectedType === opt.id ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50 font-medium'
+                          }`}
+                        >
+                          <span>{opt.label}</span>
+                          {selectedType === opt.id && <Check className="w-3.5 h-3.5 text-[#407F3E] shrink-0" />}
+                        </div>
+                      ))}
+                    {[
+                      { id: 'ALL', label: 'Tất cả loại' },
+                      { id: 'PhanCong', label: 'Phân công' },
+                      { id: 'CanhBao', label: 'Cảnh báo' },
+                      { id: 'ThanhCong', label: 'Thành công' },
+                    ].filter(opt => !searchTypeDropdown || opt.label.toLowerCase().includes(searchTypeDropdown.toLowerCase())).length === 0 && (
+                      <div className="px-3 py-2 text-xs text-slate-500 text-center">Không tìm thấy loại</div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+        </div>
+
         {/* Notifications Feed */}
         <div className="bg-white rounded-2xl shadow-sm border border-[#E7E0C4] overflow-hidden">
-          {filteredNotifications.length === 0 ? (
+          {paginatedNotifications.length === 0 ? (
             <div className="p-12 text-center flex flex-col items-center justify-center">
               <div className="w-16 h-16 bg-[#E7E0C4]/30 rounded-full flex items-center justify-center mb-4">
                 <Bell className="w-8 h-8 text-slate-300" />
               </div>
               <h3 className="text-slate-700 font-bold">Không có thông báo nào.</h3>
-              <p className="text-sm text-slate-500 mt-1">Bạn đã cập nhật tất cả thông tin mới nhất.</p>
+              <p className="text-sm text-slate-500 mt-1">Không tìm thấy thông báo phù hợp bộ lọc.</p>
             </div>
           ) : (
             <div className="flex flex-col">
-              {filteredNotifications.map((notif, index) => (
+              {paginatedNotifications.map((notif, index) => (
                 <div 
                   key={notif.id} 
                   onClick={() => handleMarkAsRead(notif)}
                   className={`p-5 flex gap-4 transition-colors hover:bg-slate-50 group cursor-pointer ${
-                    index !== filteredNotifications.length - 1 ? 'border-b border-[#E7E0C4]/60' : ''
+                    index !== paginatedNotifications.length - 1 ? 'border-b border-[#E7E0C4]/60' : ''
                   } ${!notif.da_doc ? 'bg-[#fdfcf8]' : 'opacity-70 hover:opacity-100'}`}
                 >
                   
@@ -184,6 +292,61 @@ export default function ThongBao_GV() {
               ))}
             </div>
           )}
+
+          {/* Pagination Footer */}
+          <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
+              <span>Hiển thị</span>
+              <select 
+                value={limit}
+                onChange={(e) => {
+                  const newLimit = Number(e.target.value);
+                  setLimit(newLimit);
+                  setCurrentPage(1);
+                }}
+                className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
+              >
+                <option value={15}>15</option>
+                <option value={30}>30</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+              <span>/ {filteredNotifications.length} thông báo</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button 
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage(1)}
+                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Trang đầu
+              </button>
+              <button 
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Trước
+              </button>
+              <span className="px-4 py-1.5 rounded-lg bg-[#407F3E] text-white text-sm font-bold shadow-sm cursor-default mx-1">
+                Trang {currentPage} / {totalPages}
+              </span>
+              <button 
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Sau
+              </button>
+              <button 
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage(totalPages)}
+                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Trang cuối
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 

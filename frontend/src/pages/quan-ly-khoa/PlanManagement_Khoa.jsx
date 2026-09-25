@@ -31,6 +31,20 @@ export default function PlanManagement_Khoa() {
   const [filterNamHoc, setFilterNamHoc] = useState('');
   const [filterHocKy, setFilterHocKy] = useState('');
   const [filterTrangThai, setFilterTrangThai] = useState('');
+
+  // Filter Popover Dropdown States
+  const [isNamHocDropdownOpen, setIsNamHocDropdownOpen] = useState(false);
+  const [searchNamHocDropdown, setSearchNamHocDropdown] = useState('');
+  const [isHocKyDropdownOpen, setIsHocKyDropdownOpen] = useState(false);
+  const [searchHocKyDropdown, setSearchHocKyDropdown] = useState('');
+  const [isTrangThaiDropdownOpen, setIsTrangThaiDropdownOpen] = useState(false);
+  const [searchTrangThaiDropdown, setSearchTrangThaiDropdown] = useState('');
+
+  const closeFilterDropdowns = () => {
+    setIsNamHocDropdownOpen(false);
+    setIsHocKyDropdownOpen(false);
+    setIsTrangThaiDropdownOpen(false);
+  };
     
   // Student Pagination & Search State
   const [studentPage, setStudentPage] = useState(1);
@@ -460,7 +474,7 @@ export default function PlanManagement_Khoa() {
   });
 
   return (
-    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300 relative">
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300 relative" onClick={closeFilterDropdowns}>
       <Toast show={toast.show} message={toast.message} type={toast.type} onClose={() => setToast({ show: false, message: '', type: 'success' })} />
       {/* Header section */}
       <div className="flex flex-col gap-4 mb-6">
@@ -476,8 +490,9 @@ export default function PlanManagement_Khoa() {
         </div>
 
         {/* Filters */}
-        <div className="flex flex-wrap items-center gap-3 bg-white p-3 rounded-lg shadow-sm border border-slate-100">
-          <div className="relative">
+        <div className="flex flex-wrap items-center gap-3 bg-white p-3 rounded-xl shadow-sm border border-[#E7E0C4] relative z-20">
+          {/* Search Input */}
+          <div className="relative flex-1 min-w-[240px]">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input 
               type="text" 
@@ -487,53 +502,201 @@ export default function PlanManagement_Khoa() {
                 setSearchTerm(e.target.value);
                 setCampaignPage(1);
               }}
-              className="w-full sm:w-64 pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-[#407F3E] transition-all"
+              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E] transition-all font-medium text-slate-700"
             />
           </div>
           
-          <select
-            value={filterNamHoc}
-            onChange={(e) => {
-              setFilterNamHoc(e.target.value);
-              setCampaignPage(1);
-            }}
-            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-[#407F3E]"
-          >
-            <option value="">Tất cả năm học</option>
-            {years.map(y => (
-              <option key={y.id} value={y.id}>{y.ten_nam_hoc}</option>
-            ))}
-          </select>
+          {/* Năm học Dropdown */}
+          <div className="relative min-w-[170px]" onClick={(e) => e.stopPropagation()}>
+            <div 
+              onClick={() => {
+                setIsNamHocDropdownOpen(!isNamHocDropdownOpen);
+                setIsHocKyDropdownOpen(false);
+                setIsTrangThaiDropdownOpen(false);
+              }}
+              className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isNamHocDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+            >
+              <span className="truncate pr-2 font-medium text-slate-700">
+                {filterNamHoc ? (years.find(y => String(y.id) === String(filterNamHoc))?.ten_nam_hoc || 'Năm học') : 'Tất cả năm học'}
+              </span>
+              <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+            </div>
+            {isNamHocDropdownOpen && (
+              <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[200px]">
+                <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
+                  <input 
+                    type="text" 
+                    placeholder="Tìm năm học..." 
+                    value={searchNamHocDropdown}
+                    onChange={(e) => setSearchNamHocDropdown(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
+                  />
+                </div>
+                <div className="max-h-60 overflow-y-auto">
+                  <div 
+                    onClick={() => { setFilterNamHoc(''); setIsNamHocDropdownOpen(false); setSearchNamHocDropdown(''); setCampaignPage(1); }}
+                    className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                      !filterNamHoc ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50'
+                    }`}
+                  >
+                    <span>Tất cả năm học</span>
+                    {!filterNamHoc && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                  </div>
+                  {years
+                    .filter(y => y.ten_nam_hoc?.toLowerCase().includes(searchNamHocDropdown.toLowerCase()))
+                    .map(y => (
+                    <div 
+                      key={y.id}
+                      onClick={() => { setFilterNamHoc(y.id); setIsNamHocDropdownOpen(false); setSearchNamHocDropdown(''); setCampaignPage(1); }}
+                      className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                        String(filterNamHoc) === String(y.id) ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50'
+                      }`}
+                    >
+                      <span className="truncate pr-2">{y.ten_nam_hoc}</span>
+                      {String(filterNamHoc) === String(y.id) && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                    </div>
+                  ))}
+                  {years.filter(y => y.ten_nam_hoc?.toLowerCase().includes(searchNamHocDropdown.toLowerCase())).length === 0 && (
+                    <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy</div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
 
-          <select
-            value={filterHocKy}
-            onChange={(e) => {
-              setFilterHocKy(e.target.value);
-              setCampaignPage(1);
-            }}
-            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-[#407F3E]"
-          >
-            <option value="">Tất cả học kỳ</option>
-            {terms.map(t => (
-              <option key={t.id} value={t.id}>{t.ten_hoc_ky}</option>
-            ))}
-          </select>
+          {/* Học kỳ Dropdown */}
+          <div className="relative min-w-[160px]" onClick={(e) => e.stopPropagation()}>
+            <div 
+              onClick={() => {
+                setIsHocKyDropdownOpen(!isHocKyDropdownOpen);
+                setIsNamHocDropdownOpen(false);
+                setIsTrangThaiDropdownOpen(false);
+              }}
+              className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isHocKyDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+            >
+              <span className="truncate pr-2 font-medium text-slate-700">
+                {filterHocKy ? (terms.find(t => String(t.id) === String(filterHocKy))?.ten_hoc_ky || 'Học kỳ') : 'Tất cả học kỳ'}
+              </span>
+              <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+            </div>
+            {isHocKyDropdownOpen && (
+              <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[200px]">
+                <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
+                  <input 
+                    type="text" 
+                    placeholder="Tìm học kỳ..." 
+                    value={searchHocKyDropdown}
+                    onChange={(e) => setSearchHocKyDropdown(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
+                  />
+                </div>
+                <div className="max-h-60 overflow-y-auto">
+                  <div 
+                    onClick={() => { setFilterHocKy(''); setIsHocKyDropdownOpen(false); setSearchHocKyDropdown(''); setCampaignPage(1); }}
+                    className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                      !filterHocKy ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50'
+                    }`}
+                  >
+                    <span>Tất cả học kỳ</span>
+                    {!filterHocKy && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                  </div>
+                  {terms
+                    .filter(t => t.ten_hoc_ky?.toLowerCase().includes(searchHocKyDropdown.toLowerCase()))
+                    .map(t => (
+                    <div 
+                      key={t.id}
+                      onClick={() => { setFilterHocKy(t.id); setIsHocKyDropdownOpen(false); setSearchHocKyDropdown(''); setCampaignPage(1); }}
+                      className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                        String(filterHocKy) === String(t.id) ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50'
+                      }`}
+                    >
+                      <span className="truncate pr-2">{t.ten_hoc_ky}</span>
+                      {String(filterHocKy) === String(t.id) && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                    </div>
+                  ))}
+                  {terms.filter(t => t.ten_hoc_ky?.toLowerCase().includes(searchHocKyDropdown.toLowerCase())).length === 0 && (
+                    <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy</div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
 
-          <select
-            value={filterTrangThai}
-            onChange={(e) => {
-              setFilterTrangThai(e.target.value);
-              setCampaignPage(1);
-            }}
-            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-[#407F3E]"
-          >
-            <option value="">Tất cả trạng thái</option>
-            <option value="Nhap">Nháp</option>
-            <option value="DangTrienKhai">Đang triển khai</option>
-            <option value="DaKetThuc">Đã kết thúc</option>
-            <option value="DaKhoa">Đã khóa</option>
-            <option value="DaHuy">Đã hủy</option>
-          </select>
+          {/* Trạng thái Dropdown */}
+          <div className="relative min-w-[170px]" onClick={(e) => e.stopPropagation()}>
+            <div 
+              onClick={() => {
+                setIsTrangThaiDropdownOpen(!isTrangThaiDropdownOpen);
+                setIsNamHocDropdownOpen(false);
+                setIsHocKyDropdownOpen(false);
+              }}
+              className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isTrangThaiDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+            >
+              <span className="truncate pr-2 font-medium text-slate-700">
+                {filterTrangThai === '' ? 'Tất cả trạng thái' : 
+                 filterTrangThai === 'Nhap' ? 'Nháp' :
+                 filterTrangThai === 'DangTrienKhai' ? 'Đang triển khai' :
+                 filterTrangThai === 'DaKetThuc' ? 'Đã kết thúc' :
+                 filterTrangThai === 'DaKhoa' ? 'Đã khóa' :
+                 filterTrangThai === 'DaHuy' ? 'Đã hủy' : filterTrangThai}
+              </span>
+              <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+            </div>
+            {isTrangThaiDropdownOpen && (
+              <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[200px]">
+                <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
+                  <input 
+                    type="text" 
+                    placeholder="Tìm trạng thái..." 
+                    value={searchTrangThaiDropdown}
+                    onChange={(e) => setSearchTrangThaiDropdown(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
+                  />
+                </div>
+                <div className="max-h-60 overflow-y-auto">
+                  {[
+                    { value: '', label: 'Tất cả trạng thái' },
+                    { value: 'Nhap', label: 'Nháp' },
+                    { value: 'DangTrienKhai', label: 'Đang triển khai' },
+                    { value: 'DaKetThuc', label: 'Đã kết thúc' },
+                    { value: 'DaKhoa', label: 'Đã khóa' },
+                    { value: 'DaHuy', label: 'Đã hủy' }
+                  ]
+                    .filter(opt => !searchTrangThaiDropdown || opt.label.toLowerCase().includes(searchTrangThaiDropdown.toLowerCase()))
+                    .map(opt => (
+                      <div 
+                        key={opt.value}
+                        onClick={() => { 
+                          setFilterTrangThai(opt.value); 
+                          setIsTrangThaiDropdownOpen(false); 
+                          setSearchTrangThaiDropdown('');
+                          setCampaignPage(1); 
+                        }}
+                        className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                          filterTrangThai === opt.value ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50'
+                        }`}
+                      >
+                        <span>{opt.label}</span>
+                        {filterTrangThai === opt.value && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                      </div>
+                    ))}
+                  {[
+                    { value: '', label: 'Tất cả trạng thái' },
+                    { value: 'Nhap', label: 'Nháp' },
+                    { value: 'DangTrienKhai', label: 'Đang triển khai' },
+                    { value: 'DaKetThuc', label: 'Đã kết thúc' },
+                    { value: 'DaKhoa', label: 'Đã khóa' },
+                    { value: 'DaHuy', label: 'Đã hủy' }
+                  ].filter(opt => !searchTrangThaiDropdown || opt.label.toLowerCase().includes(searchTrangThaiDropdown.toLowerCase())).length === 0 && (
+                    <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy</div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -589,60 +752,60 @@ export default function PlanManagement_Khoa() {
               )}
             </tbody>
           </table>
-          {campaigns.length > 0 && (
-            <div className="flex items-center justify-between px-6 py-4 bg-slate-50 border-t border-[#E7E0C4] rounded-b-xl">
-              <div className="flex items-center gap-3">
-                <select
-                  value={campaignLimit}
-                  onChange={(e) => {
-                    const newLimit = Number(e.target.value);
-                    setCampaignLimit(newLimit);
-                    setCampaignPage(1);
-                  }}
-                  className="px-2 py-1.5 bg-white border border-slate-200 rounded text-sm font-medium focus:outline-none focus:border-[#407F3E]"
-                >
-                  <option value="15">15 dòng</option>
-                  <option value="30">30 dòng</option>
-                  <option value="50">50 dòng</option>
-                  <option value="100">100 dòng</option>
-                </select>
-                <span className="text-sm font-medium text-slate-500">
-                  Trang {campaignPage} / {campaignTotalPages}
-                </span>
-              </div>
-              
-              <div className="flex gap-2">
-                <button
-                  disabled={campaignPage === 1}
-                  onClick={() => setCampaignPage(1)}
-                  className="px-3 py-1.5 bg-white border border-slate-200 rounded text-sm font-bold disabled:opacity-50 hover:bg-slate-50 cursor-pointer text-slate-700"
-                >
-                  Đầu
-                </button>
-                <button
-                  disabled={campaignPage === 1}
-                  onClick={() => setCampaignPage(p => Math.max(1, p - 1))}
-                  className="px-3 py-1.5 bg-white border border-slate-200 rounded text-sm font-bold disabled:opacity-50 hover:bg-slate-50 cursor-pointer text-slate-700"
-                >
-                  Trước
-                </button>
-                <button
-                  disabled={campaignPage === campaignTotalPages}
-                  onClick={() => setCampaignPage(p => Math.min(campaignTotalPages, p + 1))}
-                  className="px-3 py-1.5 bg-white border border-slate-200 rounded text-sm font-bold disabled:opacity-50 hover:bg-slate-50 cursor-pointer text-slate-700"
-                >
-                  Sau
-                </button>
-                <button
-                  disabled={campaignPage === campaignTotalPages}
-                  onClick={() => setCampaignPage(campaignTotalPages)}
-                  className="px-3 py-1.5 bg-white border border-slate-200 rounded text-sm font-bold disabled:opacity-50 hover:bg-slate-50 cursor-pointer text-slate-700"
-                >
-                  Cuối
-                </button>
-              </div>
+          <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-b-xl">
+            <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
+              <span>Hiển thị</span>
+              <select
+                value={campaignLimit}
+                onChange={(e) => {
+                  const newLimit = Number(e.target.value);
+                  setCampaignLimit(newLimit);
+                  setCampaignPage(1);
+                }}
+                className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
+              >
+                <option value={15}>15</option>
+                <option value={30}>30</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+              <span>/ {campaignTotal} đợt</span>
             </div>
-          )}
+            
+            <div className="flex items-center gap-1.5">
+              <button
+                disabled={campaignPage === 1}
+                onClick={() => setCampaignPage(1)}
+                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Trang đầu
+              </button>
+              <button
+                disabled={campaignPage === 1}
+                onClick={() => setCampaignPage(p => Math.max(1, p - 1))}
+                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Trước
+              </button>
+              <span className="px-4 py-1.5 rounded-lg bg-[#407F3E] text-white text-sm font-bold shadow-sm cursor-default mx-1">
+                Trang {campaignPage} / {campaignTotalPages}
+              </span>
+              <button
+                disabled={campaignPage === campaignTotalPages}
+                onClick={() => setCampaignPage(p => Math.min(campaignTotalPages, p + 1))}
+                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Sau
+              </button>
+              <button
+                disabled={campaignPage === campaignTotalPages}
+                onClick={() => setCampaignPage(campaignTotalPages)}
+                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Trang cuối
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -954,8 +1117,9 @@ export default function PlanManagement_Khoa() {
                         </tbody>
                       </table>
                       {studentTotalPages > 1 && (
-                        <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-t border-slate-200">
-                          <div className="flex items-center gap-2">
+                        <div className="p-3 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-3">
+                          <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+                            <span>Hiển thị</span>
                             <select
                               value={studentLimit}
                               onChange={(e) => {
@@ -963,46 +1127,47 @@ export default function PlanManagement_Khoa() {
                                 setStudentLimit(newLimit);
                                 fetchCampaignStudents(editingId, 1, studentSearch, newLimit);
                               }}
-                              className="px-2 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-[#407F3E]"
+                              className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm text-xs"
                             >
-                              <option value="15">15 dòng</option>
-                              <option value="30">30 dòng</option>
-                              <option value="50">50 dòng</option>
-                              <option value="100">100 dòng</option>
+                              <option value="15">15</option>
+                              <option value="30">30</option>
+                              <option value="50">50</option>
+                              <option value="100">100</option>
                             </select>
-                            <span className="text-xs text-slate-500">
-                              Trang {studentPage} / {studentTotalPages}
-                            </span>
+                            <span>/ {studentTotal} sinh viên</span>
                           </div>
                           
-                          <div className="flex gap-1">
+                          <div className="flex items-center gap-1">
                             <button
                               disabled={studentPage === 1}
                               onClick={() => fetchCampaignStudents(editingId, 1, studentSearch)}
-                              className="px-2 py-1 bg-white border border-slate-200 rounded text-xs font-bold disabled:opacity-50 hover:bg-slate-50 cursor-pointer"
+                              className="px-2.5 py-1 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-xs font-semibold transition-colors cursor-pointer"
                             >
-                              Đầu
+                              Trang đầu
                             </button>
                             <button
                               disabled={studentPage === 1}
                               onClick={() => fetchCampaignStudents(editingId, studentPage - 1, studentSearch)}
-                              className="px-2 py-1 bg-white border border-slate-200 rounded text-xs font-bold disabled:opacity-50 hover:bg-slate-50 cursor-pointer"
+                              className="px-2.5 py-1 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-xs font-semibold transition-colors cursor-pointer"
                             >
                               Trước
                             </button>
+                            <span className="px-3 py-1 rounded-lg bg-[#407F3E] text-white text-xs font-bold shadow-sm cursor-default mx-0.5">
+                              Trang {studentPage} / {studentTotalPages}
+                            </span>
                             <button
                               disabled={studentPage === studentTotalPages}
                               onClick={() => fetchCampaignStudents(editingId, studentPage + 1, studentSearch)}
-                              className="px-2 py-1 bg-white border border-slate-200 rounded text-xs font-bold disabled:opacity-50 hover:bg-slate-50 cursor-pointer"
+                              className="px-2.5 py-1 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-xs font-semibold transition-colors cursor-pointer"
                             >
                               Sau
                             </button>
                             <button
                               disabled={studentPage === studentTotalPages}
                               onClick={() => fetchCampaignStudents(editingId, studentTotalPages, studentSearch)}
-                              className="px-2 py-1 bg-white border border-slate-200 rounded text-xs font-bold disabled:opacity-50 hover:bg-slate-50 cursor-pointer"
+                              className="px-2.5 py-1 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-xs font-semibold transition-colors cursor-pointer"
                             >
-                              Cuối
+                              Trang cuối
                             </button>
                           </div>
                         </div>
@@ -1120,8 +1285,9 @@ export default function PlanManagement_Khoa() {
                       </tbody>
                     </table>
                     {studentTotalPages > 1 && (
-                      <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-t border-slate-200">
-                        <div className="flex items-center gap-2">
+                      <div className="p-3 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+                          <span>Hiển thị</span>
                           <select
                             value={studentLimit}
                             onChange={(e) => {
@@ -1129,46 +1295,47 @@ export default function PlanManagement_Khoa() {
                               setStudentLimit(newLimit);
                               fetchCampaignStudents(viewingDetail.id, 1, studentSearch, newLimit);
                             }}
-                            className="px-2 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-[#407F3E]"
+                            className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm text-xs"
                           >
-                            <option value="15">15 dòng</option>
-                            <option value="30">30 dòng</option>
-                            <option value="50">50 dòng</option>
-                            <option value="100">100 dòng</option>
+                            <option value="15">15</option>
+                            <option value="30">30</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
                           </select>
-                          <span className="text-xs text-slate-500">
-                            Trang {studentPage} / {studentTotalPages}
-                          </span>
+                          <span>/ {studentTotal} sinh viên</span>
                         </div>
                         
-                        <div className="flex gap-1">
+                        <div className="flex items-center gap-1">
                           <button
                             disabled={studentPage === 1}
                             onClick={() => fetchCampaignStudents(viewingDetail.id, 1, studentSearch)}
-                            className="px-2 py-1 bg-white border border-slate-200 rounded text-xs font-bold disabled:opacity-50 hover:bg-slate-50 cursor-pointer"
+                            className="px-2.5 py-1 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-xs font-semibold transition-colors cursor-pointer"
                           >
-                            Đầu
+                            Trang đầu
                           </button>
                           <button
                             disabled={studentPage === 1}
                             onClick={() => fetchCampaignStudents(viewingDetail.id, studentPage - 1, studentSearch)}
-                            className="px-2 py-1 bg-white border border-slate-200 rounded text-xs font-bold disabled:opacity-50 hover:bg-slate-50 cursor-pointer"
+                            className="px-2.5 py-1 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-xs font-semibold transition-colors cursor-pointer"
                           >
                             Trước
                           </button>
+                          <span className="px-3 py-1 rounded-lg bg-[#407F3E] text-white text-xs font-bold shadow-sm cursor-default mx-0.5">
+                            Trang {studentPage} / {studentTotalPages}
+                          </span>
                           <button
                             disabled={studentPage === studentTotalPages}
                             onClick={() => fetchCampaignStudents(viewingDetail.id, studentPage + 1, studentSearch)}
-                            className="px-2 py-1 bg-white border border-slate-200 rounded text-xs font-bold disabled:opacity-50 hover:bg-slate-50 cursor-pointer"
+                            className="px-2.5 py-1 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-xs font-semibold transition-colors cursor-pointer"
                           >
                             Sau
                           </button>
                           <button
                             disabled={studentPage === studentTotalPages}
                             onClick={() => fetchCampaignStudents(viewingDetail.id, studentTotalPages, studentSearch)}
-                            className="px-2 py-1 bg-white border border-slate-200 rounded text-xs font-bold disabled:opacity-50 hover:bg-slate-50 cursor-pointer"
+                            className="px-2.5 py-1 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-xs font-semibold transition-colors cursor-pointer"
                           >
-                            Cuối
+                            Trang cuối
                           </button>
                         </div>
                       </div>

@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  RotateCcw, Plus, UploadCloud, X, Check, AlertCircle
+  RotateCcw, Plus, UploadCloud, X, Check, AlertCircle, Search, ChevronDown
 } from 'lucide-react';
 import api, { sinhVienApi } from '../../services/api';
 
@@ -12,6 +12,14 @@ export default function HoanPhi_SV() {
   const [student, setStudent] = useState(null);
   const [invoices, setInvoices] = useState([]);
   const [refunds, setRefunds] = useState([]);
+
+  // Filter & Pagination state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+  const [searchStatusDropdown, setSearchStatusDropdown] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [limit, setLimit] = useState(15);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState('');
@@ -118,13 +126,27 @@ export default function HoanPhi_SV() {
     }
   };
 
+  const filteredRefunds = useMemo(() => {
+    return refunds.filter(r => {
+      const q = searchQuery.toLowerCase();
+      const invoiceName = r.hoaDon?.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || `Hóa đơn #${r.hoaDon?.id}`;
+      const note = r.ghi_chu_phan_hoi || '';
+      const matchSearch = !searchQuery || invoiceName.toLowerCase().includes(q) || note.toLowerCase().includes(q);
+      const matchStatus = statusFilter === 'ALL' || r.trang_thai === statusFilter;
+      return matchSearch && matchStatus;
+    });
+  }, [refunds, searchQuery, statusFilter]);
+
+  const totalPages = Math.ceil(filteredRefunds.length / limit) || 1;
+  const paginatedRefunds = filteredRefunds.slice((currentPage - 1) * limit, currentPage * limit);
+
   const existingRefundInvoiceIds = refunds.map(r => r.hoa_don_id);
   const eligibleInvoices = invoices.filter(i => 
     i.trang_thai === 'ViPham' && !existingRefundInvoiceIds.includes(i.id)
   );
 
   return (
-    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300">
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300 relative" onClick={() => setIsStatusDropdownOpen(false)}>
       
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-800">Tài chính</h1>
@@ -169,6 +191,90 @@ export default function HoanPhi_SV() {
         </div>
       )}
 
+      {/* Filter Bar */}
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-[#E7E0C4] mb-6 flex flex-wrap gap-4 items-center justify-between relative z-20">
+        
+        {/* Search Input */}
+        <div className="relative flex-1 min-w-[240px]">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input 
+            type="text" 
+            placeholder="Tìm theo nhà máy, nội dung..." 
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E] transition-all text-slate-800 font-medium"
+          />
+        </div>
+
+        {/* Status Popover Dropdown */}
+        <div className="relative min-w-[180px]" onClick={(e) => e.stopPropagation()}>
+          <div 
+            onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
+            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isStatusDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+          >
+            <span className="truncate pr-2 font-medium text-slate-700">
+              {statusFilter === 'ALL' && 'Tất cả trạng thái'}
+              {statusFilter === 'ChoXuLy' && 'Chờ xử lý'}
+              {statusFilter === 'DaHoanTien' && 'Đã hoàn tiền'}
+              {statusFilter === 'TuChoi' && 'Từ chối'}
+            </span>
+            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+          </div>
+          {isStatusDropdownOpen && (
+            <div className="absolute top-full right-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-50 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[200px]">
+              <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
+                <input 
+                  type="text" 
+                  placeholder="Tìm trạng thái..." 
+                  value={searchStatusDropdown}
+                  onChange={(e) => setSearchStatusDropdown(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
+                />
+              </div>
+              <div className="max-h-60 overflow-y-auto">
+                {[
+                  { id: 'ALL', label: 'Tất cả trạng thái' },
+                  { id: 'ChoXuLy', label: 'Chờ xử lý' },
+                  { id: 'DaHoanTien', label: 'Đã hoàn tiền' },
+                  { id: 'TuChoi', label: 'Từ chối' },
+                ]
+                  .filter(opt => opt.label.toLowerCase().includes(searchStatusDropdown.toLowerCase()))
+                  .map(opt => (
+                    <div 
+                      key={opt.id}
+                      onClick={() => {
+                        setStatusFilter(opt.id);
+                        setIsStatusDropdownOpen(false);
+                        setSearchStatusDropdown('');
+                        setCurrentPage(1);
+                      }}
+                      className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                        statusFilter === opt.id ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50 font-medium'
+                      }`}
+                    >
+                      <span>{opt.label}</span>
+                      {statusFilter === opt.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                    </div>
+                  ))}
+                {[
+                  { id: 'ALL', label: 'Tất cả trạng thái' },
+                  { id: 'ChoXuLy', label: 'Chờ xử lý' },
+                  { id: 'DaHoanTien', label: 'Đã hoàn tiền' },
+                  { id: 'TuChoi', label: 'Từ chối' },
+                ].filter(opt => opt.label.toLowerCase().includes(searchStatusDropdown.toLowerCase())).length === 0 && (
+                  <div className="px-3 py-2 text-xs text-slate-500 text-center">Không tìm thấy</div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+      </div>
+
       {/* Tab Content: Hoàn phí */}
       <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-visible animate-in fade-in slide-in-from-bottom-2 duration-300">
         <div className="p-5 border-b border-[#E7E0C4] flex items-center justify-between bg-slate-50/50 rounded-t-xl">
@@ -196,14 +302,14 @@ export default function HoanPhi_SV() {
               </tr>
             </thead>
             <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
-              {refunds.length === 0 ? (
+              {paginatedRefunds.length === 0 ? (
                 <tr>
                   <td colSpan="4" className="p-8 text-center text-slate-500 font-medium italic">
-                    Không có dữ liệu yêu cầu hoàn phí.
+                    Không có dữ liệu yêu cầu hoàn phí phù hợp.
                   </td>
                 </tr>
               ) : (
-                refunds.map(refund => (
+                paginatedRefunds.map(refund => (
                   <tr key={refund.id} className="hover:bg-slate-50 transition-colors">
                     <td className="p-4 pl-6 font-medium text-slate-600">
                       {new Date(refund.ngay_nop).toLocaleDateString('vi-VN')}
@@ -222,6 +328,61 @@ export default function HoanPhi_SV() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Pagination Footer */}
+        <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
+            <span>Hiển thị</span>
+            <select 
+              value={limit}
+              onChange={(e) => {
+                const newLimit = Number(e.target.value);
+                setLimit(newLimit);
+                setCurrentPage(1);
+              }}
+              className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
+            >
+              <option value={15}>15</option>
+              <option value={30}>30</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <span>/ {filteredRefunds.length} yêu cầu</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button 
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage(1)}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Trang đầu
+            </button>
+            <button 
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Trước
+            </button>
+            <span className="px-4 py-1.5 rounded-lg bg-[#407F3E] text-white text-sm font-bold shadow-sm cursor-default mx-1">
+              Trang {currentPage} / {totalPages}
+            </span>
+            <button 
+              disabled={currentPage >= totalPages}
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Sau
+            </button>
+            <button 
+              disabled={currentPage >= totalPages}
+              onClick={() => setCurrentPage(totalPages)}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Trang cuối
+            </button>
+          </div>
         </div>
       </div>
 

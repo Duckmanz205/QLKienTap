@@ -1,12 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Info, ChevronDown, Check, Save, Plus, Minus
+  Info, ChevronDown, Check, Save, Plus, Minus, Search
 } from 'lucide-react';
 import { giangVienApi } from '../../services/api';
 
 export default function DiemChuanBi_DiemCong_GV() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [tripSearch, setTripSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [limit, setLimit] = useState(15);
   
   const [lecturer, setLecturer] = useState(null);
   const [trips, setTrips] = useState([]);
@@ -44,6 +48,7 @@ export default function DiemChuanBi_DiemCong_GV() {
   useEffect(() => {
     if (selectedTrip) {
       fetchStudents(selectedTrip.id);
+      setCurrentPage(1);
     }
   }, [selectedTrip]);
 
@@ -112,6 +117,18 @@ export default function DiemChuanBi_DiemCong_GV() {
     }
   };
 
+  // Filtered & Paginated logic
+  const filteredStudents = useMemo(() => {
+    return students.filter(s => {
+      if (!searchQuery) return true;
+      const q = searchQuery.toLowerCase();
+      return (s.name && s.name.toLowerCase().includes(q)) || (s.mssv && s.mssv.includes(q));
+    });
+  }, [students, searchQuery]);
+
+  const totalPages = Math.ceil(filteredStudents.length / limit) || 1;
+  const paginatedStudents = filteredStudents.slice((currentPage - 1) * limit, currentPage * limit);
+
   return (
     <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300 relative" onClick={() => setIsDropdownOpen(false)}>
       
@@ -119,36 +136,74 @@ export default function DiemChuanBi_DiemCong_GV() {
         <h1 className="text-2xl font-bold text-slate-800">Điểm chuẩn bị & điểm cộng</h1>
       </div>
 
-      {/* Top Bar: Dropdown */}
-      <div className="mb-6">
-        <div className="relative w-full md:w-[400px]">
-          <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Chọn chuyến tham quan</label>
+      {/* Filter Bar */}
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-[#E7E0C4] mb-6 flex flex-wrap gap-4 items-center relative z-20">
+        
+        {/* Search Input */}
+        <div className="relative flex-1 min-w-[240px]">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input 
+            type="text" 
+            placeholder="Tìm theo MSSV/họ tên..." 
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E] transition-all text-slate-800 font-medium"
+          />
+        </div>
+
+        {/* Trip Selector Popover */}
+        <div className="relative min-w-[280px] flex-1" onClick={(e) => e.stopPropagation()}>
           <div 
-            onClick={(e) => { e.stopPropagation(); setIsDropdownOpen(!isDropdownOpen); }}
-            className={`w-full px-4 py-2.5 bg-white border rounded-xl text-sm flex justify-between items-center cursor-pointer transition-all shadow-sm ${isDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
           >
-            <span className="font-bold text-slate-800 truncate pr-2">
-              {selectedTrip ? selectedTrip.name : 'Đang tải...'}
+            <span className="truncate pr-2 font-medium text-slate-700">
+              {selectedTrip ? selectedTrip.name : 'Đang tải chuyến...'}
             </span>
             <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
           </div>
           {isDropdownOpen && trips.length > 0 && (
-            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-50 py-1 overflow-hidden animate-in slide-in-from-top-1">
-              {trips.map(trip => (
-                <div 
-                  key={trip.id}
-                  onClick={() => { setSelectedTrip(trip); setIsDropdownOpen(false); }}
-                  className={`px-4 py-3 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                    selectedTrip?.id === trip.id ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50 font-medium'
-                  }`}
-                >
-                  <span className="truncate pr-2">{trip.name}</span>
-                  {selectedTrip?.id === trip.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                </div>
-              ))}
+            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-50 py-1 overflow-hidden animate-in slide-in-from-top-1 max-h-64 flex flex-col">
+              <div className="p-2 border-b border-[#E7E0C4] sticky top-0 bg-white z-10">
+                <input
+                  type="text"
+                  placeholder="Tìm chuyến đi..."
+                  value={tripSearch}
+                  onChange={(e) => setTripSearch(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-[#E7E0C4] rounded-lg focus:outline-none focus:border-[#407F3E]"
+                />
+              </div>
+              <div className="overflow-y-auto">
+                {trips
+                  .filter(t => !tripSearch || t.name.toLowerCase().includes(tripSearch.toLowerCase()))
+                  .map(trip => (
+                    <div 
+                      key={trip.id}
+                      onClick={() => {
+                        setSelectedTrip(trip);
+                        setIsDropdownOpen(false);
+                        setTripSearch('');
+                      }}
+                      className={`px-4 py-2.5 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                        selectedTrip?.id === trip.id ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50 font-medium'
+                      }`}
+                    >
+                      <span className="truncate pr-2">{trip.name}</span>
+                      {selectedTrip?.id === trip.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                    </div>
+                  ))}
+                {trips.filter(t => !tripSearch || t.name.toLowerCase().includes(tripSearch.toLowerCase())).length === 0 && (
+                  <div className="px-4 py-3 text-xs text-slate-500 text-center">Không tìm thấy chuyến đi</div>
+                )}
+              </div>
             </div>
           )}
         </div>
+
       </div>
 
       {/* Info Banner */}
@@ -178,12 +233,12 @@ export default function DiemChuanBi_DiemCong_GV() {
                 <tr>
                   <td colSpan="5" className="p-8 text-center text-slate-500">Đang tải dữ liệu...</td>
                 </tr>
-              ) : students.length === 0 ? (
+              ) : paginatedStudents.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="p-8 text-center text-slate-500">Chưa có sinh viên nào tham gia chuyến đi này.</td>
+                  <td colSpan="5" className="p-8 text-center text-slate-500">Không tìm thấy sinh viên nào.</td>
                 </tr>
               ) : (
-                students.map(student => (
+                paginatedStudents.map(student => (
                   <tr key={student.id} className="hover:bg-slate-50 transition-colors group">
                     
                     <td className="p-4 pl-6 font-mono font-bold text-slate-600">{student.mssv}</td>
@@ -247,6 +302,61 @@ export default function DiemChuanBi_DiemCong_GV() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Pagination Footer */}
+        <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
+            <span>Hiển thị</span>
+            <select 
+              value={limit}
+              onChange={(e) => {
+                const newLimit = Number(e.target.value);
+                setLimit(newLimit);
+                setCurrentPage(1);
+              }}
+              className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
+            >
+              <option value={15}>15</option>
+              <option value={30}>30</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <span>/ {filteredStudents.length} sinh viên</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button 
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage(1)}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Trang đầu
+            </button>
+            <button 
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Trước
+            </button>
+            <span className="px-4 py-1.5 rounded-lg bg-[#407F3E] text-white text-sm font-bold shadow-sm cursor-default mx-1">
+              Trang {currentPage} / {totalPages}
+            </span>
+            <button 
+              disabled={currentPage >= totalPages}
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Sau
+            </button>
+            <button 
+              disabled={currentPage >= totalPages}
+              onClick={() => setCurrentPage(totalPages)}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Trang cuối
+            </button>
+          </div>
         </div>
       </div>
 

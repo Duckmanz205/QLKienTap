@@ -24,8 +24,22 @@ export default function ChuyenThamQuan_DSLoc() {
   const [tripsTuDo, setTripsTuDo] = useState([]);
   const [loading, setLoading] = useState(false);
   
+  // Tab 1 filters & pagination
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('ALL');
+  const [isFilterStatusOpen, setIsFilterStatusOpen] = useState(false);
+  const [searchStatusKhoa, setSearchStatusKhoa] = useState('');
+  const [currentPageKhoa, setCurrentPageKhoa] = useState(1);
+  const [limitKhoa, setLimitKhoa] = useState(15);
+
+  // Tab 2 filters & pagination
+  const [searchQueryTuDo, setSearchQueryTuDo] = useState('');
+  const [filterStatusTuDo, setFilterStatusTuDo] = useState('ALL');
+  const [isFilterStatusTuDoOpen, setIsFilterStatusTuDoOpen] = useState(false);
+  const [searchStatusTuDo, setSearchStatusTuDo] = useState('');
+  const [currentPageTuDo, setCurrentPageTuDo] = useState(1);
+  const [limitTuDo, setLimitTuDo] = useState(15);
+
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 });
 
@@ -267,6 +281,8 @@ export default function ChuyenThamQuan_DSLoc() {
     setIsNhaMayDropdownOpen(false);
     setIsLichDropdownOpen(false);
     setIsHinhThucDropdownOpen(false);
+    setIsFilterStatusOpen(false);
+    setIsFilterStatusTuDoOpen(false);
     setActiveDropdown(null);
   };
 
@@ -378,30 +394,92 @@ export default function ChuyenThamQuan_DSLoc() {
       {activeTab === 'khoa' && (
         <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div className="flex items-center gap-3 w-full sm:w-auto">
-              <div className="relative flex-1 sm:w-64">
+            <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto flex-1">
+              <div className="relative flex-1 sm:w-64 min-w-[200px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input 
                   type="text" 
                   placeholder="Tìm kiếm nhà máy..." 
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 bg-white border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#89B449]/50 transition-shadow"
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setCurrentPageKhoa(1);
+                  }}
+                  className="w-full pl-9 pr-4 py-2 bg-white border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#407F3E] focus:border-[#407F3E] transition-shadow"
                 />
               </div>
-              <select 
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="px-4 py-2 bg-white border border-[#E7E0C4] rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#89B449]/50 transition-shadow cursor-pointer"
-              >
-                <option value="ALL">Tất cả trạng thái</option>
-                <option value="Nhap">Nháp</option>
-                <option value="MoDangKy">Mở đăng ký</option>
-                <option value="DaChotDanhSach">Đã chốt danh sách</option>
-                <option value="DaDienRa">Đã diễn ra</option>
-                <option value="DaHuy">Đã huỷ</option>
-              </select>
+
+              {/* Popover Filter Trạng thái Tab 1 */}
+              <div className="relative min-w-[200px]" onClick={e => e.stopPropagation()}>
+                <div 
+                  onClick={() => setIsFilterStatusOpen(!isFilterStatusOpen)}
+                  className={`w-full px-4 py-2 bg-white border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isFilterStatusOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+                >
+                  <span className={`truncate pr-2 font-medium ${filterStatus !== 'ALL' ? 'text-slate-800' : 'text-slate-600'}`}>
+                    {filterStatus === 'ALL' ? 'Tất cả trạng thái' :
+                     filterStatus === 'Nhap' ? 'Nháp' :
+                     filterStatus === 'MoDangKy' ? 'Mở đăng ký' :
+                     filterStatus === 'DaChotDanhSach' ? 'Đã chốt danh sách' :
+                     filterStatus === 'DaDienRa' ? 'Đã diễn ra' :
+                     filterStatus === 'DaHuy' ? 'Đã huỷ' : filterStatus}
+                  </span>
+                  <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isFilterStatusOpen ? 'rotate-180 text-[#407F3E]' : ''}`} />
+                </div>
+                {isFilterStatusOpen && (
+                  <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[200px]">
+                    <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
+                      <input 
+                        type="text" 
+                        placeholder="Tìm trạng thái..." 
+                        value={searchStatusKhoa}
+                        onChange={(e) => setSearchStatusKhoa(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
+                      />
+                    </div>
+                    <div className="max-h-60 overflow-y-auto">
+                      {[
+                        { value: 'ALL', label: 'Tất cả trạng thái' },
+                        { value: 'Nhap', label: 'Nháp' },
+                        { value: 'MoDangKy', label: 'Mở đăng ký' },
+                        { value: 'DaChotDanhSach', label: 'Đã chốt danh sách' },
+                        { value: 'DaDienRa', label: 'Đã diễn ra' },
+                        { value: 'DaHuy', label: 'Đã huỷ' },
+                      ]
+                        .filter(opt => opt.label.toLowerCase().includes(searchStatusKhoa.toLowerCase()))
+                        .map(opt => (
+                        <div
+                          key={opt.value}
+                          onClick={() => {
+                            setFilterStatus(opt.value);
+                            setIsFilterStatusOpen(false);
+                            setCurrentPageKhoa(1);
+                            setSearchStatusKhoa('');
+                          }}
+                          className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                            filterStatus === opt.value ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50 font-medium'
+                          }`}
+                        >
+                          <span className="truncate pr-2">{opt.label}</span>
+                          {filterStatus === opt.value && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                        </div>
+                      ))}
+                      {[
+                        { value: 'ALL', label: 'Tất cả trạng thái' },
+                        { value: 'Nhap', label: 'Nháp' },
+                        { value: 'MoDangKy', label: 'Mở đăng ký' },
+                        { value: 'DaChotDanhSach', label: 'Đã chốt danh sách' },
+                        { value: 'DaDienRa', label: 'Đã diễn ra' },
+                        { value: 'DaHuy', label: 'Đã huỷ' },
+                      ].filter(opt => opt.label.toLowerCase().includes(searchStatusKhoa.toLowerCase())).length === 0 && searchStatusKhoa && (
+                        <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
+
             <button 
               onClick={(e) => { e.stopPropagation(); handleAddClick(); }}
               className="px-4 py-2 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer whitespace-nowrap"
@@ -411,227 +489,443 @@ export default function ChuyenThamQuan_DSLoc() {
             </button>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-hidden">
-            <div className="overflow-x-auto">
-              {loading ? (
-                <div className="text-center py-12 text-slate-400 font-semibold flex items-center justify-center gap-2">
-                  <RefreshCw className="animate-spin w-5 h-5 text-[#407F3E]" />
-                  Đang tải...
-                </div>
-              ) : (
-                <table className="w-full text-left border-collapse min-w-[900px]">
-                  <thead>
-                    <tr className="bg-[#E7E0C4] text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
-                      <th className="p-4 pl-6">Nhà máy</th>
-                      <th className="p-4">Ngày tham quan</th>
-                      <th className="p-4">Giờ</th>
-                      <th className="p-4 text-center">Hình thức</th>
-                      <th className="p-4">Sức chứa</th>
-                      <th className="p-4 text-center">Trạng thái</th>
-                      <th className="p-4 text-right pr-6">Thao tác</th>
-                    </tr>
-                  </thead>
-                  <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
-                    {tripsKhoa
-                      .filter(t => {
-                        const tenNhaMay = t.nhaMay?.ten_nha_may || '';
-                        const matchSearch = tenNhaMay.toLowerCase().includes(searchQuery.toLowerCase());
-                        const matchStatus = filterStatus === 'ALL' || t.trang_thai === filterStatus;
-                        return matchSearch && matchStatus;
-                      })
-                      .map(t => {
-                      const used = t.dang_ky_count || 0;
-                      const max = t.suc_chua || 0;
-                      const percent = max > 0 ? (used / max) * 100 : 0;
-                      
-                      const formatTime = (timeStr) => {
-                        if (!timeStr) return '';
-                        // Nếu backend trả về '23:00:00.0000000'
-                        return timeStr.substring(0, 5); 
-                      };
+          {(() => {
+            const filteredTripsKhoa = tripsKhoa.filter(t => {
+              const tenNhaMay = t.nhaMay?.ten_nha_may || '';
+              const matchSearch = tenNhaMay.toLowerCase().includes(searchQuery.toLowerCase());
+              const matchStatus = filterStatus === 'ALL' || t.trang_thai === filterStatus;
+              return matchSearch && matchStatus;
+            });
+            const totalKhoa = filteredTripsKhoa.length;
+            const totalPagesKhoa = Math.ceil(totalKhoa / limitKhoa) || 1;
+            const validCurrentPageKhoa = Math.min(currentPageKhoa, totalPagesKhoa);
+            const paginatedTripsKhoa = filteredTripsKhoa.slice((validCurrentPageKhoa - 1) * limitKhoa, validCurrentPageKhoa * limitKhoa);
 
-                      return (
-                        <tr key={t.id} onClick={() => setViewingDetail(t)} className="hover:bg-slate-50 transition-colors cursor-pointer group">
-                          <td className="p-4 pl-6 font-bold text-slate-800">{t.nhaMay?.ten_nha_may || 'N/A'}</td>
-                          <td className="p-4 font-medium text-slate-600">
-                            {new Date(t.ngay_tham_quan).toLocaleDateString('vi-VN')}
-                          </td>
-                          <td className="p-4 font-medium text-slate-600">{formatTime(t.gio_bat_dau)}</td>
-                          <td className="p-4 text-center">
-                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-bold border ${
-                              t.hinh_thuc === 'TrucTiep' ? 'bg-[#89B449]/10 text-[#407F3E] border-[#89B449]/20' : 'bg-slate-100 text-slate-600 border-slate-200'
-                            }`}>
-                              {t.hinh_thuc === 'TrucTiep' ? 'Trực tiếp' : 'Trực tuyến'}
-                            </span>
-                          </td>
-                          <td className="p-4">
-                            <div className="flex items-center justify-between text-xs font-bold mb-1 text-slate-700">
-                              <span>{used}/{max}</span>
-                            </div>
-                            <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                              <div 
-                                className={`h-full rounded-full transition-all ${percent >= 100 ? 'bg-[#E68A8C]' : 'bg-[#89B449]'}`} 
-                                style={{ width: `${percent}%` }}
-                              ></div>
-                            </div>
-                          </td>
-                          <td className="p-4 text-center">
-                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold shadow-sm border ${
-                              t.trang_thai === 'MoDangKy' ? 'bg-[#89B449] text-white border-[#89B449]/20' : 
-                              t.trang_thai === 'Nhap' ? 'bg-slate-400 text-white border-slate-400/20' :
-                              t.trang_thai === 'DaHuy' ? 'bg-[#E68A8C] text-white border-[#E68A8C]/20' :
-                              'bg-[#407F3E] text-white border-[#407F3E]/20'
-                            }`}>
-                              {t.trang_thai === 'MoDangKy' ? 'Mở đăng ký' : 
-                               t.trang_thai === 'DaChotDanhSach' ? 'Đã chốt danh sách' : 
-                               t.trang_thai === 'DaDienRa' ? 'Đã diễn ra' : 
-                               t.trang_thai === 'DaHuy' ? 'Đã huỷ' : 'Nháp'}
-                            </span>
-                          </td>
-                          <td className="p-4 text-right pr-6 relative">
-                            <button 
-                              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${activeDropdown === t.id ? 'bg-[#407F3E]/10 text-[#407F3E]' : 'text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10'}`} 
-                              title="Thao tác"
-                              onClick={(e) => handleActionClick(e, t.id)}
-                            >
-                              <MoreVertical className="w-5 h-5" />
-                            </button>
-                            
-                            {activeDropdown === t.id && createPortal(
-                              <div 
-                                className="dropdown-menu-container fixed w-48 bg-white rounded-xl shadow-lg border border-[#E7E0C4] overflow-hidden z-[9999] animate-in fade-in zoom-in-95 duration-200"
-                                style={{ top: dropdownPosition.top, right: dropdownPosition.right }}
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                {t.trang_thai === 'Nhap' && (
-                                  <>
-                                    <button onClick={(e) => { e.stopPropagation(); handleEditClick(t); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors">
-                                      <Edit className="w-4 h-4 text-[#89B449]" /> Cập nhật
-                                    </button>
-                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteTrip(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#E68A8C] hover:bg-red-50 flex items-center gap-2 transition-colors border-t border-slate-100">
-                                      <Trash2 className="w-4 h-4" /> Xóa
-                                    </button>
-                                  </>
-                                )}
-
-                                {t.trang_thai === 'MoDangKy' && (
-                                  <>
-                                    <button onClick={(e) => { e.stopPropagation(); handlePreviewAssignStudents(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#407F3E] hover:bg-green-50 flex items-center gap-2 transition-colors">
-                                      <CheckCircle className="w-4 h-4" /> Xét duyệt danh sách
-                                    </button>
-                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteTrip(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#E68A8C] hover:bg-red-50 flex items-center gap-2 transition-colors border-t border-slate-100">
-                                      <Trash2 className="w-4 h-4" /> Hủy chuyến
-                                    </button>
-                                  </>
-                                )}
-
-                                {t.trang_thai === 'DaChotDanhSach' && (
-                                  <>
-                                    <button onClick={(e) => { e.stopPropagation(); handleReopenRegistration(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-orange-600 hover:bg-orange-50 flex items-center gap-2 transition-colors">
-                                      <RotateCcw className="w-4 h-4" /> Mở đăng ký bổ sung
-                                    </button>
-                                  </>
-                                )}
-
-                                {t.trang_thai === 'DaDuyet' && (
-                                  <button onClick={(e) => { e.stopPropagation(); handleDeleteTrip(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#E68A8C] hover:bg-red-50 flex items-center gap-2 transition-colors border-t border-slate-100">
-                                    <Trash2 className="w-4 h-4" /> Hủy chuyến
-                                  </button>
-                                )}
-
-                                {t.trang_thai !== 'Nhap' && t.trang_thai !== 'MoDangKy' && t.trang_thai !== 'DaDuyet' && t.trang_thai !== 'DaChotDanhSach' && (
-                                  <div className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-400">
-                                    Không có thao tác
-                                  </div>
-                                )}
-                              </div>,
-                              document.body
-                            )}
-                          </td>
+            return (
+              <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-hidden">
+                <div className="overflow-x-auto">
+                  {loading ? (
+                    <div className="text-center py-12 text-slate-400 font-semibold flex items-center justify-center gap-2">
+                      <RefreshCw className="animate-spin w-5 h-5 text-[#407F3E]" />
+                      Đang tải...
+                    </div>
+                  ) : (
+                    <table className="w-full text-left border-collapse min-w-[900px]">
+                      <thead>
+                        <tr className="bg-[#E7E0C4] text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
+                          <th className="p-4 pl-6">Nhà máy</th>
+                          <th className="p-4">Ngày tham quan</th>
+                          <th className="p-4">Giờ</th>
+                          <th className="p-4 text-center">Hình thức</th>
+                          <th className="p-4">Sức chứa</th>
+                          <th className="p-4 text-center">Trạng thái</th>
+                          <th className="p-4 text-right pr-6">Thao tác</th>
                         </tr>
-                      )
-                    })}
-                    {tripsKhoa.length === 0 && (
-                      <tr>
-                        <td colSpan="7" className="text-center py-8 text-slate-500 font-medium">Không tìm thấy chuyến nào</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
+                      </thead>
+                      <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
+                        {paginatedTripsKhoa.map(t => {
+                          const used = t.dang_ky_count || 0;
+                          const max = t.suc_chua || 0;
+                          const percent = max > 0 ? (used / max) * 100 : 0;
+                          
+                          const formatTime = (timeStr) => {
+                            if (!timeStr) return '';
+                            return timeStr.substring(0, 5); 
+                          };
+
+                          return (
+                            <tr key={t.id} onClick={() => setViewingDetail(t)} className="hover:bg-slate-50 transition-colors cursor-pointer group">
+                              <td className="p-4 pl-6 font-bold text-slate-800">{t.nhaMay?.ten_nha_may || 'N/A'}</td>
+                              <td className="p-4 font-medium text-slate-600">
+                                {new Date(t.ngay_tham_quan).toLocaleDateString('vi-VN')}
+                              </td>
+                              <td className="p-4 font-medium text-slate-600">{formatTime(t.gio_bat_dau)}</td>
+                              <td className="p-4 text-center">
+                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-bold border ${
+                                  t.hinh_thuc === 'TrucTiep' ? 'bg-[#89B449]/10 text-[#407F3E] border-[#89B449]/20' : 'bg-slate-100 text-slate-600 border-slate-200'
+                                }`}>
+                                  {t.hinh_thuc === 'TrucTiep' ? 'Trực tiếp' : 'Trực tuyến'}
+                                </span>
+                              </td>
+                              <td className="p-4">
+                                <div className="flex items-center justify-between text-xs font-bold mb-1 text-slate-700">
+                                  <span>{used}/{max}</span>
+                                </div>
+                                <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                  <div 
+                                    className={`h-full rounded-full transition-all ${percent >= 100 ? 'bg-[#E68A8C]' : 'bg-[#89B449]'}`} 
+                                    style={{ width: `${percent}%` }}
+                                  ></div>
+                                </div>
+                              </td>
+                              <td className="p-4 text-center">
+                                <span className={`inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold shadow-sm border ${
+                                  t.trang_thai === 'MoDangKy' ? 'bg-[#89B449] text-white border-[#89B449]/20' : 
+                                  t.trang_thai === 'Nhap' ? 'bg-slate-400 text-white border-slate-400/20' :
+                                  t.trang_thai === 'DaHuy' ? 'bg-[#E68A8C] text-white border-[#E68A8C]/20' :
+                                  'bg-[#407F3E] text-white border-[#407F3E]/20'
+                                }`}>
+                                  {t.trang_thai === 'MoDangKy' ? 'Mở đăng ký' : 
+                                   t.trang_thai === 'DaChotDanhSach' ? 'Đã chốt danh sách' : 
+                                   t.trang_thai === 'DaDienRa' ? 'Đã diễn ra' : 
+                                   t.trang_thai === 'DaHuy' ? 'Đã huỷ' : 'Nháp'}
+                                </span>
+                              </td>
+                              <td className="p-4 text-right pr-6 relative">
+                                <button 
+                                  className={`p-1.5 rounded-lg transition-colors cursor-pointer ${activeDropdown === t.id ? 'bg-[#407F3E]/10 text-[#407F3E]' : 'text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10'}`} 
+                                  title="Thao tác"
+                                  onClick={(e) => handleActionClick(e, t.id)}
+                                >
+                                  <MoreVertical className="w-5 h-5" />
+                                </button>
+                                
+                                {activeDropdown === t.id && createPortal(
+                                  <div 
+                                    className="dropdown-menu-container fixed w-48 bg-white rounded-xl shadow-lg border border-[#E7E0C4] overflow-hidden z-[9999] animate-in fade-in zoom-in-95 duration-200"
+                                    style={{ top: dropdownPosition.top, right: dropdownPosition.right }}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {t.trang_thai === 'Nhap' && (
+                                      <>
+                                        <button onClick={(e) => { e.stopPropagation(); handleEditClick(t); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors">
+                                          <Edit className="w-4 h-4 text-[#89B449]" /> Cập nhật
+                                        </button>
+                                        <button onClick={(e) => { e.stopPropagation(); handleDeleteTrip(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#E68A8C] hover:bg-red-50 flex items-center gap-2 transition-colors border-t border-slate-100">
+                                          <Trash2 className="w-4 h-4" /> Xóa
+                                        </button>
+                                      </>
+                                    )}
+
+                                    {t.trang_thai === 'MoDangKy' && (
+                                      <>
+                                        <button onClick={(e) => { e.stopPropagation(); handlePreviewAssignStudents(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#407F3E] hover:bg-green-50 flex items-center gap-2 transition-colors">
+                                          <CheckCircle className="w-4 h-4" /> Xét duyệt danh sách
+                                        </button>
+                                        <button onClick={(e) => { e.stopPropagation(); handleDeleteTrip(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#E68A8C] hover:bg-red-50 flex items-center gap-2 transition-colors border-t border-slate-100">
+                                          <Trash2 className="w-4 h-4" /> Hủy chuyến
+                                        </button>
+                                      </>
+                                    )}
+
+                                    {t.trang_thai === 'DaChotDanhSach' && (
+                                      <>
+                                        <button onClick={(e) => { e.stopPropagation(); handleReopenRegistration(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-orange-600 hover:bg-orange-50 flex items-center gap-2 transition-colors">
+                                          <RotateCcw className="w-4 h-4" /> Mở đăng ký bổ sung
+                                        </button>
+                                      </>
+                                    )}
+
+                                    {t.trang_thai === 'DaDuyet' && (
+                                      <button onClick={(e) => { e.stopPropagation(); handleDeleteTrip(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#E68A8C] hover:bg-red-50 flex items-center gap-2 transition-colors border-t border-slate-100">
+                                        <Trash2 className="w-4 h-4" /> Hủy chuyến
+                                      </button>
+                                    )}
+
+                                    {t.trang_thai !== 'Nhap' && t.trang_thai !== 'MoDangKy' && t.trang_thai !== 'DaDuyet' && t.trang_thai !== 'DaChotDanhSach' && (
+                                      <div className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-400">
+                                        Không có thao tác
+                                      </div>
+                                    )}
+                                  </div>,
+                                  document.body
+                                )}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                        {paginatedTripsKhoa.length === 0 && (
+                          <tr>
+                            <td colSpan="7" className="text-center py-8 text-slate-500 font-medium">Không tìm thấy chuyến nào</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+
+                {/* Pagination Footer Tab 1 */}
+                <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
+                    <span>Hiển thị</span>
+                    <select
+                      value={limitKhoa}
+                      onChange={e => {
+                        setLimitKhoa(Number(e.target.value));
+                        setCurrentPageKhoa(1);
+                      }}
+                      className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
+                    >
+                      <option value={15}>15</option>
+                      <option value={30}>30</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                    <span>/ {totalKhoa} chuyến</span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => setCurrentPageKhoa(1)}
+                      disabled={validCurrentPageKhoa <= 1}
+                      className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+                    >
+                      Trang đầu
+                    </button>
+                    <button
+                      onClick={() => setCurrentPageKhoa(prev => Math.max(prev - 1, 1))}
+                      disabled={validCurrentPageKhoa <= 1}
+                      className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+                    >
+                      Trước
+                    </button>
+                    <span className="px-4 py-1.5 rounded-lg bg-[#407F3E] text-white text-sm font-bold shadow-sm cursor-default mx-1">
+                      Trang {validCurrentPageKhoa} / {totalPagesKhoa}
+                    </span>
+                    <button
+                      onClick={() => setCurrentPageKhoa(prev => Math.min(prev + 1, totalPagesKhoa))}
+                      disabled={validCurrentPageKhoa >= totalPagesKhoa}
+                      className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+                    >
+                      Sau
+                    </button>
+                    <button
+                      onClick={() => setCurrentPageKhoa(totalPagesKhoa)}
+                      disabled={validCurrentPageKhoa >= totalPagesKhoa}
+                      className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+                    >
+                      Trang cuối
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
       {/* Tab 2: Tự do chờ duyệt */}
       {activeTab === 'tudo' && (
         <div className="space-y-4 animate-in slide-in-from-left-4 duration-300">
-          <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-hidden mt-10">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[900px]">
-                <thead>
-                  <tr className="bg-[#E7E0C4] text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
-                    <th className="p-4 pl-6">Sinh viên đề xuất</th>
-                    <th className="p-4">Nhà máy đề xuất</th>
-                    <th className="p-4">Ngày tham quan</th>
-                    <th className="p-4">Trạng thái</th>
-                    <th className="p-4 text-right pr-6">Thao tác</th>
-                  </tr>
-                </thead>
-                <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
-                  {tripsTuDo.map(t => (
-                    <tr key={t.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="p-4 pl-6">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-[#E7E0C4] text-[#407F3E] flex items-center justify-center font-bold text-xs shadow-sm">
-                            {t.sinhVien?.ho_ten?.charAt(0) || '?'}
-                          </div>
-                          <div>
-                            <div className="font-bold text-slate-800">{t.sinhVien?.ho_ten}</div>
-                            <div className="text-xs font-mono text-slate-500">{t.sinhVien?.mssv}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-4 font-bold text-slate-800">{t.ten_nha_may_de_xuat || t.nhaMay?.ten_nha_may || 'N/A'}</td>
-                      <td className="p-4 font-medium text-slate-600">
-                        {t.ngay_tham_quan_de_xuat ? new Date(t.ngay_tham_quan_de_xuat).toLocaleDateString('vi-VN') : 'N/A'}
-                      </td>
-                      <td className="p-4">
-                        <span className="inline-flex items-center px-2 py-1 rounded bg-slate-100 text-slate-500 text-[10px] font-bold border border-slate-200">
-                          {t.trang_thai_duyet === 'ChoDuyet' ? 'Chờ duyệt' : t.trang_thai_duyet}
-                        </span>
-                      </td>
-                      <td className="p-4 text-right pr-6">
-                        <div className="flex items-center justify-end gap-2">
-                          <button onClick={() => setViewingDetail(t)} className="p-1.5 text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer" title="Chi tiết">
-                            <ChevronRight className="w-5 h-5" />
-                          </button>
-                          {t.trang_thai_duyet === 'ChoDuyet' && (
-                            <>
-                              <button onClick={() => handleApproveTrip(t.id, true)} className="px-3 py-1.5 bg-[#89B449] hover:bg-[#89B449]/90 text-white rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center gap-1 cursor-pointer">
-                                <CheckCircle2 className="w-4 h-4" />
-                                Duyệt
-                              </button>
-                              <button onClick={() => handleApproveTrip(t.id, false)} className="px-3 py-1.5 border border-[#E68A8C] text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer">
-                                <XCircle className="w-4 h-4" />
-                                Từ chối
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {tripsTuDo.length === 0 && (
-                    <tr>
-                      <td colSpan="5" className="text-center py-8 text-slate-500 font-medium">Không có đề xuất tự do nào</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+          {/* Filter Bar Tab 2 */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 sm:w-64 min-w-[220px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input 
+                type="text" 
+                placeholder="Tìm theo SV, MSSV, Nhà máy..." 
+                value={searchQueryTuDo}
+                onChange={(e) => {
+                  setSearchQueryTuDo(e.target.value);
+                  setCurrentPageTuDo(1);
+                }}
+                className="w-full pl-9 pr-4 py-2 bg-white border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#407F3E] focus:border-[#407F3E] transition-shadow"
+              />
+            </div>
+
+            {/* Popover Filter Trạng thái Tab 2 */}
+            <div className="relative min-w-[180px]" onClick={e => e.stopPropagation()}>
+              <div 
+                onClick={() => setIsFilterStatusTuDoOpen(!isFilterStatusTuDoOpen)}
+                className={`w-full px-4 py-2 bg-white border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isFilterStatusTuDoOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+              >
+                <span className={`truncate pr-2 font-medium ${filterStatusTuDo !== 'ALL' ? 'text-slate-800' : 'text-slate-600'}`}>
+                  {filterStatusTuDo === 'ALL' ? 'Tất cả trạng thái' :
+                   filterStatusTuDo === 'ChoDuyet' ? 'Chờ duyệt' :
+                   filterStatusTuDo === 'DaDuyet' ? 'Đã duyệt' :
+                   filterStatusTuDo === 'TuChoi' ? 'Từ chối' : filterStatusTuDo}
+                </span>
+                <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isFilterStatusTuDoOpen ? 'rotate-180 text-[#407F3E]' : ''}`} />
+              </div>
+              {isFilterStatusTuDoOpen && (
+                <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[200px]">
+                  <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
+                    <input 
+                      type="text" 
+                      placeholder="Tìm trạng thái..." 
+                      value={searchStatusTuDo}
+                      onChange={(e) => setSearchStatusTuDo(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
+                    />
+                  </div>
+                  <div className="max-h-60 overflow-y-auto">
+                    {[
+                      { value: 'ALL', label: 'Tất cả trạng thái' },
+                      { value: 'ChoDuyet', label: 'Chờ duyệt' },
+                      { value: 'DaDuyet', label: 'Đã duyệt' },
+                      { value: 'TuChoi', label: 'Từ chối' },
+                    ]
+                      .filter(opt => opt.label.toLowerCase().includes(searchStatusTuDo.toLowerCase()))
+                      .map(opt => (
+                      <div
+                        key={opt.value}
+                        onClick={() => {
+                          setFilterStatusTuDo(opt.value);
+                          setIsFilterStatusTuDoOpen(false);
+                          setCurrentPageTuDo(1);
+                          setSearchStatusTuDo('');
+                        }}
+                        className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                          filterStatusTuDo === opt.value ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50 font-medium'
+                        }`}
+                      >
+                        <span className="truncate pr-2">{opt.label}</span>
+                        {filterStatusTuDo === opt.value && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                      </div>
+                    ))}
+                    {[
+                      { value: 'ALL', label: 'Tất cả trạng thái' },
+                      { value: 'ChoDuyet', label: 'Chờ duyệt' },
+                      { value: 'DaDuyet', label: 'Đã duyệt' },
+                      { value: 'TuChoi', label: 'Từ chối' },
+                    ].filter(opt => opt.label.toLowerCase().includes(searchStatusTuDo.toLowerCase())).length === 0 && searchStatusTuDo && (
+                      <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy</div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
+
+          {(() => {
+            const filteredTripsTuDo = tripsTuDo.filter(t => {
+              const sv = t.sinhVien || {};
+              const factory = t.ten_nha_may_de_xuat || t.nhaMay?.ten_nha_may || '';
+              const matchSearch = (sv.ho_ten || '').toLowerCase().includes(searchQueryTuDo.toLowerCase()) ||
+                                  (sv.mssv || '').toLowerCase().includes(searchQueryTuDo.toLowerCase()) ||
+                                  factory.toLowerCase().includes(searchQueryTuDo.toLowerCase());
+              const matchStatus = filterStatusTuDo === 'ALL' || t.trang_thai_duyet === filterStatusTuDo;
+              return matchSearch && matchStatus;
+            });
+            const totalTuDo = filteredTripsTuDo.length;
+            const totalPagesTuDo = Math.ceil(totalTuDo / limitTuDo) || 1;
+            const validCurrentPageTuDo = Math.min(currentPageTuDo, totalPagesTuDo);
+            const paginatedTripsTuDo = filteredTripsTuDo.slice((validCurrentPageTuDo - 1) * limitTuDo, validCurrentPageTuDo * limitTuDo);
+
+            return (
+              <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse min-w-[900px]">
+                    <thead>
+                      <tr className="bg-[#E7E0C4] text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
+                        <th className="p-4 pl-6">Sinh viên đề xuất</th>
+                        <th className="p-4">Nhà máy đề xuất</th>
+                        <th className="p-4">Ngày tham quan</th>
+                        <th className="p-4">Trạng thái</th>
+                        <th className="p-4 text-right pr-6">Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
+                      {paginatedTripsTuDo.map(t => (
+                        <tr key={t.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="p-4 pl-6">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-[#E7E0C4] text-[#407F3E] flex items-center justify-center font-bold text-xs shadow-sm">
+                                {t.sinhVien?.ho_ten?.charAt(0) || '?'}
+                              </div>
+                              <div>
+                                <div className="font-bold text-slate-800">{t.sinhVien?.ho_ten}</div>
+                                <div className="text-xs font-mono text-slate-500">{t.sinhVien?.mssv}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-4 font-bold text-slate-800">{t.ten_nha_may_de_xuat || t.nhaMay?.ten_nha_may || 'N/A'}</td>
+                          <td className="p-4 font-medium text-slate-600">
+                            {t.ngay_tham_quan_de_xuat ? new Date(t.ngay_tham_quan_de_xuat).toLocaleDateString('vi-VN') : 'N/A'}
+                          </td>
+                          <td className="p-4">
+                            <span className="inline-flex items-center px-2 py-1 rounded bg-slate-100 text-slate-500 text-[10px] font-bold border border-slate-200">
+                              {t.trang_thai_duyet === 'ChoDuyet' ? 'Chờ duyệt' : t.trang_thai_duyet}
+                            </span>
+                          </td>
+                          <td className="p-4 text-right pr-6">
+                            <div className="flex items-center justify-end gap-2">
+                              <button onClick={() => setViewingDetail(t)} className="p-1.5 text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer" title="Chi tiết">
+                                <ChevronRight className="w-5 h-5" />
+                              </button>
+                              {t.trang_thai_duyet === 'ChoDuyet' && (
+                                <>
+                                  <button onClick={() => handleApproveTrip(t.id, true)} className="px-3 py-1.5 bg-[#89B449] hover:bg-[#89B449]/90 text-white rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center gap-1 cursor-pointer">
+                                    <CheckCircle2 className="w-4 h-4" />
+                                    Duyệt
+                                  </button>
+                                  <button onClick={() => handleApproveTrip(t.id, false)} className="px-3 py-1.5 border border-[#E68A8C] text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer">
+                                    <XCircle className="w-4 h-4" />
+                                    Từ chối
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {paginatedTripsTuDo.length === 0 && (
+                        <tr>
+                          <td colSpan="5" className="text-center py-8 text-slate-500 font-medium">Không có đề xuất tự do nào</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination Footer Tab 2 */}
+                <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
+                    <span>Hiển thị</span>
+                    <select
+                      value={limitTuDo}
+                      onChange={e => {
+                        setLimitTuDo(Number(e.target.value));
+                        setCurrentPageTuDo(1);
+                      }}
+                      className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
+                    >
+                      <option value={15}>15</option>
+                      <option value={30}>30</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                    <span>/ {totalTuDo} đề xuất</span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => setCurrentPageTuDo(1)}
+                      disabled={validCurrentPageTuDo <= 1}
+                      className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+                    >
+                      Trang đầu
+                    </button>
+                    <button
+                      onClick={() => setCurrentPageTuDo(prev => Math.max(prev - 1, 1))}
+                      disabled={validCurrentPageTuDo <= 1}
+                      className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+                    >
+                      Trước
+                    </button>
+                    <span className="px-4 py-1.5 rounded-lg bg-[#407F3E] text-white text-sm font-bold shadow-sm cursor-default mx-1">
+                      Trang {validCurrentPageTuDo} / {totalPagesTuDo}
+                    </span>
+                    <button
+                      onClick={() => setCurrentPageTuDo(prev => Math.min(prev + 1, totalPagesTuDo))}
+                      disabled={validCurrentPageTuDo >= totalPagesTuDo}
+                      className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+                    >
+                      Sau
+                    </button>
+                    <button
+                      onClick={() => setCurrentPageTuDo(totalPagesTuDo)}
+                      disabled={validCurrentPageTuDo >= totalPagesTuDo}
+                      className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+                    >
+                      Trang cuối
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 

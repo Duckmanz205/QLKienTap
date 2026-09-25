@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   ArrowLeft, FileText, CheckCircle2, Save, Search, ChevronRight,
-  ZoomIn, ZoomOut, Download, Sparkles, MessageSquareWarning, User
+  ZoomIn, ZoomOut, Download, Sparkles, MessageSquareWarning, User,
+  Filter, Check, ChevronDown
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { giangVienApi } from '../../services/api';
@@ -12,6 +13,26 @@ export default function ChamBaiThuHoach_GV() {
   const [lecturer, setLecturer] = useState(null);
   const [reports, setReports] = useState([]);
   const [selectedReport, setSelectedReport] = useState(null);
+
+  // Filter & Pagination states
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState('ALL');
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+  const [searchStatusDropdown, setSearchStatusDropdown] = useState('');
+  const statusDropdownRef = useRef(null);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [limit, setLimit] = useState(15);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target)) {
+        setIsStatusDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
   
   // Grading states
   const [score, setScore] = useState('');
@@ -74,13 +95,32 @@ export default function ChamBaiThuHoach_GV() {
     }
   };
 
+  const filteredReports = reports.filter(r => {
+    const sv = r.phieuDangKy?.sinhVien || {};
+    const nhaMay = r.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || '';
+    const matchSearch = !searchTerm || 
+      (sv.ho_ten && sv.ho_ten.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (sv.mssv && sv.mssv.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      nhaMay.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const isGraded = r.diem_thu_hoach !== null;
+    const matchStatus = selectedStatus === 'ALL' || 
+      (selectedStatus === 'PENDING' && !isGraded) || 
+      (selectedStatus === 'GRADED' && isGraded);
+
+    return matchSearch && matchStatus;
+  });
+
+  const totalPages = Math.ceil(filteredReports.length / limit) || 1;
+  const paginatedReports = filteredReports.slice((currentPage - 1) * limit, currentPage * limit);
+
   // ---------------------------------------------------------
   // VIEW 1: LIST OF REPORTS
   // ---------------------------------------------------------
   const renderReportList = () => (
     <div className="space-y-6">
       {/* Header & Back Button */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
         <div>
           <button 
             onClick={() => navigate('/giang-vien')}
@@ -94,14 +134,103 @@ export default function ChamBaiThuHoach_GV() {
         </div>
       </div>
 
+      {/* Filter Bar */}
+      <div className="bg-white p-4 rounded-xl border border-[#E7E0C4] shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+        <div className="flex flex-1 flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          {/* Search Input */}
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Tìm kiếm sinh viên, MSSV, nhà máy..."
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full pl-9 pr-4 py-2 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E] bg-slate-50/50"
+            />
+          </div>
+
+          {/* Popover Dropdown Status */}
+          <div className="relative" ref={statusDropdownRef}>
+            <button
+              type="button"
+              onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
+              className="w-full sm:w-56 px-3.5 py-2 border border-[#E7E0C4] rounded-lg text-sm font-medium bg-slate-50/50 text-slate-700 flex items-center justify-between hover:bg-slate-100 transition-colors shadow-sm"
+            >
+              <div className="flex items-center gap-2 truncate">
+                <Filter className="w-4 h-4 text-slate-400 shrink-0" />
+                <span className="truncate">
+                  {selectedStatus === 'ALL' && 'Tất cả trạng thái'}
+                  {selectedStatus === 'PENDING' && 'Chờ chấm'}
+                  {selectedStatus === 'GRADED' && 'Đã chấm'}
+                </span>
+              </div>
+              <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isStatusDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {isStatusDropdownOpen && (
+              <div className="absolute left-0 right-0 sm:right-auto sm:w-56 mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-50 py-1 flex flex-col">
+                <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
+                  <input 
+                    type="text" 
+                    placeholder="Tìm trạng thái..." 
+                    value={searchStatusDropdown}
+                    onChange={(e) => setSearchStatusDropdown(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
+                  />
+                </div>
+                <div className="max-h-60 overflow-y-auto">
+                  {[
+                    { value: 'ALL', label: 'Tất cả trạng thái' },
+                    { value: 'PENDING', label: 'Chờ chấm' },
+                    { value: 'GRADED', label: 'Đã chấm' }
+                  ]
+                    .filter(opt => opt.label.toLowerCase().includes(searchStatusDropdown.toLowerCase()))
+                    .map(opt => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => {
+                          setSelectedStatus(opt.value);
+                          setIsStatusDropdownOpen(false);
+                          setSearchStatusDropdown('');
+                          setCurrentPage(1);
+                        }}
+                        className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between hover:bg-slate-50 transition-colors ${selectedStatus === opt.value ? 'bg-[#E7E0C4]/40 font-bold text-[#407F3E]' : 'text-slate-700'}`}
+                      >
+                        <span>{opt.label}</span>
+                        {selectedStatus === opt.value && <Check className="w-4 h-4 text-[#407F3E]" />}
+                      </button>
+                    ))}
+                  {[
+                    { value: 'ALL', label: 'Tất cả trạng thái' },
+                    { value: 'PENDING', label: 'Chờ chấm' },
+                    { value: 'GRADED', label: 'Đã chấm' }
+                  ].filter(opt => opt.label.toLowerCase().includes(searchStatusDropdown.toLowerCase())).length === 0 && (
+                    <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy</div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="text-xs text-slate-500 font-medium">
+          Tìm thấy: <span className="font-bold text-slate-700">{filteredReports.length}</span> bài nộp
+        </div>
+      </div>
+
       {/* Grid of Report Cards */}
-      {reports.length === 0 ? (
+      {paginatedReports.length === 0 ? (
         <div className="p-8 text-center text-slate-500 bg-white rounded-2xl border border-[#E7E0C4]">
-          Không có bài thu hoạch nào.
+          {reports.length === 0 ? 'Không có bài thu hoạch nào.' : 'Không tìm thấy bài thu hoạch nào phù hợp với bộ lọc.'}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {reports.map((report) => {
+          {paginatedReports.map((report) => {
             const isGraded = report.diem_thu_hoach !== null;
             const sv = report.phieuDangKy?.sinhVien || {};
             const nhaMay = report.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Chuyến đi';
@@ -163,6 +292,61 @@ export default function ChamBaiThuHoach_GV() {
           })}
         </div>
       )}
+
+      {/* Pagination Footer */}
+      <div className="p-4 border border-[#E7E0C4] bg-white rounded-xl shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
+          <span>Hiển thị</span>
+          <select 
+            value={limit}
+            onChange={(e) => {
+              const newLimit = Number(e.target.value);
+              setLimit(newLimit);
+              setCurrentPage(1);
+            }}
+            className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
+          >
+            <option value={15}>15</option>
+            <option value={30}>30</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+          </select>
+          <span>/ {filteredReports.length} bài thu hoạch</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button 
+            disabled={currentPage <= 1}
+            onClick={() => setCurrentPage(1)}
+            className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+          >
+            Trang đầu
+          </button>
+          <button 
+            disabled={currentPage <= 1}
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+          >
+            Trước
+          </button>
+          <span className="px-4 py-1.5 rounded-lg bg-[#407F3E] text-white text-sm font-bold shadow-sm cursor-default mx-1">
+            Trang {currentPage} / {totalPages}
+          </span>
+          <button 
+            disabled={currentPage >= totalPages}
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+          >
+            Sau
+          </button>
+          <button 
+            disabled={currentPage >= totalPages}
+            onClick={() => setCurrentPage(totalPages)}
+            className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+          >
+            Trang cuối
+          </button>
+        </div>
+      </div>
     </div>
   );
 

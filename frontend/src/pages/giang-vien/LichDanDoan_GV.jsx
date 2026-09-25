@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Calendar as CalendarIcon, MapPin, Laptop, ChevronLeft, ChevronRight, Eye
+  Calendar as CalendarIcon, MapPin, Laptop, ChevronLeft, ChevronRight, Eye,
+  Search, ChevronDown, Check
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { giangVienApi } from '../../services/api';
@@ -12,6 +13,24 @@ export default function LichDanDoan_GV() {
   const [loading, setLoading] = useState(false);
   const [lecturer, setLecturer] = useState(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
+
+  // Filter & Pagination states
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState('ALL');
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+  const [searchStatusDropdown, setSearchStatusDropdown] = useState('');
+
+  const [selectedHinhThuc, setSelectedHinhThuc] = useState('ALL');
+  const [isHinhThucDropdownOpen, setIsHinhThucDropdownOpen] = useState(false);
+  const [searchHinhThucDropdown, setSearchHinhThucDropdown] = useState('');
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [limit, setLimit] = useState(15);
+
+  const closeAllDropdowns = () => {
+    setIsStatusDropdownOpen(false);
+    setIsHinhThucDropdownOpen(false);
+  };
 
   useEffect(() => {
     const userJson = localStorage.getItem('user');
@@ -136,8 +155,26 @@ export default function LichDanDoan_GV() {
     );
   };
 
+  // Filter & Pagination logic
+  const filteredTrips = useMemo(() => {
+    return trips.filter(trip => {
+      const nhaMay = trip.nhaMay?.ten_nha_may || 'Chuyến tham quan';
+      const matchSearch = !searchTerm || nhaMay.toLowerCase().includes(searchTerm.toLowerCase());
+      const statusText = getStatus(trip);
+      const matchStatus = selectedStatus === 'ALL' || statusText === selectedStatus;
+      const isOnline = trip.hinh_thuc === 'TrucTuyen';
+      const matchHinhThuc = selectedHinhThuc === 'ALL' || 
+        (selectedHinhThuc === 'TrucTuyen' && isOnline) || 
+        (selectedHinhThuc === 'TrucTiep' && !isOnline);
+      return matchSearch && matchStatus && matchHinhThuc;
+    });
+  }, [trips, searchTerm, selectedStatus, selectedHinhThuc]);
+
+  const totalPages = Math.ceil(filteredTrips.length / limit) || 1;
+  const paginatedTrips = filteredTrips.slice((currentPage - 1) * limit, currentPage * limit);
+
   return (
-    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300">
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300" onClick={closeAllDropdowns}>
       
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <h1 className="text-2xl font-bold text-slate-800">Lịch dẫn đoàn</h1>
@@ -163,6 +200,142 @@ export default function LichDanDoan_GV() {
         </div>
       </div>
 
+      {/* Filter Bar (Only in list view) */}
+      {viewMode === 'list' && (
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-[#E7E0C4] mb-6 flex flex-wrap gap-4 items-center relative z-20">
+          {/* Search Input */}
+          <div className="relative flex-1 min-w-[240px]">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input 
+              type="text" 
+              placeholder="Tìm theo tên nhà máy, chuyến đi..."
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E] transition-all font-medium text-slate-700"
+            />
+          </div>
+
+          {/* Trạng thái Dropdown */}
+          <div className="relative min-w-[180px]" onClick={(e) => e.stopPropagation()}>
+            <div 
+              onClick={() => {
+                setIsStatusDropdownOpen(!isStatusDropdownOpen);
+                setIsHinhThucDropdownOpen(false);
+              }}
+              className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isStatusDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+            >
+              <span className="truncate pr-2 font-medium text-slate-700">
+                {selectedStatus === 'ALL' ? 'Tất cả trạng thái' : selectedStatus}
+              </span>
+              <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+            </div>
+            {isStatusDropdownOpen && (
+              <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[200px]">
+                <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
+                  <input 
+                    type="text" 
+                    placeholder="Tìm trạng thái..." 
+                    value={searchStatusDropdown}
+                    onChange={(e) => setSearchStatusDropdown(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
+                  />
+                </div>
+                <div className="max-h-60 overflow-y-auto">
+                  {[
+                    { id: 'ALL', name: 'Tất cả trạng thái' },
+                    { id: 'Sắp diễn ra', name: 'Sắp diễn ra' },
+                    { id: 'Đang diễn ra', name: 'Đang diễn ra' },
+                    { id: 'Đã hoàn thành', name: 'Đã hoàn thành' }
+                  ]
+                    .filter(opt => opt.name.toLowerCase().includes(searchStatusDropdown.toLowerCase()))
+                    .map(opt => (
+                      <div 
+                        key={opt.id}
+                        onClick={() => { setSelectedStatus(opt.id); setIsStatusDropdownOpen(false); setSearchStatusDropdown(''); setCurrentPage(1); }}
+                        className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                          selectedStatus === opt.id ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                        }`}
+                      >
+                        <span>{opt.name}</span>
+                        {selectedStatus === opt.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                      </div>
+                    ))}
+                  {[
+                    { id: 'ALL', name: 'Tất cả trạng thái' },
+                    { id: 'Sắp diễn ra', name: 'Sắp diễn ra' },
+                    { id: 'Đang diễn ra', name: 'Đang diễn ra' },
+                    { id: 'Đã hoàn thành', name: 'Đã hoàn thành' }
+                  ].filter(opt => opt.name.toLowerCase().includes(searchStatusDropdown.toLowerCase())).length === 0 && (
+                    <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy</div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Hình thức Dropdown */}
+          <div className="relative min-w-[180px]" onClick={(e) => e.stopPropagation()}>
+            <div 
+              onClick={() => {
+                setIsHinhThucDropdownOpen(!isHinhThucDropdownOpen);
+                setIsStatusDropdownOpen(false);
+              }}
+              className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isHinhThucDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+            >
+              <span className="truncate pr-2 font-medium text-slate-700">
+                {selectedHinhThuc === 'ALL' ? 'Tất cả hình thức' : selectedHinhThuc === 'TrucTiep' ? 'Trực tiếp' : 'Trực tuyến'}
+              </span>
+              <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+            </div>
+            {isHinhThucDropdownOpen && (
+              <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[200px]">
+                <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
+                  <input 
+                    type="text" 
+                    placeholder="Tìm hình thức..." 
+                    value={searchHinhThucDropdown}
+                    onChange={(e) => setSearchHinhThucDropdown(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
+                  />
+                </div>
+                <div className="max-h-60 overflow-y-auto">
+                  {[
+                    { id: 'ALL', name: 'Tất cả hình thức' },
+                    { id: 'TrucTiep', name: 'Trực tiếp' },
+                    { id: 'TrucTuyen', name: 'Trực tuyến' }
+                  ]
+                    .filter(opt => opt.name.toLowerCase().includes(searchHinhThucDropdown.toLowerCase()))
+                    .map(opt => (
+                      <div 
+                        key={opt.id}
+                        onClick={() => { setSelectedHinhThuc(opt.id); setIsHinhThucDropdownOpen(false); setSearchHinhThucDropdown(''); setCurrentPage(1); }}
+                        className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                          selectedHinhThuc === opt.id ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                        }`}
+                      >
+                        <span>{opt.name}</span>
+                        {selectedHinhThuc === opt.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                      </div>
+                    ))}
+                  {[
+                    { id: 'ALL', name: 'Tất cả hình thức' },
+                    { id: 'TrucTiep', name: 'Trực tiếp' },
+                    { id: 'TrucTuyen', name: 'Trực tuyến' }
+                  ].filter(opt => opt.name.toLowerCase().includes(searchHinhThucDropdown.toLowerCase())).length === 0 && (
+                    <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy</div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
         
         {/* Main Content: Table View */}
@@ -187,14 +360,14 @@ export default function LichDanDoan_GV() {
                       <tr>
                         <td colSpan="7" className="p-8 text-center text-slate-500 font-medium">Đang tải dữ liệu...</td>
                       </tr>
-                    ) : trips.length === 0 ? (
+                    ) : filteredTrips.length === 0 ? (
                       <tr>
                         <td colSpan="7" className="p-8 text-center text-slate-500 font-medium italic">
-                          Chưa có lịch dẫn đoàn nào.
+                          Không tìm thấy chuyến tham quan nào.
                         </td>
                       </tr>
                     ) : (
-                      trips.map(trip => {
+                      paginatedTrips.map(trip => {
                         const isOnline = trip.hinh_thuc === 'TrucTuyen';
                         const hinhThucText = isOnline ? 'Trực tuyến' : 'Trực tiếp';
                         const dateText = new Date(trip.ngay_tham_quan || trip.ngay_khoi_hanh || Date.now()).toLocaleDateString('vi-VN');
@@ -235,6 +408,61 @@ export default function LichDanDoan_GV() {
                     )}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Pagination Footer */}
+              <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
+                  <span>Hiển thị</span>
+                  <select 
+                    value={limit}
+                    onChange={(e) => {
+                      const newLimit = Number(e.target.value);
+                      setLimit(newLimit);
+                      setCurrentPage(1);
+                    }}
+                    className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
+                  >
+                    <option value={15}>15</option>
+                    <option value={30}>30</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                  <span>/ {filteredTrips.length} chuyến</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button 
+                    disabled={currentPage <= 1}
+                    onClick={() => setCurrentPage(1)}
+                    className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+                  >
+                    Trang đầu
+                  </button>
+                  <button 
+                    disabled={currentPage <= 1}
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+                  >
+                    Trước
+                  </button>
+                  <span className="px-4 py-1.5 rounded-lg bg-[#407F3E] text-white text-sm font-bold shadow-sm cursor-default mx-1">
+                    Trang {currentPage} / {totalPages}
+                  </span>
+                  <button 
+                    disabled={currentPage >= totalPages}
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+                  >
+                    Sau
+                  </button>
+                  <button 
+                    disabled={currentPage >= totalPages}
+                    onClick={() => setCurrentPage(totalPages)}
+                    className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+                  >
+                    Trang cuối
+                  </button>
+                </div>
               </div>
             </div>
           ) : (
