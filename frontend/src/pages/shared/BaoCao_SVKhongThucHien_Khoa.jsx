@@ -34,7 +34,7 @@ export default function BaoCao_SVKhongThucHien_Khoa() {
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const [limit, setLimit] = useState(15);
 
   useEffect(() => {
     fetchData();
@@ -94,8 +94,8 @@ export default function BaoCao_SVKhongThucHien_Khoa() {
     return matchSearch && matchClass && matchKhoa;
   });
 
-  const totalPages = Math.ceil(filteredStudents.length / itemsPerPage) || 1;
-  const paginatedData = filteredStudents.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const totalPages = Math.ceil(filteredStudents.length / limit) || 1;
+  const paginatedData = filteredStudents.slice((currentPage - 1) * limit, currentPage * limit);
 
   const exportExcel = () => {
     let csvContent = '\uFEFF';
@@ -322,7 +322,7 @@ export default function BaoCao_SVKhongThucHien_Khoa() {
                 paginatedData.map((s, idx) => (
                   <tr key={s.id} className="hover:bg-slate-50 transition-colors">
                     <td className="p-4 pl-6 text-center text-slate-400 font-mono">
-                      {(currentPage - 1) * itemsPerPage + idx + 1}
+                      {(currentPage - 1) * limit + idx + 1}
                     </td>
                     <td className="p-4 font-mono font-bold text-slate-800">{s.mssv}</td>
                     <td className="p-4 font-bold text-slate-800">{s.ho_ten}</td>
@@ -365,45 +365,62 @@ export default function BaoCao_SVKhongThucHien_Khoa() {
           </table>
         </div>
 
-        {/* Pagination Info */}
-        {!loading && filteredStudents.length > 0 && (
-          <div className="p-4 border-t border-[#E7E0C4]/50 bg-white flex items-center justify-between">
-            <span className="text-sm font-semibold text-slate-500">
-              Hiển thị <span className="text-slate-800">{(currentPage - 1) * itemsPerPage + 1}</span> - <span className="text-slate-800">{Math.min(currentPage * itemsPerPage, filteredStudents.length)}</span> trong tổng số <span className="text-slate-800">{filteredStudents.length}</span> sinh viên
-            </span>
-            <div className="flex items-center gap-2">
-              <button 
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E7E0C4] text-slate-500 hover:bg-slate-50 hover:text-[#407F3E] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <div className="flex items-center gap-1">
-                {[...Array(totalPages)].map((_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setCurrentPage(i + 1)}
-                    className={`w-8 h-8 flex items-center justify-center rounded-lg text-sm font-bold transition-colors ${
-                      currentPage === i + 1 
-                        ? 'bg-[#407F3E] text-white shadow-sm' 
-                        : 'text-slate-500 hover:bg-slate-50 hover:text-[#407F3E]'
-                    }`}
-                  >
-                    {i + 1}
-                  </button>
-                ))}
-              </div>
-              <button 
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-                className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E7E0C4] text-slate-500 hover:bg-slate-50 hover:text-[#407F3E] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
+        {/* Pagination Footer */}
+        <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
+            <span>Hiển thị</span>
+            <select 
+              value={limit}
+              onChange={(e) => {
+                const newLimit = Number(e.target.value);
+                setLimit(newLimit);
+                setCurrentPage(1);
+              }}
+              className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
+            >
+              <option value={15}>15</option>
+              <option value={30}>30</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <span>/ {filteredStudents.length} sinh viên</span>
           </div>
-        )}
+          <div className="flex items-center gap-1.5">
+            <button 
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage(1)}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Trang đầu
+            </button>
+            <button 
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Trước
+            </button>
+            
+            <span className="px-4 py-1.5 rounded-lg bg-[#407F3E] text-white text-sm font-bold shadow-sm cursor-default mx-1">
+              Trang {currentPage} / {totalPages}
+            </span>
+            
+            <button 
+              disabled={currentPage >= totalPages}
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Sau
+            </button>
+            <button 
+              disabled={currentPage >= totalPages}
+              onClick={() => setCurrentPage(totalPages)}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Trang cuối
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

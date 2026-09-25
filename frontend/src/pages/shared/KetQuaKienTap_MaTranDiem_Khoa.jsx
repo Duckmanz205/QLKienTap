@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Lock, ChevronDown, Check, ChevronRight, AlertTriangle, 
-  CheckCircle2, XCircle, Clock, Ban, Award
+  CheckCircle2, XCircle, Clock, Ban, Award, Search
 } from 'lucide-react';
 import { khoaApi } from '../../services/api';
 
@@ -13,6 +13,14 @@ export default function KetQuaKienTap_Khoa() {
   const [results, setResults] = useState([]);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
+
+  // Search & Filter & Pagination states
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedClass, setSelectedClass] = useState('ALL');
+  const [isClassDropdownOpen, setIsClassDropdownOpen] = useState(false);
+  const [searchLopDropdown, setSearchLopDropdown] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [limit, setLimit] = useState(15);
 
   useEffect(() => {
     fetchSchedules();
@@ -61,13 +69,40 @@ export default function KetQuaKienTap_Khoa() {
   // Close all dropdowns
   const closeAllDropdowns = () => {
     setIsLichDropdownOpen(false);
+    setIsClassDropdownOpen(false);
   };
 
-  const handleDropdownClick = (e, setter) => {
+  const handleDropdownClick = (e, setter, currentVal) => {
     e.stopPropagation();
     closeAllDropdowns();
-    setter(!isLichDropdownOpen);
+    setter(!currentVal);
   };
+
+  // Class list extraction
+  const classList = useMemo(() => {
+    const set = new Set();
+    results.forEach(r => {
+      const lop = r.sinhVien?.ten_lop || r.sinhVien?.lop;
+      if (lop) set.add(lop);
+    });
+    return Array.from(set).sort();
+  }, [results]);
+
+  // Filtered & Paginated results
+  const filteredResults = useMemo(() => {
+    return results.filter(r => {
+      const sv = r.sinhVien || {};
+      const matchSearch = !searchTerm || 
+        sv.mssv?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        sv.ho_ten?.toLowerCase().includes(searchTerm.toLowerCase());
+      const lop = sv.ten_lop || sv.lop;
+      const matchClass = selectedClass === 'ALL' || lop === selectedClass;
+      return matchSearch && matchClass;
+    });
+  }, [results, searchTerm, selectedClass]);
+
+  const totalPages = Math.ceil(filteredResults.length / limit) || 1;
+  const paginatedResults = filteredResults.slice((currentPage - 1) * limit, currentPage * limit);
 
   // Stats calculation
   const statDaDat = results.filter(r => r.trang_thai === 'Đạt').length;
@@ -100,12 +135,12 @@ export default function KetQuaKienTap_Khoa() {
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-[#E7E0C4] flex items-center gap-4 relative z-20 mb-6">
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-[#E7E0C4] flex flex-wrap items-end gap-4 relative z-20 mb-6">
         {/* Lịch Dropdown */}
-        <div className="relative min-w-[350px]">
+        <div className="relative min-w-[280px] flex-1">
           <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Lịch kiến tập</label>
           <div 
-            onClick={(e) => handleDropdownClick(e, setIsLichDropdownOpen)}
+            onClick={(e) => handleDropdownClick(e, setIsLichDropdownOpen, isLichDropdownOpen)}
             className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isLichDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
           >
             <span className={`truncate pr-2 font-medium ${selectedLich ? 'text-slate-700' : 'text-slate-400'}`}>
@@ -130,7 +165,7 @@ export default function KetQuaKienTap_Khoa() {
                   schedules.filter(opt => opt.ten_lich?.toLowerCase().includes(searchLich.toLowerCase())).map(opt => (
                     <div 
                       key={opt.id}
-                      onClick={() => { setSelectedLich(opt.id); setIsLichDropdownOpen(false); setSearchLich(''); }}
+                      onClick={() => { setSelectedLich(opt.id); setIsLichDropdownOpen(false); setSearchLich(''); setCurrentPage(1); }}
                       className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
                         selectedLich === opt.id ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
                       }`}
@@ -145,6 +180,75 @@ export default function KetQuaKienTap_Khoa() {
               </div>
             </div>
           )}
+        </div>
+
+        {/* Lớp Dropdown */}
+        <div className="relative w-64">
+          <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Lớp</label>
+          <div 
+            onClick={(e) => handleDropdownClick(e, setIsClassDropdownOpen, isClassDropdownOpen)}
+            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isClassDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+          >
+            <span className="truncate pr-2 font-medium text-slate-700">
+              {selectedClass === 'ALL' ? 'Tất cả lớp' : selectedClass}
+            </span>
+            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+          </div>
+          {isClassDropdownOpen && (
+            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col">
+              <div className="px-2 pb-1 border-b border-[#E7E0C4]/50">
+                <input
+                  type="text"
+                  placeholder="Tìm lớp..."
+                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-md text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E]"
+                  value={searchLopDropdown}
+                  onChange={(e) => setSearchLopDropdown(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+              <div className="overflow-y-auto max-h-48">
+                <div 
+                  onClick={() => { setSelectedClass('ALL'); setIsClassDropdownOpen(false); setSearchLopDropdown(''); setCurrentPage(1); }}
+                  className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                    selectedClass === 'ALL' ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                  }`}
+                >
+                  <span>Tất cả lớp</span>
+                  {selectedClass === 'ALL' && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                </div>
+                {classList.filter(l => l.toLowerCase().includes(searchLopDropdown.toLowerCase())).map(lop => (
+                  <div 
+                    key={lop}
+                    onClick={() => { setSelectedClass(lop); setIsClassDropdownOpen(false); setSearchLopDropdown(''); setCurrentPage(1); }}
+                    className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                      selectedClass === lop ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                    }`}
+                  >
+                    <span className="truncate pr-2">{lop}</span>
+                    {selectedClass === lop && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Search Input */}
+        <div className="relative min-w-[240px] flex-1">
+          <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Tìm kiếm</label>
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input 
+              type="text"
+              placeholder="Tìm theo MSSV, họ tên..."
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full pl-9 pr-4 py-2 border border-[#E7E0C4] rounded-lg text-sm bg-slate-50 focus:outline-none focus:border-[#407F3E] text-slate-700 font-medium"
+            />
+          </div>
         </div>
       </div>
 
@@ -221,12 +325,12 @@ export default function KetQuaKienTap_Khoa() {
               </tr>
             </thead>
             <tbody className="text-xs text-slate-700">
-              {results.length === 0 ? (
+              {filteredResults.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="p-8 text-center text-slate-500 font-medium border-b border-[#E7E0C4]/50">Không có kết quả nào.</td>
+                  <td colSpan={11} className="p-8 text-center text-slate-500 font-medium border-b border-[#E7E0C4]/50">Không có kết quả nào phù hợp.</td>
                 </tr>
               ) : (
-                results.map((r, index) => {
+                paginatedResults.map((r, index) => {
                   const sv = r.sinhVien || {};
                   const grade = r || {};
                   
@@ -269,6 +373,61 @@ export default function KetQuaKienTap_Khoa() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Pagination Footer */}
+        <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
+            <span>Hiển thị</span>
+            <select 
+              value={limit}
+              onChange={(e) => {
+                const newLimit = Number(e.target.value);
+                setLimit(newLimit);
+                setCurrentPage(1);
+              }}
+              className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
+            >
+              <option value={15}>15</option>
+              <option value={30}>30</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <span>/ {filteredResults.length} sinh viên</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button 
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage(1)}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Trang đầu
+            </button>
+            <button 
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Trước
+            </button>
+            <span className="px-4 py-1.5 rounded-lg bg-[#407F3E] text-white text-sm font-bold shadow-sm cursor-default mx-1">
+              Trang {currentPage} / {totalPages}
+            </span>
+            <button 
+              disabled={currentPage >= totalPages}
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Sau
+            </button>
+            <button 
+              disabled={currentPage >= totalPages}
+              onClick={() => setCurrentPage(totalPages)}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Trang cuối
+            </button>
+          </div>
         </div>
       </div>
 

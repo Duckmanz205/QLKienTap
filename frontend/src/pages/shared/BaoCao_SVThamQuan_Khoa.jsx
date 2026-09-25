@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Search, Users, CheckCircle, BarChart2, FileSpreadsheet, ChevronLeft, ChevronRight, FileDown } from 'lucide-react';
+import { ArrowLeft, Search, Users, CheckCircle, BarChart2, FileSpreadsheet, ChevronLeft, ChevronRight, FileDown, ChevronDown, Check } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { khoaApi } from '../../services/api';
 
@@ -21,11 +21,13 @@ export default function BaoCao_SVThamQuan_Khoa() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClass, setSelectedClass] = useState('All');
+  const [isClassDropdownOpen, setIsClassDropdownOpen] = useState(false);
+  const [searchLopDropdown, setSearchLopDropdown] = useState('');
   const [classes, setClasses] = useState([]);
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const [limit, setLimit] = useState(15);
 
   useEffect(() => {
     if (lichKienTapId) {
@@ -79,8 +81,8 @@ export default function BaoCao_SVThamQuan_Khoa() {
     return matchSearch && matchClass;
   });
 
-  const totalPages = Math.ceil(filteredStudents.length / itemsPerPage) || 1;
-  const paginatedData = filteredStudents.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const totalPages = Math.ceil(filteredStudents.length / limit) || 1;
+  const paginatedData = filteredStudents.slice((currentPage - 1) * limit, currentPage * limit);
 
   const exportExcel = () => {
     let csvContent = '\uFEFF';
@@ -103,7 +105,7 @@ export default function BaoCao_SVThamQuan_Khoa() {
   };
 
   return (
-    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300">
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300" onClick={() => setIsClassDropdownOpen(false)}>
       
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm font-semibold text-slate-500 mb-6">
@@ -129,7 +131,7 @@ export default function BaoCao_SVThamQuan_Khoa() {
             </div>
           </div>
         </div>
-        <button onClick={exportExcel} className="flex items-center gap-2 px-5 py-2.5 bg-[#407F3E] hover:bg-[#346832] text-white rounded-xl text-sm font-bold shadow-sm transition-colors">
+        <button onClick={exportExcel} className="flex items-center gap-2 px-5 py-2.5 bg-[#407F3E] hover:bg-[#346832] text-white rounded-xl text-sm font-bold shadow-sm transition-colors cursor-pointer">
           <FileSpreadsheet className="w-4 h-4" />
           <span>Xuất Excel</span>
         </button>
@@ -172,31 +174,66 @@ export default function BaoCao_SVThamQuan_Khoa() {
       </div>
 
       {/* Toolbar */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-[#E7E0C4] flex flex-col md:flex-row items-center gap-4 mb-6">
-        <div className="relative flex-1 w-full md:w-auto">
-          <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-[#E7E0C4] flex flex-col md:flex-row items-center gap-4 mb-6 relative z-20">
+        <div className="relative flex-1 w-full">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input 
             type="text" 
             placeholder="Tìm kiếm theo MSSV hoặc Họ tên..." 
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#407F3E]/20 focus:border-[#407F3E] transition-all"
+            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all"
             value={searchTerm}
             onChange={(e) => {setSearchTerm(e.target.value); setCurrentPage(1);}}
           />
         </div>
-        <div className="flex items-center gap-4 w-full md:w-auto">
-          <select 
-            className="px-4 py-2.5 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#407F3E]/20"
-            value={selectedClass}
-            onChange={(e) => {setSelectedClass(e.target.value); setCurrentPage(1);}}
+
+        {/* Lớp Dropdown */}
+        <div className="relative min-w-[200px] w-full md:w-auto">
+          <div 
+            onClick={(e) => { e.stopPropagation(); setIsClassDropdownOpen(!isClassDropdownOpen); }}
+            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isClassDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
           >
-            <option value="All">Tất cả các lớp</option>
-            {classes.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
+            <span className="text-slate-700 font-medium">{selectedClass === 'All' ? 'Tất cả lớp' : selectedClass}</span>
+            <ChevronDown className="w-4 h-4 text-slate-400 ml-2" />
+          </div>
+          {isClassDropdownOpen && (
+            <div 
+              onClick={(e) => e.stopPropagation()}
+              className="absolute top-full right-0 w-full md:w-56 mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col"
+            >
+              <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
+                <input 
+                  type="text" 
+                  placeholder="Tìm lớp..." 
+                  value={searchLopDropdown}
+                  onChange={(e) => setSearchLopDropdown(e.target.value)}
+                  className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
+                />
+              </div>
+              <div className="max-h-60 overflow-y-auto">
+                {['All', ...classes]
+                  .filter(opt => opt === 'All' ? 'tất cả lớp'.includes(searchLopDropdown.toLowerCase()) : opt.toLowerCase().includes(searchLopDropdown.toLowerCase()))
+                  .map(opt => (
+                    <div 
+                      key={opt}
+                      onClick={() => { setSelectedClass(opt); setIsClassDropdownOpen(false); setSearchLopDropdown(''); setCurrentPage(1); }}
+                      className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                        selectedClass === opt 
+                          ? 'bg-[#E7E0C4] text-slate-800 font-bold' 
+                          : 'text-slate-700 hover:bg-[#E7E0C4]/50'
+                      }`}
+                    >
+                      <span>{opt === 'All' ? 'Tất cả lớp' : opt}</span>
+                      {selectedClass === opt && <Check className="w-4 h-4 text-[#407F3E]" />}
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-[#E7E0C4] overflow-hidden flex flex-col">
+      <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-hidden flex flex-col relative z-10">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[800px]">
             <thead>
@@ -239,7 +276,7 @@ export default function BaoCao_SVThamQuan_Khoa() {
                 paginatedData.map((s, idx) => (
                   <tr key={s.id} className="hover:bg-slate-50 transition-colors">
                     <td className="p-4 pl-6 text-center text-slate-400 font-mono">
-                      {(currentPage - 1) * itemsPerPage + idx + 1}
+                      {(currentPage - 1) * limit + idx + 1}
                     </td>
                     <td className="p-4 font-mono font-bold text-[#407F3E]">{s.mssv}</td>
                     <td className="p-4 font-bold text-slate-800">{s.ho_ten}</td>
@@ -257,45 +294,62 @@ export default function BaoCao_SVThamQuan_Khoa() {
           </table>
         </div>
 
-        {/* Pagination Info */}
-        {!loading && filteredStudents.length > 0 && (
-          <div className="p-4 border-t border-[#E7E0C4]/50 bg-white flex items-center justify-between">
-            <span className="text-sm font-semibold text-slate-500">
-              Hiển thị <span className="text-slate-800">{(currentPage - 1) * itemsPerPage + 1}</span> - <span className="text-slate-800">{Math.min(currentPage * itemsPerPage, filteredStudents.length)}</span> trong tổng số <span className="text-slate-800">{filteredStudents.length}</span> sinh viên
-            </span>
-            <div className="flex items-center gap-2">
-              <button 
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E7E0C4] text-slate-500 hover:bg-slate-50 hover:text-[#407F3E] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <div className="flex items-center gap-1">
-                {[...Array(totalPages)].map((_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setCurrentPage(i + 1)}
-                    className={`w-8 h-8 flex items-center justify-center rounded-lg text-sm font-bold transition-colors ${
-                      currentPage === i + 1 
-                        ? 'bg-[#407F3E] text-white shadow-sm' 
-                        : 'text-slate-500 hover:bg-slate-50 hover:text-[#407F3E]'
-                    }`}
-                  >
-                    {i + 1}
-                  </button>
-                ))}
-              </div>
-              <button 
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-                className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E7E0C4] text-slate-500 hover:bg-slate-50 hover:text-[#407F3E] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
+        {/* Pagination Footer */}
+        <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
+            <span>Hiển thị</span>
+            <select 
+              value={limit}
+              onChange={(e) => {
+                const newLimit = Number(e.target.value);
+                setLimit(newLimit);
+                setCurrentPage(1);
+              }}
+              className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
+            >
+              <option value={15}>15</option>
+              <option value={30}>30</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <span>/ {filteredStudents.length} sinh viên</span>
           </div>
-        )}
+          <div className="flex items-center gap-1.5">
+            <button 
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage(1)}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Trang đầu
+            </button>
+            <button 
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Trước
+            </button>
+            
+            <span className="px-4 py-1.5 rounded-lg bg-[#407F3E] text-white text-sm font-bold shadow-sm cursor-default mx-1">
+              Trang {currentPage} / {totalPages}
+            </span>
+            
+            <button 
+              disabled={currentPage >= totalPages}
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Sau
+            </button>
+            <button 
+              disabled={currentPage >= totalPages}
+              onClick={() => setCurrentPage(totalPages)}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Trang cuối
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ArrowLeft, Search, FileCheck, CheckCircle, XCircle, Clock, FileSpreadsheet, ChevronLeft, ChevronRight, BarChart2, PieChart, ArrowDownUp, ArrowUp, ArrowDown } from 'lucide-react';
+import { ArrowLeft, Search, FileCheck, CheckCircle, XCircle, Clock, FileSpreadsheet, ChevronLeft, ChevronRight, BarChart2, PieChart, ArrowDownUp, ArrowUp, ArrowDown, ChevronDown, Check } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { khoaApi } from '../../services/api';
 
@@ -14,12 +14,17 @@ export default function BaoCao_SVDatKhongDat_Khoa() {
   const [scheduleName, setScheduleName] = useState('');
   
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedClass, setSelectedClass] = useState('All');
+  const [isClassDropdownOpen, setIsClassDropdownOpen] = useState(false);
+  const [searchLopDropdown, setSearchLopDropdown] = useState('');
   const [resultFilter, setResultFilter] = useState('All'); // 'All' | 'Dat' | 'KhongDat' | 'DangHoc'
+  const [searchResultDropdown, setSearchResultDropdown] = useState('');
+  const [isResultDropdownOpen, setIsResultDropdownOpen] = useState(false);
   const [sortOrder, setSortOrder] = useState(null); // null | 'asc' | 'desc'
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const [limit, setLimit] = useState(15);
 
   useEffect(() => {
     if (lichKienTapId) {
@@ -123,12 +128,17 @@ export default function BaoCao_SVDatKhongDat_Khoa() {
     };
   }, [data]);
 
+  const classes = useMemo(() => {
+    return [...new Set(data.map(d => d.lop).filter(Boolean))];
+  }, [data]);
+
   const filteredAndSorted = useMemo(() => {
     let filtered = data.filter(d => {
       const term = searchTerm.toLowerCase();
       const matchSearch = (d.mssv?.toLowerCase().includes(term) || d.ho_ten?.toLowerCase().includes(term));
       const matchResult = resultFilter === 'All' || d.resultValue === resultFilter;
-      return matchSearch && matchResult;
+      const matchClass = selectedClass === 'All' || d.lop === selectedClass;
+      return matchSearch && matchResult && matchClass;
     });
 
     if (sortOrder) {
@@ -141,10 +151,10 @@ export default function BaoCao_SVDatKhongDat_Khoa() {
     }
 
     return filtered;
-  }, [data, searchTerm, resultFilter, sortOrder]);
+  }, [data, searchTerm, resultFilter, selectedClass, sortOrder]);
 
-  const totalPages = Math.ceil(filteredAndSorted.length / itemsPerPage) || 1;
-  const paginatedData = filteredAndSorted.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const totalPages = Math.ceil(filteredAndSorted.length / limit) || 1;
+  const paginatedData = filteredAndSorted.slice((currentPage - 1) * limit, currentPage * limit);
 
   const toggleSort = () => {
     if (sortOrder === null) setSortOrder('desc');
@@ -180,7 +190,7 @@ export default function BaoCao_SVDatKhongDat_Khoa() {
   };
 
   return (
-    <div className="bg-slate-50/50 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300">
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300" onClick={() => { setIsClassDropdownOpen(false); setIsResultDropdownOpen(false); }}>
       
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm font-semibold text-slate-500 mb-6 print:hidden">
@@ -292,66 +302,165 @@ export default function BaoCao_SVDatKhongDat_Khoa() {
       )}
 
       {/* Toolbar */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row items-center justify-between gap-4 mb-6 print:hidden">
-        <div className="relative flex-1 w-full max-w-md">
-          <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-[#E7E0C4] flex flex-col md:flex-row items-center gap-4 mb-6 relative z-20 print:hidden">
+        <div className="relative flex-1 w-full">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input 
             type="text" 
             placeholder="Tìm kiếm theo MSSV hoặc Họ tên..." 
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all"
+            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all"
             value={searchTerm}
             onChange={(e) => {setSearchTerm(e.target.value); setCurrentPage(1);}}
           />
         </div>
-        
-        <div className="flex items-center gap-3 w-full md:w-auto flex-wrap">
-          <select 
-            className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-            value={resultFilter}
-            onChange={(e) => {setResultFilter(e.target.value); setCurrentPage(1);}}
+
+        {/* Lớp Dropdown */}
+        <div className="relative min-w-[180px] w-full md:w-auto">
+          <div 
+            onClick={(e) => { e.stopPropagation(); setIsClassDropdownOpen(!isClassDropdownOpen); setIsResultDropdownOpen(false); }}
+            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isClassDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
           >
-            <option value="All">Tất cả kết quả</option>
-            <option value="Dat">Đạt</option>
-            <option value="KhongDat">Không đạt</option>
-            <option value="DangHoc">Đang học (Chưa chốt)</option>
-          </select>
+            <span className="text-slate-700 font-medium">{selectedClass === 'All' ? 'Tất cả lớp' : selectedClass}</span>
+            <ChevronDown className="w-4 h-4 text-slate-400 ml-2" />
+          </div>
+          {isClassDropdownOpen && (
+            <div 
+              onClick={(e) => e.stopPropagation()}
+              className="absolute top-full right-0 w-full md:w-56 mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col"
+            >
+              <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
+                <input 
+                  type="text" 
+                  placeholder="Tìm lớp..." 
+                  value={searchLopDropdown}
+                  onChange={(e) => setSearchLopDropdown(e.target.value)}
+                  className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
+                />
+              </div>
+              <div className="max-h-60 overflow-y-auto">
+                {['All', ...classes]
+                  .filter(opt => opt === 'All' ? 'tất cả lớp'.includes(searchLopDropdown.toLowerCase()) : opt.toLowerCase().includes(searchLopDropdown.toLowerCase()))
+                  .map(opt => (
+                    <div 
+                      key={opt}
+                      onClick={() => { setSelectedClass(opt); setIsClassDropdownOpen(false); setSearchLopDropdown(''); setCurrentPage(1); }}
+                      className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                        selectedClass === opt 
+                          ? 'bg-[#E7E0C4] text-slate-800 font-bold' 
+                          : 'text-slate-700 hover:bg-[#E7E0C4]/50'
+                      }`}
+                    >
+                      <span>{opt === 'All' ? 'Tất cả lớp' : opt}</span>
+                      {selectedClass === opt && <Check className="w-4 h-4 text-[#407F3E]" />}
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Kết quả Dropdown */}
+        <div className="relative min-w-[180px] w-full md:w-auto">
+          <div 
+            onClick={(e) => { e.stopPropagation(); setIsResultDropdownOpen(!isResultDropdownOpen); setIsClassDropdownOpen(false); }}
+            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isResultDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+          >
+            <span className="text-slate-700 font-medium">
+              {resultFilter === 'All' ? 'Tất cả kết quả' : resultFilter === 'Dat' ? 'Đạt' : resultFilter === 'KhongDat' ? 'Không đạt' : 'Đang học'}
+            </span>
+            <ChevronDown className="w-4 h-4 text-slate-400 ml-2" />
+          </div>
+          {isResultDropdownOpen && (
+            <div 
+              onClick={(e) => e.stopPropagation()}
+              className="absolute top-full right-0 w-full md:w-48 mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col"
+            >
+              <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
+                <input 
+                  type="text" 
+                  placeholder="Tìm kết quả..." 
+                  value={searchResultDropdown}
+                  onChange={(e) => setSearchResultDropdown(e.target.value)}
+                  className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
+                />
+              </div>
+              <div className="max-h-60 overflow-y-auto">
+              {[
+                { label: 'Tất cả kết quả', value: 'All' },
+                { label: 'Đạt', value: 'Dat' },
+                { label: 'Không đạt', value: 'KhongDat' },
+                { label: 'Đang học', value: 'DangHoc' },
+              ]
+                .filter(opt => !searchResultDropdown || opt.label.toLowerCase().includes(searchResultDropdown.toLowerCase()))
+                .map(opt => (
+                <div 
+                  key={opt.value}
+                  onClick={() => { 
+                    setResultFilter(opt.value); 
+                    setIsResultDropdownOpen(false); 
+                    setSearchResultDropdown('');
+                    setCurrentPage(1); 
+                  }}
+                  className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                    resultFilter === opt.value 
+                      ? 'bg-[#E7E0C4] text-slate-800 font-bold' 
+                      : 'text-slate-700 hover:bg-[#E7E0C4]/50'
+                  }`}
+                >
+                  <span>{opt.label}</span>
+                  {resultFilter === opt.value && <Check className="w-4 h-4 text-[#407F3E]" />}
+                </div>
+              ))}
+              {[
+                { label: 'Tất cả kết quả', value: 'All' },
+                { label: 'Đạt', value: 'Dat' },
+                { label: 'Không đạt', value: 'KhongDat' },
+                { label: 'Đang học', value: 'DangHoc' },
+              ].filter(opt => !searchResultDropdown || opt.label.toLowerCase().includes(searchResultDropdown.toLowerCase())).length === 0 && (
+                <div className="px-4 py-3 text-xs text-slate-500 text-center">Không tìm thấy</div>
+              )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+      <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-hidden flex flex-col relative z-10">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[700px]">
+          <table className="w-full text-left border-collapse min-w-[750px]">
             <thead>
-              <tr className="bg-slate-50 text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
+              <tr className="bg-[#E7E0C4] text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
                 <th className="p-4 pl-6 w-16 text-center">STT</th>
                 <th className="p-4">MSSV</th>
                 <th className="p-4">Họ và tên</th>
-                <th className="p-4 text-right cursor-pointer hover:bg-slate-100 transition-colors group" onClick={toggleSort}>
+                <th className="p-4">Lớp</th>
+                <th className="p-4 text-right cursor-pointer hover:bg-black/5 transition-colors group" onClick={toggleSort}>
                   <div className="flex items-center justify-end gap-1">
                     <span>Điểm tổng kết</span>
-                    {sortOrder === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : 
-                     sortOrder === 'desc' ? <ArrowDown className="w-3.5 h-3.5 text-indigo-600" /> : 
-                     <ArrowDownUp className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-400" />}
+                    {sortOrder === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-[#407F3E]" /> : 
+                     sortOrder === 'desc' ? <ArrowDown className="w-3.5 h-3.5 text-[#407F3E]" /> : 
+                     <ArrowDownUp className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600" />}
                   </div>
                 </th>
                 <th className="p-4 text-center">Kết quả</th>
               </tr>
             </thead>
-            <tbody className="text-sm text-slate-700 divide-y divide-slate-100">
+            <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
               {loading ? (
                 [...Array(5)].map((_, i) => (
                   <tr key={i} className="animate-pulse">
                     <td className="p-4"><div className="h-4 bg-slate-200 rounded w-8 mx-auto"></div></td>
                     <td className="p-4"><div className="h-4 bg-slate-200 rounded w-24"></div></td>
                     <td className="p-4"><div className="h-4 bg-slate-200 rounded w-48"></div></td>
+                    <td className="p-4"><div className="h-4 bg-slate-200 rounded w-20"></div></td>
                     <td className="p-4"><div className="h-4 bg-slate-200 rounded w-16 ml-auto"></div></td>
                     <td className="p-4"><div className="h-6 bg-slate-200 rounded-full w-20 mx-auto"></div></td>
                   </tr>
                 ))
               ) : filteredAndSorted.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="p-16 text-center">
+                  <td colSpan={6} className="p-16 text-center">
                     <div className="flex flex-col items-center justify-center text-slate-400">
                       <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4 border border-slate-100">
                         <FileCheck className="w-8 h-8 text-slate-300" />
@@ -363,12 +472,13 @@ export default function BaoCao_SVDatKhongDat_Khoa() {
                 </tr>
               ) : (
                 paginatedData.map((s, idx) => (
-                  <tr key={s.id} className="hover:bg-indigo-50/30 transition-colors">
+                  <tr key={s.id} className="hover:bg-slate-50 transition-colors">
                     <td className="p-4 pl-6 text-center text-slate-400 font-mono">
-                      {(currentPage - 1) * itemsPerPage + idx + 1}
+                      {(currentPage - 1) * limit + idx + 1}
                     </td>
-                    <td className="p-4 font-mono font-bold text-indigo-900">{s.mssv}</td>
+                    <td className="p-4 font-mono font-bold text-[#407F3E]">{s.mssv}</td>
                     <td className="p-4 font-bold text-slate-800">{s.ho_ten}</td>
+                    <td className="p-4 font-medium text-slate-600">{s.lop || '-'}</td>
                     <td className={`p-4 text-right font-mono text-[15px] ${s.diem !== null ? 'font-bold text-slate-800 tabular-nums' : 'text-slate-400 italic text-sm'}`}>
                       {s.diem !== null ? s.diem.toFixed(2) : 'Chưa chốt'}
                     </td>
@@ -382,51 +492,62 @@ export default function BaoCao_SVDatKhongDat_Khoa() {
           </table>
         </div>
 
-        {/* Pagination Info */}
-        {!loading && filteredAndSorted.length > 0 && (
-          <div className="p-4 border-t border-slate-200 bg-white flex items-center justify-between print:hidden">
-            <span className="text-sm font-semibold text-slate-500">
-              Hiển thị <span className="text-slate-800">{(currentPage - 1) * itemsPerPage + 1}</span> - <span className="text-slate-800">{Math.min(currentPage * itemsPerPage, filteredAndSorted.length)}</span> / <span className="text-slate-800">{filteredAndSorted.length}</span> SV
-            </span>
-            <div className="flex items-center gap-2">
-              <button 
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <div className="flex items-center gap-1">
-                {[...Array(totalPages)].map((_, i) => {
-                  if (totalPages > 5 && i > 1 && i < totalPages - 2 && Math.abs(i + 1 - currentPage) > 1) {
-                    if (i === 2 || i === totalPages - 3) return <span key={i} className="px-1 text-slate-400">...</span>;
-                    return null;
-                  }
-                  return (
-                    <button
-                      key={i}
-                      onClick={() => setCurrentPage(i + 1)}
-                      className={`w-8 h-8 flex items-center justify-center rounded-lg text-sm font-bold transition-colors ${
-                        currentPage === i + 1 
-                          ? 'bg-indigo-600 text-white shadow-sm' 
-                          : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'
-                      }`}
-                    >
-                      {i + 1}
-                    </button>
-                  );
-                })}
-              </div>
-              <button 
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-                className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
+        {/* Pagination Footer */}
+        <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4 print:hidden">
+          <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
+            <span>Hiển thị</span>
+            <select 
+              value={limit}
+              onChange={(e) => {
+                const newLimit = Number(e.target.value);
+                setLimit(newLimit);
+                setCurrentPage(1);
+              }}
+              className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
+            >
+              <option value={15}>15</option>
+              <option value={30}>30</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <span>/ {filteredAndSorted.length} sinh viên</span>
           </div>
-        )}
+          <div className="flex items-center gap-1.5">
+            <button 
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage(1)}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Trang đầu
+            </button>
+            <button 
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Trước
+            </button>
+            
+            <span className="px-4 py-1.5 rounded-lg bg-[#407F3E] text-white text-sm font-bold shadow-sm cursor-default mx-1">
+              Trang {currentPage} / {totalPages}
+            </span>
+            
+            <button 
+              disabled={currentPage >= totalPages}
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Sau
+            </button>
+            <button 
+              disabled={currentPage >= totalPages}
+              onClick={() => setCurrentPage(totalPages)}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Trang cuối
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

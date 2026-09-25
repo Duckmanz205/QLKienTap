@@ -15,9 +15,11 @@ export default function TaiKhoanNguoiDung_Khoa() {
   // Filter States
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('Tất cả vai trò');
+  const [searchRoleDropdown, setSearchRoleDropdown] = useState('');
   const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
   
   const [filterTrangThai, setFilterTrangThai] = useState('Tất cả');
+  const [searchTrangThaiDropdown, setSearchTrangThaiDropdown] = useState('');
   const [isTrangThaiDropdownOpen, setIsTrangThaiDropdownOpen] = useState(false);
 
   // Pagination States
@@ -125,7 +127,7 @@ export default function TaiKhoanNguoiDung_Khoa() {
         </div>
 
         {/* Vai trò Dropdown */}
-        <div className="relative min-w-[200px]">
+        <div className="relative min-w-[200px]" onClick={(e) => e.stopPropagation()}>
           <div 
             onClick={() => { setIsRoleDropdownOpen(!isRoleDropdownOpen); setIsTrangThaiDropdownOpen(false); }}
             className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isRoleDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
@@ -137,26 +139,47 @@ export default function TaiKhoanNguoiDung_Khoa() {
           </div>
           {isRoleDropdownOpen && (
             <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1">
-              {roleOptions.map(opt => (
-                <div 
-                  key={opt.value}
-                  onClick={() => { setFilterRole(opt.value); setIsRoleDropdownOpen(false); }}
-                  className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                    (filterRole === opt.value) 
-                      ? 'bg-[#E7E0C4] text-slate-800 font-bold' 
-                      : 'text-slate-700 hover:bg-[#E7E0C4]/50'
-                  }`}
-                >
-                  <span className="truncate pr-2">{opt.label}</span>
-                  {filterRole === opt.value && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                </div>
-              ))}
+              <div className="p-2 border-b border-[#E7E0C4]">
+                <input
+                  type="text"
+                  placeholder="Tìm vai trò..."
+                  value={searchRoleDropdown}
+                  onChange={(e) => setSearchRoleDropdown(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full px-2.5 py-1 text-xs bg-slate-50 border border-[#E7E0C4] rounded-md focus:outline-none focus:border-[#407F3E]"
+                />
+              </div>
+              <div className="max-h-60 overflow-y-auto">
+                {roleOptions
+                  .filter(opt => !searchRoleDropdown || opt.label.toLowerCase().includes(searchRoleDropdown.toLowerCase()))
+                  .map(opt => (
+                    <div 
+                      key={opt.value}
+                      onClick={() => { 
+                        setFilterRole(opt.value); 
+                        setIsRoleDropdownOpen(false);
+                        setSearchRoleDropdown('');
+                      }}
+                      className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                        (filterRole === opt.value) 
+                          ? 'bg-[#E7E0C4] text-slate-800 font-bold' 
+                          : 'text-slate-700 hover:bg-[#E7E0C4]/50'
+                      }`}
+                    >
+                      <span className="truncate pr-2">{opt.label}</span>
+                      {filterRole === opt.value && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                    </div>
+                  ))}
+                {roleOptions.filter(opt => !searchRoleDropdown || opt.label.toLowerCase().includes(searchRoleDropdown.toLowerCase())).length === 0 && (
+                  <div className="px-4 py-3 text-xs text-slate-500 text-center">Không tìm thấy vai trò</div>
+                )}
+              </div>
             </div>
           )}
         </div>
 
         {/* Trạng thái Dropdown */}
-        <div className="relative min-w-[180px]">
+        <div className="relative min-w-[180px]" onClick={(e) => e.stopPropagation()}>
           <div 
             onClick={() => { setIsTrangThaiDropdownOpen(!isTrangThaiDropdownOpen); setIsRoleDropdownOpen(false); }}
             className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isTrangThaiDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
@@ -168,20 +191,41 @@ export default function TaiKhoanNguoiDung_Khoa() {
           </div>
           {isTrangThaiDropdownOpen && (
             <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1">
-              {trangThaiOptions.map(opt => (
-                <div 
-                  key={opt.value}
-                  onClick={() => { setFilterTrangThai(opt.value); setIsTrangThaiDropdownOpen(false); }}
-                  className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                    (filterTrangThai === opt.value) 
-                      ? 'bg-[#E7E0C4] text-slate-800 font-bold' 
-                      : 'text-slate-700 hover:bg-[#E7E0C4]/50'
-                  }`}
-                >
-                  {opt.label}
-                  {filterTrangThai === opt.value && <Check className="w-4 h-4 text-[#407F3E]" />}
-                </div>
-              ))}
+              <div className="p-2 border-b border-[#E7E0C4]">
+                <input
+                  type="text"
+                  placeholder="Tìm trạng thái..."
+                  value={searchTrangThaiDropdown}
+                  onChange={(e) => setSearchTrangThaiDropdown(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full px-2.5 py-1 text-xs bg-slate-50 border border-[#E7E0C4] rounded-md focus:outline-none focus:border-[#407F3E]"
+                />
+              </div>
+              <div className="max-h-60 overflow-y-auto">
+                {trangThaiOptions
+                  .filter(opt => !searchTrangThaiDropdown || opt.label.toLowerCase().includes(searchTrangThaiDropdown.toLowerCase()))
+                  .map(opt => (
+                    <div 
+                      key={opt.value}
+                      onClick={() => { 
+                        setFilterTrangThai(opt.value); 
+                        setIsTrangThaiDropdownOpen(false);
+                        setSearchTrangThaiDropdown('');
+                      }}
+                      className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                        (filterTrangThai === opt.value) 
+                          ? 'bg-[#E7E0C4] text-slate-800 font-bold' 
+                          : 'text-slate-700 hover:bg-[#E7E0C4]/50'
+                      }`}
+                    >
+                      {opt.label}
+                      {filterTrangThai === opt.value && <Check className="w-4 h-4 text-[#407F3E]" />}
+                    </div>
+                  ))}
+                {trangThaiOptions.filter(opt => !searchTrangThaiDropdown || opt.label.toLowerCase().includes(searchTrangThaiDropdown.toLowerCase())).length === 0 && (
+                  <div className="px-4 py-3 text-xs text-slate-500 text-center">Không tìm thấy trạng thái</div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -270,62 +314,60 @@ export default function TaiKhoanNguoiDung_Khoa() {
         </div>
         
         {/* Pagination Footer */}
-        {accounts.length > 0 && (
-          <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
-              <span>Hiển thị</span>
-              <select 
-                value={limit}
-                onChange={(e) => {
-                  setLimit(Number(e.target.value));
-                  setPage(1);
-                }}
-                className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
-              >
-                <option value={15}>15</option>
-                <option value={30}>30</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-              </select>
-              <span>/ {totalAccounts} tài khoản</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <button 
-                disabled={page <= 1}
-                onClick={() => setPage(1)}
-                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
-              >
-                Trang đầu
-              </button>
-              <button 
-                disabled={page <= 1}
-                onClick={() => setPage(p => p - 1)}
-                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
-              >
-                Trước
-              </button>
-              
-              <span className="px-4 py-1.5 rounded-lg bg-[#407F3E] text-white text-sm font-bold shadow-sm cursor-default mx-1">
-                Trang {page} / {totalPages}
-              </span>
-              
-              <button 
-                disabled={page >= totalPages}
-                onClick={() => setPage(p => p + 1)}
-                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
-              >
-                Sau
-              </button>
-              <button 
-                disabled={page >= totalPages}
-                onClick={() => setPage(totalPages)}
-                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
-              >
-                Trang cuối
-              </button>
-            </div>
+        <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
+            <span>Hiển thị</span>
+            <select 
+              value={limit}
+              onChange={(e) => {
+                setLimit(Number(e.target.value));
+                setPage(1);
+              }}
+              className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
+            >
+              <option value={15}>15</option>
+              <option value={30}>30</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <span>/ {totalAccounts} tài khoản</span>
           </div>
-        )}
+          <div className="flex items-center gap-1.5">
+            <button 
+              disabled={page <= 1}
+              onClick={() => setPage(1)}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Trang đầu
+            </button>
+            <button 
+              disabled={page <= 1}
+              onClick={() => setPage(p => p - 1)}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Trước
+            </button>
+            
+            <span className="px-4 py-1.5 rounded-lg bg-[#407F3E] text-white text-sm font-bold shadow-sm cursor-default mx-1">
+              Trang {page} / {totalPages}
+            </span>
+            
+            <button 
+              disabled={page >= totalPages}
+              onClick={() => setPage(p => p + 1)}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Sau
+            </button>
+            <button 
+              disabled={page >= totalPages}
+              onClick={() => setPage(totalPages)}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Trang cuối
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

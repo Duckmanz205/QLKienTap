@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Building, 
   User, 
@@ -9,7 +9,9 @@ import {
   AlertTriangle,
   FileSpreadsheet,
   Gavel,
-  ClipboardList
+  ClipboardList,
+  Search,
+  ChevronDown
 } from 'lucide-react';
 import { giangVienApi } from '../../services/api';
 
@@ -17,6 +19,14 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
   const [lecturer, setLecturer] = useState(null);
   const [boards, setBoards] = useState([]);
   
+  // Filter & Pagination state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedRole, setSelectedRole] = useState('ALL');
+  const [searchRoleDropdown, setSearchRoleDropdown] = useState('');
+  const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [limit, setLimit] = useState(6);
+
   // Scoring state
   const [activeTab, setActiveTab] = useState('list');
   const [activeBoard, setActiveBoard] = useState(null);
@@ -111,11 +121,30 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
     );
   }
 
+  // Derived filter & pagination logic
+  const availableRoles = useMemo(() => {
+    return Array.from(new Set(boards.map(b => b.vai_tro).filter(Boolean)));
+  }, [boards]);
+
+  const filteredBoards = useMemo(() => {
+    return boards.filter(b => {
+      const q = searchQuery.toLowerCase();
+      const matchSearch = !searchQuery || 
+        (b.session?.ten_hoi_dong && b.session.ten_hoi_dong.toLowerCase().includes(q)) ||
+        (b.session?.dia_diem && b.session.dia_diem.toLowerCase().includes(q));
+      const matchRole = selectedRole === 'ALL' || b.vai_tro === selectedRole;
+      return matchSearch && matchRole;
+    });
+  }, [boards, searchQuery, selectedRole]);
+
+  const totalPages = Math.ceil(filteredBoards.length / limit) || 1;
+  const paginatedBoards = filteredBoards.slice((currentPage - 1) * limit, currentPage * limit);
+
   // Calculated average helper
   const currentAvg = Math.round(((parseFloat(score1) || 0) * 0.4 + (parseFloat(score2) || 0) * 0.3 + (parseFloat(score3) || 0) * 0.3) * 10) / 10;
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in relative" onClick={() => setIsRoleDropdownOpen(false)}>
       {/* Header section with tab switcher */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
         <div>
@@ -169,17 +198,92 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
       {activeTab === 'list' ? (
         /* Board meetings overview list */
         <div className="space-y-6 relative z-10">
+          {/* Filter Bar */}
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-[#E7E0C4] flex flex-wrap gap-4 items-center relative z-20">
+            {/* Search Input */}
+            <div className="relative flex-1 min-w-[240px]">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input 
+                type="text" 
+                placeholder="Tìm tên hội đồng, địa điểm..." 
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E] transition-all text-slate-800 font-medium"
+              />
+            </div>
+
+            {/* Role Filter Popover */}
+            <div className="relative min-w-[200px]" onClick={(e) => e.stopPropagation()}>
+              <div 
+                onClick={() => setIsRoleDropdownOpen(!isRoleDropdownOpen)}
+                className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isRoleDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+              >
+                <span className="truncate pr-2 font-medium text-slate-700">
+                  {selectedRole === 'ALL' ? 'Tất cả vai trò' : selectedRole}
+                </span>
+                <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+              </div>
+              {isRoleDropdownOpen && (
+                <div className="absolute top-full right-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-50 py-1 overflow-hidden animate-in slide-in-from-top-1">
+                  <div className="p-2 border-b border-[#E7E0C4]">
+                    <input
+                      type="text"
+                      placeholder="Tìm vai trò..."
+                      value={searchRoleDropdown}
+                      onChange={(e) => setSearchRoleDropdown(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-[#E7E0C4] rounded-lg focus:outline-none focus:border-[#407F3E]"
+                    />
+                  </div>
+                  <div className="max-h-60 overflow-y-auto">
+                    {['ALL', ...availableRoles]
+                      .filter(role => {
+                        const label = role === 'ALL' ? 'Tất cả vai trò' : role;
+                        return !searchRoleDropdown || label.toLowerCase().includes(searchRoleDropdown.toLowerCase());
+                      })
+                      .map(role => (
+                        <div 
+                          key={role}
+                          onClick={() => {
+                            setSelectedRole(role);
+                            setIsRoleDropdownOpen(false);
+                            setSearchRoleDropdown('');
+                            setCurrentPage(1);
+                          }}
+                          className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                            selectedRole === role ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50 font-medium'
+                          }`}
+                        >
+                          <span>{role === 'ALL' ? 'Tất cả vai trò' : role}</span>
+                          {selectedRole === role && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                        </div>
+                      ))}
+                    {['ALL', ...availableRoles].filter(role => {
+                      const label = role === 'ALL' ? 'Tất cả vai trò' : role;
+                      return !searchRoleDropdown || label.toLowerCase().includes(searchRoleDropdown.toLowerCase());
+                    }).length === 0 && (
+                      <div className="px-4 py-3 text-xs text-slate-500 text-center">Không tìm thấy vai trò</div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-surface-variant/40">
             <h2 className="font-bold text-sm uppercase tracking-wider text-on-surface-variant mb-6 flex items-center gap-1.5">
               <ClipboardList className="w-5 h-5 text-primary" />
               <span>Các hội đồng được phân công chấm điểm</span>
             </h2>
             
-            {boards.length === 0 ? (
-              <p className="text-slate-500 text-xs py-4">Bạn chưa tham gia hội đồng chấm báo cáo nào.</p>
+            {paginatedBoards.length === 0 ? (
+              <p className="text-slate-500 text-xs py-4">Không tìm thấy hội đồng nào phù hợp.</p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {boards.map((b, idx) => (
+                {paginatedBoards.map((b, idx) => (
                   <div 
                     key={idx}
                     className="bg-white rounded-2xl p-5 shadow-sm border border-surface-variant/40 transition-all flex flex-col justify-between hover:border-primary"
@@ -243,6 +347,61 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
                 ))}
               </div>
             )}
+
+            {/* Pagination Footer */}
+            <div className="mt-6 pt-4 border-t border-[#E7E0C4] flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
+                <span>Hiển thị</span>
+                <select 
+                  value={limit}
+                  onChange={(e) => {
+                    const newLimit = Number(e.target.value);
+                    setLimit(newLimit);
+                    setCurrentPage(1);
+                  }}
+                  className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
+                >
+                  <option value={6}>6</option>
+                  <option value={12}>12</option>
+                  <option value={24}>24</option>
+                  <option value={48}>48</option>
+                </select>
+                <span>/ {filteredBoards.length} hội đồng</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button 
+                  disabled={currentPage <= 1}
+                  onClick={() => setCurrentPage(1)}
+                  className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+                >
+                  Trang đầu
+                </button>
+                <button 
+                  disabled={currentPage <= 1}
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+                >
+                  Trước
+                </button>
+                <span className="px-4 py-1.5 rounded-lg bg-[#407F3E] text-white text-sm font-bold shadow-sm cursor-default mx-1">
+                  Trang {currentPage} / {totalPages}
+                </span>
+                <button 
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+                >
+                  Sau
+                </button>
+                <button 
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setCurrentPage(totalPages)}
+                  className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+                >
+                  Trang cuối
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       ) : (

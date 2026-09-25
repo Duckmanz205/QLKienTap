@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  MapPin, Laptop, Calendar, Clock, Image as ImageIcon, Users, ChevronDown, Check, Search, X, Banknote, Map
+  MapPin, Laptop, Calendar, Clock, Image as ImageIcon, Users, ChevronDown, Check, Search, X, Banknote, Map,
+  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { sinhVienApi } from '../../services/api';
@@ -15,8 +16,21 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
   const [registeredTrips, setRegisteredTrips] = useState([]);
   const [proposals, setProposals] = useState([]);
   
+  // Tab 1 filters & pagination
   const [searchTripTerm, setSearchTripTerm] = useState('');
   const [selectedFactory, setSelectedFactory] = useState('');
+  const [isFilterFactoryOpen, setIsFilterFactoryOpen] = useState(false);
+  const [filterFactorySearchTerm, setFilterFactorySearchTerm] = useState('');
+  const [pageAvailable, setPageAvailable] = useState(1);
+  const [limitAvailable, setLimitAvailable] = useState(6);
+
+  // Tab 2 filters & pagination
+  const [searchRegTerm, setSearchRegTerm] = useState('');
+  const [filterRegStatus, setFilterRegStatus] = useState('');
+  const [isFilterRegStatusOpen, setIsFilterRegStatusOpen] = useState(false);
+  const [searchRegStatusDropdown, setSearchRegStatusDropdown] = useState('');
+  const [pageRegistered, setPageRegistered] = useState(1);
+  const [limitRegistered, setLimitRegistered] = useState(15);
 
   // Form states for Propose
   const [proposalType, setProposalType] = useState('system'); // 'system' or 'custom'
@@ -188,7 +202,14 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
   };
 
   return (
-    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300 relative">
+    <div 
+      className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300 relative"
+      onClick={() => {
+        setIsFilterFactoryOpen(false);
+        setIsFactoryDropdownOpen(false);
+        setIsFilterRegStatusOpen(false);
+      }}
+    >
       
       {/* Custom Popup Toast */}
       {popup.show && (
@@ -416,7 +437,7 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
         {/* TAB 1: Có thể đăng ký */}
         {activeTab === 'coTheDangKy' && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            {/* Search Bar & Filter */}
+            {/* Search Bar & Popover Filter */}
             <div className="flex flex-col sm:flex-row gap-4 mb-6">
               <div className="relative flex-1">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -426,29 +447,86 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                   type="text" 
                   placeholder="Tìm kiếm theo tên công ty, nhà máy..."
                   value={searchTripTerm}
-                  onChange={e => setSearchTripTerm(e.target.value)}
+                  onChange={e => {
+                    setSearchTripTerm(e.target.value);
+                    setPageAvailable(1);
+                  }}
                   className="w-full pl-11 pr-4 py-3 bg-white border border-[#E7E0C4] rounded-2xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] shadow-sm transition-all"
                 />
               </div>
-              <div className="w-full sm:w-64 relative">
-                <select 
-                  value={selectedFactory}
-                  onChange={e => setSelectedFactory(e.target.value)}
-                  className="w-full pl-4 pr-10 py-3 appearance-none bg-white border border-[#E7E0C4] rounded-2xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] shadow-sm transition-all text-slate-700 font-medium cursor-pointer"
+
+              {/* Popover Filter Nhà máy */}
+              <div className="w-full sm:w-72 relative" onClick={e => e.stopPropagation()}>
+                <div 
+                  onClick={() => setIsFilterFactoryOpen(!isFilterFactoryOpen)}
+                  className={`w-full px-4 py-3 bg-white border rounded-2xl text-sm flex justify-between items-center cursor-pointer transition-all shadow-sm ${
+                    isFilterFactoryOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'
+                  }`}
                 >
-                  <option value="">Tất cả nhà máy</option>
-                  {Array.from(new Set(availableTrips.filter(t => t.nhaMay).map(t => t.nhaMay.id))).map(factoryId => {
-                    const factory = availableTrips.find(t => t.nhaMay?.id === factoryId)?.nhaMay;
-                    return (
-                      <option key={factoryId} value={factoryId}>
-                        {factory?.ten_nha_may}
-                      </option>
-                    )
-                  })}
-                </select>
-                <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
-                  <ChevronDown className="h-4 w-4 text-slate-400" />
+                  <span className={`font-medium truncate pr-2 ${selectedFactory ? 'text-slate-800' : 'text-slate-600'}`}>
+                    {selectedFactory ? (
+                      availableTrips.find(t => t.nhaMay?.id?.toString() === selectedFactory)?.nhaMay?.ten_nha_may || 'Đã chọn 1 nhà máy'
+                    ) : 'Tất cả nhà máy'}
+                  </span>
+                  <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isFilterFactoryOpen ? 'rotate-180 text-[#407F3E]' : ''}`} />
                 </div>
+
+                {isFilterFactoryOpen && (
+                  <div className="absolute top-full right-0 w-full mt-1.5 bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-40 py-1 overflow-hidden animate-in slide-in-from-top-1 max-h-64 flex flex-col">
+                    <div className="p-2 border-b border-slate-100 bg-slate-50/50 sticky top-0 z-10">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                        <input
+                          type="text"
+                          placeholder="Lọc danh sách nhà máy..."
+                          value={filterFactorySearchTerm}
+                          onChange={e => setFilterFactorySearchTerm(e.target.value)}
+                          className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-[#407F3E]"
+                        />
+                      </div>
+                    </div>
+                    <div className="overflow-y-auto max-h-48 py-1">
+                      <div
+                        onClick={() => {
+                          setSelectedFactory('');
+                          setIsFilterFactoryOpen(false);
+                          setFilterFactorySearchTerm('');
+                          setPageAvailable(1);
+                        }}
+                        className={`px-3 py-2 text-xs cursor-pointer flex items-center justify-between transition-colors ${
+                          selectedFactory === '' ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span>Tất cả nhà máy</span>
+                        {selectedFactory === '' && <Check className="w-3.5 h-3.5 text-[#407F3E] shrink-0" />}
+                      </div>
+
+                      {Array.from(new Set(availableTrips.filter(t => t.nhaMay).map(t => t.nhaMay.id)))
+                        .map(factoryId => availableTrips.find(t => t.nhaMay?.id === factoryId)?.nhaMay)
+                        .filter(f => f && f.ten_nha_may?.toLowerCase().includes(filterFactorySearchTerm.toLowerCase()))
+                        .map(factory => {
+                          const isSelected = selectedFactory === factory.id.toString();
+                          return (
+                            <div
+                              key={factory.id}
+                              onClick={() => {
+                                setSelectedFactory(factory.id.toString());
+                                setIsFilterFactoryOpen(false);
+                                setFilterFactorySearchTerm('');
+                                setPageAvailable(1);
+                              }}
+                              className={`px-3 py-2 text-xs cursor-pointer flex items-center justify-between transition-colors ${
+                                isSelected ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50'
+                              }`}
+                            >
+                              <span className="truncate pr-2">{factory.ten_nha_may}</span>
+                              {isSelected && <Check className="w-3.5 h-3.5 text-[#407F3E] shrink-0" />}
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -459,184 +537,415 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                 return matchSearch && matchFactory;
               });
 
+              const totalAvailable = filteredTrips.length;
+              const totalPagesAvailable = Math.ceil(totalAvailable / limitAvailable) || 1;
+              const currentAvailablePage = Math.min(pageAvailable, totalPagesAvailable);
+              const paginatedTrips = filteredTrips.slice((currentAvailablePage - 1) * limitAvailable, currentAvailablePage * limitAvailable);
+
               return (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredTrips.length === 0 ? (
-                    <div className="col-span-full p-8 text-center text-slate-500 bg-white rounded-2xl border border-[#E7E0C4]">
-                      Hiện không có chuyến đi nào mở đăng ký phù hợp.
-                    </div>
-                  ) : (
-                    filteredTrips.map(trip => {
-                      const isOnline = trip.hinh_thuc === 'TrucTuyen';
-                      return (
-                        <div 
-                          key={trip.id} 
-                          className="bg-white rounded-2xl border border-[#E7E0C4] shadow-sm hover:shadow-md hover:-translate-y-1 transition-all flex flex-col group p-6 relative overflow-hidden cursor-pointer duration-300"
-                          onClick={() => {
-                            if(trip.nhaMay) setViewingTrip(trip);
-                          }}
-                        >
-                          
-                          {/* Top row: Name & Badge */}
-                          <div className="flex justify-between items-start gap-4 mb-5">
-                            <h3 className="text-lg font-black text-slate-800 line-clamp-2 leading-tight group-hover:text-[#407F3E] transition-colors flex-1">
-                              {trip.nhaMay?.ten_nha_may}
-                            </h3>
-                            <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider shrink-0 ${
-                              isOnline ? 'bg-slate-800 text-white' : 'bg-[#E7E0C4]/50 text-slate-800'
-                            }`}>
-                              {isOnline ? <Laptop className="w-3.5 h-3.5" /> : <MapPin className="w-3.5 h-3.5" />}
-                              {isOnline ? 'Trực tuyến' : 'Trực tiếp'}
-                            </span>
-                          </div>
-                          
-                          {/* Info list */}
-                          <div className="space-y-3 mb-6 mt-auto">
-                            <div className="flex items-center gap-3 text-sm font-medium text-slate-600">
-                              <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
-                                <Calendar className="w-4 h-4 text-slate-400" />
-                              </div>
-                              {trip.ngay_tham_quan ? new Date(trip.ngay_tham_quan).toLocaleDateString('vi-VN') : '--'}
-                            </div>
-                            <div className="flex items-center gap-3 text-sm font-medium text-slate-600">
-                              <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
-                                <Clock className="w-4 h-4 text-slate-400" />
-                              </div>
-                              {(trip.gio_bat_dau || '--').slice(0, 5)}
-                            </div>
-                            <div className="flex items-center gap-3 text-sm font-medium text-slate-600">
-                              <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
-                                <Map className="w-4 h-4 text-slate-400" />
-                              </div>
-                              <span className="line-clamp-1" title={trip.dia_diem_tap_trung || 'Đang cập nhật'}>
-                                {trip.dia_diem_tap_trung || 'Đang cập nhật'}
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {paginatedTrips.length === 0 ? (
+                      <div className="col-span-full p-8 text-center text-slate-500 bg-white rounded-2xl border border-[#E7E0C4]">
+                        Hiện không có chuyến đi nào mở đăng ký phù hợp.
+                      </div>
+                    ) : (
+                      paginatedTrips.map(trip => {
+                        const isOnline = trip.hinh_thuc === 'TrucTuyen';
+                        return (
+                          <div 
+                            key={trip.id} 
+                            className="bg-white rounded-2xl border border-[#E7E0C4] shadow-sm hover:shadow-md hover:-translate-y-1 transition-all flex flex-col group p-6 relative overflow-hidden cursor-pointer duration-300"
+                            onClick={() => {
+                              if(trip.nhaMay) setViewingTrip(trip);
+                            }}
+                          >
+                            {/* Top row: Name & Badge */}
+                            <div className="flex justify-between items-start gap-4 mb-5">
+                              <h3 className="text-lg font-black text-slate-800 line-clamp-2 leading-tight group-hover:text-[#407F3E] transition-colors flex-1">
+                                {trip.nhaMay?.ten_nha_may}
+                              </h3>
+                              <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider shrink-0 ${
+                                isOnline ? 'bg-slate-800 text-white' : 'bg-[#E7E0C4]/50 text-slate-800'
+                              }`}>
+                                {isOnline ? <Laptop className="w-3.5 h-3.5" /> : <MapPin className="w-3.5 h-3.5" />}
+                                {isOnline ? 'Trực tuyến' : 'Trực tiếp'}
                               </span>
                             </div>
-                            <div className="flex items-center gap-3 text-sm font-medium text-slate-600">
-                              <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
-                                <Banknote className="w-4 h-4 text-slate-400" />
+                            
+                            {/* Info list */}
+                            <div className="space-y-3 mb-6 mt-auto">
+                              <div className="flex items-center gap-3 text-sm font-medium text-slate-600">
+                                <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
+                                  <Calendar className="w-4 h-4 text-slate-400" />
+                                </div>
+                                {trip.ngay_tham_quan ? new Date(trip.ngay_tham_quan).toLocaleDateString('vi-VN') : '--'}
                               </div>
-                              {trip.le_phi ? `${trip.le_phi.toLocaleString('vi-VN')} VNĐ` : <span className="text-[#89B449] font-bold">Miễn phí</span>}
+                              <div className="flex items-center gap-3 text-sm font-medium text-slate-600">
+                                <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
+                                  <Clock className="w-4 h-4 text-slate-400" />
+                                </div>
+                                {(trip.gio_bat_dau || '--').slice(0, 5)}
+                              </div>
+                              <div className="flex items-center gap-3 text-sm font-medium text-slate-600">
+                                <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
+                                  <Map className="w-4 h-4 text-slate-400" />
+                                </div>
+                                <span className="line-clamp-1" title={trip.dia_diem_tap_trung || 'Đang cập nhật'}>
+                                  {trip.dia_diem_tap_trung || 'Đang cập nhật'}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-3 text-sm font-medium text-slate-600">
+                                <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
+                                  <Banknote className="w-4 h-4 text-slate-400" />
+                                </div>
+                                {trip.le_phi ? `${trip.le_phi.toLocaleString('vi-VN')} VNĐ` : <span className="text-[#89B449] font-bold">Miễn phí</span>}
+                              </div>
                             </div>
-                          </div>
 
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRegister(trip.id);
-                            }}
-                            className="w-full py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl text-sm font-bold uppercase tracking-wider transition-colors shadow-sm cursor-pointer mt-4"
-                          >
-                            Đăng ký
-                          </button>
-                        </div>
-                      );
-                  })
-                )}
-              </div>
-            );
-          })()}
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRegister(trip.id);
+                              }}
+                              className="w-full py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl text-sm font-bold uppercase tracking-wider transition-colors shadow-sm cursor-pointer mt-4"
+                            >
+                              Đăng ký
+                            </button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* Pagination Footer Tab 1 */}
+                  <div className="p-4 bg-white rounded-xl border border-[#E7E0C4] flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
+                    <div className="text-xs text-slate-600 flex items-center gap-2">
+                      <span>Hiển thị</span>
+                      <select
+                        value={limitAvailable}
+                        onChange={e => {
+                          setLimitAvailable(Number(e.target.value));
+                          setPageAvailable(1);
+                        }}
+                        className="px-2 py-1 bg-white border border-[#E7E0C4] rounded-lg text-xs font-semibold focus:outline-none focus:border-[#407F3E] cursor-pointer"
+                      >
+                        <option value={6}>6 chuyến</option>
+                        <option value={12}>12 chuyến</option>
+                        <option value={24}>24 chuyến</option>
+                        <option value={48}>48 chuyến</option>
+                      </select>
+                      <span>/ tổng số <strong className="text-slate-800">{totalAvailable}</strong> chuyến mở</span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setPageAvailable(1)}
+                        disabled={currentAvailablePage <= 1}
+                        className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-xs font-semibold"
+                      >
+                        Trang đầu
+                      </button>
+                      <button
+                        onClick={() => setPageAvailable(prev => Math.max(prev - 1, 1))}
+                        disabled={currentAvailablePage <= 1}
+                        className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-xs font-semibold"
+                      >
+                        Trước
+                      </button>
+                      <span className="text-xs font-bold text-white bg-[#407F3E] px-4 py-1.5 rounded-lg shadow-sm mx-1">
+                        Trang {currentAvailablePage} / {totalPagesAvailable}
+                      </span>
+                      <button
+                        onClick={() => setPageAvailable(prev => Math.min(prev + 1, totalPagesAvailable))}
+                        disabled={currentAvailablePage >= totalPagesAvailable}
+                        className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-xs font-semibold"
+                      >
+                        Sau
+                      </button>
+                      <button
+                        onClick={() => setPageAvailable(totalPagesAvailable)}
+                        disabled={currentAvailablePage >= totalPagesAvailable}
+                        className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-xs font-semibold"
+                      >
+                        Trang cuối
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
 
         {/* TAB 2: Đã đăng ký */}
         {activeTab === 'daDangKy' && (
-          <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-visible animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-[#E7E0C4] text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
-                    <th className="p-4 pl-6 min-w-[250px]">Nhà máy</th>
-                    <th className="p-4 min-w-[150px]">Ngày tham quan</th>
-                    <th className="p-4 text-center">Hình thức</th>
-                    <th className="p-4 text-center">Trạng thái</th>
-                    <th className="p-4 text-center min-w-[180px]">Thanh toán</th>
-                    <th className="p-4 text-right pr-6 min-w-[120px]">Hành động</th>
-                  </tr>
-                </thead>
-                <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
-                  {registeredTrips.length === 0 ? (
-                    <tr>
-                      <td colSpan="5" className="p-8 text-center text-slate-500 italic">
-                        Bạn chưa đăng ký chuyến kiến tập nào.
-                      </td>
-                    </tr>
-                  ) : (
-                    registeredTrips.map(reg => {
-                      const trip = reg.chuyenThamQuan;
-                      const isOnline = trip?.hinh_thuc === 'TrucTuyen';
-                      const canCancel = reg.trang_thai === 'ChoDuyet' || reg.trang_thai === 'HopLe';
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            {/* Search and Status filter */}
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                <input 
+                  type="text" 
+                  placeholder="Tìm kiếm theo tên nhà máy đã đăng ký..."
+                  value={searchRegTerm}
+                  onChange={e => {
+                    setSearchRegTerm(e.target.value);
+                    setPageRegistered(1);
+                  }}
+                  className="w-full pl-11 pr-4 py-2.5 bg-white border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] shadow-sm transition-all"
+                />
+              </div>
 
-                      return (
-                        <tr key={reg.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="p-4 pl-6">
-                            <span 
-                              className="font-bold text-slate-800 cursor-pointer hover:text-[#407F3E] transition-colors"
-                              onClick={() => {
-                                if(trip?.nhaMay) setViewingTrip(trip);
-                              }}
-                            >
-                              {trip?.nhaMay?.ten_nha_may || 'Chưa rõ'}
-                            </span>
-                          </td>
-                          <td className="p-4 font-medium text-slate-600">{trip?.ngay_tham_quan ? new Date(trip.ngay_tham_quan).toLocaleDateString('vi-VN') : '--'}</td>
-                          <td className="p-4 text-center">
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shrink-0 ${
-                              isOnline ? 'bg-slate-100 text-slate-600' : 'bg-[#89B449]/10 text-[#407F3E]'
-                            }`}>
-                              {isOnline ? <Laptop className="w-3 h-3" /> : <MapPin className="w-3 h-3" />}
-                              {isOnline ? 'Trực tuyến' : 'Trực tiếp'}
-                            </span>
-                          </td>
-                          <td className="p-4 text-center">
-                            {getStatusBadge(reg.trang_thai)}
-                          </td>
-                          <td className="p-4 text-center">
-                            {reg.hoaDon ? (
-                              <div className="flex flex-col items-center gap-1">
-                                <span className="font-bold text-slate-800 text-xs">{reg.hoaDon.so_tien?.toLocaleString('vi-VN')} VNĐ</span>
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                  reg.hoaDon.trang_thai === 'ChuaDong' ? 'bg-orange-100 text-orange-600' :
-                                  reg.hoaDon.trang_thai === 'DaDong' ? 'bg-[#89B449]/20 text-[#407F3E]' :
-                                  'bg-red-100 text-red-600'
-                                }`}>
-                                  {reg.hoaDon.trang_thai === 'ChuaDong' ? 'Chưa đóng' :
-                                   reg.hoaDon.trang_thai === 'DaDong' ? 'Đã đóng' : 'Quá hạn'}
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="text-xs text-slate-400 italic">Chưa có</span>
-                            )}
-                          </td>
-                          <td className="p-4 text-right pr-6">
-                            <div className="flex flex-col items-end gap-2">
-                              {reg.hoaDon && reg.hoaDon.trang_thai === 'ChuaDong' && (
-                                <button 
-                                  onClick={() => navigate('/sinh-vien/payment')}
-                                  className="text-xs font-bold text-[#407F3E] hover:text-[#407F3E]/70 hover:underline transition-colors cursor-pointer"
-                                >
-                                  Thanh toán ngay
-                                </button>
-                              )}
-                              {canCancel ? (
-                                <button 
-                                  onClick={() => handleCancelRegistration(reg.id)}
-                                  className="text-xs font-bold text-[#E68A8C] hover:text-[#E68A8C]/70 hover:underline transition-colors cursor-pointer"
-                                >
-                                  Hủy đăng ký
-                                </button>
-                              ) : (
-                                <span className="text-xs font-bold text-slate-300 italic">Không thể hủy</span>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
+              {/* Popover Filter Trạng thái */}
+              <div className="w-full sm:w-60 relative" onClick={e => e.stopPropagation()}>
+                <div 
+                  onClick={() => setIsFilterRegStatusOpen(!isFilterRegStatusOpen)}
+                  className={`w-full px-4 py-2.5 bg-white border rounded-xl text-sm flex justify-between items-center cursor-pointer transition-all shadow-sm ${
+                    isFilterRegStatusOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'
+                  }`}
+                >
+                  <span className="font-medium truncate pr-2 text-slate-700">
+                    {filterRegStatus ? (
+                      filterRegStatus === 'ChoDuyet' ? 'Chờ duyệt' :
+                      filterRegStatus === 'HopLe' ? 'Hợp lệ' :
+                      filterRegStatus === 'TuChoi' ? 'Từ chối' :
+                      filterRegStatus === 'BiLoai' ? 'Bị loại' :
+                      filterRegStatus === 'VangMat' ? 'Vắng mặt' :
+                      filterRegStatus === 'KhongDat' ? 'Không đạt' :
+                      filterRegStatus === 'DaHuy' ? 'Đã hủy' : filterRegStatus
+                    ) : 'Tất cả trạng thái'}
+                  </span>
+                  <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isFilterRegStatusOpen ? 'rotate-180 text-[#407F3E]' : ''}`} />
+                </div>
+
+                {isFilterRegStatusOpen && (
+                  <div className="absolute top-full right-0 w-full mt-1.5 bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-40 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[200px]">
+                    <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
+                      <input 
+                        type="text" 
+                        placeholder="Tìm trạng thái..." 
+                        value={searchRegStatusDropdown}
+                        onChange={(e) => setSearchRegStatusDropdown(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
+                      />
+                    </div>
+                    <div className="max-h-60 overflow-y-auto">
+                      {[
+                        { value: '', label: 'Tất cả trạng thái' },
+                        { value: 'ChoDuyet', label: 'Chờ duyệt' },
+                        { value: 'HopLe', label: 'Hợp lệ' },
+                        { value: 'TuChoi', label: 'Từ chối' },
+                        { value: 'BiLoai', label: 'Bị loại' },
+                        { value: 'VangMat', label: 'Vắng mặt' },
+                        { value: 'KhongDat', label: 'Không đạt' },
+                        { value: 'DaHuy', label: 'Đã hủy' },
+                      ]
+                        .filter(st => st.label.toLowerCase().includes(searchRegStatusDropdown.toLowerCase()))
+                        .map(st => (
+                          <div
+                            key={st.value}
+                            onClick={() => {
+                              setFilterRegStatus(st.value);
+                              setIsFilterRegStatusOpen(false);
+                              setSearchRegStatusDropdown('');
+                              setPageRegistered(1);
+                            }}
+                            className={`px-3 py-2 text-xs cursor-pointer flex items-center justify-between transition-colors ${
+                              filterRegStatus === st.value ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50'
+                            }`}
+                          >
+                            <span>{st.label}</span>
+                            {filterRegStatus === st.value && <Check className="w-3.5 h-3.5 text-[#407F3E] shrink-0" />}
+                          </div>
+                        ))}
+                      {[
+                        { value: '', label: 'Tất cả trạng thái' },
+                        { value: 'ChoDuyet', label: 'Chờ duyệt' },
+                        { value: 'HopLe', label: 'Hợp lệ' },
+                        { value: 'TuChoi', label: 'Từ chối' },
+                        { value: 'BiLoai', label: 'Bị loại' },
+                        { value: 'VangMat', label: 'Vắng mặt' },
+                        { value: 'KhongDat', label: 'Không đạt' },
+                        { value: 'DaHuy', label: 'Đã hủy' },
+                      ].filter(st => st.label.toLowerCase().includes(searchRegStatusDropdown.toLowerCase())).length === 0 && (
+                        <div className="px-3 py-2 text-xs text-slate-500 text-center">Không tìm thấy</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
+
+            {(() => {
+              const filteredRegistered = registeredTrips.filter(reg => {
+                const trip = reg.chuyenThamQuan;
+                const matchSearch = trip?.nhaMay?.ten_nha_may?.toLowerCase().includes(searchRegTerm.toLowerCase());
+                const matchStatus = !filterRegStatus || reg.trang_thai === filterRegStatus;
+                return matchSearch && matchStatus;
+              });
+
+              const totalReg = filteredRegistered.length;
+              const totalPagesReg = Math.ceil(totalReg / limitRegistered) || 1;
+              const currentRegPage = Math.min(pageRegistered, totalPagesReg);
+              const paginatedReg = filteredRegistered.slice((currentRegPage - 1) * limitRegistered, currentRegPage * limitRegistered);
+
+              return (
+                <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-[#E7E0C4] text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
+                          <th className="p-4 pl-6 min-w-[250px]">Nhà máy</th>
+                          <th className="p-4 min-w-[150px]">Ngày tham quan</th>
+                          <th className="p-4 text-center">Hình thức</th>
+                          <th className="p-4 text-center">Trạng thái</th>
+                          <th className="p-4 text-center min-w-[180px]">Thanh toán</th>
+                          <th className="p-4 text-right pr-6 min-w-[120px]">Hành động</th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
+                        {paginatedReg.length === 0 ? (
+                          <tr>
+                            <td colSpan="6" className="p-8 text-center text-slate-500 italic">
+                              {registeredTrips.length === 0 ? 'Bạn chưa đăng ký chuyến kiến tập nào.' : 'Không tìm thấy chuyến kiến tập đã đăng ký phù hợp.'}
+                            </td>
+                          </tr>
+                        ) : (
+                          paginatedReg.map(reg => {
+                            const trip = reg.chuyenThamQuan;
+                            const isOnline = trip?.hinh_thuc === 'TrucTuyen';
+                            const canCancel = reg.trang_thai === 'ChoDuyet' || reg.trang_thai === 'HopLe';
+
+                            return (
+                              <tr key={reg.id} className="hover:bg-slate-50 transition-colors">
+                                <td className="p-4 pl-6">
+                                  <span 
+                                    className="font-bold text-slate-800 cursor-pointer hover:text-[#407F3E] transition-colors"
+                                    onClick={() => {
+                                      if(trip?.nhaMay) setViewingTrip(trip);
+                                    }}
+                                  >
+                                    {trip?.nhaMay?.ten_nha_may || 'Chưa rõ'}
+                                  </span>
+                                </td>
+                                <td className="p-4 font-medium text-slate-600">{trip?.ngay_tham_quan ? new Date(trip.ngay_tham_quan).toLocaleDateString('vi-VN') : '--'}</td>
+                                <td className="p-4 text-center">
+                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shrink-0 ${
+                                    isOnline ? 'bg-slate-100 text-slate-600' : 'bg-[#89B449]/10 text-[#407F3E]'
+                                  }`}>
+                                    {isOnline ? <Laptop className="w-3 h-3" /> : <MapPin className="w-3 h-3" />}
+                                    {isOnline ? 'Trực tuyến' : 'Trực tiếp'}
+                                  </span>
+                                </td>
+                                <td className="p-4 text-center">
+                                  {getStatusBadge(reg.trang_thai)}
+                                </td>
+                                <td className="p-4 text-center">
+                                  {reg.hoaDon ? (
+                                    <div className="flex flex-col items-center gap-1">
+                                      <span className="font-bold text-slate-800 text-xs">{reg.hoaDon.so_tien?.toLocaleString('vi-VN')} VNĐ</span>
+                                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                        reg.hoaDon.trang_thai === 'ChuaDong' ? 'bg-orange-100 text-orange-600' :
+                                        reg.hoaDon.trang_thai === 'DaDong' ? 'bg-[#89B449]/20 text-[#407F3E]' :
+                                        'bg-red-100 text-red-600'
+                                      }`}>
+                                        {reg.hoaDon.trang_thai === 'ChuaDong' ? 'Chưa đóng' :
+                                         reg.hoaDon.trang_thai === 'DaDong' ? 'Đã đóng' : 'Quá hạn'}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-xs text-slate-400 italic">Chưa có</span>
+                                  )}
+                                </td>
+                                <td className="p-4 text-right pr-6">
+                                  <div className="flex flex-col items-end gap-2">
+                                    {reg.hoaDon && reg.hoaDon.trang_thai === 'ChuaDong' && (
+                                      <button 
+                                        onClick={() => navigate('/sinh-vien/payment')}
+                                        className="text-xs font-bold text-[#407F3E] hover:text-[#407F3E]/70 hover:underline transition-colors cursor-pointer"
+                                      >
+                                        Thanh toán ngay
+                                      </button>
+                                    )}
+                                    {canCancel ? (
+                                      <button 
+                                        onClick={() => handleCancelRegistration(reg.id)}
+                                        className="text-xs font-bold text-[#E68A8C] hover:text-[#E68A8C]/70 hover:underline transition-colors cursor-pointer"
+                                      >
+                                        Hủy đăng ký
+                                      </button>
+                                    ) : (
+                                      <span className="text-xs font-bold text-slate-300 italic">Không thể hủy</span>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Pagination Footer Tab 2 */}
+                  <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="text-xs text-slate-600 flex items-center gap-2">
+                      <span>Hiển thị</span>
+                      <select
+                        value={limitRegistered}
+                        onChange={e => {
+                          setLimitRegistered(Number(e.target.value));
+                          setPageRegistered(1);
+                        }}
+                        className="px-2 py-1 bg-white border border-[#E7E0C4] rounded-lg text-xs font-semibold focus:outline-none focus:border-[#407F3E] cursor-pointer"
+                      >
+                        <option value={15}>15 mục</option>
+                        <option value={30}>30 mục</option>
+                        <option value={50}>50 mục</option>
+                        <option value={100}>100 mục</option>
+                      </select>
+                      <span>/ tổng số <strong className="text-slate-800">{totalReg}</strong> đơn đăng ký</span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setPageRegistered(1)}
+                        disabled={currentRegPage <= 1}
+                        className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-xs font-semibold"
+                      >
+                        Trang đầu
+                      </button>
+                      <button
+                        onClick={() => setPageRegistered(prev => Math.max(prev - 1, 1))}
+                        disabled={currentRegPage <= 1}
+                        className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-xs font-semibold"
+                      >
+                        Trước
+                      </button>
+                      <span className="text-xs font-bold text-white bg-[#407F3E] px-4 py-1.5 rounded-lg shadow-sm mx-1">
+                        Trang {currentRegPage} / {totalPagesReg}
+                      </span>
+                      <button
+                        onClick={() => setPageRegistered(prev => Math.min(prev + 1, totalPagesReg))}
+                        disabled={currentRegPage >= totalPagesReg}
+                        className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-xs font-semibold"
+                      >
+                        Sau
+                      </button>
+                      <button
+                        onClick={() => setPageRegistered(totalPagesReg)}
+                        disabled={currentRegPage >= totalPagesReg}
+                        className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-xs font-semibold"
+                      >
+                        Trang cuối
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
 

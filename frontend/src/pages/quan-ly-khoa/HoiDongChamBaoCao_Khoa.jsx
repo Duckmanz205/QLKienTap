@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Plus, ChevronDown, Check, X, Search, ChevronRight, Calendar, MapPin
 } from 'lucide-react';
@@ -13,6 +13,14 @@ export default function HoiDongChamBaoCao_Khoa() {
   const [isMembersOpen, setIsMembersOpen] = useState(false);
   const [isStudentsOpen, setIsStudentsOpen] = useState(false); // To show the open state
 
+  // Filter & Pagination States
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState('ALL');
+  const [searchStatusDropdown, setSearchStatusDropdown] = useState('');
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [limit, setLimit] = useState(15);
+
   // Form States
   const [boardName, setBoardName] = useState('');
   const [selectedSchedule, setSelectedSchedule] = useState('');
@@ -24,6 +32,19 @@ export default function HoiDongChamBaoCao_Khoa() {
   // Data
   const [schedules, setSchedules] = useState([]);
   const [lecturers, setLecturers] = useState([]);
+  const [committees, setCommittees] = useState([
+    { 
+      id: 1, 
+      ten: 'HĐ Bảo vệ TQNM - K14 H1', 
+      lich: 'Đợt kiến tập - Học kỳ 1 - 2025-2026', 
+      ngay: '10/09/2026', 
+      gio: '08:00', 
+      diaDiem: 'Phòng A.101', 
+      members: ['https://i.pravatar.cc/150?u=1', 'https://i.pravatar.cc/150?u=2', 'https://i.pravatar.cc/150?u=3', 'https://i.pravatar.cc/150?u=4', 'https://i.pravatar.cc/150?u=5'],
+      sv: 15, 
+      trangThai: 'Sắp diễn ra' 
+    }
+  ]);
 
   useEffect(() => {
     fetchData();
@@ -67,6 +88,19 @@ export default function HoiDongChamBaoCao_Khoa() {
         });
       }
       
+      const newCommittee = {
+        id: boardId || Date.now(),
+        ten: boardName,
+        lich: schedules.find(s => s.id === selectedSchedule)?.ten_lich || 'Đợt kiến tập',
+        ngay: dateTime ? new Date(dateTime).toLocaleDateString('vi-VN') : '',
+        gio: dateTime ? new Date(dateTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
+        diaDiem: room,
+        members: ['https://i.pravatar.cc/150?u=1', 'https://i.pravatar.cc/150?u=2'],
+        sv: 0,
+        trangThai: 'Sắp diễn ra'
+      };
+      setCommittees(prev => [newCommittee, ...prev]);
+
       alert('Tạo hội đồng thành công!');
       setIsModalOpen(false);
       setBoardName('');
@@ -93,20 +127,20 @@ export default function HoiDongChamBaoCao_Khoa() {
     setter(true);
   };
 
-  // Mock Data for table display (since no getBoards API in khoaApi)
-  const committees = [
-    { 
-      id: 1, 
-      ten: 'HĐ Bảo vệ TQNM - K14 H1', 
-      lich: 'Đợt kiến tập - Học kỳ 1 - 2025-2026', 
-      ngay: '10/09/2026', 
-      gio: '08:00', 
-      diaDiem: 'Phòng A.101', 
-      members: ['https://i.pravatar.cc/150?u=1', 'https://i.pravatar.cc/150?u=2', 'https://i.pravatar.cc/150?u=3', 'https://i.pravatar.cc/150?u=4', 'https://i.pravatar.cc/150?u=5'],
-      sv: 15, 
-      trangThai: 'Sắp diễn ra' 
-    }
-  ];
+  // Filter & Pagination logic
+  const filteredCommittees = useMemo(() => {
+    return committees.filter(c => {
+      const matchSearch = !searchTerm || 
+        c.ten?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        c.lich?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        c.diaDiem?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchStatus = selectedStatus === 'ALL' || c.trangThai === selectedStatus;
+      return matchSearch && matchStatus;
+    });
+  }, [committees, searchTerm, selectedStatus]);
+
+  const totalPages = Math.ceil(filteredCommittees.length / limit) || 1;
+  const paginatedCommittees = filteredCommittees.slice((currentPage - 1) * limit, currentPage * limit);
 
   const getStatusBadge = (status) => {
     switch (status) {
@@ -135,6 +169,87 @@ export default function HoiDongChamBaoCao_Khoa() {
         </button>
       </div>
 
+      {/* Filter Bar */}
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-[#E7E0C4] flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div className="flex flex-wrap items-center gap-4 flex-1">
+          {/* Search Input */}
+          <div className="relative min-w-[280px] flex-1">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input 
+              type="text"
+              placeholder="Tìm theo tên hội đồng, lịch, địa điểm..."
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full pl-9 pr-4 py-2 border border-[#E7E0C4] rounded-lg text-sm bg-slate-50 focus:outline-none focus:border-[#407F3E] text-slate-700 font-medium"
+            />
+          </div>
+
+          {/* Status Dropdown */}
+          <div className="relative w-56" onClick={(e) => e.stopPropagation()}>
+            <div 
+              onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
+              className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isStatusDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+            >
+              <span className="truncate pr-2 font-medium text-slate-700">
+                {selectedStatus === 'ALL' ? 'Tất cả trạng thái' : selectedStatus}
+              </span>
+              <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+            </div>
+            {isStatusDropdownOpen && (
+              <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1">
+                <div className="p-2 border-b border-[#E7E0C4]">
+                  <input
+                    type="text"
+                    placeholder="Tìm trạng thái..."
+                    value={searchStatusDropdown}
+                    onChange={(e) => setSearchStatusDropdown(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-full px-2.5 py-1 text-xs bg-slate-50 border border-[#E7E0C4] rounded-md focus:outline-none focus:border-[#407F3E]"
+                  />
+                </div>
+                <div className="max-h-60 overflow-y-auto">
+                  {[
+                    { id: 'ALL', name: 'Tất cả trạng thái' },
+                    { id: 'Sắp diễn ra', name: 'Sắp diễn ra' },
+                    { id: 'Đang diễn ra', name: 'Đang diễn ra' },
+                    { id: 'Đã hoàn thành', name: 'Đã hoàn thành' }
+                  ]
+                    .filter(opt => !searchStatusDropdown || opt.name.toLowerCase().includes(searchStatusDropdown.toLowerCase()))
+                    .map(opt => (
+                      <div 
+                        key={opt.id}
+                        onClick={() => { 
+                          setSelectedStatus(opt.id); 
+                          setIsStatusDropdownOpen(false); 
+                          setSearchStatusDropdown('');
+                          setCurrentPage(1); 
+                        }}
+                        className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                          selectedStatus === opt.id ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                        }`}
+                      >
+                        <span>{opt.name}</span>
+                        {selectedStatus === opt.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                      </div>
+                    ))}
+                  {[
+                    { id: 'ALL', name: 'Tất cả trạng thái' },
+                    { id: 'Sắp diễn ra', name: 'Sắp diễn ra' },
+                    { id: 'Đang diễn ra', name: 'Đang diễn ra' },
+                    { id: 'Đã hoàn thành', name: 'Đã hoàn thành' }
+                  ].filter(opt => !searchStatusDropdown || opt.name.toLowerCase().includes(searchStatusDropdown.toLowerCase())).length === 0 && (
+                    <div className="px-4 py-3 text-xs text-slate-500 text-center">Không tìm thấy</div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Main Table */}
       <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-hidden">
         <div className="overflow-x-auto">
@@ -152,12 +267,12 @@ export default function HoiDongChamBaoCao_Khoa() {
               </tr>
             </thead>
             <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
-              {committees.length === 0 ? (
+              {filteredCommittees.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center text-slate-500 font-medium">Không có hội đồng nào.</td>
+                  <td colSpan={8} className="p-8 text-center text-slate-500 font-medium">Không có hội đồng nào phù hợp.</td>
                 </tr>
               ) : (
-                committees.map(c => {
+                paginatedCommittees.map(c => {
                   const displayMembers = c.members.slice(0, 3);
                   const extraMembers = c.members.length - 3;
                   
@@ -201,6 +316,61 @@ export default function HoiDongChamBaoCao_Khoa() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Pagination Footer */}
+        <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
+            <span>Hiển thị</span>
+            <select 
+              value={limit}
+              onChange={(e) => {
+                const newLimit = Number(e.target.value);
+                setLimit(newLimit);
+                setCurrentPage(1);
+              }}
+              className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
+            >
+              <option value={15}>15</option>
+              <option value={30}>30</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <span>/ {filteredCommittees.length} hội đồng</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button 
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage(1)}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Trang đầu
+            </button>
+            <button 
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Trước
+            </button>
+            <span className="px-4 py-1.5 rounded-lg bg-[#407F3E] text-white text-sm font-bold shadow-sm cursor-default mx-1">
+              Trang {currentPage} / {totalPages}
+            </span>
+            <button 
+              disabled={currentPage >= totalPages}
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Sau
+            </button>
+            <button 
+              disabled={currentPage >= totalPages}
+              onClick={() => setCurrentPage(totalPages)}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Trang cuối
+            </button>
+          </div>
         </div>
       </div>
 
