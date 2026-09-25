@@ -381,6 +381,13 @@ export class LichKienTap {
   @Column()
   dot_kien_tap_id: number;
 
+  @ManyToOne(() => TaiKhoanThuHuong, { nullable: true })
+  @JoinColumn({ name: 'tai_khoan_thu_huong_id' })
+  taiKhoanThuHuong: TaiKhoanThuHuong;
+
+  @Column({ nullable: true })
+  tai_khoan_thu_huong_id: number;
+
   @Column()
   ten_lich: string;
 
@@ -741,6 +748,15 @@ export class DonHoanPhi {
 
   @Column()
   hoa_don_id: number;
+
+  @Column()
+  ngan_hang_nhan: string;
+
+  @Column()
+  so_tai_khoan_nhan: string;
+
+  @Column()
+  ten_chu_tai_khoan_nhan: string;
 
   @Column()
   file_don_da_duyet: string;

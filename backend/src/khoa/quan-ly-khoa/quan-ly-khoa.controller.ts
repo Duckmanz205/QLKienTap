@@ -34,6 +34,9 @@ import {
   FilterAssignStudentsDto,
   AssignGvhdDto,
   AssignGvddDto,
+  BatchAssignGvhdDto,
+  AutoAssignGvhdDto,
+  ConfirmAutoAssignGvhdDto,
   CreateBoardDto,
   AddBoardMemberDto,
   LockGradesDto,
@@ -164,6 +167,12 @@ export class KhoaController {
   @Get('lecturers')
   async getLecturers() {
     return this.khoaService.getLecturers();
+  }
+
+  @Roles('QuanLyKhoa')
+  @Get('lecturers-with-workload')
+  async getLecturersWithWorkload() {
+    return this.khoaService.getLecturersWithWorkload();
   }
 
   @Roles('QuanLyKhoa')
@@ -395,6 +404,27 @@ export class KhoaController {
       body.lichKienTapSinhVienId,
       body.lecturerId,
     );
+  }
+
+  @Roles('QuanLyKhoa')
+  @Post('batch-assign-gvhd')
+  async batchAssignGvhd(@Body() body: BatchAssignGvhdDto) {
+    return this.khoaService.batchAssignGvhd(
+      body.dotKienTapSinhVienIds,
+      body.lecturerId,
+    );
+  }
+
+  @Roles('QuanLyKhoa')
+  @Post('preview-auto-assign-gvhd')
+  async previewAutoAssignGvhd(@Body() body: AutoAssignGvhdDto) {
+    return this.khoaService.previewAutoAssignGvhd(body.dotKienTapId);
+  }
+
+  @Roles('QuanLyKhoa')
+  @Post('confirm-auto-assign-gvhd')
+  async confirmAutoAssignGvhd(@Body() body: ConfirmAutoAssignGvhdDto) {
+    return this.khoaService.confirmAutoAssignGvhd(body.assignments);
   }
 
   @Roles('QuanLyKhoa')

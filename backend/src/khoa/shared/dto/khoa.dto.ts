@@ -659,3 +659,24 @@ export class UpdateLecturerDto {
   @IsOptional() @IsString() sdt?: string;
   @IsOptional() @IsInt() so_sv_toi_da_huong_dan?: number;
 }
+
+export class BatchAssignGvhdDto {
+  @IsArray()
+  @IsInt({ each: true })
+  dotKienTapSinhVienIds: number[];
+
+  @IsInt()
+  @Min(1)
+  lecturerId: number;
+}
+
+export class AutoAssignGvhdDto {
+  @IsInt()
+  @Min(1)
+  dotKienTapId: number;
+}
+
+export class ConfirmAutoAssignGvhdDto {
+  @IsArray()
+  assignments: { dotKienTapSinhVienId: number; lecturerId: number }[];
+}

@@ -35,7 +35,7 @@ import ChuyenThamQuan_DSLoc from './pages/clb/ChuyenThamQuan_DSLoc';
 import HoiDongChamBaoCao_Khoa from './pages/quan-ly-khoa/HoiDongChamBaoCao_Khoa';
 import PlanManagement_Khoa from './pages/quan-ly-khoa/PlanManagement_Khoa';
 import RegistrationManagement_Khoa from './pages/clb/RegistrationManagement_Khoa';
-import SupervisorAssignment_Khoa from './pages/clb/SupervisorAssignment_Khoa';
+import SupervisorAssignment_Khoa from './pages/quan-ly-khoa/SupervisorAssignment_Khoa';
 import LeaderAssignment_Khoa from './pages/clb/LeaderAssignment_Khoa';
 import ThongBao_Khoa from './pages/shared/ThongBao_Khoa';
 import BaoCaoThongKe_Khoa from './pages/shared/BaoCaoThongKe_Khoa';
@@ -125,6 +125,7 @@ export default function App() {
             <Route path="khoa/lecturers" element={<DanhMuc_GiangVien_Khoa />} />
             <Route path="khoa/students" element={<DanhMuc_SinhVien_Khoa />} />
             <Route path="khoa/boards" element={<HoiDongChamBaoCao_Khoa />} />
+            <Route path="khoa/supervisors" element={<SupervisorAssignment_Khoa />} />
 
             <Route path="khoa/results" element={<KetQuaKienTap_MaTranDiem_Khoa />} />
             <Route path="khoa/notifications" element={<ThongBao_Khoa />} />

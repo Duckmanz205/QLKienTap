@@ -831,6 +831,26 @@ export class KhoaService {
     if (lich.trang_thai !== 'ChoDuyet') {
       throw new BadRequestException('Lịch không ở trạng thái chờ duyệt');
     }
+
+    const totalStudents = await this.dksvRepo.count({
+      where: { dot_kien_tap_id: lich.dot_kien_tap_id, trang_thai: 'DangThucHien' },
+    });
+
+    if (totalStudents > 0) {
+      const assignedStudentsCount = await this.pcGvhdRepo.createQueryBuilder('pc')
+        .innerJoin('pc.dotKienTapSinhVien', 'dksv')
+        .where('dksv.dot_kien_tap_id = :dotId', { dotId: lich.dot_kien_tap_id })
+        .andWhere('dksv.trang_thai = :status1', { status1: 'DangThucHien' })
+        .andWhere('pc.trang_thai = :status2', { status2: 'DangHoatDong' })
+        .getCount();
+
+      if (assignedStudentsCount < totalStudents) {
+        throw new BadRequestException(
+          `Bạn phải hoàn thành phân công GVHD cho toàn bộ sinh viên trong đợt trước khi duyệt lịch (Còn ${totalStudents - assignedStudentsCount}/${totalStudents} SV chưa được phân công).`
+        );
+      }
+    }
+
     lich.trang_thai = 'DaDuyet';
     lich.ly_do_tu_choi = null as any;
     await this.lichRepo.save(lich);
@@ -1618,11 +1638,45 @@ export class KhoaService {
   // -------------------------------------------------------------
   // Phan Cong GVHD & GVDD
   // -------------------------------------------------------------
-  async assignLecturerGuide(dotKienTapSinhVienId: number, lecturerId: number) {
+  async assignLecturerGuide(dotKienTapSinhVienId: number, lecturerId: number, checkLimit: boolean = true) {
     const dksv = await this.dksvRepo.findOne({
       where: { id: dotKienTapSinhVienId },
+      relations: { dotKienTap: true }
     });
     if (!dksv) throw new NotFoundException('Không tìm thấy đăng ký đợt kiến tập');
+
+    if (dksv.trang_thai !== 'DangThucHien') {
+      throw new BadRequestException('Sinh viên không trong trạng thái đang thực hiện kiến tập');
+    }
+
+    if (dksv.dotKienTap && (dksv.dotKienTap.trang_thai === 'DaKetThuc' || dksv.dotKienTap.trang_thai === 'DaKhoa')) {
+      throw new BadRequestException('Không thể phân công khi đợt kiến tập đã kết thúc hoặc khóa');
+    }
+
+    if (checkLimit) {
+      const gv = await this.gvRepo.findOne({ where: { id: lecturerId } });
+      if (!gv) throw new NotFoundException('Không tìm thấy giảng viên');
+      
+      if (gv.so_sv_toi_da_huong_dan) {
+        const currentCount = await this.pcGvhdRepo.count({
+          where: { giang_vien_id: lecturerId, trang_thai: 'DangHoatDong' },
+        });
+        
+        const isAlreadyAssigned = await this.pcGvhdRepo.findOne({
+          where: {
+            dot_kien_tap_sinh_vien_id: dotKienTapSinhVienId,
+            giang_vien_id: lecturerId,
+            trang_thai: 'DangHoatDong'
+          }
+        });
+        
+        if (!isAlreadyAssigned && currentCount >= gv.so_sv_toi_da_huong_dan) {
+          throw new BadRequestException(
+            `GV ${gv.ho_ten} đã đạt giới hạn ${gv.so_sv_toi_da_huong_dan} sinh viên hướng dẫn`,
+          );
+        }
+      }
+    }
 
     const current = await this.pcGvhdRepo.findOne({
       where: {
@@ -1645,6 +1699,91 @@ export class KhoaService {
     await this.assignGvhdToTuDoTrips(dksv.sinh_vien_id, lecturerId);
 
     return { success: true, pc };
+  }
+
+  async getLecturersWithWorkload() {
+    const lecturers = await this.gvRepo.find();
+    const result: any[] = [];
+    for (const gv of lecturers) {
+      const count = await this.pcGvhdRepo.count({
+        where: { giang_vien_id: gv.id, trang_thai: 'DangHoatDong' },
+      });
+      result.push({
+        ...gv,
+        so_sv_dang_huong_dan: count,
+      });
+    }
+    return result;
+  }
+
+  async batchAssignGvhd(dotKienTapSinhVienIds: number[], lecturerId: number) {
+    const results = { success: 0, failed: [] as any[] };
+    for (const id of dotKienTapSinhVienIds) {
+      try {
+        await this.assignLecturerGuide(id, lecturerId, true);
+        results.success++;
+      } catch (err) {
+        results.failed.push({ id, reason: err.message });
+      }
+    }
+    return results;
+  }
+
+  async previewAutoAssignGvhd(dotKienTapId: number) {
+    const dksvs = await this.dksvRepo.find({
+      where: { dot_kien_tap_id: dotKienTapId },
+      relations: { sinhVien: true }
+    });
+
+    const unassignedDksvs: any[] = [];
+    for (const dksv of dksvs) {
+      const pc = await this.pcGvhdRepo.findOne({
+        where: { dot_kien_tap_sinh_vien_id: dksv.id, trang_thai: 'DangHoatDong' }
+      });
+      if (!pc) unassignedDksvs.push(dksv);
+    }
+
+    if (unassignedDksvs.length === 0) {
+      return { assignments: [], unassigned: [] };
+    }
+
+    const lecturers = await this.getLecturersWithWorkload();
+    const availableLecturers = lecturers.filter(gv => !gv.so_sv_toi_da_huong_dan || gv.so_sv_dang_huong_dan < gv.so_sv_toi_da_huong_dan);
+    
+    const assignments: any[] = [];
+    const unassigned: any[] = [];
+    
+    for (const dksv of unassignedDksvs) {
+      availableLecturers.sort((a, b) => (a.so_sv_dang_huong_dan || 0) - (b.so_sv_dang_huong_dan || 0));
+      
+      const targetGv = availableLecturers[0];
+      if (targetGv && (!targetGv.so_sv_toi_da_huong_dan || targetGv.so_sv_dang_huong_dan < targetGv.so_sv_toi_da_huong_dan)) {
+        assignments.push({
+          dotKienTapSinhVienId: dksv.id,
+          sinhVien: dksv.sinhVien,
+          lecturerId: targetGv.id,
+          lecturer: targetGv
+        });
+        targetGv.so_sv_dang_huong_dan++;
+      } else {
+        unassigned.push(dksv);
+      }
+    }
+    
+    return { assignments, unassigned };
+  }
+
+  async confirmAutoAssignGvhd(assignments: { dotKienTapSinhVienId: number; lecturerId: number }[]) {
+    const results = { success: 0, failed: [] as any[] };
+    for (const assign of assignments) {
+      try {
+        await this.assignLecturerGuide(assign.dotKienTapSinhVienId, assign.lecturerId, false);
+        results.success++;
+      } catch (err) {
+        results.failed.push({ id: assign.dotKienTapSinhVienId, reason: err.message });
+      }
+    }
+    return results;
   }
 
   async assignTourLeader(
