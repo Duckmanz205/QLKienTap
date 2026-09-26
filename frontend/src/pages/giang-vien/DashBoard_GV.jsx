@@ -59,7 +59,7 @@ export default function DashBoard_GV() {
       type: 'DanDoan',
       title: t.nhaMay?.ten_nha_may || 'Chuyến tham quan',
       date: t.ngay_tham_quan ? new Date(t.ngay_tham_quan).toLocaleDateString('vi-VN') : '--',
-      time: `${(t.gio_bat_dau || '--').slice(0, 5)} - ${(t.gio_ket_thuc || '--').slice(0, 5)}`,
+      time: `${(t.gio_bat_dau || '--').slice(0, 5)}`,
       rawDate: new Date(t.ngay_tham_quan)
     })),
     ...boards.map(b => ({
@@ -67,7 +67,7 @@ export default function DashBoard_GV() {
       type: 'HoiDong',
       title: `Hội đồng Bảo vệ - Nhóm ${b.session?.id}`,
       date: b.session?.ngay_bao_cao ? new Date(b.session.ngay_bao_cao).toLocaleDateString('vi-VN') : '--',
-      time: `${(b.session?.gio_bat_dau || '--').slice(0, 5)} - ${(b.session?.gio_ket_thuc || '--').slice(0, 5)}`,
+      time: `${(b.session?.gio_bat_dau || '--').slice(0, 5)}`,
       rawDate: b.session?.ngay_bao_cao ? new Date(b.session.ngay_bao_cao) : new Date(0)
     }))
   ].sort((a, b) => a.rawDate - b.rawDate).slice(0, 5);

@@ -51,7 +51,7 @@ export default function BaoCaoThongKe_Khoa() {
       matchNamHoc = s.ten_lich?.includes(selectedNamHoc) || s.dotKienTap?.hocKy?.namHoc?.ten_nam_hoc === selectedNamHoc;
     }
     if (selectedKhoa && selectedKhoa !== "Tất cả") {
-      matchKhoa = s.ten_lich?.includes(selectedKhoa) || s.khoa?.ten_khoa === selectedKhoa;
+      matchKhoa = s.ten_lich?.includes(selectedKhoa) || s.khoaHoc?.ten_khoa_hoc === selectedKhoa;
     }
 
     let matchSearch = true;
@@ -151,7 +151,7 @@ export default function BaoCaoThongKe_Khoa() {
     if (reportType === 'retake') {
       csvContent += 'MSSV,Họ tên,Lớp,Email,Khoa\n';
       data.forEach(s => {
-        csvContent += `"${s.mssv}","${s.ho_ten}","${s.ten_lop || ''}","${s.email || ''}","${s.khoa?.ten_khoa || ''}"\n`;
+        csvContent += `"${s.mssv}","${s.ho_ten}","${s.ten_lop || ''}","${s.email || ''}","${s.khoaHoc?.ten_khoa_hoc || ''}"\n`;
       });
     } else if (reportType === 'final') {
       csvContent += 'MSSV,Họ tên,Điểm tổng kết,Kết quả\n';
@@ -160,12 +160,12 @@ export default function BaoCaoThongKe_Khoa() {
         if (r.ket_qua === 'Dat') lbl = 'Đạt';
         else if (r.ket_qua === 'KhongDat') lbl = 'Không Đạt';
 
-        csvContent += `"${r.lichKienTapSinhVien?.sinhVien?.mssv}","${r.lichKienTapSinhVien?.sinhVien?.ho_ten}","${r.diem_tong_ket !== null ? Number(r.diem_tong_ket).toFixed(2) : 'Chưa chốt'}","${lbl}"\n`;
+        csvContent += `"${r.sinhVien?.mssv}","${r.sinhVien?.ho_ten}","${r.diem_tong_ket !== null ? Number(r.diem_tong_ket).toFixed(2) : 'Chưa chốt'}","${lbl}"\n`;
       });
     } else if (reportType === 'students') {
       csvContent += 'MSSV,Họ tên,Lớp,Khóa\n';
       data.forEach(s => {
-        csvContent += `"${s.mssv}","${s.ho_ten}","${s.lop || ''}","${s.khoa?.ten_khoa || ''}"\n`;
+        csvContent += `"${s.mssv}","${s.ho_ten}","${s.lop || ''}","${s.khoaHoc?.ten_khoa_hoc || ''}"\n`;
       });
     }
 

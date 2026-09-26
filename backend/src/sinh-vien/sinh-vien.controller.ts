@@ -59,6 +59,11 @@ export class SinhVienController {
     return this.svService.getAvailableTrips(student.id);
   }
 
+  @Get('payment-config')
+  async getPaymentConfig() {
+    return this.svService.getPaymentConfig();
+  }
+
   @Get('registered-trips')
   async getMyRegisteredTrips(@CurrentUser() user: JwtPayloadUser) {
     const student = await this.svService.getStudentByAccountId(user.sub);
@@ -69,6 +74,12 @@ export class SinhVienController {
   async getRegisteredTrips(@CurrentUser() user: JwtPayloadUser) {
     const student = await this.svService.getStudentByAccountId(user.sub);
     return this.svService.getStudentRegisteredTrips(student.id);
+  }
+
+  @Get('proposals')
+  async getMyProposals(@CurrentUser() user: JwtPayloadUser) {
+    const student = await this.svService.getStudentByAccountId(user.sub);
+    return this.svService.getStudentProposals(student.id);
   }
 
   @Post('register')
@@ -90,7 +101,6 @@ export class SinhVienController {
       student.id,
       body.ngayThamQuan,
       body.gioBatDau,
-      body.gioKetThuc,
       body.hinhThuc,
       body.nhaMayId,
       body.tenNhaMayDeXuat,

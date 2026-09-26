@@ -12,6 +12,7 @@ import {
   LogOut,
   BookOpen,
   ChevronRight,
+  ChevronLeft,
   ChevronDown,
   User,
   UserCheck,
@@ -24,7 +25,10 @@ import {
   Award,
   Eye,
   EyeOff,
-  Key
+  Key,
+  Menu,
+  PanelLeftClose,
+  PanelLeftOpen
 } from 'lucide-react';
 import { sinhVienApi, authApi } from '../services/api';
 
@@ -35,8 +39,8 @@ export default function Layout() {
   const location = useLocation();
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState({
     'DANH MỤC HỆ THỐNG': true,
     'KẾ HOẠCH KIẾN TẬP': true,
@@ -60,14 +64,6 @@ export default function Layout() {
     }
   }, [session, navigate]);
 
-  useEffect(() => {
-    if (location.pathname === '/giang-vien/grading') {
-      setIsSidebarCollapsed(true);
-    } else {
-      setIsSidebarCollapsed(false);
-    }
-  }, [location.pathname]);
-
   if (!session) return null;
 
   const { user, token } = session;
@@ -83,6 +79,13 @@ export default function Layout() {
       }).catch(err => console.error(err));
     }
   }, [vai_tro, details, phai_doi_mat_khau]);
+
+  // Tự động thu gọn sidebar khi vào trang nộp bài để tiết kiệm không gian
+  useEffect(() => {
+    if (location.pathname === '/sinh-vien/reports') {
+      setIsSidebarCollapsed(true);
+    }
+  }, [location.pathname]);
 
   const confirmLogout = () => {
     setShowLogoutModal(true);
@@ -194,18 +197,24 @@ export default function Layout() {
     return (
       <div className="min-h-screen bg-[#f8faf1] flex font-sans">
         {/* Sidebar */}
-        <aside className="fixed left-0 top-0 h-screen w-[260px] bg-[#407F3E] text-white z-50 flex flex-col shadow-xl border-r border-[#2c6b2d]/10">
+        <aside className={`fixed left-0 top-0 h-screen transition-transform duration-300 bg-[#407F3E] w-[260px] ${isSidebarCollapsed ? '-translate-x-full' : 'translate-x-0'} text-white z-50 flex flex-col shadow-xl border-r border-[#2c6b2d]/10`} >
+          <button 
+            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            className={`absolute -right-3.5 top-6 w-7 h-7 bg-white border border-gray-200 shadow-md rounded-full flex items-center justify-center text-gray-500 hover:text-[#407F3E] transition-all z-[100] ${isSidebarCollapsed ? 'translate-x-[20px]' : ''}`}
+          >
+            {isSidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          </button>
           <div className="flex flex-col border-b border-white/10 bg-[#2c6b2d]/15">
             <div className="h-16 flex items-center justify-center px-4">
-              <img src="/huit-logo.png" alt="Logo HUIT" className="w-44 max-w-full h-auto object-contain brightness-0 invert opacity-95 shrink-0" />
+              {isSidebarCollapsed ? <div className="font-black text-2xl tracking-tighter">HUIT</div> : <img src="/huit-logo.png" alt="Logo HUIT" className="w-44 max-w-full h-auto object-contain brightness-0 invert opacity-95 shrink-0" />}
             </div>
             <div className="pb-3.5 px-4 flex flex-col items-center text-center gap-0.5">
-              <span className="font-extrabold text-[15px] leading-tight text-white uppercase tracking-wider block">
+              {!isSidebarCollapsed && <span className="font-extrabold text-[15px] leading-tight text-white uppercase tracking-wider block">
                 Quản lý kiến tập
-              </span>
-              <span className="text-[10px] text-[#e5ffdc]/70 font-semibold tracking-widest block uppercase">
+              </span>}
+              {!isSidebarCollapsed && <span className="text-[10px] text-[#e5ffdc]/70 font-semibold tracking-widest block uppercase">
                 HUIT — Khoa CNTP
-              </span>
+              </span>}
             </div>
           </div>
 
@@ -231,9 +240,9 @@ export default function Layout() {
                       >
                         <div className="flex items-center gap-3">
                           <Icon className="w-[18px] h-[18px]" />
-                          <span>{item.label}</span>
+                          {!isSidebarCollapsed && <span>{item.label}</span>}
                         </div>
-                        {item.badge !== undefined && item.badge > 0 && (
+                        {item.badge !== undefined && item.badge > 0 && !isSidebarCollapsed && (
                           <span className="bg-[#DBD468] text-[#191d17] font-bold text-[10px] px-2 py-0.5 rounded-full shadow-sm">
                             {item.badge}
                           </span>
@@ -251,25 +260,25 @@ export default function Layout() {
               <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center border-2 border-white/20 font-bold text-white">
                 {fullName.charAt(0).toUpperCase()}
               </div>
-              <div className="flex flex-col min-w-0">
+              {!isSidebarCollapsed && <div className="flex flex-col min-w-0">
                 <span className="text-white font-bold text-sm truncate">{fullName}</span>
                 <span className="text-[#e5ffdc]/60 text-xs">Sinh viên</span>
-              </div>
+              </div>}
             </div>
             <button
               onClick={confirmLogout}
               className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 text-red-300 hover:bg-red-500 hover:text-white transition-all text-sm font-bold border border-red-500/20 cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
-              <span>Đăng xuất</span>
+              {!isSidebarCollapsed && <span>Đăng xuất</span>}
             </button>
           </div>
         </aside>
 
         {/* Content Area */}
-        <div className="flex-1 flex flex-col pl-[260px] min-w-0">
+        <div className={`flex-1 flex flex-col transition-all duration-300 ${isSidebarCollapsed ? 'pl-0' : 'pl-[260px]'} min-w-0`}>
           {/* Header */}
-          <header className="fixed top-0 left-[260px] right-0 h-16 bg-white border-b border-surface-variant/60 z-40 flex items-center justify-between px-6 shadow-sm">
+          <header className={`fixed top-0 right-0 h-16 bg-white border-b border-surface-variant/60 z-40 flex items-center justify-between px-6 shadow-sm transition-all duration-300 ${isSidebarCollapsed ? 'left-0' : 'left-[260px]'}`}>
             <div className="flex items-center gap-2 text-on-surface-variant font-medium text-sm truncate">
               <Link to="/sinh-vien" className="hover:text-primary transition-colors flex items-center gap-2 font-semibold shrink-0">
                 <Home className="w-4 h-4" />
@@ -303,7 +312,7 @@ export default function Layout() {
             </div>
           </header>
 
-          <main className="flex-1 overflow-auto pt-24 pb-8 px-6 md:px-8">
+          <main className="flex-1 flex flex-col pt-16 bg-[#f8faf1]">
             <Outlet />
           </main>
         </div>
@@ -329,44 +338,39 @@ export default function Layout() {
     return (
       <div className="min-h-screen bg-[#f8faf1] flex font-sans">
         {/* Sidebar */}
-        <aside className={`fixed left-0 top-0 h-screen bg-[#407F3E] text-white z-50 flex flex-col shadow-xl border-r border-[#2c6b2d]/10 transition-all duration-300 ${isSidebarCollapsed ? 'w-[80px]' : 'w-[260px]'}`}>
+        <aside className={`fixed left-0 top-0 h-screen transition-transform duration-300 bg-[#407F3E] w-[260px] ${isSidebarCollapsed ? '-translate-x-full' : 'translate-x-0'} text-white z-50 flex flex-col shadow-xl border-r border-[#2c6b2d]/10`}>
           <button 
             onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            className="absolute -right-3 top-20 bg-white border border-[#407F3E] text-[#407F3E] rounded-full p-1 shadow-md hover:bg-slate-50 z-50"
+            className={`absolute -right-3.5 top-6 w-7 h-7 bg-white border border-gray-200 shadow-md rounded-full flex items-center justify-center text-gray-500 hover:text-[#407F3E] transition-all z-[100] ${isSidebarCollapsed ? 'translate-x-[20px]' : ''}`}
           >
-            <ChevronRight className={`w-3 h-3 transition-transform ${isSidebarCollapsed ? '' : 'rotate-180'}`} />
+            {isSidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </button>
-          
           <div className="flex flex-col border-b border-white/10 bg-[#2c6b2d]/15">
             <div className="h-16 flex items-center justify-center px-4">
-              <img src="/huit-logo.png" alt="Logo HUIT" className={`max-w-full h-auto object-contain brightness-0 invert opacity-95 shrink-0 transition-all ${isSidebarCollapsed ? 'w-10' : 'w-44'}`} />
+              {isSidebarCollapsed ? <div className="font-black text-2xl tracking-tighter">HUIT</div> : <img src="/huit-logo.png" alt="Logo HUIT" className="w-44 max-w-full h-auto object-contain brightness-0 invert opacity-95 shrink-0" />}
             </div>
-            {!isSidebarCollapsed && (
-              <div className="pb-3.5 px-4 flex flex-col items-center text-center gap-0.5">
+            <div className="pb-3.5 px-4 flex flex-col items-center text-center gap-0.5">
+              {!isSidebarCollapsed && (
                 <span className="font-extrabold text-[15px] leading-tight text-white uppercase tracking-wider block">
                   Quản lý kiến tập
                 </span>
+              )}
+              {!isSidebarCollapsed && (
                 <span className="text-[10px] text-[#e5ffdc]/70 font-semibold tracking-widest block uppercase">
                   HUIT — Giảng viên
                 </span>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
-          <nav className="flex-1 overflow-y-auto px-2 py-6 space-y-5 sidebar-scrollbar overflow-x-hidden">
+          <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-5 sidebar-scrollbar">
             {gvCategories.map((cat) => {
               const items = gvMenuItems.filter((item) => item.category === cat);
-              if (items.length === 0) return null;
               return (
                 <div key={cat} className="space-y-1">
-                  {!isSidebarCollapsed && (
-                    <p className="px-4 text-[10px] font-bold tracking-widest uppercase text-[#e5ffdc]/50 mb-2 truncate">
-                      {cat}
-                    </p>
-                  )}
-                  {isSidebarCollapsed && (
-                     <div className="w-full h-px bg-white/10 my-2"></div>
-                  )}
+                  <p className="px-4 text-[10px] font-bold tracking-widest uppercase text-[#e5ffdc]/50 mb-2">
+                    {cat}
+                  </p>
                   {items.map((item) => {
                     const Icon = item.icon;
                     const isActive = location.pathname === item.to;
@@ -374,15 +378,14 @@ export default function Layout() {
                       <Link
                         key={item.to}
                         to={item.to}
-                        title={isSidebarCollapsed ? item.label : undefined}
-                        className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-4'} py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${isActive
+                        className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${isActive
                           ? 'bg-white text-[#407F3E] shadow-md font-bold scale-[1.02]'
                           : 'text-white/80 hover:bg-[#89B449]/25 hover:text-white'
                           }`}
                       >
                         <div className="flex items-center gap-3">
-                          <Icon className="w-[18px] h-[18px] shrink-0" />
-                          {!isSidebarCollapsed && <span className="truncate">{item.label}</span>}
+                          <Icon className="w-[18px] h-[18px]" />
+                          {!isSidebarCollapsed && <span>{item.label}</span>}
                         </div>
                       </Link>
                     );
@@ -392,33 +395,30 @@ export default function Layout() {
             })}
           </nav>
 
-          <div className={`p-4 border-t border-white/10 bg-[#2c6b2d]/10 flex flex-col gap-4 ${isSidebarCollapsed ? 'items-center' : ''}`}>
-            <div className={`flex items-center gap-3 ${isSidebarCollapsed ? 'px-0' : 'px-2'}`}>
-              <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center border-2 border-white/20 font-bold text-white shrink-0">
+          <div className="p-4 border-t border-white/10 bg-[#2c6b2d]/10 flex flex-col gap-4">
+            <div className="flex items-center gap-3 px-2">
+              <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center border-2 border-white/20 font-bold text-white">
                 {fullName.charAt(0).toUpperCase()}
               </div>
-              {!isSidebarCollapsed && (
-                <div className="flex flex-col min-w-0">
-                  <span className="text-white font-bold text-sm truncate">{fullName}</span>
-                  <span className="text-[#e5ffdc]/60 text-xs">Giảng viên</span>
-                </div>
-              )}
+              {!isSidebarCollapsed && <div className="flex flex-col min-w-0">
+                <span className="text-white font-bold text-sm truncate">{fullName}</span>
+                <span className="text-[#e5ffdc]/60 text-xs">Giảng viên</span>
+              </div>}
             </div>
             <button
               onClick={confirmLogout}
-              title={isSidebarCollapsed ? "Đăng xuất" : undefined}
-              className={`flex items-center justify-center gap-2 py-2 rounded-xl bg-red-500/10 text-red-300 hover:bg-red-500 hover:text-white transition-all text-sm font-bold border border-red-500/20 cursor-pointer ${isSidebarCollapsed ? 'w-10 px-0' : 'w-full px-4'}`}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 text-red-300 hover:bg-red-500 hover:text-white transition-all text-sm font-bold border border-red-500/20 cursor-pointer"
             >
-              <LogOut className="w-4 h-4 shrink-0" />
+              <LogOut className="w-4 h-4" />
               {!isSidebarCollapsed && <span>Đăng xuất</span>}
             </button>
           </div>
         </aside>
 
         {/* Content Area */}
-        <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${isSidebarCollapsed ? 'pl-[80px]' : 'pl-[260px]'}`}>
+        <div className={`flex-1 flex flex-col transition-all duration-300 ${isSidebarCollapsed ? 'pl-0' : 'pl-[260px]'} min-w-0`}>
           {/* Header */}
-          <header className={`fixed top-0 right-0 h-16 bg-white border-b border-surface-variant/60 z-40 flex items-center justify-between px-6 shadow-sm transition-all duration-300 ${isSidebarCollapsed ? 'left-[80px]' : 'left-[260px]'}`}>
+          <header className={`fixed top-0 right-0 h-16 bg-white border-b border-surface-variant/60 z-40 flex items-center justify-between px-6 shadow-sm transition-all duration-300 ${isSidebarCollapsed ? 'left-0' : 'left-[260px]'}`}>
             <div className="flex items-center gap-2 text-on-surface-variant font-medium text-sm truncate">
               <Link to="/giang-vien" className="hover:text-primary transition-colors flex items-center gap-2 font-semibold shrink-0">
                 <Home className="w-4 h-4" />
@@ -449,7 +449,7 @@ export default function Layout() {
             </div>
           </header>
 
-          <main className="flex-1 overflow-auto pt-24 pb-8 px-6 md:px-8">
+          <main className="flex-1 flex flex-col pt-16 bg-[#f8faf1]">
             <Outlet />
           </main>
         </div>
@@ -483,6 +483,8 @@ export default function Layout() {
       // KẾ HOẠCH KIẾN TẬP
       { to: '/khoa/plans', label: 'Đợt kiến tập', icon: Calendar, category: 'KẾ HOẠCH KIẾN TẬP' },
       { to: '/khoa/lich-kien-tap', label: 'Lịch kiến tập', icon: Layers, category: 'KẾ HOẠCH KIẾN TẬP' },
+      // ĐĂNG KÝ & PHÂN CÔNG
+      { to: '/khoa/supervisors', label: 'Phân công GVHD', icon: GraduationCap, category: 'ĐĂNG KÝ & PHÂN CÔNG' },
       // ĐÁNH GIÁ & KẾT QUẢ
       { to: '/khoa/boards', label: 'Hội đồng chấm báo cáo', icon: Presentation, category: 'ĐÁNH GIÁ & KẾT QUẢ' },
       { to: '/khoa/results', label: 'Kết quả kiến tập', icon: Award, category: 'ĐÁNH GIÁ & KẾT QUẢ' },
@@ -502,7 +504,6 @@ export default function Layout() {
       { to: '/clb/visit-report', label: 'Báo cáo tham quan', icon: Eye, category: 'KẾ HOẠCH KIẾN TẬP' },
       // ĐĂNG KÝ & PHÂN CÔNG
       { to: '/clb/registrations', label: 'Quản lý đăng ký', icon: FileCheck, category: 'ĐĂNG KÝ & PHÂN CÔNG' },
-      { to: '/clb/supervisors', label: 'Phân công GVHD', icon: GraduationCap, category: 'ĐĂNG KÝ & PHÂN CÔNG' },
       { to: '/clb/leaders', label: 'Phân công GV dẫn đoàn', icon: UserCheck, category: 'ĐĂNG KÝ & PHÂN CÔNG' },
       // TÀI CHÍNH
       { to: '/clb/fees', label: 'Quản lý lệ phí', icon: CreditCard, category: 'TÀI CHÍNH' },
@@ -530,18 +531,24 @@ export default function Layout() {
   return (
     <div className="min-h-screen bg-[#E7E0C4]/30 flex font-sans">
       {/* Sidebar */}
-      <aside className="fixed left-0 top-0 h-screen w-[264px] bg-[#407F3E] text-white z-50 flex flex-col shadow-xl border-r border-[#2c6b2d]/10">
+      <aside className={`fixed left-0 top-0 h-screen transition-transform duration-300 bg-[#407F3E] w-[264px] ${isSidebarCollapsed ? '-translate-x-full' : 'translate-x-0'} text-white z-50 flex flex-col shadow-xl border-r border-[#2c6b2d]/10`}>
+        <button 
+          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          className="absolute -right-3.5 top-6 w-7 h-7 bg-white border border-gray-200 shadow-md rounded-full flex items-center justify-center text-gray-500 hover:text-[#407F3E] transition-colors z-[100]"
+        >
+          {isSidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+        </button>
         <div className="flex flex-col border-b border-white/10 bg-white/5">
           <div className="h-16 flex items-center justify-center px-4">
-            <img src="/huit-logo.png" alt="Logo HUIT" className="w-44 max-w-full h-auto object-contain brightness-0 invert opacity-95 shrink-0" />
+            {isSidebarCollapsed ? <div className="font-black text-2xl tracking-tighter">HUIT</div> : <img src="/huit-logo.png" alt="Logo HUIT" className="w-44 max-w-full h-auto object-contain brightness-0 invert opacity-95 shrink-0" />}
           </div>
           <div className="pb-3.5 px-4 flex flex-col items-center text-center gap-0.5">
-            <span className="font-extrabold text-[15px] leading-tight text-white uppercase tracking-wider block">
+            {!isSidebarCollapsed && <span className="font-extrabold text-[15px] leading-tight text-white uppercase tracking-wider block">
               Quản lý kiến tập
-            </span>
-            <span className="text-[10px] text-[#e5ffdc]/70 font-semibold tracking-widest block uppercase">
+            </span>}
+            {!isSidebarCollapsed && <span className="text-[10px] text-[#e5ffdc]/70 font-semibold tracking-widest block uppercase">
               HUIT — {roleName}
-            </span>
+            </span>}
           </div>
         </div>
 
@@ -562,7 +569,7 @@ export default function Layout() {
                 >
                   <div className="flex items-center gap-3">
                     <Icon className="w-[18px] h-[18px]" />
-                    <span>{homeItem.label}</span>
+                    {!isSidebarCollapsed && <span>{homeItem.label}</span>}
                   </div>
                 </Link>
               );
@@ -606,7 +613,7 @@ export default function Layout() {
                         >
                           <div className="flex items-center gap-3">
                             <Icon className="w-[18px] h-[18px]" />
-                            <span>{item.label}</span>
+                            {!isSidebarCollapsed && <span>{item.label}</span>}
                           </div>
                         </Link>
                       );
@@ -635,9 +642,9 @@ export default function Layout() {
                   >
                     <div className="flex items-center gap-3">
                       <Icon className="w-[18px] h-[18px]" />
-                      <span>{item.label}</span>
+                      {!isSidebarCollapsed && <span>{item.label}</span>}
                     </div>
-                    {item.badge && (
+                    {item.badge && !isSidebarCollapsed && (
                       <span className="bg-[#DBD468] text-[#191d17] font-bold text-[10px] px-2 py-0.5 rounded-full shadow-sm">
                         Mới
                       </span>
@@ -653,29 +660,26 @@ export default function Layout() {
             <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center border-2 border-white/20 font-bold text-white">
               {fullName.charAt(0).toUpperCase()}
             </div>
-            <div className="flex flex-col min-w-0">
+            {!isSidebarCollapsed && <div className="flex flex-col min-w-0">
               <span className="text-white font-bold text-sm truncate">{fullName}</span>
               <span className="text-[#e5ffdc]/60 text-xs">{roleName}</span>
-            </div>
+            </div>}
           </div>
           <button
             onClick={confirmLogout}
             className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 text-red-300 hover:bg-red-500 hover:text-white transition-all text-sm font-bold border border-red-500/20 cursor-pointer"
           >
             <LogOut className="w-4 h-4" />
-            <span>Đăng xuất</span>
+            {!isSidebarCollapsed && <span>Đăng xuất</span>}
           </button>
         </div>
       </aside>
 
       {/* Content Area */}
-      <div className="flex-1 flex flex-col pl-[264px] min-w-0">
+      <div className={`flex-1 flex flex-col transition-all duration-300 ${isSidebarCollapsed ? 'pl-0' : 'pl-[264px]'} min-w-0`}>
         {/* Header */}
-        <header className="fixed top-0 left-[264px] right-0 h-16 bg-white border-b border-[#E7E0C4] z-40 flex items-center justify-between px-6 shadow-sm">
+        <header className={`fixed top-0 right-0 h-16 bg-white border-b border-[#E7E0C4] z-40 flex items-center justify-between px-6 shadow-sm transition-all duration-300 ${isSidebarCollapsed ? 'left-0' : 'left-[264px]'}`}>
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded bg-[#407F3E] flex items-center justify-center text-white">
-              <Layers className="w-5 h-5" />
-            </div>
             <span className="text-slate-800 font-bold text-lg">Quản lý Kiến tập</span>
           </div>
 
@@ -725,7 +729,7 @@ export default function Layout() {
           </div>
         </header>
 
-        <main className="flex-1 overflow-auto pt-24 pb-8 px-6 md:px-8 bg-[#E7E0C4]/10">
+        <main className="flex-1 flex flex-col pt-16 bg-[#E7E0C4]/10">
           <Outlet />
         </main>
       </div>
@@ -921,7 +925,7 @@ function ForceChangePasswordView({ user, onPasswordChanged, onLogout }) {
                 className="flex items-center justify-center gap-1.5 py-2.5 px-4 border border-slate-200 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-100 transition-all cursor-pointer"
               >
                 <LogOut className="w-4 h-4" />
-                <span>Đăng xuất</span>
+                {!isSidebarCollapsed && <span>Đăng xuất</span>}
               </button>
             </div>
           </form>

@@ -51,11 +51,6 @@ export class ProposeTripDto {
   })
   gioBatDau: string;
 
-  @IsString()
-  @Matches(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/, {
-    message: 'Giờ kết thúc phải theo định dạng HH:mm',
-  })
-  gioKetThuc: string;
 
   @IsString()
   @IsIn(['TrucTiep', 'TrucTuyen'], {

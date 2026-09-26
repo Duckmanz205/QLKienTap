@@ -34,6 +34,9 @@ import {
   FilterAssignStudentsDto,
   AssignGvhdDto,
   AssignGvddDto,
+  BatchAssignGvhdDto,
+  AutoAssignGvhdDto,
+  ConfirmAutoAssignGvhdDto,
   CreateBoardDto,
   AddBoardMemberDto,
   LockGradesDto,
@@ -69,7 +72,11 @@ export class KhoaController {
   @Roles('QuanLyKhoa')
   @Post('years')
   async createYear(@Body() body: CreateYearDto) {
-    return this.khoaService.createYear(body);
+    try {
+      return await this.khoaService.createYear(body);
+    } catch (error) {
+      throw new BadRequestException(error.message || 'Lỗi tạo năm học');
+    }
   }
 
   @Roles('QuanLyKhoa')
@@ -163,6 +170,12 @@ export class KhoaController {
   }
 
   @Roles('QuanLyKhoa')
+  @Get('lecturers-with-workload')
+  async getLecturersWithWorkload(@Query('dotKienTapId') dotKienTapId?: string) {
+    return this.khoaService.getLecturersWithWorkload(dotKienTapId ? parseInt(dotKienTapId) : undefined);
+  }
+
+  @Roles('QuanLyKhoa')
   @Post('lecturers')
   async createLecturer(@Body() body: CreateLecturerDto) {
     return this.khoaService.createLecturer(body);
@@ -202,13 +215,13 @@ export class KhoaController {
     return this.khoaService.createStudent(body);
   }
 
-  @Roles('QuanLyCLB')
+  @Roles('QuanLyKhoa')
   @Put('students/:id')
   async updateStudent(@Param('id') id: number, @Body() body: UpdateStudentDto) {
     return this.khoaService.updateStudent(+id, body);
   }
 
-  @Roles('QuanLyCLB')
+  @Roles('QuanLyKhoa')
   @Delete('students/:id')
   async deleteStudent(@Param('id') id: number) {
     return this.khoaService.deleteStudent(+id);
@@ -217,8 +230,17 @@ export class KhoaController {
 
   @Roles('QuanLyKhoa', 'QuanLyCLB')
   @Get('campaigns')
-  async getCampaigns() {
-    return this.khoaService.getCampaigns();
+  async getCampaigns(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('namHoc') namHoc?: string,
+    @Query('hocKy') hocKy?: string,
+    @Query('trangThai') trangThai?: string,
+  ) {
+    const pageNum = page ? parseInt(page, 10) : 1;
+    const limitNum = limit ? parseInt(limit, 10) : 15;
+    return this.khoaService.getCampaigns(pageNum, limitNum, search, namHoc, hocKy, trangThai);
   }
 
   @Roles('QuanLyKhoa')
@@ -240,10 +262,38 @@ export class KhoaController {
   }
 
   @Roles('QuanLyKhoa')
-  @Post('campaigns/:id/publish')
-  async publishCampaign(@Param('id', ParseIntPipe) id: number) {
-    return this.khoaService.publishCampaign(id);
+  @Get('campaigns/:id/students')
+  async getCampaignStudents(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+  ) {
+    const pageNum = page ? parseInt(page, 10) : 1;
+    const limitNum = limit ? parseInt(limit, 10) : 10;
+    return this.khoaService.getCampaignStudents(id, pageNum, limitNum, search);
   }
+
+  @Roles('QuanLyKhoa')
+  @Post('campaigns/:id/students')
+  async addStudentToCampaign(@Param('id', ParseIntPipe) id: number, @Body('mssv') mssv: string) {
+    if (!mssv) throw new BadRequestException('Vui lòng cung cấp MSSV');
+    return this.khoaService.addStudentToCampaign(id, mssv);
+  }
+
+  @Roles('QuanLyKhoa')
+  @Delete('campaigns/:id/students/:studentId')
+  async removeStudentFromCampaign(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('studentId', ParseIntPipe) studentId: number
+  ) {
+    return this.khoaService.removeStudentFromCampaign(id, studentId);
+  }
+
+
+  // [ĐÃ XÓA] POST campaigns/:id/publish — trạng thái đợt kiến tập
+  // giờ được tự động chuyển bởi updateDotKienTapStatus() khi trạng thái
+  // LichKienTap thay đổi, không còn cho phép nhập tay.
 
   @Roles('QuanLyKhoa', 'QuanLyCLB')
   @Get('schedules')
@@ -287,14 +337,22 @@ export class KhoaController {
     return this.khoaService.rejectSchedule(id, lyDo);
   }
 
+
+
   @Roles('QuanLyKhoa', 'QuanLyCLB')
-  @Post('import-students')
-  async importStudents(@Body() body: ImportStudentsDto) {
-    return this.khoaService.importStudentsToSchedule(
-      body.lichId,
-      body.studentIds,
-    );
-  }@Roles('QuanLyCLB')
+  @Get('trips')
+  async getTrips(@Query('unassigned') unassigned?: string) {
+    const isUnassigned = unassigned === 'true';
+    return this.khoaService.getTrips(isUnassigned);
+  }
+
+  @Roles('QuanLyKhoa', 'QuanLyCLB')
+  @Get('proposals')
+  async getProposals() {
+    return this.khoaService.getProposals();
+  }
+
+  @Roles('QuanLyCLB')
   @Post('trips')
   async createTrip(@Body() body: CreateTripDto) {
     return this.khoaService.createTrip(body);
@@ -327,10 +385,16 @@ export class KhoaController {
     );
   }
 
-  @Roles('QuanLyCLB')
-  @Post('filter-assign-students')
-  async filterAssignStudents(@Body() body: FilterAssignStudentsDto) {
-    return this.khoaService.filterAndAssignStudents(body.tripId);
+  @Roles('QuanLyCLB', 'QuanLyKhoa')
+  @Post('preview-assign-students')
+  async previewAssignStudents(@Body() body: FilterAssignStudentsDto) {
+    return this.khoaService.previewAssignStudents(body.tripId);
+  }
+
+  @Roles('QuanLyCLB', 'QuanLyKhoa')
+  @Post('confirm-assign-students')
+  async confirmAssignStudents(@Body() body: { tripId: number, acceptedStudentIds: number[] }) {
+    return this.khoaService.confirmAssignStudents(body.tripId, body.acceptedStudentIds);
   }
 
   @Roles('QuanLyKhoa')
@@ -343,6 +407,27 @@ export class KhoaController {
   }
 
   @Roles('QuanLyKhoa')
+  @Post('batch-assign-gvhd')
+  async batchAssignGvhd(@Body() body: BatchAssignGvhdDto) {
+    return this.khoaService.batchAssignGvhd(
+      body.dotKienTapSinhVienIds,
+      body.lecturerId,
+    );
+  }
+
+  @Roles('QuanLyKhoa')
+  @Post('preview-auto-assign-gvhd')
+  async previewAutoAssignGvhd(@Body() body: AutoAssignGvhdDto) {
+    return this.khoaService.previewAutoAssignGvhd(body.dotKienTapId);
+  }
+
+  @Roles('QuanLyKhoa')
+  @Post('confirm-auto-assign-gvhd')
+  async confirmAutoAssignGvhd(@Body() body: ConfirmAutoAssignGvhdDto) {
+    return this.khoaService.confirmAutoAssignGvhd(body.assignments);
+  }
+
+  @Roles('QuanLyKhoa')
   @Post('assign-gvdd')
   async assignGvdd(@Body() body: AssignGvddDto) {
     return this.khoaService.assignTourLeader(
@@ -350,6 +435,21 @@ export class KhoaController {
       body.lecturerId,
       body.laTruongDoan,
     );
+  }
+
+  @Roles('QuanLyKhoa')
+  @Delete('assign-gvdd/:tripId/:lecturerId')
+  async unassignGvdd(
+    @Param('tripId', ParseIntPipe) tripId: number,
+    @Param('lecturerId', ParseIntPipe) lecturerId: number,
+  ) {
+    return this.khoaService.unassignTourLeader(tripId, lecturerId);
+  }
+
+  @Roles('QuanLyKhoa')
+  @Post('auto-assign-gvdd')
+  async autoAssignGvdd() {
+    return this.khoaService.autoAssignGvdd();
   }
 
   @Roles('QuanLyKhoa')
@@ -436,6 +536,7 @@ export class KhoaController {
       query.status,
       query.lichKienTapId,
       query.chuyenThamQuanId,
+      query.hasCancelRequest,
     );
   }
 

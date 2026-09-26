@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -16,6 +17,9 @@ import { QueueModule } from './queue/queue.module';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+
+    // Cau hinh dat lich trinh tu dong
+    ScheduleModule.forRoot(),
 
     // Cau hinh ket noi SQL Server
     TypeOrmModule.forRootAsync({

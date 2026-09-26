@@ -28,6 +28,7 @@ export default function DanhMuc_GiangVien_Khoa() {
   // Filter States
   const [searchTerm, setSearchTerm] = useState('');
   const [filterHoiDong, setFilterHoiDong] = useState('Tất cả');
+  const [searchHoiDongDropdown, setSearchHoiDongDropdown] = useState('');
   const [isHoiDongDropdownOpen, setIsHoiDongDropdownOpen] = useState(false);
   
   // Pagination States
@@ -238,7 +239,7 @@ export default function DanhMuc_GiangVien_Khoa() {
         <div className="relative min-w-[250px]">
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-slate-700 whitespace-nowrap">Đủ ĐK hội đồng:</span>
-            <div className="relative w-full">
+            <div className="relative w-full" onClick={(e) => e.stopPropagation()}>
               <div 
                 onClick={() => setIsHoiDongDropdownOpen(!isHoiDongDropdownOpen)}
                 className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isHoiDongDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
@@ -248,20 +249,41 @@ export default function DanhMuc_GiangVien_Khoa() {
               </div>
               {isHoiDongDropdownOpen && (
                 <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1">
-                  {hoiDongOptions.map(opt => (
-                    <div 
-                      key={opt}
-                      onClick={() => { setFilterHoiDong(opt); setIsHoiDongDropdownOpen(false); }}
-                      className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                        (filterHoiDong === opt) 
-                          ? 'bg-[#E7E0C4] text-slate-800 font-bold' 
-                          : 'text-slate-700 hover:bg-[#E7E0C4]/50'
-                      }`}
-                    >
-                      {opt}
-                      {filterHoiDong === opt && <Check className="w-4 h-4 text-[#407F3E]" />}
-                    </div>
-                  ))}
+                  <div className="p-2 border-b border-[#E7E0C4]">
+                    <input
+                      type="text"
+                      placeholder="Tìm điều kiện..."
+                      value={searchHoiDongDropdown}
+                      onChange={(e) => setSearchHoiDongDropdown(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-full px-2.5 py-1 text-xs bg-slate-50 border border-[#E7E0C4] rounded-md focus:outline-none focus:border-[#407F3E]"
+                    />
+                  </div>
+                  <div className="max-h-60 overflow-y-auto">
+                    {hoiDongOptions
+                      .filter(opt => !searchHoiDongDropdown || opt.toLowerCase().includes(searchHoiDongDropdown.toLowerCase()))
+                      .map(opt => (
+                        <div 
+                          key={opt}
+                          onClick={() => { 
+                            setFilterHoiDong(opt); 
+                            setIsHoiDongDropdownOpen(false);
+                            setSearchHoiDongDropdown('');
+                          }}
+                          className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                            (filterHoiDong === opt) 
+                              ? 'bg-[#E7E0C4] text-slate-800 font-bold' 
+                              : 'text-slate-700 hover:bg-[#E7E0C4]/50'
+                          }`}
+                        >
+                          {opt}
+                          {filterHoiDong === opt && <Check className="w-4 h-4 text-[#407F3E]" />}
+                        </div>
+                      ))}
+                    {hoiDongOptions.filter(opt => !searchHoiDongDropdown || opt.toLowerCase().includes(searchHoiDongDropdown.toLowerCase())).length === 0 && (
+                      <div className="px-4 py-3 text-xs text-slate-500 text-center">Không tìm thấy</div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
+import * as express from 'express';
 
 async function bootstrap() {
   const isProduction = process.env.NODE_ENV === 'production';
@@ -51,6 +52,10 @@ async function bootstrap() {
 
   // Dat prefix cho tat ca API routes: /api/...
   app.setGlobalPrefix('api');
+
+  // Tăng giới hạn dung lượng payload JSON để hỗ trợ import file lớn
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
   // Bat validation pipe de validate DTO
   app.useGlobalPipes(

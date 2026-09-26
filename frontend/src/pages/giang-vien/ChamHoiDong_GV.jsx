@@ -108,11 +108,8 @@ export default function ChamHoiDong_GV() {
         id: reg.id,
         nhaMay: reg.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Chuyến đi',
         hinhThuc: reg.chuyenThamQuan?.hinh_thuc === 'TrucTuyen' ? 'Trực tuyến' : 'Trực tiếp',
-        score: '', // we don't have individual member's past score easily in this API unless it's in diemHoiDong array
-        committee: [
-          // mock committee members for UI since the API doesn't return other members' scores here
-          { id: 1, name: 'Tôi', avatar: 'https://ui-avatars.com/api/?name=Toi&background=89B449&color=fff', status: 'Chưa chấm' }
-        ],
+        score: reg.committee?.find(c => c.id === item.memberId)?.score || '', 
+        committee: reg.committee || [],
         memberId: item.memberId // the member id of the current lecturer
       });
     });
@@ -354,13 +351,18 @@ export default function ChamHoiDong_GV() {
                     <div>
                       <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Tiến độ hội đồng</p>
                       <div className="flex flex-wrap gap-2">
-                        {rep.committee.map(member => (
-                          <div key={member.id} className="flex items-center gap-1.5 bg-white border border-[#E7E0C4] px-2 py-1 rounded-md shadow-sm">
-                            <img src={member.avatar} alt="avt" className="w-5 h-5 rounded-full" />
-                            <span className="text-[10px] font-bold text-slate-600">{member.name}</span>
-                            <div className={`w-1.5 h-1.5 rounded-full ${scores[rep.id] !== '' ? 'bg-[#89B449]' : 'bg-slate-300'}`}></div>
-                          </div>
-                        ))}
+                        {rep.committee.map(member => {
+                          const avatarUrl = member.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name || 'GV')}&background=E7E0C4&color=407F3E`;
+                          const isGraded = member.id === rep.memberId ? scores[rep.id] !== '' : member.status === 'Đã chấm';
+                          
+                          return (
+                            <div key={member.id} className="flex items-center gap-1.5 bg-white border border-[#E7E0C4] px-2 py-1 rounded-md shadow-sm" title={member.score !== null ? `Đã chấm: ${member.score}` : 'Chưa chấm'}>
+                              <img src={avatarUrl} alt="avt" className="w-5 h-5 rounded-full" />
+                              <span className="text-[10px] font-bold text-slate-600">{member.name}</span>
+                              <div className={`w-1.5 h-1.5 rounded-full ${isGraded ? 'bg-[#89B449]' : 'bg-slate-300'}`}></div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>

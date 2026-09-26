@@ -12,9 +12,11 @@ export default function DanhMuc_NhaMay_Khoa() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterNhomNganh, setFilterNhomNganh] = useState('Tất cả nhóm ngành');
   const [isNhomNganhDropdownOpen, setIsNhomNganhDropdownOpen] = useState(false);
+  const [searchNhomNganh, setSearchNhomNganh] = useState('');
   
   const [filterTrangThai, setFilterTrangThai] = useState('Tất cả');
   const [isTrangThaiDropdownOpen, setIsTrangThaiDropdownOpen] = useState(false);
+  const [searchTrangThai, setSearchTrangThai] = useState('');
 
   // Pagination States
   const [page, setPage] = useState(1);
@@ -121,9 +123,15 @@ export default function DanhMuc_NhaMay_Khoa() {
     }
   };
 
-
-
   const trangThaiOptions = ["Tất cả", "Hoạt động", "Ngừng hợp tác"];
+
+  const filteredNhomNganhOptions = nhomNganhOptions.filter(opt => 
+    opt.toLowerCase().includes(searchNhomNganh.toLowerCase())
+  );
+
+  const filteredTrangThaiOptions = trangThaiOptions.filter(opt => 
+    opt.toLowerCase().includes(searchTrangThai.toLowerCase())
+  );
 
   const filteredFactories = factories.filter(f => {
     const matchesSearch = f.ten_nha_may?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -142,10 +150,19 @@ export default function DanhMuc_NhaMay_Khoa() {
 
   const totalFactories = filteredFactories.length;
   const totalPages = Math.ceil(totalFactories / limit) || 1;
-  const paginatedFactories = filteredFactories.slice((page - 1) * limit, page * limit);
+  const validCurrentPage = Math.min(page, totalPages);
+  const paginatedFactories = filteredFactories.slice((validCurrentPage - 1) * limit, validCurrentPage * limit);
 
   return (
-    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-2 animate-in fade-in duration-300 relative">
+    <div 
+      className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300 relative"
+      onClick={() => {
+        setIsNhomNganhDropdownOpen(false);
+        setIsTrangThaiDropdownOpen(false);
+        setSearchNhomNganh('');
+        setSearchTrangThai('');
+      }}
+    >
       {/* Header section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <h1 className="text-2xl font-bold text-slate-800">Nhà máy</h1>
@@ -165,7 +182,7 @@ export default function DanhMuc_NhaMay_Khoa() {
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input 
             type="text" 
-            placeholder="Tìm theo tên nhà máy"
+            placeholder="Tìm theo tên nhà máy..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all"
@@ -173,59 +190,97 @@ export default function DanhMuc_NhaMay_Khoa() {
         </div>
 
         {/* Nhóm ngành Dropdown */}
-        <div className="relative min-w-[220px]">
+        <div className="relative min-w-[220px]" onClick={e => e.stopPropagation()}>
           <div 
-            onClick={() => { setIsNhomNganhDropdownOpen(!isNhomNganhDropdownOpen); setIsTrangThaiDropdownOpen(false); }}
+            onClick={() => { 
+              setIsNhomNganhDropdownOpen(!isNhomNganhDropdownOpen); 
+              setIsTrangThaiDropdownOpen(false); 
+              setSearchNhomNganh('');
+            }}
             className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isNhomNganhDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
           >
             <span className="text-slate-700 font-medium truncate pr-2">{filterNhomNganh}</span>
-            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+            <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isNhomNganhDropdownOpen ? 'rotate-180 text-[#407F3E]' : ''}`} />
           </div>
           {isNhomNganhDropdownOpen && (
-            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 max-h-[300px] overflow-y-auto">
-              {nhomNganhOptions.map(opt => (
-                <div 
-                  key={opt}
-                  onClick={() => { setFilterNhomNganh(opt); setIsNhomNganhDropdownOpen(false); }}
-                  className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                    (filterNhomNganh === opt) 
-                      ? 'bg-[#E7E0C4] text-slate-800 font-bold' 
-                      : 'text-slate-700 hover:bg-[#E7E0C4]/50'
-                  }`}
-                >
-                  <span className="truncate pr-2">{opt}</span>
-                  {filterNhomNganh === opt && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                </div>
-              ))}
+            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[240px]">
+              <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
+                <input 
+                  type="text" 
+                  placeholder="Tìm nhóm ngành..." 
+                  value={searchNhomNganh}
+                  onChange={(e) => setSearchNhomNganh(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
+                />
+              </div>
+              <div className="max-h-[260px] overflow-y-auto">
+                {filteredNhomNganhOptions.map(opt => (
+                  <div 
+                    key={opt}
+                    onClick={() => { setFilterNhomNganh(opt); setIsNhomNganhDropdownOpen(false); }}
+                    className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                      (filterNhomNganh === opt) 
+                        ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' 
+                        : 'text-slate-700 hover:bg-slate-50 font-medium'
+                    }`}
+                  >
+                    <span className="truncate pr-2">{opt}</span>
+                    {filterNhomNganh === opt && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                  </div>
+                ))}
+                {filteredNhomNganhOptions.length === 0 && (
+                  <div className="px-4 py-2 text-xs text-slate-400 text-center">Không tìm thấy nhóm ngành</div>
+                )}
+              </div>
             </div>
           )}
         </div>
 
         {/* Trạng thái Dropdown */}
-        <div className="relative min-w-[160px]">
+        <div className="relative min-w-[170px]" onClick={e => e.stopPropagation()}>
           <div 
-            onClick={() => { setIsTrangThaiDropdownOpen(!isTrangThaiDropdownOpen); setIsNhomNganhDropdownOpen(false); }}
+            onClick={() => { 
+              setIsTrangThaiDropdownOpen(!isTrangThaiDropdownOpen); 
+              setIsNhomNganhDropdownOpen(false); 
+              setSearchTrangThai('');
+            }}
             className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isTrangThaiDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
           >
             <span className="text-slate-700 font-medium">{filterTrangThai}</span>
-            <ChevronDown className="w-4 h-4 text-slate-400" />
+            <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isTrangThaiDropdownOpen ? 'rotate-180 text-[#407F3E]' : ''}`} />
           </div>
           {isTrangThaiDropdownOpen && (
-            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1">
-              {trangThaiOptions.map(opt => (
-                <div 
-                  key={opt}
-                  onClick={() => { setFilterTrangThai(opt); setIsTrangThaiDropdownOpen(false); }}
-                  className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                    (filterTrangThai === opt) 
-                      ? 'bg-[#E7E0C4] text-slate-800 font-bold' 
-                      : 'text-slate-700 hover:bg-[#E7E0C4]/50'
-                  }`}
-                >
-                  {opt}
-                  {filterTrangThai === opt && <Check className="w-4 h-4 text-[#407F3E]" />}
-                </div>
-              ))}
+            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[180px]">
+              <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
+                <input 
+                  type="text" 
+                  placeholder="Tìm trạng thái..." 
+                  value={searchTrangThai}
+                  onChange={(e) => setSearchTrangThai(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
+                />
+              </div>
+              <div className="max-h-[200px] overflow-y-auto">
+                {filteredTrangThaiOptions.map(opt => (
+                  <div 
+                    key={opt}
+                    onClick={() => { setFilterTrangThai(opt); setIsTrangThaiDropdownOpen(false); }}
+                    className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                      (filterTrangThai === opt) 
+                        ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' 
+                        : 'text-slate-700 hover:bg-slate-50 font-medium'
+                    }`}
+                  >
+                    {opt}
+                    {filterTrangThai === opt && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                  </div>
+                ))}
+                {filteredTrangThaiOptions.length === 0 && (
+                  <div className="px-4 py-2 text-xs text-slate-400 text-center">Không tìm thấy trạng thái</div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -317,62 +372,60 @@ export default function DanhMuc_NhaMay_Khoa() {
         )}
 
         {/* Pagination Footer */}
-        {paginatedFactories.length > 0 && (
-          <div className="p-4 border border-[#E7E0C4] bg-white rounded-xl shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
-              <span>Hiển thị</span>
-              <select 
-                value={limit}
-                onChange={(e) => {
-                  setLimit(Number(e.target.value));
-                  setPage(1);
-                }}
-                className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
-              >
-                <option value={15}>15</option>
-                <option value={30}>30</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-              </select>
-              <span>/ {totalFactories} nhà máy</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <button 
-                disabled={page <= 1}
-                onClick={() => setPage(1)}
-                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
-              >
-                Trang đầu
-              </button>
-              <button 
-                disabled={page <= 1}
-                onClick={() => setPage(p => p - 1)}
-                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
-              >
-                Trước
-              </button>
-              
-              <span className="px-4 py-1.5 rounded-lg bg-[#407F3E] text-white text-sm font-bold shadow-sm cursor-default mx-1">
-                Trang {page} / {totalPages}
-              </span>
-              
-              <button 
-                disabled={page >= totalPages}
-                onClick={() => setPage(p => p + 1)}
-                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
-              >
-                Sau
-              </button>
-              <button 
-                disabled={page >= totalPages}
-                onClick={() => setPage(totalPages)}
-                className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
-              >
-                Trang cuối
-              </button>
-            </div>
+        <div className="p-4 border border-[#E7E0C4] bg-white rounded-xl shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
+            <span>Hiển thị</span>
+            <select 
+              value={limit}
+              onChange={(e) => {
+                setLimit(Number(e.target.value));
+                setPage(1);
+              }}
+              className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
+            >
+              <option value={15}>15</option>
+              <option value={30}>30</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <span>/ {totalFactories} nhà máy</span>
           </div>
-        )}
+          <div className="flex items-center gap-1.5">
+            <button 
+              disabled={validCurrentPage <= 1}
+              onClick={() => setPage(1)}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Trang đầu
+            </button>
+            <button 
+              disabled={validCurrentPage <= 1}
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Trước
+            </button>
+            
+            <span className="px-4 py-1.5 rounded-lg bg-[#407F3E] text-white text-sm font-bold shadow-sm cursor-default mx-1">
+              Trang {validCurrentPage} / {totalPages}
+            </span>
+            
+            <button 
+              disabled={validCurrentPage >= totalPages}
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Sau
+            </button>
+            <button 
+              disabled={validCurrentPage >= totalPages}
+              onClick={() => setPage(totalPages)}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Trang cuối
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Create / Edit Modal */}

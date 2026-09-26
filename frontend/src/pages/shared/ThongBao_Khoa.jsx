@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Plus, X, ChevronRight, Bold, Italic, List, 
   ChevronDown, Check, UploadCloud, FileText,
-  MessageSquare
+  MessageSquare, Search
 } from 'lucide-react';
 import api, { khoaApi } from '../../services/api';
 
@@ -11,6 +11,14 @@ export default function ThongBao_Khoa() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDoiTuongDropdownOpen, setIsDoiTuongDropdownOpen] = useState(false);
   const [viewingDetail, setViewingDetail] = useState(null);
+
+  // Filter & Pagination states
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedFilterDoiTuong, setSelectedFilterDoiTuong] = useState('ALL');
+  const [searchDoiTuongDropdown, setSearchDoiTuongDropdown] = useState('');
+  const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [limit, setLimit] = useState(15);
   
   // Compose form states
   const [title, setTitle] = useState('');
@@ -84,6 +92,18 @@ export default function ThongBao_Khoa() {
     }
   };
 
+  // Filter & Pagination logic
+  const filteredNotifications = useMemo(() => {
+    return notifications.filter(n => {
+      const matchSearch = !searchTerm || n.tieu_de?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchAudience = selectedFilterDoiTuong === 'ALL' || n.doi_tuong_nhan === selectedFilterDoiTuong;
+      return matchSearch && matchAudience;
+    });
+  }, [notifications, searchTerm, selectedFilterDoiTuong]);
+
+  const totalPages = Math.ceil(filteredNotifications.length / limit) || 1;
+  const paginatedNotifications = filteredNotifications.slice((currentPage - 1) * limit, currentPage * limit);
+
   return (
     <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300 relative">
       {/* Header section */}
@@ -96,6 +116,85 @@ export default function ThongBao_Khoa() {
           <Plus className="w-4 h-4" />
           Soạn thông báo
         </button>
+      </div>
+
+      {/* Filter Bar */}
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-[#E7E0C4] flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div className="flex flex-wrap items-center gap-4 flex-1">
+          {/* Search Input */}
+          <div className="relative min-w-[280px] flex-1">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input 
+              type="text"
+              placeholder="Tìm kiếm theo tiêu đề thông báo..."
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full pl-9 pr-4 py-2 border border-[#E7E0C4] rounded-lg text-sm bg-slate-50 focus:outline-none focus:border-[#407F3E] text-slate-700 font-medium"
+            />
+          </div>
+
+          {/* Đối tượng Filter Dropdown */}
+          <div className="relative w-56" onClick={(e) => e.stopPropagation()}>
+            <div 
+              onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
+              className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isFilterDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+            >
+              <span className="truncate pr-2 font-medium text-slate-700">
+                {selectedFilterDoiTuong === 'ALL' ? 'Tất cả đối tượng' : (selectedFilterDoiTuong === 'STUDENT' ? 'Sinh viên' : 'Giảng viên')}
+              </span>
+              <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+            </div>
+            {isFilterDropdownOpen && (
+              <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1">
+                <div className="p-2 border-b border-[#E7E0C4]">
+                  <input
+                    type="text"
+                    placeholder="Tìm đối tượng..."
+                    value={searchDoiTuongDropdown}
+                    onChange={(e) => setSearchDoiTuongDropdown(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-full px-2.5 py-1 text-xs bg-slate-50 border border-[#E7E0C4] rounded-md focus:outline-none focus:border-[#407F3E]"
+                  />
+                </div>
+                <div className="max-h-60 overflow-y-auto">
+                {[
+                  { id: 'ALL', name: 'Tất cả đối tượng' },
+                  { id: 'STUDENT', name: 'Sinh viên' },
+                  { id: 'LECTURER', name: 'Giảng viên' }
+                ]
+                  .filter(opt => !searchDoiTuongDropdown || opt.name.toLowerCase().includes(searchDoiTuongDropdown.toLowerCase()))
+                  .map(opt => (
+                  <div 
+                    key={opt.id}
+                    onClick={() => { 
+                      setSelectedFilterDoiTuong(opt.id); 
+                      setIsFilterDropdownOpen(false); 
+                      setSearchDoiTuongDropdown('');
+                      setCurrentPage(1); 
+                    }}
+                    className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                      selectedFilterDoiTuong === opt.id ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                    }`}
+                  >
+                    <span>{opt.name}</span>
+                    {selectedFilterDoiTuong === opt.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                  </div>
+                ))}
+                {[
+                  { id: 'ALL', name: 'Tất cả đối tượng' },
+                  { id: 'STUDENT', name: 'Sinh viên' },
+                  { id: 'LECTURER', name: 'Giảng viên' }
+                ].filter(opt => !searchDoiTuongDropdown || opt.name.toLowerCase().includes(searchDoiTuongDropdown.toLowerCase())).length === 0 && (
+                  <div className="px-4 py-3 text-xs text-slate-500 text-center">Không tìm thấy</div>
+                )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Main Table */}
@@ -111,7 +210,7 @@ export default function ThongBao_Khoa() {
               </tr>
             </thead>
             <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
-              {notifications.map(n => {
+              {paginatedNotifications.map(n => {
                 let doiTuongLabel = 'Tất cả';
                 if (n.doi_tuong_nhan === 'STUDENT') doiTuongLabel = 'Sinh viên';
                 if (n.doi_tuong_nhan === 'LECTURER') doiTuongLabel = 'Giảng viên';
@@ -148,15 +247,70 @@ export default function ThongBao_Khoa() {
                   </tr>
                 )
               })}
-              {notifications.length === 0 && (
+              {filteredNotifications.length === 0 && (
                 <tr>
                   <td colSpan="4" className="text-center py-8 text-slate-400 font-medium">
-                    Không có thông báo nào.
+                    Không có thông báo nào phù hợp.
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Pagination Footer */}
+        <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
+            <span>Hiển thị</span>
+            <select 
+              value={limit}
+              onChange={(e) => {
+                const newLimit = Number(e.target.value);
+                setLimit(newLimit);
+                setCurrentPage(1);
+              }}
+              className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
+            >
+              <option value={15}>15</option>
+              <option value={30}>30</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <span>/ {filteredNotifications.length} thông báo</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button 
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage(1)}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Trang đầu
+            </button>
+            <button 
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Trước
+            </button>
+            <span className="px-4 py-1.5 rounded-lg bg-[#407F3E] text-white text-sm font-bold shadow-sm cursor-default mx-1">
+              Trang {currentPage} / {totalPages}
+            </span>
+            <button 
+              disabled={currentPage >= totalPages}
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Sau
+            </button>
+            <button 
+              disabled={currentPage >= totalPages}
+              onClick={() => setCurrentPage(totalPages)}
+              className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Trang cuối
+            </button>
+          </div>
         </div>
       </div>
 
