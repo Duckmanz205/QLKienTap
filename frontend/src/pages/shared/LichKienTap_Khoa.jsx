@@ -143,7 +143,7 @@ export default function LichKienTap_Khoa() {
         fetchData();
       } catch (err) {
         console.error(err);
-        showToast("Lỗi khi duyệt lịch", "error");
+        showToast(err.response?.data?.message || "Lỗi khi duyệt lịch", "error");
       }
     });
   };
@@ -156,7 +156,7 @@ export default function LichKienTap_Khoa() {
         fetchData();
       } catch (err) {
         console.error(err);
-        showToast("Lỗi khi từ chối lịch", "error");
+        showToast(err.response?.data?.message || "Lỗi khi từ chối lịch", "error");
       }
     }, 'prompt');
   };

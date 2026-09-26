@@ -10,6 +10,7 @@ import {
   ParseFilePipe,
   MaxFileSizeValidator,
   FileTypeValidator,
+  FileValidator,
   BadRequestException,
   NotFoundException,
   ForbiddenException,
@@ -28,6 +29,20 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser, JwtPayloadUser } from '../auth/decorators/user.decorator';
 import { SinhVien, GiangVien, PhanCongGVHD } from '../entities/qlkt.entity';
+
+export class CustomFileTypeValidator extends FileValidator<{ fileType: RegExp | string }> {
+  buildErrorMessage(): string {
+    return `Validation failed (expected type is ${this.validationOptions.fileType})`;
+  }
+  isValid(file: Express.Multer.File): boolean {
+    if (!file) return false;
+    if (this.validationOptions.fileType instanceof RegExp) {
+      return this.validationOptions.fileType.test(file.mimetype) || this.validationOptions.fileType.test(file.originalname);
+    }
+    return file.mimetype === this.validationOptions.fileType || file.originalname.endsWith(this.validationOptions.fileType);
+  }
+}
+
 import { GetSignedUrlQueryDto } from './dto/upload.dto';
 
 const UPLOAD_DIR = './uploads';
@@ -144,7 +159,7 @@ export class UploadController {
       new ParseFilePipe({
         validators: [
           new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }),
-          new FileTypeValidator({ fileType: /(pdf|docx|doc)$/i }),
+          new CustomFileTypeValidator({ fileType: /(pdf|docx|doc)$/i }),
         ],
       }),
     )
@@ -152,6 +167,18 @@ export class UploadController {
     @CurrentUser() user: JwtPayloadUser,
   ) {
     if (!file) throw new BadRequestException('Tệp tải lên không hợp lệ.');
+
+    let extractedText = null;
+    if (file.originalname.toLowerCase().endsWith('.pdf')) {
+      try {
+        const pdfParse = require('pdf-parse');
+        const pdfBuffer = require('fs').readFileSync(file.path);
+        const data = await pdfParse(pdfBuffer);
+        extractedText = data.text;
+      } catch (err) {
+        console.error('PDF parsing error:', err);
+      }
+    }
 
     // Nếu R2 sẵn sàng → upload lên cloud với owner là user.sub, xóa file local
     if (this.r2.isReady()) {
@@ -184,6 +211,7 @@ export class UploadController {
         originalName: file.originalname,
         key,
         url: signedUrl,
+        extractedText,
       };
     }
 
@@ -194,6 +222,7 @@ export class UploadController {
       originalName: file.originalname,
       fileName: file.filename,
       url: `/api/upload/file/reports/${user.sub}/${file.filename}`,
+      extractedText,
     };
   }
 
@@ -224,7 +253,7 @@ export class UploadController {
       new ParseFilePipe({
         validators: [
           new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }),
-          new FileTypeValidator({ fileType: /(xlsx|xls)$/i }),
+          new CustomFileTypeValidator({ fileType: /(xlsx|xls)$/i }),
         ],
       }),
     )
@@ -269,7 +298,7 @@ export class UploadController {
       new ParseFilePipe({
         validators: [
           new MaxFileSizeValidator({ maxSize: 2 * 1024 * 1024 }),
-          new FileTypeValidator({ fileType: /(jpg|jpeg|png)$/i }),
+          new CustomFileTypeValidator({ fileType: /(jpg|jpeg|png)$/i }),
         ],
       }),
     )
@@ -347,7 +376,7 @@ export class UploadController {
       new ParseFilePipe({
         validators: [
           new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }),
-          new FileTypeValidator({
+          new CustomFileTypeValidator({
             fileType: /(pdf|doc|docx|xlsx|xls|png|jpg|jpeg|zip|rar)$/i,
           }),
         ],

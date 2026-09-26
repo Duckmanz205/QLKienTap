@@ -117,7 +117,7 @@ export default function App() {
           </Route>
 
           {/* Khoa Portal Routes */}
-          <Route element={<ProtectedRoute allowedRoles={['QuanLyKhoa']} />}>
+          <Route element={<ProtectedRoute allowedRoles={['QuanLyKhoa', 'Khoa']} />}>
             <Route path="khoa" element={<DashBoard_Khoa />} />
             <Route path="khoa/danh-muc-nen" element={<DanhMucNen_ThemMoiHocKy_Khoa />} />
             <Route path="khoa/plans" element={<PlanManagement_Khoa />} />

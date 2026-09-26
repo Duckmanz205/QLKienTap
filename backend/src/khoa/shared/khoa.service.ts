@@ -446,12 +446,13 @@ export class KhoaService {
   async getAccounts(page: number = 1, limit: number = 15, search?: string, vaiTro?: string, trangThai?: string) {
     const qb = this.taiKhoanRepo
       .createQueryBuilder('tk')
+      .leftJoin('tk.vaiTro', 'vt')
       .leftJoin('SinhVien', 'sv', 'sv.taikhoan_id = tk.id')
       .leftJoin('GiangVien', 'gv', 'gv.taikhoan_id = tk.id')
       .select([
         'tk.id AS id',
         'tk.ten_dang_nhap AS ten_dang_nhap',
-        'tk.vai_tro AS vai_tro',
+        'vt.ten_vai_tro AS vai_tro',
         'tk.trang_thai AS trang_thai',
         'tk.lan_dang_nhap_cuoi AS lan_dang_nhap_cuoi',
         'COALESCE(sv.ho_ten, gv.ho_ten, tk.ten_dang_nhap) AS ho_ten',
@@ -460,7 +461,7 @@ export class KhoaService {
     if (search) {
       qb.andWhere('(tk.ten_dang_nhap LIKE :s OR sv.ho_ten LIKE :s OR gv.ho_ten LIKE :s)', { s: `%${search}%` });
     }
-    if (vaiTro) qb.andWhere('tk.vai_tro = :vaiTro', { vaiTro });
+    if (vaiTro) qb.andWhere('vt.ma_vai_tro = :vaiTro', { vaiTro });
     if (trangThai) qb.andWhere('tk.trang_thai = :trangThai', { trangThai });
 
     const total = await qb.getCount();
@@ -925,7 +926,6 @@ export class KhoaService {
       giaoVienDanDoan: assignments.filter(a => a.chuyen_tham_quan_id === ent.id)
     }));
 
-    require('fs').writeFileSync('debug_trips.json', JSON.stringify({ assignments, result: result.slice(0, 2) }, null, 2));
     return result;
   }
 
