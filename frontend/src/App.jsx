@@ -146,7 +146,6 @@ export default function App() {
             <Route path="clb/trips" element={<ChuyenThamQuan_DSLoc />} />
             <Route path="clb/lich-kien-tap" element={<LichKienTap_Khoa />} />
             <Route path="clb/registrations" element={<RegistrationManagement_Khoa />} />
-            <Route path="clb/supervisors" element={<SupervisorAssignment_Khoa />} />
             <Route path="clb/leaders" element={<LeaderAssignment_Khoa />} />
             <Route path="clb/fees" element={<QuanLyLePhi_Khoa />} />
             <Route path="clb/refund-approval" element={<DuyetHoanPhi_Khoa />} />

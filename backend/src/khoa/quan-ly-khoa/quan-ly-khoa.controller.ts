@@ -171,8 +171,8 @@ export class KhoaController {
 
   @Roles('QuanLyKhoa')
   @Get('lecturers-with-workload')
-  async getLecturersWithWorkload() {
-    return this.khoaService.getLecturersWithWorkload();
+  async getLecturersWithWorkload(@Query('dotKienTapId') dotKienTapId?: string) {
+    return this.khoaService.getLecturersWithWorkload(dotKienTapId ? parseInt(dotKienTapId) : undefined);
   }
 
   @Roles('QuanLyKhoa')

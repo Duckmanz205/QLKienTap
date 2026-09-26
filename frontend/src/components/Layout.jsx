@@ -294,7 +294,7 @@ export default function Layout() {
             </div>
           </header>
 
-          <main className="flex-1 overflow-auto pt-24 pb-8 px-6 md:px-8">
+          <main className="flex-1 flex flex-col pt-16 bg-[#f8faf1]">
             <Outlet />
           </main>
         </div>
@@ -421,7 +421,7 @@ export default function Layout() {
             </div>
           </header>
 
-          <main className="flex-1 overflow-auto pt-24 pb-8 px-6 md:px-8">
+          <main className="flex-1 flex flex-col pt-16 bg-[#f8faf1]">
             <Outlet />
           </main>
         </div>
@@ -455,6 +455,8 @@ export default function Layout() {
       // KẾ HOẠCH KIẾN TẬP
       { to: '/khoa/plans', label: 'Đợt kiến tập', icon: Calendar, category: 'KẾ HOẠCH KIẾN TẬP' },
       { to: '/khoa/lich-kien-tap', label: 'Lịch kiến tập', icon: Layers, category: 'KẾ HOẠCH KIẾN TẬP' },
+      // ĐĂNG KÝ & PHÂN CÔNG
+      { to: '/khoa/supervisors', label: 'Phân công GVHD', icon: GraduationCap, category: 'ĐĂNG KÝ & PHÂN CÔNG' },
       // ĐÁNH GIÁ & KẾT QUẢ
       { to: '/khoa/boards', label: 'Hội đồng chấm báo cáo', icon: Presentation, category: 'ĐÁNH GIÁ & KẾT QUẢ' },
       { to: '/khoa/results', label: 'Kết quả kiến tập', icon: Award, category: 'ĐÁNH GIÁ & KẾT QUẢ' },
@@ -474,7 +476,6 @@ export default function Layout() {
       { to: '/clb/visit-report', label: 'Báo cáo tham quan', icon: Eye, category: 'KẾ HOẠCH KIẾN TẬP' },
       // ĐĂNG KÝ & PHÂN CÔNG
       { to: '/clb/registrations', label: 'Quản lý đăng ký', icon: FileCheck, category: 'ĐĂNG KÝ & PHÂN CÔNG' },
-      { to: '/clb/supervisors', label: 'Phân công GVHD', icon: GraduationCap, category: 'ĐĂNG KÝ & PHÂN CÔNG' },
       { to: '/clb/leaders', label: 'Phân công GV dẫn đoàn', icon: UserCheck, category: 'ĐĂNG KÝ & PHÂN CÔNG' },
       // TÀI CHÍNH
       { to: '/clb/fees', label: 'Quản lý lệ phí', icon: CreditCard, category: 'TÀI CHÍNH' },
@@ -697,7 +698,7 @@ export default function Layout() {
           </div>
         </header>
 
-        <main className="flex-1 overflow-auto pt-24 pb-8 px-6 md:px-8 bg-[#E7E0C4]/10">
+        <main className="flex-1 flex flex-col pt-16 bg-[#E7E0C4]/10">
           <Outlet />
         </main>
       </div>

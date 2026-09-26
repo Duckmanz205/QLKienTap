@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   UploadCloud, FileText, CheckCircle2, AlertCircle, ChevronRight, Lock,
   ArrowLeft, Search, ZoomIn, ZoomOut, AlertTriangle, Send, Maximize2, Minimize2
@@ -12,6 +12,8 @@ export default function NopBaiThuHoach_SV() {
   const [uploadedFile, setUploadedFile] = useState(null);
   const [isTextMaximized, setIsTextMaximized] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(100);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     const userJson = localStorage.getItem('user');
@@ -32,6 +34,13 @@ export default function NopBaiThuHoach_SV() {
         let status = 'Chưa nộp';
         if (trip.baiThuHoach) status = 'Đã nộp';
         
+        let hanNopStr = 'Chưa xác định';
+        if (trip.chuyenThamQuan?.ngay_tham_quan) {
+          const dateObj = new Date(trip.chuyenThamQuan.ngay_tham_quan);
+          dateObj.setDate(dateObj.getDate() + 7);
+          hanNopStr = dateObj.toLocaleDateString('vi-VN');
+        }
+
         return {
           id: trip.id,
           nhaMay: trip.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Chưa xác định',
@@ -39,7 +48,7 @@ export default function NopBaiThuHoach_SV() {
           loaiChuyen: trip.chuyenThamQuan?.loai_chuyen || 'khoa',
           hinhThuc: trip.chuyenThamQuan?.hinh_thuc === 'TrucTuyen' ? 'Trực tuyến' : 'Trực tiếp',
           trangThai: status,
-          hanNop: '1 tuần sau chuyến đi', // Backend mock logic
+          hanNop: hanNopStr,
           baiThuHoach: trip.baiThuHoach
         };
       }));
@@ -65,12 +74,27 @@ export default function NopBaiThuHoach_SV() {
     }
   };
 
-  const handleUploadMock = () => {
-    setUploadedFile({
-      name: 'BaoCao_ThuHoach.pdf',
-      size: '2.4 MB',
-      text: "LỜI MỞ ĐẦU\n\nKiến tập là một hoạt động vô cùng quan trọng đối với sinh viên chuyên ngành Công nghệ Thực phẩm. Nhờ sự hỗ trợ của nhà trường và công ty, đoàn chúng em đã có cơ hội tham quan quy trình sản xuất thực tế.\n\nI. QUY TRÌNH CÔNG NGHỆ\nNhà máy áp dụng dây chuyền khép kín hoàn toàn từ khâu xử lý nguyên liệu đến đóng gói. Các cánh tay robot tự động làm nhiệm vụ xếp palette, giảm thiểu nhân công và đảm bảo vệ sinh an toàn thực phẩm mức tối đa.\n\nII. BÀI HỌC KINH NGHIỆM\nChuyến tham quan giúp em hiểu rõ hơn về các tiêu chuẩn HACCP và ISO được ứng dụng trong thực tế sản xuất công nghiệp..."
-    });
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    setUploading(true);
+    try {
+      const res = await sinhVienApi.uploadReport(file);
+      const url = res.data.url;
+      setUploadedFile({
+        name: res.data.fileName || res.data.originalName || file.name,
+        size: (file.size / (1024 * 1024)).toFixed(1) + ' MB',
+        text: "Tệp PDF của bạn đã được tải lên thành công. Nội dung văn bản hiển thị trên ứng dụng có thể không khả dụng với file PDF gốc. Vui lòng bấm Nộp bài để hoàn tất.",
+        url: url
+      });
+    } catch (err) {
+      console.error(err);
+      alert('Lỗi tải tệp lên. Xin thử lại.');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = null;
+    }
   };
 
   const handleSubmit = async () => {
@@ -78,7 +102,7 @@ export default function NopBaiThuHoach_SV() {
     try {
       await sinhVienApi.submitReport({
         registrationId: selectedTrip.id,
-        fileBaoCaoUrl: uploadedFile.name,
+        fileBaoCaoUrl: uploadedFile.url || uploadedFile.name,
         fileXacNhanUrl: null,
       });
       alert("Nộp bài thành công!");
@@ -284,11 +308,19 @@ export default function NopBaiThuHoach_SV() {
                 <p className="text-sm font-medium text-slate-500 mb-8 max-w-xs leading-relaxed">
                   Kéo thả file báo cáo thu hoạch của bạn vào đây, hoặc nhấn nút bên dưới để chọn file (Tối đa 15MB).
                 </p>
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  className="hidden" 
+                  accept=".pdf,.doc,.docx"
+                  onChange={handleFileChange} 
+                />
                 <button 
-                  onClick={handleUploadMock}
-                  className="px-8 py-3.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl font-bold text-sm shadow-md transition-all cursor-pointer"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="px-8 py-3.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl font-bold text-sm shadow-md transition-all cursor-pointer disabled:opacity-50"
                 >
-                  Chọn file từ máy tính
+                  {uploading ? 'Đang tải lên...' : 'Chọn file từ máy tính'}
                 </button>
               </div>
             </div>

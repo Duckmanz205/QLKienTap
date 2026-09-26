@@ -8,6 +8,7 @@ import {
   Repository,
   In,
   LessThanOrEqual,
+  MoreThanOrEqual,
   DataSource,
   EntityManager,
   Not,
@@ -1578,7 +1579,7 @@ export class KhoaService {
           if (!existingInvoice) {
             const hoaDon = new HoaDonLePhi();
             hoaDon.phieu_dang_ky_id = phieu.id;
-            hoaDon.so_tien = trip.hinh_thuc === 'TrucTiep' ? 150000 : 50000;
+            hoaDon.so_tien = trip.le_phi || 0;
             
             // Generate formatted string
             const removeAccents = (str: string) => {
@@ -1701,13 +1702,20 @@ export class KhoaService {
     return { success: true, pc };
   }
 
-  async getLecturersWithWorkload() {
+  async getLecturersWithWorkload(dotKienTapId?: number) {
     const lecturers = await this.gvRepo.find();
     const result: any[] = [];
     for (const gv of lecturers) {
-      const count = await this.pcGvhdRepo.count({
-        where: { giang_vien_id: gv.id, trang_thai: 'DangHoatDong' },
-      });
+      const qb = this.pcGvhdRepo.createQueryBuilder('pc')
+        .where('pc.giang_vien_id = :gvId', { gvId: gv.id })
+        .andWhere('pc.trang_thai = :trangThai', { trangThai: 'DangHoatDong' });
+
+      if (dotKienTapId) {
+        qb.innerJoin('pc.dotKienTapSinhVien', 'dksv')
+          .andWhere('dksv.dot_kien_tap_id = :dotKienTapId', { dotKienTapId });
+      }
+
+      const count = await qb.getCount();
       result.push({
         ...gv,
         so_sv_dang_huong_dan: count,
@@ -2314,6 +2322,7 @@ export class KhoaService {
     const lecturerCount = await this.gvRepo.count();
     const factoryCount = await this.nhaMayRepo.count();
     const campaignCount = await this.dotRepo.count();
+    const scheduleCount = await this.lichRepo.count();
 
     const pendingCancelCount = await this.huyRepo.count({
       where: { trang_thai_duyet: 'ChoDuyet' },
@@ -2323,13 +2332,72 @@ export class KhoaService {
       where: { trang_thai: 'ChoXuLy' },
     });
 
+    // Thống kê sinh viên theo Khóa học
+    const khoas = await this.khoaHocRepo.find();
+    const distributionData: any[] = [];
+    for (const kh of khoas) {
+      const count = await this.svRepo.count({ where: { khoa_hoc_id: kh.id } });
+      if (count > 0) {
+        distributionData.push({ name: kh.ten_khoa_hoc, value: count });
+      }
+    }
+
+    // Timeline hôm nay/tuần này
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const chuyens = await this.chuyenRepo.find({
+      where: { 
+        ngay_tham_quan: MoreThanOrEqual(today),
+      },
+      relations: {
+        nhaMay: true
+      },
+      order: { ngay_tham_quan: 'ASC' },
+      take: 10
+    });
+
+    const timeline = await Promise.all(chuyens.map(async (chuyen, index) => {
+      let status = 'Sắp xuất phát';
+      let statusColor = 'bg-[#DBD468] text-slate-800';
+      if (chuyen.ngay_tham_quan < new Date()) {
+        status = 'Đang diễn ra';
+        statusColor = 'bg-[#89B449] text-white';
+      }
+
+      const studentCount = await this.phieuRepo.count({
+        where: { chuyen_tham_quan_id: chuyen.id, trang_thai: 'HopLe' }
+      });
+
+      const phanCongs = await this.danDoanRepo.find({
+        where: { chuyen_tham_quan_id: chuyen.id },
+        relations: { giangVien: true }
+      });
+
+      const gio = chuyen.gio_bat_dau ? chuyen.gio_bat_dau.substring(0, 5) : '00:00';
+      return {
+        id: chuyen.id,
+        factoryName: chuyen.nhaMay?.ten_nha_may || 'Chuyến đi',
+        time: gio,
+        studentCount: studentCount || 0,
+        lecturer: phanCongs[0]?.giangVien?.ho_ten || 'Đang chờ PC',
+        status,
+        statusColor
+      };
+    }));
+
     return {
       studentCount,
       lecturerCount,
       factoryCount,
       campaignCount,
+      scheduleCount,
       pendingCancelCount,
       pendingRefundCount,
+      distributionData,
+      timeline
     };
   }
 

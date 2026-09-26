@@ -5,7 +5,7 @@ import {
 import { khoaApi } from '../../services/api';
 
 export default function SupervisorAssignment_Khoa() {
-  const [schedules, setSchedules] = useState([]);
+  const [campaigns, setCampaigns] = useState([]);
   const [enrollments, setEnrollments] = useState([]);
   const [lecturers, setLecturers] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -16,9 +16,9 @@ export default function SupervisorAssignment_Khoa() {
   const [limit, setLimit] = useState(15);
 
   // Dropdown States for Filters
-  const [isLichDropdownOpen, setIsLichDropdownOpen] = useState(false);
-  const [selectedLich, setSelectedLich] = useState('');
-  const [searchLichTerm, setSearchLichTerm] = useState('');
+  const [isCampaignDropdownOpen, setIsCampaignDropdownOpen] = useState(false);
+  const [selectedCampaign, setSelectedCampaign] = useState('');
+  const [searchCampaignTerm, setSearchCampaignTerm] = useState('');
 
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState('');
@@ -39,21 +39,22 @@ export default function SupervisorAssignment_Khoa() {
   }, []);
 
   useEffect(() => {
-    if (selectedLich) {
+    if (selectedCampaign) {
       fetchEnrollments();
     }
-  }, [selectedLich]);
+  }, [selectedCampaign]);
 
   const fetchInitialData = async () => {
     try {
-      const [schRes, lecRes] = await Promise.all([
-        khoaApi.getSchedules(),
+      const [campRes, lecRes] = await Promise.all([
+        khoaApi.getCampaigns({ limit: 100 }),
         khoaApi.getLecturers()
       ]);
-      setSchedules(schRes.data);
+      const camps = campRes.data.data || campRes.data;
+      setCampaigns(camps);
       setLecturers(lecRes.data);
-      if (schRes.data.length > 0) {
-        setSelectedLich(schRes.data[0].id);
+      if (camps.length > 0) {
+        setSelectedCampaign(camps[0].id);
       }
     } catch (err) {
       console.error(err);
@@ -63,9 +64,11 @@ export default function SupervisorAssignment_Khoa() {
   const fetchEnrollments = async () => {
     setLoading(true);
     try {
-      const res = await khoaApi.getEnrollments({ lichKienTapId: selectedLich });
+      const res = await khoaApi.getEnrollments({ lichKienTapId: selectedCampaign });
+      // res.data is expected to be { data: [...], total: ... }
+      const enrolls = res.data.data || res.data;
       // add checked property
-      setEnrollments(res.data.map(e => ({ ...e, checked: false })));
+      setEnrollments(enrolls.map(e => ({ ...e, checked: false })));
       setSelectAll(false);
     } catch (err) {
       console.error(err);
@@ -98,11 +101,11 @@ export default function SupervisorAssignment_Khoa() {
 
   // Close all dropdowns
   const closeAllDropdowns = () => {
-    setIsLichDropdownOpen(false);
+    setIsCampaignDropdownOpen(false);
     setIsStatusDropdownOpen(false);
     setIsClassDropdownOpen(false);
     setOpenDropdownId(null);
-    setSearchLichTerm('');
+    setSearchCampaignTerm('');
     setSearchClassTerm('');
     setSearchStatusTerm('');
     setSearchLecturerTerm('');
@@ -151,8 +154,8 @@ export default function SupervisorAssignment_Khoa() {
   const validCurrentPage = Math.min(currentPage, totalPages);
   const paginatedEnrollments = filteredEnrollments.slice((validCurrentPage - 1) * limit, validCurrentPage * limit);
 
-  const filteredSchedules = schedules.filter(s => 
-    s.ten_lich?.toLowerCase().includes(searchLichTerm.toLowerCase())
+  const filteredCampaigns = campaigns.filter(s => 
+    s.ten_dot?.toLowerCase().includes(searchCampaignTerm.toLowerCase())
   );
 
   const filteredClassList = classList.filter(cls => 
@@ -193,44 +196,44 @@ export default function SupervisorAssignment_Khoa() {
           />
         </div>
 
-        {/* Lịch Dropdown */}
+        {/* Đợt kiến tập Dropdown */}
         <div className="relative min-w-[260px]">
           <div 
-            onClick={(e) => handleDropdownClick(e, setIsLichDropdownOpen)}
-            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isLichDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+            onClick={(e) => handleDropdownClick(e, setIsCampaignDropdownOpen)}
+            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isCampaignDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
           >
-            <span className={`truncate pr-2 font-medium ${selectedLich ? 'text-slate-700' : 'text-slate-400'}`}>
-              {schedules.find(s => s.id === selectedLich)?.ten_lich || 'Chọn lịch kiến tập'}
+            <span className={`truncate pr-2 font-medium ${selectedCampaign ? 'text-slate-700' : 'text-slate-400'}`}>
+              {campaigns.find(s => s.id === selectedCampaign)?.ten_dot || 'Chọn đợt kiến tập'}
             </span>
-            <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isLichDropdownOpen ? 'rotate-180 text-[#407F3E]' : ''}`} />
+            <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isCampaignDropdownOpen ? 'rotate-180 text-[#407F3E]' : ''}`} />
           </div>
-          {isLichDropdownOpen && (
+          {isCampaignDropdownOpen && (
             <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[260px]">
               <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
                 <input 
                   type="text" 
-                  placeholder="Tìm lịch kiến tập..." 
-                  value={searchLichTerm}
-                  onChange={(e) => setSearchLichTerm(e.target.value)}
+                  placeholder="Tìm đợt kiến tập..." 
+                  value={searchCampaignTerm}
+                  onChange={(e) => setSearchCampaignTerm(e.target.value)}
                   onClick={(e) => e.stopPropagation()}
                   className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
                 />
               </div>
               <div className="max-h-60 overflow-y-auto">
-                {filteredSchedules.map(opt => (
+                {filteredCampaigns.map(opt => (
                   <div 
                     key={opt.id}
-                    onClick={() => { setSelectedLich(opt.id); setIsLichDropdownOpen(false); setCurrentPage(1); }}
+                    onClick={() => { setSelectedCampaign(opt.id); setIsCampaignDropdownOpen(false); setCurrentPage(1); }}
                     className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                      selectedLich === opt.id ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/30 font-medium'
+                      selectedCampaign === opt.id ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/30 font-medium'
                     }`}
                   >
-                    <span className="truncate pr-2">{opt.ten_lich}</span>
-                    {selectedLich === opt.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                    <span className="truncate pr-2">{opt.ten_dot}</span>
+                    {selectedCampaign === opt.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
                   </div>
                 ))}
-                {filteredSchedules.length === 0 && (
-                  <div className="px-4 py-2 text-xs text-slate-400 text-center">Không tìm thấy lịch nào</div>
+                {filteredCampaigns.length === 0 && (
+                  <div className="px-4 py-2 text-xs text-slate-400 text-center">Không tìm thấy đợt nào</div>
                 )}
               </div>
             </div>

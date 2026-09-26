@@ -60,6 +60,7 @@
           "trang_thai": "Nhap"
         },
         "dot_kien_tap_id": 3,
+        "tai_khoan_thu_huong_id": null,
         "ten_lich": "lich",
         "so_luong_du_kien": 1,
         "tg_mo_dang_ky_tu": "2026-09-23T17:00:00.000Z",
@@ -122,6 +123,7 @@
           "trang_thai": "Nhap"
         },
         "dot_kien_tap_id": 3,
+        "tai_khoan_thu_huong_id": null,
         "ten_lich": "lich2",
         "so_luong_du_kien": 1,
         "tg_mo_dang_ky_tu": "2026-09-23T17:00:00.000Z",

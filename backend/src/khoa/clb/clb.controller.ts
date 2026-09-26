@@ -165,6 +165,11 @@ export class ClbController {
     return this.khoaService.getLecturers();
   }
 
+  @Get('lecturers-with-workload')
+  async getLecturersWithWorkload() {
+    return this.khoaService.getLecturersWithWorkload();
+  }
+
   @Post('assign-gvdd')
   async assignGvdd(@Body() body: AssignGvddDto) {
     return this.khoaService.assignTourLeader(
