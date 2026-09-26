@@ -1,4 +1,164 @@
 {
-  "assignments": [],
-  "result": []
+  "assignments": [
+    {
+      "id": 1,
+      "chuyen_tham_quan_id": 1,
+      "giangVien": {
+        "id": 1,
+        "ma_gv": "GV001",
+        "ho_ten": "Lê Văn Tám",
+        "taikhoan_id": 1,
+        "email": null,
+        "sdt": null,
+        "du_dk_hoi_dong": true,
+        "so_sv_toi_da_huong_dan": null
+      },
+      "giang_vien_id": 1,
+      "la_truong_doan": true
+    },
+    {
+      "id": 2,
+      "chuyen_tham_quan_id": 2,
+      "giangVien": {
+        "id": 2,
+        "ma_gv": "GV002",
+        "ho_ten": "Nguyễn Thị Kim Thoa",
+        "taikhoan_id": 2,
+        "email": null,
+        "sdt": null,
+        "du_dk_hoi_dong": true,
+        "so_sv_toi_da_huong_dan": null
+      },
+      "giang_vien_id": 2,
+      "la_truong_doan": true
+    }
+  ],
+  "result": [
+    {
+      "id": 1,
+      "nhaMay": {
+        "id": 3,
+        "ten_nha_may": "Aceook",
+        "dia_chi": null,
+        "nhom_nganh": null,
+        "nguoi_lien_he": null,
+        "sdt_lien_he": null,
+        "ho_tro_truc_tiep": true,
+        "ho_tro_truc_tuyen": false,
+        "trang_thai": "HoatDong"
+      },
+      "nha_may_id": 3,
+      "lichKienTap": {
+        "id": 3,
+        "dotKienTap": {
+          "id": 3,
+          "ten_dot": "dot",
+          "hoc_ky_id": 1,
+          "khoa_hoc_id": 6,
+          "ngay_bat_dau": "2026-09-24",
+          "ngay_ket_thuc": "2026-09-25",
+          "trang_thai": "Nhap"
+        },
+        "dot_kien_tap_id": 3,
+        "tai_khoan_thu_huong_id": null,
+        "ten_lich": "lịch 3",
+        "so_luong_du_kien": 1,
+        "tg_mo_dang_ky_tu": "2026-09-25T17:00:00.000Z",
+        "tg_mo_dang_ky_den": "2026-09-26T16:59:59.000Z",
+        "ly_do_tu_choi": null,
+        "trang_thai": "DaDuyet"
+      },
+      "lich_kien_tap_id": 3,
+      "ngay_tham_quan": "2026-09-25",
+      "gio_bat_dau": "22:22:00",
+      "hinh_thuc": "TrucTiep",
+      "cach_to_chuc": "DoKhoaToChuc",
+      "suc_chua": 1,
+      "le_phi": 10000,
+      "dia_diem_tap_trung": "1",
+      "trang_thai": "DaDuyet",
+      "dang_ky_count": 1,
+      "giaoVienDanDoan": [
+        {
+          "id": 1,
+          "chuyen_tham_quan_id": 1,
+          "giangVien": {
+            "id": 1,
+            "ma_gv": "GV001",
+            "ho_ten": "Lê Văn Tám",
+            "taikhoan_id": 1,
+            "email": null,
+            "sdt": null,
+            "du_dk_hoi_dong": true,
+            "so_sv_toi_da_huong_dan": null
+          },
+          "giang_vien_id": 1,
+          "la_truong_doan": true
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "nhaMay": {
+        "id": 5,
+        "ten_nha_may": "Ajinomoto",
+        "dia_chi": null,
+        "nhom_nganh": null,
+        "nguoi_lien_he": null,
+        "sdt_lien_he": null,
+        "ho_tro_truc_tiep": true,
+        "ho_tro_truc_tuyen": false,
+        "trang_thai": "HoatDong"
+      },
+      "nha_may_id": 5,
+      "lichKienTap": {
+        "id": 2,
+        "dotKienTap": {
+          "id": 3,
+          "ten_dot": "dot",
+          "hoc_ky_id": 1,
+          "khoa_hoc_id": 6,
+          "ngay_bat_dau": "2026-09-24",
+          "ngay_ket_thuc": "2026-09-25",
+          "trang_thai": "Nhap"
+        },
+        "dot_kien_tap_id": 3,
+        "tai_khoan_thu_huong_id": null,
+        "ten_lich": "lich2",
+        "so_luong_du_kien": 1,
+        "tg_mo_dang_ky_tu": "2026-09-23T17:00:00.000Z",
+        "tg_mo_dang_ky_den": "2026-09-24T16:59:59.000Z",
+        "ly_do_tu_choi": null,
+        "trang_thai": "MoDangKy"
+      },
+      "lich_kien_tap_id": 2,
+      "ngay_tham_quan": "2026-09-24",
+      "gio_bat_dau": "21:29:00",
+      "hinh_thuc": "TrucTiep",
+      "cach_to_chuc": "DoKhoaToChuc",
+      "suc_chua": 1,
+      "le_phi": 10,
+      "dia_diem_tap_trung": "1",
+      "trang_thai": "DaChotDanhSach",
+      "dang_ky_count": 1,
+      "giaoVienDanDoan": [
+        {
+          "id": 2,
+          "chuyen_tham_quan_id": 2,
+          "giangVien": {
+            "id": 2,
+            "ma_gv": "GV002",
+            "ho_ten": "Nguyễn Thị Kim Thoa",
+            "taikhoan_id": 2,
+            "email": null,
+            "sdt": null,
+            "du_dk_hoi_dong": true,
+            "so_sv_toi_da_huong_dan": null
+          },
+          "giang_vien_id": 2,
+          "la_truong_doan": true
+        }
+      ]
+    }
+  ]
 }

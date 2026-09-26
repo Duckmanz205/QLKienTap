@@ -138,11 +138,8 @@ class LichTrinhDoanSVScreen extends StatelessWidget {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: Colors.grey.shade300,
-                          image: DecorationImage(
-                            image: NetworkImage('https://images.unsplash.com/photo-${1500000000000 + index * 100000}?w=100'),
-                            fit: BoxFit.cover,
-                          ),
                         ),
+                        child: const Icon(Icons.person, color: Colors.white, size: 28),
                       ),
                       const SizedBox(height: 4),
                       Text(

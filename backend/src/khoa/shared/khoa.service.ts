@@ -8,6 +8,7 @@ import {
   Repository,
   In,
   LessThanOrEqual,
+  MoreThanOrEqual,
   DataSource,
   EntityManager,
   Not,
@@ -445,12 +446,13 @@ export class KhoaService {
   async getAccounts(page: number = 1, limit: number = 15, search?: string, vaiTro?: string, trangThai?: string) {
     const qb = this.taiKhoanRepo
       .createQueryBuilder('tk')
+      .leftJoin('tk.vaiTro', 'vt')
       .leftJoin('SinhVien', 'sv', 'sv.taikhoan_id = tk.id')
       .leftJoin('GiangVien', 'gv', 'gv.taikhoan_id = tk.id')
       .select([
         'tk.id AS id',
         'tk.ten_dang_nhap AS ten_dang_nhap',
-        'tk.vai_tro AS vai_tro',
+        'vt.ten_vai_tro AS vai_tro',
         'tk.trang_thai AS trang_thai',
         'tk.lan_dang_nhap_cuoi AS lan_dang_nhap_cuoi',
         'COALESCE(sv.ho_ten, gv.ho_ten, tk.ten_dang_nhap) AS ho_ten',
@@ -459,7 +461,7 @@ export class KhoaService {
     if (search) {
       qb.andWhere('(tk.ten_dang_nhap LIKE :s OR sv.ho_ten LIKE :s OR gv.ho_ten LIKE :s)', { s: `%${search}%` });
     }
-    if (vaiTro) qb.andWhere('tk.vai_tro = :vaiTro', { vaiTro });
+    if (vaiTro) qb.andWhere('vt.ma_vai_tro = :vaiTro', { vaiTro });
     if (trangThai) qb.andWhere('tk.trang_thai = :trangThai', { trangThai });
 
     const total = await qb.getCount();
@@ -831,6 +833,26 @@ export class KhoaService {
     if (lich.trang_thai !== 'ChoDuyet') {
       throw new BadRequestException('Lịch không ở trạng thái chờ duyệt');
     }
+
+    const totalStudents = await this.dksvRepo.count({
+      where: { dot_kien_tap_id: lich.dot_kien_tap_id, trang_thai: 'DangThucHien' },
+    });
+
+    if (totalStudents > 0) {
+      const assignedStudentsCount = await this.pcGvhdRepo.createQueryBuilder('pc')
+        .innerJoin('pc.dotKienTapSinhVien', 'dksv')
+        .where('dksv.dot_kien_tap_id = :dotId', { dotId: lich.dot_kien_tap_id })
+        .andWhere('dksv.trang_thai = :status1', { status1: 'DangThucHien' })
+        .andWhere('pc.trang_thai = :status2', { status2: 'DangHoatDong' })
+        .getCount();
+
+      if (assignedStudentsCount < totalStudents) {
+        throw new BadRequestException(
+          `Bạn phải hoàn thành phân công GVHD cho toàn bộ sinh viên trong đợt trước khi duyệt lịch (Còn ${totalStudents - assignedStudentsCount}/${totalStudents} SV chưa được phân công).`
+        );
+      }
+    }
+
     lich.trang_thai = 'DaDuyet';
     lich.ly_do_tu_choi = null as any;
     await this.lichRepo.save(lich);
@@ -904,7 +926,6 @@ export class KhoaService {
       giaoVienDanDoan: assignments.filter(a => a.chuyen_tham_quan_id === ent.id)
     }));
 
-    require('fs').writeFileSync('debug_trips.json', JSON.stringify({ assignments, result: result.slice(0, 2) }, null, 2));
     return result;
   }
 
@@ -1558,7 +1579,7 @@ export class KhoaService {
           if (!existingInvoice) {
             const hoaDon = new HoaDonLePhi();
             hoaDon.phieu_dang_ky_id = phieu.id;
-            hoaDon.so_tien = trip.hinh_thuc === 'TrucTiep' ? 150000 : 50000;
+            hoaDon.so_tien = trip.le_phi || 0;
             
             // Generate formatted string
             const removeAccents = (str: string) => {
@@ -1618,11 +1639,45 @@ export class KhoaService {
   // -------------------------------------------------------------
   // Phan Cong GVHD & GVDD
   // -------------------------------------------------------------
-  async assignLecturerGuide(dotKienTapSinhVienId: number, lecturerId: number) {
+  async assignLecturerGuide(dotKienTapSinhVienId: number, lecturerId: number, checkLimit: boolean = true) {
     const dksv = await this.dksvRepo.findOne({
       where: { id: dotKienTapSinhVienId },
+      relations: { dotKienTap: true }
     });
     if (!dksv) throw new NotFoundException('Không tìm thấy đăng ký đợt kiến tập');
+
+    if (dksv.trang_thai !== 'DangThucHien') {
+      throw new BadRequestException('Sinh viên không trong trạng thái đang thực hiện kiến tập');
+    }
+
+    if (dksv.dotKienTap && (dksv.dotKienTap.trang_thai === 'DaKetThuc' || dksv.dotKienTap.trang_thai === 'DaKhoa')) {
+      throw new BadRequestException('Không thể phân công khi đợt kiến tập đã kết thúc hoặc khóa');
+    }
+
+    if (checkLimit) {
+      const gv = await this.gvRepo.findOne({ where: { id: lecturerId } });
+      if (!gv) throw new NotFoundException('Không tìm thấy giảng viên');
+      
+      if (gv.so_sv_toi_da_huong_dan) {
+        const currentCount = await this.pcGvhdRepo.count({
+          where: { giang_vien_id: lecturerId, trang_thai: 'DangHoatDong' },
+        });
+        
+        const isAlreadyAssigned = await this.pcGvhdRepo.findOne({
+          where: {
+            dot_kien_tap_sinh_vien_id: dotKienTapSinhVienId,
+            giang_vien_id: lecturerId,
+            trang_thai: 'DangHoatDong'
+          }
+        });
+        
+        if (!isAlreadyAssigned && currentCount >= gv.so_sv_toi_da_huong_dan) {
+          throw new BadRequestException(
+            `GV ${gv.ho_ten} đã đạt giới hạn ${gv.so_sv_toi_da_huong_dan} sinh viên hướng dẫn`,
+          );
+        }
+      }
+    }
 
     const current = await this.pcGvhdRepo.findOne({
       where: {
@@ -1645,6 +1700,98 @@ export class KhoaService {
     await this.assignGvhdToTuDoTrips(dksv.sinh_vien_id, lecturerId);
 
     return { success: true, pc };
+  }
+
+  async getLecturersWithWorkload(dotKienTapId?: number) {
+    const lecturers = await this.gvRepo.find();
+    const result: any[] = [];
+    for (const gv of lecturers) {
+      const qb = this.pcGvhdRepo.createQueryBuilder('pc')
+        .where('pc.giang_vien_id = :gvId', { gvId: gv.id })
+        .andWhere('pc.trang_thai = :trangThai', { trangThai: 'DangHoatDong' });
+
+      if (dotKienTapId) {
+        qb.innerJoin('pc.dotKienTapSinhVien', 'dksv')
+          .andWhere('dksv.dot_kien_tap_id = :dotKienTapId', { dotKienTapId });
+      }
+
+      const count = await qb.getCount();
+      result.push({
+        ...gv,
+        so_sv_dang_huong_dan: count,
+      });
+    }
+    return result;
+  }
+
+  async batchAssignGvhd(dotKienTapSinhVienIds: number[], lecturerId: number) {
+    const results = { success: 0, failed: [] as any[] };
+    for (const id of dotKienTapSinhVienIds) {
+      try {
+        await this.assignLecturerGuide(id, lecturerId, true);
+        results.success++;
+      } catch (err) {
+        results.failed.push({ id, reason: err.message });
+      }
+    }
+    return results;
+  }
+
+  async previewAutoAssignGvhd(dotKienTapId: number) {
+    const dksvs = await this.dksvRepo.find({
+      where: { dot_kien_tap_id: dotKienTapId },
+      relations: { sinhVien: true }
+    });
+
+    const unassignedDksvs: any[] = [];
+    for (const dksv of dksvs) {
+      const pc = await this.pcGvhdRepo.findOne({
+        where: { dot_kien_tap_sinh_vien_id: dksv.id, trang_thai: 'DangHoatDong' }
+      });
+      if (!pc) unassignedDksvs.push(dksv);
+    }
+
+    if (unassignedDksvs.length === 0) {
+      return { assignments: [], unassigned: [] };
+    }
+
+    const lecturers = await this.getLecturersWithWorkload();
+    const availableLecturers = lecturers.filter(gv => !gv.so_sv_toi_da_huong_dan || gv.so_sv_dang_huong_dan < gv.so_sv_toi_da_huong_dan);
+    
+    const assignments: any[] = [];
+    const unassigned: any[] = [];
+    
+    for (const dksv of unassignedDksvs) {
+      availableLecturers.sort((a, b) => (a.so_sv_dang_huong_dan || 0) - (b.so_sv_dang_huong_dan || 0));
+      
+      const targetGv = availableLecturers[0];
+      if (targetGv && (!targetGv.so_sv_toi_da_huong_dan || targetGv.so_sv_dang_huong_dan < targetGv.so_sv_toi_da_huong_dan)) {
+        assignments.push({
+          dotKienTapSinhVienId: dksv.id,
+          sinhVien: dksv.sinhVien,
+          lecturerId: targetGv.id,
+          lecturer: targetGv
+        });
+        targetGv.so_sv_dang_huong_dan++;
+      } else {
+        unassigned.push(dksv);
+      }
+    }
+    
+    return { assignments, unassigned };
+  }
+
+  async confirmAutoAssignGvhd(assignments: { dotKienTapSinhVienId: number; lecturerId: number }[]) {
+    const results = { success: 0, failed: [] as any[] };
+    for (const assign of assignments) {
+      try {
+        await this.assignLecturerGuide(assign.dotKienTapSinhVienId, assign.lecturerId, false);
+        results.success++;
+      } catch (err) {
+        results.failed.push({ id: assign.dotKienTapSinhVienId, reason: err.message });
+      }
+    }
+    return results;
   }
 
   async assignTourLeader(
@@ -2175,6 +2322,7 @@ export class KhoaService {
     const lecturerCount = await this.gvRepo.count();
     const factoryCount = await this.nhaMayRepo.count();
     const campaignCount = await this.dotRepo.count();
+    const scheduleCount = await this.lichRepo.count();
 
     const pendingCancelCount = await this.huyRepo.count({
       where: { trang_thai_duyet: 'ChoDuyet' },
@@ -2184,13 +2332,72 @@ export class KhoaService {
       where: { trang_thai: 'ChoXuLy' },
     });
 
+    // Thống kê sinh viên theo Khóa học
+    const khoas = await this.khoaHocRepo.find();
+    const distributionData: any[] = [];
+    for (const kh of khoas) {
+      const count = await this.svRepo.count({ where: { khoa_hoc_id: kh.id } });
+      if (count > 0) {
+        distributionData.push({ name: kh.ten_khoa_hoc, value: count });
+      }
+    }
+
+    // Timeline hôm nay/tuần này
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const chuyens = await this.chuyenRepo.find({
+      where: { 
+        ngay_tham_quan: MoreThanOrEqual(today),
+      },
+      relations: {
+        nhaMay: true
+      },
+      order: { ngay_tham_quan: 'ASC' },
+      take: 10
+    });
+
+    const timeline = await Promise.all(chuyens.map(async (chuyen, index) => {
+      let status = 'Sắp xuất phát';
+      let statusColor = 'bg-[#DBD468] text-slate-800';
+      if (chuyen.ngay_tham_quan < new Date()) {
+        status = 'Đang diễn ra';
+        statusColor = 'bg-[#89B449] text-white';
+      }
+
+      const studentCount = await this.phieuRepo.count({
+        where: { chuyen_tham_quan_id: chuyen.id, trang_thai: 'HopLe' }
+      });
+
+      const phanCongs = await this.danDoanRepo.find({
+        where: { chuyen_tham_quan_id: chuyen.id },
+        relations: { giangVien: true }
+      });
+
+      const gio = chuyen.gio_bat_dau ? chuyen.gio_bat_dau.substring(0, 5) : '00:00';
+      return {
+        id: chuyen.id,
+        factoryName: chuyen.nhaMay?.ten_nha_may || 'Chuyến đi',
+        time: gio,
+        studentCount: studentCount || 0,
+        lecturer: phanCongs[0]?.giangVien?.ho_ten || 'Đang chờ PC',
+        status,
+        statusColor
+      };
+    }));
+
     return {
       studentCount,
       lecturerCount,
       factoryCount,
       campaignCount,
+      scheduleCount,
       pendingCancelCount,
       pendingRefundCount,
+      distributionData,
+      timeline
     };
   }
 

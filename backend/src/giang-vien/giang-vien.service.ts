@@ -523,6 +523,12 @@ export class GiangVienService {
 
     const results: any[] = [];
     for (const map of mappings) {
+      // Fetch all committee members for this board
+      const committeeMembers = await this.hoiDongThanhVienRepo.find({
+        where: { hoi_dong_id: map.hoi_dong_id },
+        relations: { giangVien: true }
+      });
+
       // Lay danh sach cac phieu dang ky thuoc lich kien tap cua hoi dong nay
       const phieus = await this.phieuRepo.find({
         where: {
@@ -536,14 +542,55 @@ export class GiangVienService {
           chuyenThamQuan: {
             nhaMay: true,
           },
+          phieuThamQuan: true, // Need this to get scores
         },
+      });
+
+      // Lay diem cua tat ca phieu trong hoi dong nay
+      const phieuTQIds = phieus.map(p => p.phieuThamQuan?.id).filter(id => id);
+      let allScores: any[] = [];
+      if (phieuTQIds.length > 0) {
+        allScores = await this.diemHoiDongRepo.find({
+          where: {
+            // Using In(phieuTQIds) from TypeORM would require importing In, 
+            // instead we can just fetch all scores for the committee members
+            hoi_dong_thanhvien_id: map.hoi_dong_id // wait, no, the member id is different
+          }
+        });
+        
+        // Actually it's easier to just fetch all scores for these phieuTQIds
+        // Let's do it using QueryBuilder to avoid importing In
+        allScores = await this.diemHoiDongRepo.createQueryBuilder('diem')
+          .where('diem.phieu_tham_quan_id IN (:...ids)', { ids: phieuTQIds })
+          .getMany();
+      }
+
+      // Map registrations with committee scores
+      const registrationsWithScores = phieus.map(phieu => {
+        const pTqId = phieu.phieuThamQuan?.id;
+        const committee = committeeMembers.map(cm => {
+          const scoreRecord = allScores.find(s => s.phieu_tham_quan_id === pTqId && s.hoi_dong_thanhvien_id === cm.id);
+          return {
+            id: cm.id,
+            name: cm.giangVien?.ho_ten || 'Giảng viên',
+            ma_gv: cm.giangVien?.ma_gv || '',
+            vai_tro: cm.vai_tro,
+            score: scoreRecord ? scoreRecord.diem : null,
+            status: scoreRecord ? 'Đã chấm' : 'Chưa chấm'
+          };
+        });
+
+        return {
+          ...phieu,
+          committee, // Attach committee array to each registration
+        };
       });
 
       results.push({
         session: map.hoiDong,
         vai_tro: map.vai_tro,
         memberId: map.id,
-        registrations: phieus,
+        registrations: registrationsWithScores,
       });
     }
 

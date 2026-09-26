@@ -22,8 +22,10 @@ export default function DashBoard_Khoa() {
     factoryCount: 18,
     campaignCount: 4,
     scheduleCount: 8,
-    pendingCancelCount: 15,
-    pendingRefundCount: 6,
+    pendingCancelCount: 0,
+    pendingRefundCount: 0,
+    distributionData: [],
+    timeline: []
   });
   const [loading, setLoading] = useState(true);
 
@@ -61,8 +63,10 @@ export default function DashBoard_Khoa() {
           ...prev,
           ...res.data,
           // If the backend doesn't return these fields, keep the mocked defaults
-          scheduleCount: res.data.scheduleCount || 8,
-          pendingCancelCount: res.data.pendingCancelCount || 15,
+          scheduleCount: res.data.scheduleCount || 0,
+          pendingCancelCount: res.data.pendingCancelCount || 0,
+          distributionData: res.data.distributionData || [],
+          timeline: res.data.timeline || [],
         }));
       }
     } catch (err) {
@@ -72,43 +76,16 @@ export default function DashBoard_Khoa() {
     }
   };
 
-  // Mock timeline for "Lịch trình hôm nay"
-  const todayDepartures = [
-    {
-      id: 1,
-      factoryName: 'Công ty Cổ phần Sữa Việt Nam (Vinamilk) - Nhà máy sữa Thống Nhất',
-      time: '08:00 - 11:30',
-      studentCount: 45,
-      lecturer: 'ThS. Nguyễn Văn A',
-      status: 'Đang di chuyển',
-      statusColor: 'bg-[#89B449] text-white', // Secondary Green
-    },
-    {
-      id: 2,
-      factoryName: 'Công ty Cổ phần Acecook Việt Nam - Chi nhánh TP.HCM',
-      time: '13:30 - 16:30',
-      studentCount: 40,
-      lecturer: 'ThS. Lê Thị B',
-      status: 'Sắp xuất phát',
-      statusColor: 'bg-[#DBD468] text-slate-800', // Warning Yellow
-    },
-    {
-      id: 3,
-      factoryName: 'Công ty TNHH Yakult Việt Nam - Nhà máy Bình Dương',
-      time: '15:00 - 17:30',
-      studentCount: 35,
-      lecturer: 'TS. Trần Văn C',
-      status: 'Chờ xuất phát',
-      statusColor: 'bg-[#E7E0C4] text-slate-700', // Muted Surface
-    }
-  ];
+  const todayDepartures = stats.timeline || [];
 
-  // Mock student distribution data by major/division
-  const distributionData = [
-    { name: 'Công nghệ thực phẩm', count: 312, percent: 60, color: 'bg-[#407F3E]' },
-    { name: 'Đảm bảo chất lượng & An toàn thực phẩm', count: 130, percent: 25, color: 'bg-[#89B449]' },
-    { name: 'Quản lý dịch vụ ăn uống & Lữ hành', count: 78, percent: 15, color: 'bg-[#DBD468]' }
-  ];
+  const totalStudents = stats.distributionData.reduce((acc, curr) => acc + curr.value, 0);
+  const colors = ['bg-[#407F3E]', 'bg-[#89B449]', 'bg-[#DBD468]', 'bg-[#E68A8C]', 'bg-[#3b82f6]'];
+  const distributionData = stats.distributionData.map((d, idx) => ({
+    name: d.name,
+    count: d.value,
+    percent: totalStudents > 0 ? Math.round((d.value / totalStudents) * 100) : 0,
+    color: colors[idx % colors.length]
+  }));
 
   return (
     <div className="space-y-6">

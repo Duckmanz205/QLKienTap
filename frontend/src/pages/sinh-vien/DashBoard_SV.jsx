@@ -55,24 +55,6 @@ export default function DashBoard_SV() {
 
     } catch (err) {
       console.error('Error loading dashboard data:', err);
-      
-      // MOCK DATA FALLBACK for UI testing if API fails
-      setStats({
-        registered: 3,
-        completed: 1,
-        pendingReports: 1,
-        avgScore: '8.5'
-      });
-      setTrips([
-        { id: 1, trang_thai: 'HopLe', chuyenThamQuan: { hinh_thuc: 'TrucTiep', nhaMay: { ten_nha_may: 'Yakult HCM' }, ngay_tham_quan: '2026-09-10', gio_bat_dau: '08:00' } },
-        { id: 2, trang_thai: 'HopLe', chuyenThamQuan: { hinh_thuc: 'TrucTuyen', nhaMay: { ten_nha_may: 'Vinamilk Bình Dương' }, ngay_tham_quan: '2026-09-15', gio_bat_dau: '13:00' } }
-      ]);
-      setNotifications([
-        { id: 1, da_doc: false, tieu_de: 'Nhắc nhở nộp bài thu hoạch chuyến đi Yakult', ngay_gui: '2026-08-19' },
-        { id: 2, da_doc: true, tieu_de: 'Lịch tham quan mới đã được cập nhật', ngay_gui: '2026-08-15' },
-        { id: 3, da_doc: true, tieu_de: 'Hoàn tất thủ tục thanh toán lệ phí', ngay_gui: '2026-08-10' }
-      ]);
-      setStudent({ ho_ten: 'Sinh viên Demo' });
     }
   };
 

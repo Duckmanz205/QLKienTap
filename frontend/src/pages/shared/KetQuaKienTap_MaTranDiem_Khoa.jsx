@@ -107,7 +107,8 @@ export default function KetQuaKienTap_Khoa() {
   // Stats calculation
   const statDaDat = results.filter(r => r.trang_thai === 'Đạt').length;
   const statKhongDat = results.filter(r => r.trang_thai === 'Không đạt').length;
-  const statDangThucHien = results.filter(r => !r.trang_thai).length; // or mapped by other logic
+  const statDangThucHien = results.filter(r => !['Đạt', 'Không đạt'].includes(r.trang_thai)).length; 
+  const statChuaHoanThanh = statKhongDat; // Temporary mapping, usually ChuaHoanThanh could be different
 
   const getStatusBadge = (status) => {
     switch (status) {
@@ -283,7 +284,7 @@ export default function KetQuaKienTap_Khoa() {
           </div>
           <div>
             <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Chưa hoàn thành</div>
-            <div className="text-2xl font-black text-slate-800">0</div>
+            <div className="text-2xl font-black text-slate-800">{statChuaHoanThanh}</div>
           </div>
         </div>
 

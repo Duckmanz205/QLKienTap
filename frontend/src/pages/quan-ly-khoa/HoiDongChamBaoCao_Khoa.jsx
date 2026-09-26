@@ -71,10 +71,10 @@ export default function HoiDongChamBaoCao_Khoa() {
     }
     try {
       const res = await khoaApi.createBoard({
-        lichKienTapId: selectedSchedule,
-        tenHoiDong: boardName,
-        ngayBaoCao: dateTime,
-        diaDiem: room
+        scheduleId: selectedSchedule,
+        name: boardName,
+        date: dateTime,
+        room: room
       });
       
       const boardId = res.data.id;
@@ -84,7 +84,7 @@ export default function HoiDongChamBaoCao_Khoa() {
         await khoaApi.addBoardMember({
           boardId,
           lecturerId: memberId,
-          vaiTro: 'Thành viên'
+          role: 'Thành viên'
         });
       }
       
@@ -478,8 +478,8 @@ export default function HoiDongChamBaoCao_Khoa() {
                   </div>
                 </div>
 
-                {/* Row 3: Thành viên & Sinh viên */}
-                <div className="grid grid-cols-2 gap-5 relative z-40">
+                {/* Row 3: Thành viên */}
+                <div className="grid grid-cols-1 gap-5 relative z-40">
                   {/* Multi-select Thành viên */}
                   <div className="relative">
                     <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Thành viên hội đồng</label>
@@ -527,22 +527,12 @@ export default function HoiDongChamBaoCao_Khoa() {
                     )}
                   </div>
 
-                  {/* Multi-select Sinh viên */}
-                  <div className="relative">
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Sinh viên báo cáo</label>
-                    <div 
-                      onClick={(e) => alert('Tính năng chọn sinh viên báo cáo đang phát triển')}
-                      className="w-full px-4 py-2 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm flex justify-between items-center cursor-pointer hover:border-[#407F3E]"
-                    >
-                      <span className="text-slate-400 font-medium truncate pr-2">Chọn sinh viên (mock)</span>
-                      <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-                    </div>
-                  </div>
-                </div>
+                  {/* Removed mock student selection as students are automatically mapped via Schedule */}
 
               </div>
+            </div>
 
-              {/* Modal Footer */}
+            {/* Modal Footer */}
               <div className="px-6 py-4 border-t border-[#E7E0C4] bg-slate-50/50 flex items-center justify-end gap-3 rounded-b-2xl z-10">
                 <button 
                   type="button"

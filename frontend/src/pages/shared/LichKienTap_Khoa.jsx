@@ -143,7 +143,7 @@ export default function LichKienTap_Khoa() {
         fetchData();
       } catch (err) {
         console.error(err);
-        showToast("Lỗi khi duyệt lịch", "error");
+        showToast(err.response?.data?.message || "Lỗi khi duyệt lịch", "error");
       }
     });
   };
@@ -156,7 +156,7 @@ export default function LichKienTap_Khoa() {
         fetchData();
       } catch (err) {
         console.error(err);
-        showToast("Lỗi khi từ chối lịch", "error");
+        showToast(err.response?.data?.message || "Lỗi khi từ chối lịch", "error");
       }
     }, 'prompt');
   };
@@ -321,6 +321,7 @@ export default function LichKienTap_Khoa() {
   const getStatusBadge = (status) => {
     switch (status) {
       case 'Nháp':
+      case 'Nhap':
         return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200">Nháp</span>;
       case 'Chờ duyệt':
       case 'ChoDuyet':
@@ -335,10 +336,13 @@ export default function LichKienTap_Khoa() {
       case 'MoDangKy':
         return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#89B449] text-white border border-[#89B449]/20 shadow-sm">Mở đăng ký</span>;
       case 'Đang diễn ra':
+      case 'DangDienRa':
         return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#407F3E] text-white border border-[#407F3E]/20 shadow-sm">Đang diễn ra</span>;
       case 'Đã kết thúc':
+      case 'DaKetThuc':
         return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#DBD468] text-slate-800 border border-[#DBD468]/20 shadow-sm">Đã kết thúc</span>;
       case 'Đã khóa':
+      case 'DaKhoa':
         return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-slate-800 text-white shadow-sm">Đã khóa</span>;
       default:
         return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200">{status}</span>;
@@ -353,17 +357,13 @@ export default function LichKienTap_Khoa() {
   });
 
   const displayData = filteredSchedules.map((s, index) => {
-    const statuses = ['Nháp', 'Mở đăng ký', 'Đang diễn ra', 'Đã kết thúc', 'Đã khóa'];
-    // In real app, calculate status based on dates. Here we mock if status is null.
-    const mockStatus = s.trang_thai || statuses[index % statuses.length];
-
     return {
       id: s.id,
       ten_lich: s.ten_lich,
       dot_kien_tap: s.dotKienTap?.ten_dot || `Đợt ${s.dot_kien_tap_id}`,
       tg_mo_dang_ky: s.tg_mo_dang_ky_tu && s.tg_mo_dang_ky_den ? `${new Date(s.tg_mo_dang_ky_tu).toLocaleDateString('vi-VN')} - ${new Date(s.tg_mo_dang_ky_den).toLocaleDateString('vi-VN')}` : 'Chưa thiết lập',
       so_luong_du_kien: s.so_luong_du_kien || 0,
-      trang_thai: s.trang_thai || 'Nhap',
+      trang_thai: s.trang_thai || 'ChuaXacDinh',
       ly_do_tu_choi: s.ly_do_tu_choi
     };
   });
