@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -142,7 +143,7 @@ export default function BaoCaoThongKe_Khoa() {
 
   const exportToCSV = (data, reportType) => {
     if (!data || data.length === 0) {
-      alert('Không có dữ liệu.');
+      toast.error('Không có dữ liệu.');
       return;
     }
 

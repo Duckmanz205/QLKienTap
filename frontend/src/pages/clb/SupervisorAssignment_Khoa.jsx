@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import React, { useState, useEffect } from 'react';
 import { 
   ChevronDown, Check, Info, Search, UserCircle, UserPlus, RefreshCw, AlertCircle
@@ -80,12 +81,12 @@ export default function SupervisorAssignment_Khoa() {
   const handleAssign = async (enrollmentId, gvId) => {
     try {
       await khoaApi.assignGvhd({ dang_ky_id: enrollmentId, giang_vien_id: gvId });
-      alert('Phân công GVHD thành công');
+      toast.success('Phân công GVHD thành công');
       fetchEnrollments();
       setOpenDropdownId(null);
     } catch (err) {
       console.error(err);
-      alert('Lỗi phân công GVHD');
+      toast.error('Lỗi phân công GVHD');
     }
   };
 

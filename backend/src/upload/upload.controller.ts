@@ -73,18 +73,20 @@ export class UploadController {
    */
   private async isLecturerGuidingStudent(
     lecturerAccountId: number,
-    studentAccountId: number,
+    studentIdentifier: string,
   ): Promise<boolean> {
-    if (!studentAccountId || isNaN(studentAccountId)) return false;
+    if (!studentIdentifier) return false;
 
     const gv = await this.gvRepo.findOne({
       where: { taikhoan_id: lecturerAccountId },
     });
     if (!gv) return false;
 
-    const sv = await this.svRepo.findOne({
-      where: { taikhoan_id: studentAccountId },
-    });
+    // studentIdentifier could be taikhoan_id (number string) or MSSV (string)
+    const sv = await this.svRepo.createQueryBuilder('sv')
+      .where('sv.taikhoan_id = :identifier OR sv.mssv = :identifier', { identifier: studentIdentifier })
+      .getOne();
+
     if (!sv) return false;
 
     const assignment = await this.phanCongRepo.findOne({
@@ -115,6 +117,7 @@ export class UploadController {
     else if (ext === '.doc') contentType = 'application/msword';
     else if (ext === '.png') contentType = 'image/png';
     else if (ext === '.jpg' || ext === '.jpeg') contentType = 'image/jpeg';
+    else if (ext === '.txt') contentType = 'text/plain; charset=utf-8';
 
     res.setHeader('Content-Type', contentType);
     if (['.xlsx', '.xls', '.docx', '.doc'].includes(ext)) {
@@ -168,6 +171,10 @@ export class UploadController {
   ) {
     if (!file) throw new BadRequestException('Tệp tải lên không hợp lệ.');
 
+    const sv = await this.svRepo.findOne({ where: { taikhoan_id: user.sub } });
+    const userIdentifier = sv ? sv.mssv : String(user.sub);
+
+    // Bước 1: Trích xuất text từ PDF
     let extractedText = null;
     if (file.originalname.toLowerCase().endsWith('.pdf')) {
       try {
@@ -180,49 +187,71 @@ export class UploadController {
       }
     }
 
-    // Nếu R2 sẵn sàng → upload lên cloud với owner là user.sub, xóa file local
+    // Bước 2: Chuyển file sang thư mục MSSV (từ thư mục user.sub tạo bởi multer)
+    const newDest = `${UPLOAD_DIR}/reports/${userIdentifier}`;
+    if (!existsSync(newDest)) {
+      mkdirSync(newDest, { recursive: true });
+    }
+    const newPath = join(newDest, file.filename);
+    require('fs').renameSync(file.path, newPath);
+
+    // Bước 3: Tạo file .txt chứa text AI trích xuất
+    const txtFilename = file.filename.replace(/\.\w+$/, '.txt');
+    const txtPath = join(newDest, txtFilename);
+    require('fs').writeFileSync(txtPath, extractedText || 'Không thể trích xuất văn bản từ file này.', 'utf-8');
+
+    // Bước 4: Xử lý Cloudflare R2
     if (this.r2.isReady()) {
-      const key = this.r2.generateKey(
+      const keyPdf = this.r2.generateKey(
         'reports',
-        String(user.sub),
+        userIdentifier,
         file.originalname,
       );
-      await this.r2.uploadFile(
-        this.r2.BUCKET_REPORTS,
-        key,
-        require('fs').readFileSync(file.path),
-        file.mimetype,
-      );
+      const keyTxt = keyPdf.replace(/\.\w+$/, '.txt');
+
+      await Promise.all([
+        this.r2.uploadFile(
+          this.r2.BUCKET_REPORTS,
+          keyPdf,
+          require('fs').readFileSync(newPath),
+          file.mimetype,
+        ),
+        this.r2.uploadFile(
+          this.r2.BUCKET_REPORTS,
+          keyTxt,
+          require('fs').readFileSync(txtPath),
+          'text/plain',
+        )
+      ]);
 
       // Bài thu hoạch là dữ liệu nhạy cảm → trả signed URL có thời hạn ngắn (1 giờ) thay vì public URL
       const signedUrl = await this.r2.getSignedUrl(
         this.r2.BUCKET_REPORTS,
-        key,
+        keyPdf,
         3600,
       );
 
       try {
-        require('fs').unlinkSync(file.path);
+        require('fs').unlinkSync(newPath);
+        require('fs').unlinkSync(txtPath);
       } catch {}
 
       return {
         message: 'Tải lên bài thu hoạch thành công (R2).',
         storage: 'cloudflare-r2',
         originalName: file.originalname,
-        key,
+        key: keyPdf,
         url: signedUrl,
-        extractedText,
       };
     }
 
-    // Fallback: lưu local theo folder owner
+    // Fallback: lưu local theo folder MSSV
     return {
       message: 'Tải lên bài thu hoạch thành công (local).',
       storage: 'local',
       originalName: file.originalname,
       fileName: file.filename,
-      url: `/api/upload/file/reports/${user.sub}/${file.filename}`,
-      extractedText,
+      url: `/api/upload/file/reports/${userIdentifier}/${file.filename}`,
     };
   }
 
@@ -502,7 +531,7 @@ export class UploadController {
         } else if (/^\d+$/.test(keyOwner)) {
           const isGuiding = await this.isLecturerGuidingStudent(
             user.sub,
-            Number(keyOwner),
+            keyOwner,
           );
           if (!isGuiding) {
             throw new ForbiddenException(
@@ -522,7 +551,7 @@ export class UploadController {
         } else if (/^\d+$/.test(keyOwner)) {
           const isGuiding = await this.isLecturerGuidingStudent(
             user.sub,
-            Number(keyOwner),
+            keyOwner,
           );
           if (!isGuiding) {
             throw new ForbiddenException(
@@ -616,9 +645,15 @@ export class UploadController {
 
     const userRole = user?.role;
     const userSubStr = String(user?.sub);
+    let userMssv = '';
 
     if (userRole === 'SinhVien') {
-      if (!ownerId || ownerId !== userSubStr) {
+      const sv = await this.svRepo.findOne({ where: { taikhoan_id: user.sub } });
+      if (sv) userMssv = sv.mssv;
+    }
+
+    if (userRole === 'SinhVien') {
+      if (!ownerId || (ownerId !== userSubStr && ownerId !== userMssv)) {
         throw new ForbiddenException('Bạn không có quyền truy cập file này.');
       }
     } else if (userRole === 'GiangVien') {
@@ -633,19 +668,13 @@ export class UploadController {
           );
         }
         if (ownerId !== userSubStr) {
-          if (/^\d+$/.test(ownerId)) {
-            const isGuiding = await this.isLecturerGuidingStudent(
-              user.sub,
-              Number(ownerId),
-            );
-            if (!isGuiding) {
-              throw new ForbiddenException(
-                'Bạn không có quyền truy cập file này.',
-              );
-            }
-          } else {
+          const isGuiding = await this.isLecturerGuidingStudent(
+            user.sub,
+            ownerId,
+          );
+          if (!isGuiding) {
             throw new ForbiddenException(
-              'Không thể xác minh quyền sở hữu file legacy này.',
+              'Bạn không có quyền truy cập file này.',
             );
           }
         }
@@ -664,6 +693,30 @@ export class UploadController {
       : join(process.cwd(), 'uploads', type, filename);
 
     if (!existsSync(filePath)) {
+      if (this.r2.isReady()) {
+        const key = ownerId ? `${type}/${ownerId}/${filename}` : `${type}/${filename}`;
+        let bucketName = this.r2.BUCKET_ATTACHMENTS;
+        if (type === 'reports') bucketName = this.r2.BUCKET_REPORTS;
+        if (type === 'payments') bucketName = this.r2.BUCKET_PAYMENTS;
+        
+        try {
+          const { stream, contentType, contentLength } = await this.r2.getFileStream(bucketName, key);
+          res.setHeader('Content-Type', contentType || 'application/octet-stream');
+          if (contentLength) {
+            res.setHeader('Content-Length', contentLength);
+          }
+          if (['.xlsx', '.xls', '.docx', '.doc'].includes(extname(filename).toLowerCase())) {
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+          } else {
+            res.setHeader('Content-Security-Policy', "default-src 'none'");
+            res.setHeader('X-Content-Type-Options', 'nosniff');
+            res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+          }
+          return stream.pipe(res);
+        } catch (err) {
+          throw new NotFoundException('Tệp không tồn tại trên lưu trữ R2.');
+        }
+      }
       throw new NotFoundException('Tệp không tồn tại.');
     }
 

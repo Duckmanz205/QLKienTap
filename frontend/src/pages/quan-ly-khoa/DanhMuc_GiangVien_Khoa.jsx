@@ -8,6 +8,11 @@ import { khoaApi } from '../../services/api';
 
 export default function DanhMuc_GiangVien_Khoa() {
   const [lecturers, setLecturers] = useState([]);
+  const [popup, setPopup] = useState({ show: false, message: '', type: 'success' });
+  const showPopup = (message, type = 'error') => {
+    setPopup({ show: true, message, type });
+    setTimeout(() => setPopup({ show: false, message: '', type: 'success' }), 3500);
+  };
   const [editingLecturer, setEditingLecturer] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   
@@ -75,7 +80,7 @@ export default function DanhMuc_GiangVien_Khoa() {
       ));
     } catch (err) {
       console.error(err);
-      alert('Có lỗi xảy ra khi cập nhật trạng thái');
+      showPopup('Có lỗi xảy ra khi cập nhật trạng thái', 'error');
     }
   };
 
@@ -112,16 +117,16 @@ export default function DanhMuc_GiangVien_Khoa() {
       
       if (editingLecturer) {
         await khoaApi.updateLecturer(editingLecturer.id, dataToSubmit);
-        alert('Cập nhật giảng viên thành công');
+        showPopup('Cập nhật giảng viên thành công', 'success');
       } else {
         await khoaApi.createLecturer(dataToSubmit);
-        alert('Thêm giảng viên thành công');
+        showPopup('Thêm giảng viên thành công', 'success');
       }
       setIsModalOpen(false);
       fetchData();
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.message || 'Có lỗi xảy ra');
+      showPopup(err.response?.data?.message || 'Có lỗi xảy ra', 'error');
     }
   };
 
@@ -177,7 +182,7 @@ export default function DanhMuc_GiangVien_Khoa() {
 
   const handleImportExcel = async () => {
     if (importData.length === 0) {
-      alert('Không có dữ liệu hợp lệ để import');
+      showPopup('Không có dữ liệu hợp lệ để import', 'error');
       return;
     }
     setIsImporting(true);
@@ -194,7 +199,7 @@ export default function DanhMuc_GiangVien_Khoa() {
       }
     }
     
-    alert(`Import hoàn tất. Thành công: ${successCount}, Lỗi: ${errorCount}`);
+    showPopup(`Import hoàn tất. Thành công: ${successCount}, Lỗi: ${errorCount}`, errorCount > 0 ? 'error' : 'success');
     setIsImporting(false);
     setIsImportModalOpen(false);
     setImportData([]);
@@ -203,6 +208,19 @@ export default function DanhMuc_GiangVien_Khoa() {
 
   return (
     <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-2 animate-in fade-in duration-300">
+      {/* Custom Popup Toast */}
+      {popup.show && (
+        <div className="fixed inset-0 z-[100] flex items-start justify-center pt-24 pointer-events-none">
+          <div className="absolute inset-0 bg-white/5 backdrop-blur-[1px] pointer-events-auto" onClick={() => setPopup({ ...popup, show: false })}></div>
+          <div className={`relative z-10 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-4 animate-in slide-in-from-top-4 fade-in duration-300 pointer-events-auto ${popup.type === 'error' ? 'bg-[#E68A8C] text-white' : 'bg-[#407F3E] text-white'}`}>
+            <span className="font-bold text-sm">{popup.message}</span>
+            <button onClick={() => setPopup({ ...popup, show: false })} className="p-1 hover:bg-white/20 rounded-full transition-colors">
+              <span className="sr-only">Close</span>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+        </div>
+      )}
       {/* Header section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <h1 className="text-2xl font-bold text-slate-800">Giảng viên</h1>

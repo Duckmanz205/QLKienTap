@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authApi } from '../services/api';
@@ -195,7 +196,7 @@ export default function Login() {
                   <button
                     type="button"
                     className="text-xs font-semibold text-[#407F3E] hover:text-[#2c6b2d] transition-colors cursor-pointer"
-                    onClick={() => alert('Vui lòng liên hệ Quản lý Khoa để được cấp lại mật khẩu.')}
+                    onClick={() => toast.error('Vui lòng liên hệ Quản lý Khoa để được cấp lại mật khẩu.')}
                   >
                     Quên mật khẩu?
                   </button>

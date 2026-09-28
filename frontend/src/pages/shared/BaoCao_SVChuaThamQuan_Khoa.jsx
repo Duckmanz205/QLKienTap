@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Search, UserX, CheckCircle, Clock, FileSpreadsheet, ChevronLeft, ChevronRight, Bell, Percent, ChevronDown, Check } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -115,10 +116,10 @@ export default function BaoCao_SVChuaThamQuan_Khoa() {
 
   const handleSendReminder = () => {
     if (selectedStudentIds.size === 0) {
-      alert("Vui lòng chọn ít nhất một sinh viên để nhắc nhở!");
+      toast.success("Vui lòng chọn ít nhất một sinh viên để nhắc nhở!");
       return;
     }
-    alert(`Đã gửi thông báo nhắc nhở đến ${selectedStudentIds.size} sinh viên! (Tính năng mô phỏng)`);
+    toast.success(`Đã gửi thông báo nhắc nhở đến ${selectedStudentIds.size} sinh viên! (Tính năng mô phỏng)`);
     setSelectedStudentIds(new Set());
   };
 

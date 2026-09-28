@@ -85,10 +85,24 @@ export class GiangVienService {
         },
       },
     });
-    return mappings.map((m) => ({
-      ...m.chuyenThamQuan,
-      la_truong_doan: m.la_truong_doan,
-    }));
+
+    return await Promise.all(
+      mappings.map(async (m) => {
+        const count = await this.phieuRepo.count({
+          where: {
+            chuyen_tham_quan_id: m.chuyen_tham_quan_id,
+            trang_thai: In(['ChoDuyet', 'HopLe']),
+          },
+        });
+
+        return {
+          ...m.chuyenThamQuan,
+          la_truong_doan: m.la_truong_doan,
+          so_luong_dang_ky_hien_tai: count,
+          so_luong_sinh_vien_toi_da: m.chuyenThamQuan?.suc_chua || 0,
+        };
+      }),
+    );
   }
 
   // Lay danh sach SV trong chuyen tham quan de diem danh/nhap diem
@@ -256,8 +270,15 @@ export class GiangVienService {
       for (const record of records) {
         const phieu = phieuMap.get(record.phieuId)!;
 
-        const ptq = ptqMapByPhieuId.get(record.phieuId);
-        if (!ptq) throw new BadRequestException('Không tìm thấy phiếu tham quan cho phiếu đăng ký ' + record.phieuId);
+        let ptq = ptqMapByPhieuId.get(record.phieuId);
+        if (!ptq) {
+          // Tự động cấp phiếu tham quan nếu database bị thiếu do lỗi data/seed
+          ptq = new PhieuThamQuan();
+          ptq.phieu_dang_ky_id = record.phieuId;
+          ptq.trang_thai = 'HopLe';
+          await manager.save(PhieuThamQuan, ptq);
+          ptqMapByPhieuId.set(record.phieuId, ptq);
+        }
 
         let dd: DiemDanh | undefined = diemDanhMap.get(ptq.id);
         if (!dd) {
@@ -396,6 +417,7 @@ export class GiangVienService {
       .leftJoinAndSelect('phieu.chuyenThamQuan', 'chuyen')
       .leftJoinAndSelect('chuyen.nhaMay', 'nhaMay')
       .leftJoinAndSelect('phieuTQ.diemPhieuThamQuan', 'diemPhieu')
+      .leftJoinAndMapOne('phieuTQ.diemDanh', DiemDanh, 'diemDanh', 'diemDanh.phieu_tham_quan_id = phieuTQ.id')
       .where('phieu.sinh_vien_id IN (:...guidedSvIds)', { guidedSvIds });
 
     if (search) {

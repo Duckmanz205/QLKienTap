@@ -1,9 +1,11 @@
+import toast from 'react-hot-toast';
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   UploadCloud, FileText, CheckCircle2, AlertCircle, ChevronRight, Lock,
   ArrowLeft, Search, ZoomIn, ZoomOut, AlertTriangle, Send, Maximize2, Minimize2
 } from 'lucide-react';
 import { sinhVienApi } from '../../services/api';
+import Toast from '../../components/Toast';
 
 export default function NopBaiThuHoach_SV() {
   const [student, setStudent] = useState(null);
@@ -127,7 +129,6 @@ export default function NopBaiThuHoach_SV() {
 
   const showPopup = (message, type = 'error') => {
     setPopup({ show: true, message, type });
-    setTimeout(() => setPopup({ show: false, message: '', type: 'success' }), 3500);
   };
 
 
@@ -148,12 +149,13 @@ export default function NopBaiThuHoach_SV() {
       const validTrips = (res.data || []).filter(t => t.trang_thai === 'HopLe' || t.trang_thai === 'DaThamGia' || t.trang_thai === 'HoanThanh');
       setTrips(validTrips.map(trip => {
         let status = 'Chưa nộp';
-        if (trip.baiThuHoach) status = 'Đã nộp';
+        const baiThuHoach = trip.phieuThamQuan?.baiThuHoach;
+        if (baiThuHoach) status = 'Đã nộp';
         
         let hanNopStr = 'Chưa xác định';
         if (trip.chuyenThamQuan?.ngay_tham_quan) {
           const dateObj = new Date(trip.chuyenThamQuan.ngay_tham_quan);
-          dateObj.setDate(dateObj.getDate() + 7);
+          dateObj.setDate(dateObj.getDate() + 10);
           hanNopStr = dateObj.toLocaleDateString('vi-VN');
         }
 
@@ -165,7 +167,11 @@ export default function NopBaiThuHoach_SV() {
           hinhThuc: trip.chuyenThamQuan?.hinh_thuc === 'TrucTuyen' ? 'Trực tuyến' : 'Trực tiếp',
           trangThai: status,
           hanNop: hanNopStr,
-          baiThuHoach: trip.baiThuHoach
+          baiThuHoach: baiThuHoach,
+          cachToChuc: trip.chuyenThamQuan?.cach_to_chuc,
+          hoaDonStatus: trip.hoaDon?.trang_thai,
+          hasPhieuThamQuan: !!trip.phieuThamQuan,
+          diemDanhStatus: trip.phieuThamQuan?.diemDanh?.trang_thai
         };
       }));
     } catch (err) {
@@ -290,6 +296,24 @@ export default function NopBaiThuHoach_SV() {
           ) : (
             trips.map(trip => {
               const isTuDo = trip.loaiChuyen === 'tu_do';
+              const isDoKhoa = trip.cachToChuc === 'DoKhoaToChuc';
+              let canSubmit = true;
+              let disabledReason = '';
+              
+              if (isDoKhoa) {
+                if (!trip.hasPhieuThamQuan) {
+                  canSubmit = false;
+                  disabledReason = trip.hoaDonStatus === 'ChuaDong' ? 'Chưa đóng lệ phí' : 'Chưa có PTQ';
+                } else if (trip.diemDanhStatus !== 'CoMat') {
+                  canSubmit = false;
+                  disabledReason = 'Chưa điểm danh';
+                }
+              } else {
+                if (!trip.hasPhieuThamQuan) {
+                  canSubmit = false;
+                  disabledReason = 'Chưa cấp PTQ';
+                }
+              }
               
               return (
                 <div key={trip.id} className="bg-white rounded-2xl border border-[#E7E0C4] shadow-sm overflow-hidden flex flex-col transition-all hover:border-[#407F3E]/50 group">
@@ -309,24 +333,78 @@ export default function NopBaiThuHoach_SV() {
                     <div className="flex items-center gap-4 shrink-0">
                       {getStatusBadge(trip.trangThai)}
                       {trip.trangThai !== 'Đã nộp' ? (
-                        <button 
-                          onClick={() => {
-                            setSelectedTrip(trip);
-                            setUploadedFile(null);
-                          }}
-                          className="px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-1.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 shadow-sm transition-colors cursor-pointer"
-                        >
-                          Nộp bài <ChevronRight className="w-4 h-4" />
-                        </button>
+                        canSubmit ? (
+                          <button 
+                            onClick={() => {
+                              setSelectedTrip(trip);
+                              setUploadedFile(null);
+                            }}
+                            className="px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-1.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 shadow-sm transition-colors cursor-pointer"
+                          >
+                            Nộp bài <ChevronRight className="w-4 h-4" />
+                          </button>
+                        ) : (
+                          <div className="flex flex-col items-end">
+                            <button disabled className="px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-1.5 bg-slate-200 text-slate-400 cursor-not-allowed">
+                              Nộp bài <ChevronRight className="w-4 h-4" />
+                            </button>
+                            <span className="text-[10px] text-red-500 font-bold mt-1 uppercase tracking-wide">{disabledReason}</span>
+                          </div>
+                        )
                       ) : (
                         <button 
-                          onClick={() => {
+                          onClick={async () => {
                             setSelectedTrip(trip);
                             if (trip.baiThuHoach) {
+                              const dbPath = trip.baiThuHoach.file_bao_cao;
+                              let apiPath = '';
+                              if (dbPath) {
+                                if (dbPath.startsWith('reports/')) {
+                                  apiPath = `/upload/file/${dbPath}`;
+                                } else {
+                                  apiPath = `/upload/file/reports/${dbPath}`;
+                                }
+                              }
+
+                              // Fetch PDF and TXT via axiosClient (auto-attaches JWT)
+                              let blobUrl = '';
+                              let extractedText = 'Đây là nội dung bài làm đã nộp (đã được lưu trên hệ thống).';
+
+                              if (apiPath) {
+                                try {
+                                  const { default: api } = await import('../../services/axiosClient');
+                                  
+                                  // 1. Fetch PDF
+                                  const respPdf = await api.get(apiPath, { responseType: 'blob' });
+                                  if (respPdf.data) {
+                                    blobUrl = URL.createObjectURL(respPdf.data);
+                                  }
+
+                                  // 2. Fetch Text File (.txt)
+                                  const txtApiPath = apiPath.replace(/\.\w+$/, '.txt');
+                                  try {
+                                    const respTxt = await api.get(txtApiPath, { responseType: 'text' });
+                                    if (respTxt.data) {
+                                      extractedText = respTxt.data;
+                                    }
+                                  } catch (txtErr) {
+                                    console.warn('Không tìm thấy file text trích xuất:', txtErr);
+                                    // Fallback if older report has it in DB
+                                    if (trip.baiThuHoach.noi_dung_trich_xuat) {
+                                      extractedText = trip.baiThuHoach.noi_dung_trich_xuat;
+                                    }
+                                  }
+                                } catch (err) {
+                                  console.error('Lỗi tải file preview:', err);
+                                }
+                              }
+                              
                               setUploadedFile({
                                 name: trip.baiThuHoach.file_bao_cao_url || 'BaoCao_ThuHoach.pdf',
                                 size: 'Đã nộp',
-                                text: trip.baiThuHoach.noi_dung_trich_xuat || 'Đây là nội dung bài làm đã nộp (đã được lưu trên hệ thống).'
+                                text: extractedText,
+                                previewUrl: blobUrl,
+                                url: apiPath
                               });
                             }
                           }}
@@ -393,7 +471,7 @@ export default function NopBaiThuHoach_SV() {
 
             {hasEnoughTrips && (
               <button 
-                onClick={() => alert('Chức năng đăng ký hội đồng đang được cập nhật (UI mới)')}
+                onClick={() => toast.error('Chức năng đăng ký hội đồng đang được cập nhật (UI mới)')}
                 className="w-full mt-6 py-3.5 bg-[#DBD468] hover:bg-[#c9c256] text-slate-900 rounded-xl font-black text-sm uppercase tracking-wider transition-colors shadow-lg cursor-pointer"
               >
                 Đăng ký Hội đồng ngay
@@ -405,10 +483,12 @@ export default function NopBaiThuHoach_SV() {
     </div>
   );
 
-  const renderHighlightedText = () => {
-    if (!uploadedFile?.text) return null;
+  const getHighlightedHtml = () => {
+    if (!uploadedFile?.text) return { __html: '' };
+    const escapeHtml = (text) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    
     if (!searchText.trim()) {
-      return uploadedFile.text;
+      return { __html: escapeHtml(uploadedFile.text) };
     }
 
     const escapeRegExp = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -416,22 +496,20 @@ export default function NopBaiThuHoach_SV() {
     const parts = uploadedFile.text.split(regex);
     let matchIdx = 0;
 
-    return parts.map((part, i) => {
+    const htmlParts = parts.map((part) => {
       if (part.toLowerCase() === searchText.toLowerCase()) {
         matchIdx++;
         const isCurrent = matchIdx === currentMatchIndex;
-        return (
-          <span 
-            key={i} 
-            id={isCurrent ? 'current-search-match' : undefined}
-            className={`${isCurrent ? 'bg-green-400 text-white font-bold shadow-sm' : 'bg-green-200 text-slate-800'} rounded px-0.5`}
-          >
-            {part}
-          </span>
-        );
+        if (isCurrent) {
+          return `<span id="current-search-match" class="bg-green-400 text-white font-bold shadow-sm rounded px-0.5">${escapeHtml(part)}</span>`;
+        } else {
+          return `<span class="bg-green-200 text-slate-800 rounded px-0.5">${escapeHtml(part)}</span>`;
+        }
       }
-      return <span key={i}>{part}</span>;
+      return escapeHtml(part);
     });
+
+    return { __html: htmlParts.join('') };
   };
 
   // ---------------------------------------------------------
@@ -549,9 +627,9 @@ export default function NopBaiThuHoach_SV() {
             // PDF Preview State
             <div className="flex-1 flex flex-col h-full">
               <div className="flex-1 flex w-full h-full bg-[#E7E0C4]/20">
-                {uploadedFile.url ? (
+                {uploadedFile.previewUrl ? (
                   <iframe 
-                    src={uploadedFile.previewUrl || uploadedFile.url} 
+                    src={uploadedFile.previewUrl} 
                     className={`w-full h-full border-0 ${isDragging ? 'pointer-events-none' : ''}`} 
                     title="PDF Preview" 
                   />
@@ -668,7 +746,7 @@ export default function NopBaiThuHoach_SV() {
                   </div>
                   <div 
                     ref={contentEditableRef}
-                    className="p-6 whitespace-pre-wrap leading-relaxed text-slate-800 font-serif focus:outline-none focus:bg-slate-50 transition-colors"
+                    className="p-6 whitespace-pre-wrap leading-loose text-slate-900 font-sans tracking-wide focus:outline-none focus:bg-slate-50 transition-colors"
                     style={{ fontSize: `${rightFontSize}px` }}
                     contentEditable
                     suppressContentEditableWarning
@@ -683,9 +761,8 @@ export default function NopBaiThuHoach_SV() {
                     onClick={() => {
                         if (contentEditableRef.current) lastCaretOffset.current = getCaretCharacterOffsetWithin(contentEditableRef.current);
                     }}
-                  >
-                    {renderHighlightedText()}
-                  </div>
+                    dangerouslySetInnerHTML={getHighlightedHtml()}
+                  />
                 </div>
               )}
               
@@ -719,18 +796,11 @@ export default function NopBaiThuHoach_SV() {
   return (
     <div className={selectedTrip ? '' : 'bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300'}>
       {/* Custom Popup Toast */}
-      {popup.show && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 pointer-events-none">
-          <div className="absolute inset-0 bg-white/5 backdrop-blur-[1px] pointer-events-auto" onClick={() => setPopup({ ...popup, show: false })}></div>
-          <div className={`relative z-10 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-4 animate-in slide-in-from-top-4 fade-in duration-300 pointer-events-auto ${popup.type === 'error' ? 'bg-[#E68A8C] text-white' : 'bg-[#407F3E] text-white'}`}>
-            <span className="font-bold text-sm">{popup.message}</span>
-            <button onClick={() => setPopup({ ...popup, show: false })} className="p-1 hover:bg-white/20 rounded-full transition-colors">
-              <span className="sr-only">Close</span>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
-          </div>
-        </div>
-      )}
+      <Toast 
+        message={popup.show ? popup.message : ''}
+        type={popup.type}
+        onClose={() => setPopup({ ...popup, show: false })}
+      />
 
       {selectedTrip ? renderSubmissionView() : renderListView()}
     </div>

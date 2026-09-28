@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { 
   ChevronDown, Check, ChevronRight, Paperclip, 
   CheckCircle2, XCircle, Filter, Download, ArrowLeft, X,
-  MapPin, Calendar, Clock, Search, Eye
+  MapPin, Calendar, Clock, Search, Eye, ArrowUp, ArrowDown
 } from 'lucide-react';
 import { khoaApi } from '../../services/api';
 import * as XLSX from 'xlsx';
@@ -16,8 +16,10 @@ export default function RegistrationManagement_Khoa() {
   const [loadingTrips, setLoadingTrips] = useState(false);
 
   const [activeTab, setActiveTab] = useState('danhsach'); // 'danhsach' | 'chot' | 'dachot'
-  
   const [registrations, setRegistrations] = useState([]);
+  const [selectedStudentIds, setSelectedStudentIds] = useState(new Set());
+  const [rejectedStudentIds, setRejectedStudentIds] = useState(new Set());
+  const [isFiltering, setIsFiltering] = useState(false);
   const [globalCancelRequests, setGlobalCancelRequests] = useState([]);
   const [finalizedStudents, setFinalizedStudents] = useState([]);
   const [loadingRegs, setLoadingRegs] = useState(false);
@@ -75,8 +77,10 @@ export default function RegistrationManagement_Khoa() {
 
   useEffect(() => {
     if (selectedTripForReg) {
-      if (activeTab === 'danhsach' || activeTab === 'chot') {
+      if (activeTab === 'danhsach') {
         fetchRegistrations(selectedTripForReg.id);
+      } else if (activeTab === 'chot') {
+        fetchRegistrationsAndPreview(selectedTripForReg.id);
       } else if (activeTab === 'dachot') {
         fetchFinalizedStudents(selectedTripForReg.id);
       }
@@ -120,11 +124,50 @@ export default function RegistrationManagement_Khoa() {
       const res = await khoaApi.getRegistrations({ chuyenThamQuanId: tripId, limit: 1000 });
       const data = res.data?.data || res.data?.items || (Array.isArray(res.data) ? res.data : []);
       setRegistrations(data);
+      setSelectedStudentIds(new Set(data.map(r => r.sinhVien?.id || r.sinh_vien_id)));
     } catch (err) {
       console.error(err);
       setRegistrations([]);
     } finally {
       setLoadingRegs(false);
+    }
+  };
+
+  const fetchRegistrationsAndPreview = async (tripId) => {
+    setLoadingRegs(true);
+    setIsFiltering(true);
+    try {
+      const [regRes, previewRes] = await Promise.all([
+        khoaApi.getRegistrations({ chuyenThamQuanId: tripId, limit: 1000 }),
+        khoaApi.previewAssignStudents({ tripId })
+      ]);
+      const data = regRes.data?.data || regRes.data?.items || (Array.isArray(regRes.data) ? regRes.data : []);
+      const accepted = previewRes.data?.suggestedAccepted || [];
+      const rejected = previewRes.data?.suggestedRejected || [];
+
+      const reasonMap = {};
+      rejected.forEach(r => {
+        if (r.ly_do_loai) reasonMap[r.sinh_vien_id || r.sinhVien?.id] = r.ly_do_loai;
+      });
+
+      const enrichedData = data.map(r => ({
+        ...r,
+        ly_do_loai: reasonMap[r.sinhVien?.id || r.sinh_vien_id] || ''
+      }));
+
+      setRegistrations(enrichedData);
+      
+      const acceptedSet = new Set(accepted.map(r => r.sinhVien?.id || r.sinh_vien_id));
+      const rejectedSet = new Set(rejected.map(r => r.sinhVien?.id || r.sinh_vien_id));
+      
+      setSelectedStudentIds(acceptedSet);
+      setRejectedStudentIds(rejectedSet);
+    } catch (err) {
+      console.error(err);
+      showPopup('Lỗi khi tải dữ liệu lọc dự kiến', 'error');
+    } finally {
+      setLoadingRegs(false);
+      setIsFiltering(false);
     }
   };
 
@@ -144,9 +187,9 @@ export default function RegistrationManagement_Khoa() {
   const handleConfirmAssignStudents = async () => {
     if (!selectedTripForReg) return;
     
-    showConfirm("Chốt danh sách", "Bạn có chắc chắn muốn chốt danh sách đăng ký này?", async () => {
+    showConfirm("Chốt danh sách", `Bạn có chắc chắn muốn chốt danh sách với ${selectedStudentIds.size} sinh viên được chọn? Những sinh viên không được chọn sẽ bị loại.`, async () => {
       try {
-        const acceptedStudentIds = registrations.map(r => r.sinhVien?.id || r.sinh_vien_id).filter(Boolean);
+        const acceptedStudentIds = Array.from(selectedStudentIds).filter(Boolean);
         await khoaApi.confirmAssignStudents({ 
           tripId: selectedTripForReg.id, 
           acceptedStudentIds
@@ -213,6 +256,16 @@ export default function RegistrationManagement_Khoa() {
     e.stopPropagation();
     closeAllDropdowns();
     setter(true);
+  };
+
+  const moveStudent = (studentId, toAccepted) => {
+    if (toAccepted) {
+      setRejectedStudentIds(prev => { const s = new Set(prev); s.delete(studentId); return s; });
+      setSelectedStudentIds(prev => { const s = new Set(prev); s.add(studentId); return s; });
+    } else {
+      setSelectedStudentIds(prev => { const s = new Set(prev); s.delete(studentId); return s; });
+      setRejectedStudentIds(prev => { const s = new Set(prev); s.add(studentId); return s; });
+    }
   };
 
   // Status mapping
@@ -546,10 +599,10 @@ export default function RegistrationManagement_Khoa() {
                               </div>
                             </td>
                             <td className="p-4 text-center">
-                              {trip.trang_thai === 'MoDangKy' && <span className="bg-[#DBD468] text-slate-800 text-[11px] px-3 py-1.5 rounded-full font-bold shadow-sm">Mở đăng ký</span>}
-                              {trip.trang_thai === 'DaChotDanhSach' && <span className="bg-[#407F3E] text-white text-[11px] px-3 py-1.5 rounded-full font-bold shadow-sm">Đã chốt danh sách</span>}
-                              {trip.trang_thai === 'DaDienRa' && <span className="bg-[#5A87B6] text-white text-[11px] px-3 py-1.5 rounded-full font-bold shadow-sm">Đã diễn ra</span>}
-                              {trip.trang_thai === 'DaHuy' && <span className="bg-[#E68A8C] text-white text-[11px] px-3 py-1.5 rounded-full font-bold shadow-sm border border-[#E68A8C]/20">Đã hủy</span>}
+                              {trip.trang_thai === 'MoDangKy' && <span className="bg-[#DBD468] text-slate-800 text-[11px] px-3 py-1.5 rounded-full font-bold shadow-sm whitespace-nowrap">Mở đăng ký</span>}
+                              {trip.trang_thai === 'DaChotDanhSach' && <span className="bg-[#407F3E] text-white text-[11px] px-3 py-1.5 rounded-full font-bold shadow-sm whitespace-nowrap">Đã chốt danh sách</span>}
+                              {trip.trang_thai === 'DaDienRa' && <span className="bg-[#5A87B6] text-white text-[11px] px-3 py-1.5 rounded-full font-bold shadow-sm whitespace-nowrap">Đã diễn ra</span>}
+                              {trip.trang_thai === 'DaHuy' && <span className="bg-[#E68A8C] text-white text-[11px] px-3 py-1.5 rounded-full font-bold shadow-sm border border-[#E68A8C]/20 whitespace-nowrap">Đã hủy</span>}
                             </td>
                             <td className="p-4 text-right pr-6">
                               <button 
@@ -1072,10 +1125,14 @@ export default function RegistrationManagement_Khoa() {
 
               {/* Tab 2: Lọc & chốt danh sách */}
               {activeTab === 'chot' && (
-                <div className="space-y-4 relative z-20">
-                  <div className="flex flex-col sm:flex-row sm:items-end justify-end gap-4">
+                <div className="space-y-6 relative z-20">
+                  <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+                    <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                      <Filter className="w-4 h-4 text-[#407F3E]" />
+                      Kết quả lọc dự kiến
+                    </h4>
                     <div className="flex items-center gap-3">
-                      <span className="text-sm font-bold text-slate-600">{registrations.length} đăng ký</span>
+                      <span className="text-sm font-bold text-slate-600">Tổng: {registrations.length} đăng ký</span>
                       <button 
                         onClick={handleConfirmAssignStudents}
                         className="px-5 py-2 bg-[#407F3E] hover:bg-[#407F3E]/90 text-white rounded-xl text-sm font-bold transition-colors shadow-sm flex items-center gap-2 cursor-pointer"
@@ -1086,42 +1143,98 @@ export default function RegistrationManagement_Khoa() {
                     </div>
                   </div>
 
-                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden relative z-10">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left border-collapse min-w-[900px]">
-                        <thead>
-                          <tr className="bg-slate-50 text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
-                            <th className="p-4 pl-6 w-12">
-                              <input type="checkbox" className="w-4 h-4 text-[#407F3E] border-slate-300 rounded focus:ring-[#407F3E]" checked readOnly />
-                            </th>
-                            <th className="p-4">MSSV</th>
-                            <th className="p-4">Họ tên</th>
-                            <th className="p-4">Trạng thái hiện tại</th>
-                            <th className="p-4 text-right pr-6">Thời điểm đăng ký</th>
-                          </tr>
-                        </thead>
-                        <tbody className="text-sm text-slate-700 divide-y divide-slate-100">
-                          {loadingRegs ? (
-                            <tr><td colSpan="5" className="text-center py-8 text-slate-500">Đang tải...</td></tr>
-                          ) : registrations.length === 0 ? (
-                            <tr><td colSpan="5" className="text-center py-8 text-slate-500 font-medium">Chưa có đăng ký nào.</td></tr>
-                          ) : (
-                            registrations.map(r => (
-                              <tr key={r.id} className="hover:bg-slate-50 transition-colors bg-[#89B449]/5">
-                                <td className="p-4 pl-6">
-                                  <input type="checkbox" className="w-4 h-4 text-[#407F3E] border-slate-300 rounded focus:ring-[#407F3E] cursor-pointer" checked={true} readOnly />
-                                </td>
-                                <td className="p-4 font-mono font-bold text-[#407F3E]">{r.sinhVien?.mssv}</td>
-                                <td className="p-4 font-bold text-slate-800">{r.sinhVien?.ho_ten}</td>
-                                <td className="p-4">
-                                  {getStatusBadge(statusMap[r.trang_thai])}
-                                </td>
-                                <td className="p-4 font-medium text-slate-500 text-right pr-6">{new Date(r.ngay_dang_ky).toLocaleDateString('vi-VN')}</td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
+                  {/* Bảng 1: Hợp lệ */}
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center px-1">
+                      <h5 className="text-sm font-bold text-[#407F3E]">1. Danh sách Hợp lệ dự kiến ({selectedStudentIds.size} SV)</h5>
+                      <div className="text-xs font-semibold text-slate-500">Sức chứa: {selectedTripForReg?.suc_chua || 0}</div>
+                    </div>
+                    <div className="bg-white rounded-xl shadow-sm border border-[#407F3E]/20 overflow-hidden relative z-10">
+                      <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+                        <table className="w-full text-left border-collapse min-w-[900px]">
+                          <thead className="sticky top-0 bg-[#407F3E]/5 z-10">
+                            <tr className="text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#407F3E]/10">
+                              <th className="p-4 pl-6">MSSV</th>
+                              <th className="p-4">Họ tên</th>
+                              <th className="p-4">Trạng thái hiện tại</th>
+                              <th className="p-4 text-center">Thời điểm đăng ký</th>
+                              <th className="p-4 text-right pr-6 w-32">Thao tác</th>
+                            </tr>
+                          </thead>
+                          <tbody className="text-sm text-slate-700 divide-y divide-slate-100">
+                            {isFiltering ? (
+                              <tr><td colSpan="5" className="text-center py-8 text-slate-500">Đang lọc...</td></tr>
+                            ) : registrations.filter(r => selectedStudentIds.has(r.sinhVien?.id || r.sinh_vien_id)).length === 0 ? (
+                              <tr><td colSpan="5" className="text-center py-8 text-slate-500 font-medium">Không có sinh viên hợp lệ.</td></tr>
+                            ) : (
+                              registrations.filter(r => selectedStudentIds.has(r.sinhVien?.id || r.sinh_vien_id)).map(r => (
+                                <tr key={r.id} className="hover:bg-slate-50 transition-colors">
+                                  <td className="p-4 pl-6 font-mono font-bold text-[#407F3E]">{r.sinhVien?.mssv}</td>
+                                  <td className="p-4 font-bold text-slate-800">{r.sinhVien?.ho_ten}</td>
+                                  <td className="p-4">{getStatusBadge(statusMap[r.trang_thai])}</td>
+                                  <td className="p-4 font-medium text-slate-500 text-center">{new Date(r.ngay_dang_ky).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })}</td>
+                                  <td className="p-4 text-right pr-6">
+                                    <button 
+                                      onClick={() => moveStudent(r.sinhVien?.id || r.sinh_vien_id, false)}
+                                      className="px-3 py-1.5 bg-[#E68A8C]/10 text-[#E68A8C] hover:bg-[#E68A8C]/20 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1 ml-auto cursor-pointer"
+                                      title="Chuyển xuống danh sách bị loại"
+                                    >
+                                      Loại <ArrowDown className="w-3.5 h-3.5" />
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bảng 2: Bị loại */}
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center px-1">
+                      <h5 className="text-sm font-bold text-[#E68A8C]">2. Danh sách Bị loại dự kiến ({rejectedStudentIds.size} SV)</h5>
+                    </div>
+                    <div className="bg-white rounded-xl shadow-sm border border-[#E68A8C]/20 overflow-hidden relative z-10">
+                      <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+                        <table className="w-full text-left border-collapse min-w-[900px]">
+                          <thead className="sticky top-0 bg-[#E68A8C]/5 z-10">
+                            <tr className="text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#E68A8C]/10">
+                              <th className="p-4 pl-6">MSSV</th>
+                              <th className="p-4">Họ tên</th>
+                              <th className="p-4">Lý do bị loại</th>
+                              <th className="p-4 text-center">Thời điểm đăng ký</th>
+                              <th className="p-4 text-right pr-6 w-32">Thao tác</th>
+                            </tr>
+                          </thead>
+                          <tbody className="text-sm text-slate-700 divide-y divide-slate-100">
+                            {isFiltering ? (
+                              <tr><td colSpan="5" className="text-center py-8 text-slate-500">Đang lọc...</td></tr>
+                            ) : registrations.filter(r => rejectedStudentIds.has(r.sinhVien?.id || r.sinh_vien_id)).length === 0 ? (
+                              <tr><td colSpan="5" className="text-center py-8 text-slate-500 font-medium">Không có sinh viên bị loại.</td></tr>
+                            ) : (
+                              registrations.filter(r => rejectedStudentIds.has(r.sinhVien?.id || r.sinh_vien_id)).map(r => (
+                                <tr key={r.id} className="hover:bg-slate-50 transition-colors opacity-75 hover:opacity-100">
+                                  <td className="p-4 pl-6 font-mono font-bold text-slate-500">{r.sinhVien?.mssv}</td>
+                                  <td className="p-4 font-bold text-slate-600">{r.sinhVien?.ho_ten}</td>
+                                  <td className="p-4 font-medium text-[#E68A8C] max-w-[200px] truncate" title={r.ly_do_loai || 'Loại thủ công'}>{r.ly_do_loai || 'Loại thủ công'}</td>
+                                  <td className="p-4 font-medium text-slate-500 text-center">{new Date(r.ngay_dang_ky).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })}</td>
+                                  <td className="p-4 text-right pr-6">
+                                    <button 
+                                      onClick={() => moveStudent(r.sinhVien?.id || r.sinh_vien_id, true)}
+                                      className="px-3 py-1.5 bg-[#407F3E]/10 text-[#407F3E] hover:bg-[#407F3E]/20 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1 ml-auto cursor-pointer"
+                                      title="Thêm vào danh sách hợp lệ"
+                                    >
+                                      <ArrowUp className="w-3.5 h-3.5" /> Hợp lệ
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   </div>
                 </div>
