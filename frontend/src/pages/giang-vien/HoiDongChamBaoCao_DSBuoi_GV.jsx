@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Building, 
@@ -167,7 +168,7 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
           <button
             onClick={() => {
               if (!selectedReg) {
-                alert('Vui lòng chọn sinh viên cần chấm điểm từ danh sách hội đồng trước.');
+                toast.success('Vui lòng chọn sinh viên cần chấm điểm từ danh sách hội đồng trước.');
                 return;
               }
               setActiveTab('grading');

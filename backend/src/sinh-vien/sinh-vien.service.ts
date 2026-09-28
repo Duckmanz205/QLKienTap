@@ -187,7 +187,7 @@ export class SinhVienService {
 
   // Lay lich su chuyến đi cua SV
   async getStudentRegisteredTrips(studentId: number) {
-    return this.phieuRepo.find({
+    const phieus = await this.phieuRepo.find({
       where: { sinh_vien_id: studentId },
       relations: {
         chuyenThamQuan: { nhaMay: true },
@@ -197,6 +197,27 @@ export class SinhVienService {
       },
       order: { ngay_dang_ky: 'DESC' },
     });
+
+    const ptqIds = phieus
+      .map((p) => p.phieuThamQuan?.id)
+      .filter((id) => id != null);
+
+    if (ptqIds.length > 0) {
+      const diemDanhs = await this.dataSource.manager.find('DiemDanh', {
+        where: { phieu_tham_quan_id: In(ptqIds) },
+      });
+      const ddMap = new Map();
+      for (const dd of diemDanhs) {
+        ddMap.set((dd as any).phieu_tham_quan_id, dd);
+      }
+      for (const phieu of phieus) {
+        if (phieu.phieuThamQuan) {
+          (phieu.phieuThamQuan as any).diemDanh = ddMap.get(phieu.phieuThamQuan.id);
+        }
+      }
+    }
+
+    return phieus;
   }
 
   // Dang ky chuyen tham quan (Mo hinh Đang ky theo Khung gio & Xet duyet hang loat)
@@ -480,6 +501,14 @@ export class SinhVienService {
         hd.trang_thai = 'DaDongDungHan';
         hd.phieuDangKy.trang_thai = 'HopLe';
         await manager.save(PhieuDangKy, hd.phieuDangKy);
+        
+        let ptq = await manager.findOne(PhieuThamQuan, { where: { phieu_dang_ky_id: hd.phieu_dang_ky_id } });
+        if (!ptq) {
+          ptq = new PhieuThamQuan();
+          ptq.phieu_dang_ky_id = hd.phieu_dang_ky_id;
+          ptq.trang_thai = 'HopLe';
+          await manager.save(PhieuThamQuan, ptq);
+        }
       } else {
         hd.trang_thai = 'ViPham';
       }
@@ -501,6 +530,14 @@ export class SinhVienService {
       hd.trang_thai = 'DaDongDungHan';
       hd.phieuDangKy.trang_thai = 'HopLe';
       await this.phieuRepo.save(hd.phieuDangKy);
+
+      let ptq = await this.phieuTQRepo.findOne({ where: { phieu_dang_ky_id: hd.phieu_dang_ky_id } });
+      if (!ptq) {
+        ptq = new PhieuThamQuan();
+        ptq.phieu_dang_ky_id = hd.phieu_dang_ky_id;
+        ptq.trang_thai = 'HopLe';
+        await this.phieuTQRepo.save(ptq);
+      }
     } else {
       hd.trang_thai = 'ViPham';
     }
@@ -595,6 +632,7 @@ export class SinhVienService {
     fileRef: string,
     expectedType: 'reports' | 'payments' | 'attachments',
     accountId: number,
+    mssv?: string,
   ): string {
     if (!fileRef || typeof fileRef !== 'string') {
       throw new BadRequestException('File reference không hợp lệ');
@@ -641,6 +679,7 @@ export class SinhVienService {
       const ownerId = match[1];
       if (
         ownerId !== String(accountId) &&
+        ownerId !== mssv &&
         ownerId !== 'sv' &&
         ownerId !== 'general'
       ) {
@@ -667,10 +706,13 @@ export class SinhVienService {
     if (!phieu) throw new NotFoundException('Không tìm thấy phiếu đăng ký');
 
     const accountId = phieu.sinhVien?.taikhoan_id || 0;
+    const mssv = phieu.sinhVien?.mssv;
+
     const validBaoCaoRef = this.sanitizeAndValidateFileRef(
       fileBaoCaoUrl,
       'reports',
       accountId,
+      mssv,
     );
 
     let validXacNhanRef: string | undefined = undefined;
@@ -679,6 +721,7 @@ export class SinhVienService {
         fileXacNhanUrl,
         'payments',
         accountId,
+        mssv,
       );
     }
 
@@ -692,6 +735,12 @@ export class SinhVienService {
       where: { phieu_dang_ky_id: registrationId },
     });
     if (!phieuTQ) {
+      const hd = await this.dataSource.manager.findOne('HoaDonLePhi', {
+        where: { phieu_dang_ky_id: registrationId },
+      });
+      if (hd && (hd as any).trang_thai === 'ChuaDong') {
+        throw new BadRequestException('Bạn chưa thanh toán lệ phí cho chuyến đi này nên chưa được cấp Phiếu tham quan');
+      }
       throw new BadRequestException('Chuyến đi này chưa được cấp phiếu tham quan');
     }
 
@@ -706,29 +755,20 @@ export class SinhVienService {
       }
     }
 
-    const tripDate = new Date(phieu.chuyenThamQuan.ngay_tham_quan);
-    const now = new Date();
-    const diffTime = now.getTime() - tripDate.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays > 20) {
-      throw new BadRequestException(
-        'Đã quá hạn chót nộp bài thu hoạch (hạn chót là 20 ngày kể từ ngày tham quan). Điểm bài thu hoạch của bạn sẽ là 0 và chuyến đi sẽ không được tính điểm.',
-      );
-    }
-
     const report = new BaiThuHoach();
     report.phieu_tham_quan_id = phieuTQ.id;
     report.file_bao_cao = validBaoCaoRef;
     report.file_xac_nhan_tham_quan = (validXacNhanRef || null) as any;
-    report.ngay_nop = now;
+    report.ngay_nop = new Date();
 
-    if (diffDays > 10) {
-      report.trang_thai = 'TreHan';
-    } else {
-      report.trang_thai = 'DaNop';
+    try {
+      await this.baiThuRepo.save(report);
+    } catch (error: any) {
+      if (error.message && error.message.includes('quá thời hạn')) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
     }
-    await this.baiThuRepo.save(report);
 
     // Khoi tao ban ghi diem neu chua co
     let diem = await this.diemPhieuRepo.findOne({

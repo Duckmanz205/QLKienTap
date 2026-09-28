@@ -329,6 +329,7 @@ export default function Layout() {
       { to: '/giang-vien/attendance', label: 'Điểm danh sinh viên', icon: UserCheck, category: 'DẪN ĐOÀN' },
       { to: '/giang-vien/preparation', label: 'Điểm chuẩn bị & Cộng', icon: Star, category: 'DẪN ĐOÀN' },
       { to: '/giang-vien/guided-students', label: 'Sinh viên hướng dẫn', icon: User, category: 'HƯỚNG DẪN' },
+      { to: '/giang-vien/grading', label: 'Chấm bài thu hoạch', icon: FileCheck, category: 'HƯỚNG DẪN' },
       { to: '/giang-vien/board', label: 'Buổi báo cáo TQNM', icon: Presentation, category: 'HỘI ĐỒNG' },
       { to: '/giang-vien/notifications', label: 'Thông báo', icon: Bell, category: 'THÔNG BÁO' }
     ];

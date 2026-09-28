@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Plus, X, ChevronRight, Bold, Italic, List, 
@@ -53,7 +54,7 @@ export default function ThongBao_Khoa() {
   const handleComposeSubmit = async (e) => {
     e.preventDefault();
     if (!title || !content || !selectedDoiTuong) {
-      alert('Vui lòng nhập đầy đủ tiêu đề, nội dung và đối tượng nhận');
+      toast.success('Vui lòng nhập đầy đủ tiêu đề, nội dung và đối tượng nhận');
       return;
     }
 
@@ -78,7 +79,7 @@ export default function ThongBao_Khoa() {
         file_url: fileUrl,
         file_name: fileName
       });
-      alert('Gửi thông báo thành công');
+      toast.success('Gửi thông báo thành công');
       setIsModalOpen(false);
       setTitle('');
       setContent('');
@@ -88,7 +89,7 @@ export default function ThongBao_Khoa() {
     } catch (err) {
       console.error(err);
       setIsUploadingAttachment(false);
-      alert('Gửi thông báo thất bại');
+      toast.error('Gửi thông báo thất bại');
     }
   };
 

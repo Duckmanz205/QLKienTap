@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Lock, ChevronDown, Check, ChevronRight, AlertTriangle, 
@@ -57,12 +58,12 @@ export default function KetQuaKienTap_Khoa() {
     e.stopPropagation();
     try {
       await khoaApi.lockGrades({ lichKienTapId: selectedLich });
-      alert('Đã khóa điểm đợt này thành công!');
+      toast.success('Đã khóa điểm đợt này thành công!');
       setIsConfirmModalOpen(false);
       fetchEnrollments(); // refresh state if needed
     } catch (err) {
       console.error(err);
-      alert('Khóa điểm thất bại');
+      toast.error('Khóa điểm thất bại');
     }
   };
 

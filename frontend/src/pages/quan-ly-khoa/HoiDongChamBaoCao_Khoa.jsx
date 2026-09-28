@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Plus, ChevronDown, Check, X, Search, ChevronRight, Calendar, MapPin
@@ -66,7 +67,7 @@ export default function HoiDongChamBaoCao_Khoa() {
   const handleCreateBoard = async (e) => {
     e.preventDefault();
     if (!selectedSchedule || !boardName || !dateTime || !room) {
-      alert('Vui lòng điền đủ thông tin bắt buộc');
+      toast.success('Vui lòng điền đủ thông tin bắt buộc');
       return;
     }
     try {
@@ -101,7 +102,7 @@ export default function HoiDongChamBaoCao_Khoa() {
       };
       setCommittees(prev => [newCommittee, ...prev]);
 
-      alert('Tạo hội đồng thành công!');
+      toast.success('Tạo hội đồng thành công!');
       setIsModalOpen(false);
       setBoardName('');
       setSelectedSchedule('');
@@ -110,7 +111,7 @@ export default function HoiDongChamBaoCao_Khoa() {
       setSelectedMembers([]);
     } catch (err) {
       console.error(err);
-      alert('Lỗi tạo hội đồng');
+      toast.error('Lỗi tạo hội đồng');
     }
   };
 

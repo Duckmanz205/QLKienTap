@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import React, { useState, useEffect } from 'react';
 import { 
   Plus, Search, ChevronDown, Check,
@@ -107,7 +108,7 @@ export default function DanhMuc_NhaMay_Khoa() {
       fetchFactories();
     } catch (err) {
       console.error(err);
-      alert('Có lỗi xảy ra!');
+      toast.error('Có lỗi xảy ra!');
     } finally {
       setIsSubmitting(false);
     }

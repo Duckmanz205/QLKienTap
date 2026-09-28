@@ -3,8 +3,10 @@ import {
   Search, ChevronDown, Check, CheckCircle2, XCircle, FileWarning, Save
 } from 'lucide-react';
 import { giangVienApi } from '../../services/api';
+import Toast from '../../components/Toast';
 
 export default function DiemDanhSV_GV() {
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   const [isTripDropdownOpen, setIsTripDropdownOpen] = useState(false);
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -71,8 +73,8 @@ export default function DiemDanhSV_GV() {
         id: phieu.id,
         mssv: phieu.sinhVien?.mssv,
         name: phieu.sinhVien?.ho_ten,
-        status: phieu.trang_thai_diem_danh || null,
-        note: phieu.ghi_chu_diem_danh || '',
+        status: phieu.diemDanh?.trang_thai || null,
+        note: phieu.diemDanh?.ghi_chu || '',
         avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(phieu.sinhVien?.ho_ten || 'SV')}&background=f1f5f9&color=475569`
       }));
       
@@ -115,9 +117,9 @@ export default function DiemDanhSV_GV() {
         tripId: selectedTrip.id,
         records
       });
-      alert('Đã lưu điểm danh thành công!');
+      setToast({ show: true, message: 'Đã lưu điểm danh thành công!', type: 'success' });
     } catch (err) {
-      alert('Có lỗi xảy ra khi lưu điểm danh');
+      setToast({ show: true, message: 'Có lỗi xảy ra khi lưu điểm danh', type: 'error' });
       console.error(err);
     } finally {
       setLoading(false);
@@ -146,7 +148,11 @@ export default function DiemDanhSV_GV() {
 
   return (
     <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300 relative" onClick={closeAllDropdowns}>
-      
+      <Toast 
+        message={toast.show ? toast.message : ''} 
+        type={toast.type} 
+        onClose={() => setToast({ ...toast, show: false })} 
+      />
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-800">Điểm danh sinh viên</h1>
       </div>
