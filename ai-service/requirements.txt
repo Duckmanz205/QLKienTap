@@ -1,24 +1,21 @@
 # requirements.txt — AI Service Dependencies
-# Uncomment the frameworks you need
+# Cấu hình các thư viện cho AI Microservice (OCR & AI Grader)
 
-# === Web Framework (chọn 1) ===
+# === Web Framework ===
 fastapi==0.115.*
 uvicorn[standard]==0.34.*
-# flask==3.1.*
+python-multipart==0.0.*      # Hỗ trợ nhận file PDF upload qua API
 
-# === Machine Learning ===
-# scikit-learn==1.6.*
-# pandas==2.2.*
-# numpy==2.1.*
+# === Machine Learning / AI Integration ===
+openai==1.52.*               # Giao tiếp với Qwen Cloud API (Compatible mode)
+httpx==0.27.*                # Ép phiên bản HTTP client tương thích với OpenAI SDK
 
-# === Deep Learning (chọn 1 nếu cần) ===
-# torch==2.6.*
-# tensorflow==2.18.*
+# === Document & Image Processing (OCR Vision) ===
+PyMuPDF==1.24.*              # Đọc và bóc tách PDF (tên import là fitz)
+Pillow==10.4.*               # Xử lý hình ảnh cắt từ PDF trước khi gửi OCR
 
-# === NLP / Text Processing ===
-# transformers==4.48.*
-# underthesea==6.8.*          # NLP tiếng Việt
+# === Data Validation & Parsing ===
+pydantic==2.9.*              # Ràng buộc cấu trúc dữ liệu JSON Barem
 
 # === Utilities ===
-python-dotenv==1.1.*
-requests==2.32.*
+python-dotenv==1.1.*         # Đọc biến môi trường
