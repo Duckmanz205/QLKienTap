@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/network/api_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/state/app_state.dart';
+import '../../widgets/paginated_list.dart';
 
 class NopBaiThuHoachSVScreen extends StatefulWidget {
   const NopBaiThuHoachSVScreen({super.key});
@@ -30,23 +31,92 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
     final appStateProvider = AppStateProvider.of(context);
     final appState = appStateProvider.state;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text(
-            'Danh sách chuyến đi hoàn thành',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.darkSlate),
+    return PaginatedList<dynamic>(
+      items: appState.submissions,
+      searchHint: 'Tìm chuyến đi...',
+      dropdownTitle: 'Trạng thái',
+      dropdownOptions: const ['Tất cả', 'Đã nộp', 'Chưa nộp', 'Trễ hạn - trừ điểm'],
+      itemName: 'bài thu hoạch',
+      filter: (sub, query, status) {
+        final matchQuery = sub.tripName.toLowerCase().contains(query.toLowerCase());
+        final matchStatus = status == 'Tất cả' || sub.status == status;
+        return matchQuery && matchStatus;
+      },
+      headerWidgetBuilder: (_) => const Padding(
+        padding: EdgeInsets.fromLTRB(16, 16, 16, 0),
+        child: Text(
+          'Danh sách chuyến đi hoàn thành',
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.darkSlate),
+        ),
+      ),
+      footerWidget: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.appBackground,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.primary, width: 1.5),
           ),
-          const SizedBox(height: 12),
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: appState.submissions.length,
-            itemBuilder: (context, index) {
-              final sub = appState.submissions[index];
-              Color statusColor = AppColors.warning;
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Chọn bộ chuyến báo cáo',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.primary),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Chọn tối thiểu 2 trực tiếp + 1 trực tuyến/tự do để tạo bộ báo cáo gửi hội đồng.',
+                style: TextStyle(fontSize: 11, color: AppColors.darkSlate),
+              ),
+              const SizedBox(height: 12),
+              
+              ...appState.submissions.map((s) {
+                final isSelected = _campaignSelectedTrips.contains(s.id);
+                return CheckboxListTile(
+                  value: isSelected,
+                  onChanged: (val) {
+                    setState(() {
+                      if (val == true) {
+                        _campaignSelectedTrips.add(s.id);
+                      } else {
+                        _campaignSelectedTrips.remove(s.id);
+                      }
+                    });
+                  },
+                  title: Text(s.tripName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  subtitle: Text(s.typeText, style: const TextStyle(fontSize: 10)),
+                  controlAffinity: ListTileControlAffinity.leading,
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                );
+              }),
+              const SizedBox(height: 16),
+              
+              ElevatedButton(
+                onPressed: _campaignSelectedTrips.length >= 3
+                    ? () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Xác nhận lựa chọn bộ chuyến báo cáo thành công!')),
+                        );
+                      }
+                    : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: Colors.grey.shade300,
+                  disabledForegroundColor: Colors.grey.shade500,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text('XÁC NHẬN LỰA CHỌN', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        ),
+      ),
+      itemBuilder: (sub) {
+        Color statusColor = AppColors.warning;
               if (sub.status == 'Đã nộp') statusColor = AppColors.secondary;
               if (sub.status == 'Trễ hạn - trừ điểm') statusColor = AppColors.danger;
 
@@ -243,75 +313,7 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
                   ),
                 ),
               );
-            },
-          ),
-          const SizedBox(height: 12),
-
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.appBackground,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.primary, width: 1.5),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text(
-                  'Chọn bộ chuyến báo cáo',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.primary),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Chọn tối thiểu 2 trực tiếp + 1 trực tuyến/tự do để tạo bộ báo cáo gửi hội đồng.',
-                  style: TextStyle(fontSize: 11, color: AppColors.darkSlate),
-                ),
-                const SizedBox(height: 12),
-                
-                ...appState.submissions.map((sub) {
-                  final isSelected = _campaignSelectedTrips.contains(sub.id);
-                  return CheckboxListTile(
-                    value: isSelected,
-                    onChanged: (val) {
-                      setState(() {
-                        if (val == true) {
-                          _campaignSelectedTrips.add(sub.id);
-                        } else {
-                          _campaignSelectedTrips.remove(sub.id);
-                        }
-                      });
-                    },
-                    title: Text(sub.tripName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                    subtitle: Text(sub.typeText, style: const TextStyle(fontSize: 10)),
-                    controlAffinity: ListTileControlAffinity.leading,
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                  );
-                }),
-                const SizedBox(height: 16),
-                
-                ElevatedButton(
-                  onPressed: _campaignSelectedTrips.length >= 3
-                      ? () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Xác nhận lựa chọn bộ chuyến báo cáo thành công!')),
-                          );
-                        }
-                      : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: Colors.grey.shade300,
-                    disabledForegroundColor: Colors.grey.shade500,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  child: const Text('XÁC NHẬN LỰA CHỌN', style: TextStyle(fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+      },
     );
   }
 

@@ -18,6 +18,34 @@ class StudentProfile {
   });
 }
 
+class StudentDashboardStats {
+  final int registered;
+  final int completed;
+  final int pendingReports;
+  final String avgScore;
+
+  StudentDashboardStats({
+    required this.registered,
+    required this.completed,
+    required this.pendingReports,
+    required this.avgScore,
+  });
+}
+
+class LecturerDashboardStats {
+  final int doanDangDan;
+  final int baiCanCham;
+  final int buoiBaoCao;
+  final int tongSvHuongDan;
+
+  LecturerDashboardStats({
+    required this.doanDangDan,
+    required this.baiCanCham,
+    required this.buoiBaoCao,
+    required this.tongSvHuongDan,
+  });
+}
+
 class LecturerProfile {
   final String name;
   final String email;

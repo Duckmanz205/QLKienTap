@@ -16,18 +16,21 @@ class DashboardSVScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final appStateProvider = AppStateProvider.of(context);
     final appState = appStateProvider.state;
-
-    final registeredCount = appState.studentTrips.where((t) => t.isRegistered).length;
-    final completedCount = appState.studentTrips.where((t) => t.isCompleted).length;
-    final pendingSubmissionsCount = appState.submissions.where((s) => s.status != 'Đã nộp').length;
+    final stats = appState.studentDashboardStats;
     
-    final completedWithGrades = appState.studentTrips.where((t) => t.isCompleted && t.gradeDetails != null).toList();
-    double gpa = 0.0;
-    if (completedWithGrades.isNotEmpty) {
-      final totalScore = completedWithGrades.map((t) => t.gradeDetails!.total).reduce((a, b) => a + b);
-      gpa = totalScore / completedWithGrades.length;
-    } else {
-      gpa = 8.7;
+    final String registeredCount = stats != null ? '${stats.registered}' : '${appState.studentTrips.where((t) => t.isRegistered).length}';
+    final String completedCount = stats != null ? '${stats.completed}' : '${appState.studentTrips.where((t) => t.isCompleted).length}';
+    final int pendingCount = stats != null ? stats.pendingReports : appState.submissions.where((s) => s.status != 'Đã nộp').length;
+    
+    String gpaStr = stats?.avgScore ?? 'Chưa có';
+    if (stats == null) {
+      final completedWithGrades = appState.studentTrips.where((t) => t.isCompleted && t.gradeDetails != null).toList();
+      if (completedWithGrades.isNotEmpty) {
+        final totalScore = completedWithGrades.map((t) => t.gradeDetails!.total).reduce((a, b) => a + b);
+        gpaStr = (totalScore / completedWithGrades.length).toStringAsFixed(1);
+      } else {
+        gpaStr = '8.7';
+      }
     }
 
     final upcomingTrips = appState.studentTrips.where((t) => t.isRegistered && !t.isCompleted).toList();
@@ -46,15 +49,15 @@ class DashboardSVScreen extends StatelessWidget {
             mainAxisSpacing: 12,
             childAspectRatio: 1.5,
             children: [
-              _buildStatCard('Chuyến đã đăng ký', '$registeredCount', AppColors.primary, Colors.white),
-              _buildStatCard('Đã hoàn thành', '$completedCount', AppColors.secondary, Colors.white),
+              _buildStatCard('Chuyến đã đăng ký', registeredCount, AppColors.primary, Colors.white),
+              _buildStatCard('Đã hoàn thành', completedCount, AppColors.secondary, Colors.white),
               _buildStatCard(
                 'Bài cần nộp',
-                '$pendingSubmissionsCount',
-                pendingSubmissionsCount > 0 ? AppColors.warning : Colors.grey.shade400,
+                '$pendingCount',
+                pendingCount > 0 ? AppColors.warning : Colors.grey.shade400,
                 AppColors.darkSlate,
               ),
-              _buildStatCard('Điểm TB', gpa.toStringAsFixed(1), AppColors.primary, Colors.white, isLargeNum: true),
+              _buildStatCard('Điểm TB', gpaStr, AppColors.primary, Colors.white, isLargeNum: true),
             ],
           ),
           const SizedBox(height: 24),

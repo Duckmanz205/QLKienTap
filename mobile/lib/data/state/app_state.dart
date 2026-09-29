@@ -5,9 +5,11 @@ import '../../core/network/api_service.dart';
 
 class AppState {
   String? currentRole; // 'student', 'lecturer', or null
+  bool? phaiDoiMatKhau;
   
   // Student state
   StudentProfile studentProfile;
+  StudentDashboardStats? studentDashboardStats;
   List<Trip> studentTrips;
   List<StudentNotification> studentNotifications;
   List<Submission> submissions;
@@ -16,6 +18,7 @@ class AppState {
   
   // Lecturer state
   LecturerProfile lecturerProfile;
+  LecturerDashboardStats? lecturerDashboardStats;
   List<LecturerStudent> lecturerStudents;
   List<LecturerTour> lecturerTours;
   List<CouncilSession> councilSessions;
@@ -23,13 +26,16 @@ class AppState {
 
   AppState({
     this.currentRole,
+    this.phaiDoiMatKhau,
     required this.studentProfile,
+    this.studentDashboardStats,
     required this.studentTrips,
     required this.studentNotifications,
     required this.submissions,
     required this.payments,
     required this.refunds,
     required this.lecturerProfile,
+    this.lecturerDashboardStats,
     required this.lecturerStudents,
     required this.lecturerTours,
     required this.councilSessions,
@@ -38,13 +44,16 @@ class AppState {
 
   AppState copyWith({
     String? currentRole,
+    bool? phaiDoiMatKhau,
     StudentProfile? studentProfile,
+    StudentDashboardStats? studentDashboardStats,
     List<Trip>? studentTrips,
     List<StudentNotification>? studentNotifications,
     List<Submission>? submissions,
     List<Payment>? payments,
     List<RefundRequest>? refunds,
     LecturerProfile? lecturerProfile,
+    LecturerDashboardStats? lecturerDashboardStats,
     List<LecturerStudent>? lecturerStudents,
     List<LecturerTour>? lecturerTours,
     List<CouncilSession>? councilSessions,
@@ -52,13 +61,16 @@ class AppState {
   }) {
     return AppState(
       currentRole: currentRole ?? this.currentRole,
+      phaiDoiMatKhau: phaiDoiMatKhau ?? this.phaiDoiMatKhau,
       studentProfile: studentProfile ?? this.studentProfile,
+      studentDashboardStats: studentDashboardStats ?? this.studentDashboardStats,
       studentTrips: studentTrips ?? this.studentTrips,
       studentNotifications: studentNotifications ?? this.studentNotifications,
       submissions: submissions ?? this.submissions,
       payments: payments ?? this.payments,
       refunds: refunds ?? this.refunds,
       lecturerProfile: lecturerProfile ?? this.lecturerProfile,
+      lecturerDashboardStats: lecturerDashboardStats ?? this.lecturerDashboardStats,
       lecturerStudents: lecturerStudents ?? this.lecturerStudents,
       lecturerTours: lecturerTours ?? this.lecturerTours,
       councilSessions: councilSessions ?? this.councilSessions,
@@ -138,6 +150,7 @@ class AppStateProviderState extends State<AppStateContainer> {
   void _resetToDefaults({bool notify = true}) {
     final newState = AppState(
       currentRole: null,
+      phaiDoiMatKhau: null,
       studentProfile: StudentProfile(
         name: initialStudentProfile.name,
         email: initialStudentProfile.email,
@@ -221,6 +234,17 @@ class AppStateProviderState extends State<AppStateContainer> {
           }).toList();
         });
       }
+
+      final Map<String, dynamic> statsJson = await ApiService.getStudentDashboardStats(studentId);
+      setState(() {
+        _state.studentDashboardStats = StudentDashboardStats(
+          registered: statsJson['registered'] ?? 0,
+          completed: statsJson['completed'] ?? 0,
+          pendingReports: statsJson['pendingReports'] ?? 0,
+          avgScore: statsJson['avgScore']?.toString() ?? 'Chưa có',
+        );
+      });
+
     } catch (e) {
       print('Failed to load student data from backend, staying with in-memory mock data: $e');
     }
@@ -273,6 +297,17 @@ class AppStateProviderState extends State<AppStateContainer> {
           }).toList();
         });
       }
+
+      final Map<String, dynamic> statsJson = await ApiService.getLecturerDashboardStats(lecturerId);
+      setState(() {
+        _state.lecturerDashboardStats = LecturerDashboardStats(
+          doanDangDan: statsJson['doanDangDan'] ?? 0,
+          baiCanCham: statsJson['baiCanCham'] ?? 0,
+          buoiBaoCao: statsJson['buoiBaoCao'] ?? 0,
+          tongSvHuongDan: statsJson['tongSvHuongDan'] ?? 0,
+        );
+      });
+
     } catch (e) {
       print('Failed to load lecturer data from backend, staying with in-memory mock data: $e');
     }
@@ -285,10 +320,13 @@ class AppStateProviderState extends State<AppStateContainer> {
       final user = res['user'];
       final userRole = user?['vai_tro'];
       final details = user?['details'];
+      
+      final bool requiresPasswordChange = user?['phai_doi_mat_khau'] == 1 || user?['phai_doi_mat_khau'] == true;
 
       if (userRole == 'SinhVien') {
         setState(() {
           _state.currentRole = 'student';
+          _state.phaiDoiMatKhau = requiresPasswordChange;
           if (details != null) {
             _state.studentProfile = StudentProfile(
               name: details['ho_ten'] ?? 'Sinh viên',
@@ -300,14 +338,18 @@ class AppStateProviderState extends State<AppStateContainer> {
             );
           }
         });
-        final studentId = (details != null && details['id'] is int) ? details['id'] as int : ApiService.userId;
-        if (studentId != null) {
-          _fetchStudentDataFromApi(studentId);
+        
+        if (!requiresPasswordChange) {
+          final studentId = (details != null && details['id'] is int) ? details['id'] as int : ApiService.userId;
+          if (studentId != null) {
+            _fetchStudentDataFromApi(studentId);
+          }
         }
         onSuccess();
       } else if (userRole == 'GiangVien') {
         setState(() {
           _state.currentRole = 'lecturer';
+          _state.phaiDoiMatKhau = requiresPasswordChange;
           if (details != null) {
             _state.lecturerProfile = LecturerProfile(
               name: details['ho_ten'] ?? 'Giảng viên',
@@ -318,9 +360,12 @@ class AppStateProviderState extends State<AppStateContainer> {
             );
           }
         });
-        final lecturerId = (details != null && details['id'] is int) ? details['id'] as int : ApiService.userId;
-        if (lecturerId != null) {
-          _fetchLecturerDataFromApi(lecturerId);
+        
+        if (!requiresPasswordChange) {
+          final lecturerId = (details != null && details['id'] is int) ? details['id'] as int : ApiService.userId;
+          if (lecturerId != null) {
+            _fetchLecturerDataFromApi(lecturerId);
+          }
         }
         onSuccess();
       } else {
@@ -334,10 +379,23 @@ class AppStateProviderState extends State<AppStateContainer> {
     }
   }
 
+  void completePasswordChange() {
+    setState(() {
+      _state.phaiDoiMatKhau = false;
+    });
+    if (_state.currentRole == 'student' && ApiService.userId != null) {
+      _fetchStudentDataFromApi(ApiService.userId!);
+    } else if (_state.currentRole == 'lecturer' && ApiService.userId != null) {
+      _fetchLecturerDataFromApi(ApiService.userId!);
+    }
+  }
+
   void logout() {
     ApiService.clearSession();
     setState(() {
+      _resetToDefaults(notify: true);
       _state.currentRole = null;
+      _state.phaiDoiMatKhau = null;
     });
   }
 
@@ -379,6 +437,15 @@ class AppStateProviderState extends State<AppStateContainer> {
         _state.payments = [newPayment, ..._state.payments];
       }
     });
+  }
+
+  Future<void> proposeTrip(String companyName, String address, String description) async {
+    if (ApiService.userId == null) {
+      throw Exception('Chưa đăng nhập');
+    }
+    await ApiService.proposeTrip(ApiService.userId!, companyName, address, description);
+    // You could optionally fetch proposals or add it to local state, 
+    // but typically a success message is enough for proposals.
   }
 
   Future<void> cancelTripRegistration(String tripId) async {

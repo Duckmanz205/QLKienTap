@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/app_models.dart';
 import '../../../data/state/app_state.dart';
+import '../../widgets/paginated_list.dart';
 
 class HoiDongChamBaoCaoDSBuoiGVScreen extends StatelessWidget {
   final Function(String) onCouncilTap;
@@ -16,56 +17,187 @@ class HoiDongChamBaoCaoDSBuoiGVScreen extends StatelessWidget {
     final appStateProvider = AppStateProvider.of(context);
     final appState = appStateProvider.state;
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: appState.councilSessions.length,
-      itemBuilder: (context, index) {
-        final session = appState.councilSessions[index];
+    return PaginatedList<dynamic>(
+      items: appState.councilSessions,
+      searchHint: 'Tìm phiên chấm...',
+      dropdownTitle: 'Hội trường',
+      dropdownOptions: const ['Tất cả', 'F.4.1', 'B.3.2'],
+      itemName: 'phiên chấm',
+      verticalFilters: false,
+      headerWidgetBuilder: (filteredItems) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF3B711A), // Green
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: const Text(
+                      'Danh sách buổi',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: const Text(
+                      'Chấm điểm',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.black54, fontWeight: FontWeight.bold, fontSize: 12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+      filter: (session, query, room) {
+        final matchQuery = session.name.toLowerCase().contains(query.toLowerCase());
+        final matchRoom = room == 'Tất cả' || session.room.contains(room);
+        return matchQuery && matchRoom;
+      },
+      itemBuilder: (session) {
+        // Determine styles based on status
+        Color pillBgColor;
+        Color pillTextColor;
+        String pillText;
+        Widget button;
+        bool hasLeftBorder = false;
 
-        return Card(
+        if (session.status == 'upcoming') {
+          pillBgColor = const Color(0xFFD7CD61);
+          pillTextColor = Colors.black87;
+          pillText = 'Sắp diễn ra';
+          button = OutlinedButton(
+            onPressed: () => onCouncilTap(session.id),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Color(0xFF3B711A)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              minimumSize: const Size.fromHeight(40),
+            ),
+            child: const Text('VÀO CHẤM ĐIỂM', style: TextStyle(color: Color(0xFF3B711A), fontWeight: FontWeight.bold, fontSize: 11)),
+          );
+        } else if (session.status == 'ongoing') {
+          pillBgColor = const Color(0xFF9CCC65); // Light green
+          pillTextColor = Colors.black87;
+          pillText = 'Đang diễn ra';
+          hasLeftBorder = true;
+          button = ElevatedButton(
+            onPressed: () => onCouncilTap(session.id),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF3B711A), // Dark green
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              minimumSize: const Size.fromHeight(40),
+              elevation: 0,
+            ),
+            child: const Text('TIẾP TỤC CHẤM', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+          );
+        } else {
+          pillBgColor = Colors.grey.shade300;
+          pillTextColor = Colors.black54;
+          pillText = 'Đã hoàn thành';
+          button = OutlinedButton(
+            onPressed: () {},
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: Colors.grey.shade400),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              minimumSize: const Size.fromHeight(40),
+            ),
+            child: const Text('XEM KẾT QUẢ', style: TextStyle(color: Colors.black54, fontWeight: FontWeight.bold, fontSize: 11)),
+          );
+        }
+
+        return Container(
           margin: const EdgeInsets.only(bottom: 16),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: IntrinsicHeight(
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        session.name,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.darkSlate),
-                      ),
+                if (hasLeftBorder)
+                  Container(
+                    width: 4,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF8CB654),
+                      borderRadius: BorderRadius.horizontal(left: Radius.circular(12)),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-                      child: const Text('Đang phân công', style: TextStyle(color: AppColors.primary, fontSize: 9, fontWeight: FontWeight.bold)),
+                  ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                session.name,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black87),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(color: pillBgColor, borderRadius: BorderRadius.circular(12)),
+                              child: Text(pillText, style: TextStyle(color: pillTextColor, fontSize: 10, fontWeight: FontWeight.bold)),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Icon(Icons.calendar_today, size: 14, color: Colors.grey.shade600),
+                            const SizedBox(width: 6),
+                            Text('${session.timeRange} | ${session.date}', style: TextStyle(fontSize: 11, color: Colors.grey.shade700)),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Icon(Icons.location_on_outlined, size: 14, color: Colors.grey.shade600),
+                            const SizedBox(width: 6),
+                            Text('Phòng ${session.room}', style: TextStyle(fontSize: 11, color: Colors.grey.shade700)),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Icon(Icons.people_outline, size: 14, color: Colors.grey.shade600),
+                            const SizedBox(width: 6),
+                            Text('Số SV báo cáo: ', style: TextStyle(fontSize: 11, color: Colors.grey.shade700)),
+                            Text('${session.studentCount}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87)),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        button,
+                      ],
                     ),
-                  ],
-                ),
-                const Divider(height: 24),
-                _buildInfoRow('Hội trường:', session.room),
-                _buildInfoRow('Thời gian:', '${session.date} • ${session.timeRange}'),
-                _buildInfoRow('Số sinh viên chờ chấm:', '${session.studentCount} Sinh viên'),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        onCouncilTap(session.id);
-                      },
-                      icon: const Icon(Icons.draw, size: 16),
-                      label: const Text('VÀO PHIÊN CHẤM', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ],
             ),

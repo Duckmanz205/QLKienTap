@@ -4,6 +4,7 @@ import 'data/state/app_state.dart';
 import 'presentation/screens/login_screen.dart';
 import 'presentation/screens/student/student_portal.dart';
 import 'presentation/screens/lecturer/lecturer_portal.dart';
+import 'presentation/screens/change_password_screen.dart';
 
 void main() {
   runApp(
@@ -21,7 +22,9 @@ class MainApp extends StatelessWidget {
     final appState = AppStateProvider.of(context).state;
 
     Widget homeScreen;
-    if (appState.currentRole == 'student') {
+    if (appState.currentRole != null && appState.phaiDoiMatKhau == true) {
+      homeScreen = const ChangePasswordScreen();
+    } else if (appState.currentRole == 'student') {
       homeScreen = const StudentPortal();
     } else if (appState.currentRole == 'lecturer') {
       homeScreen = const LecturerPortal();

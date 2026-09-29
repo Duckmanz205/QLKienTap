@@ -26,9 +26,11 @@ class _DashboardGVScreenState extends State<DashboardGVScreen> {
     final appStateProvider = AppStateProvider.of(context);
     final appState = appStateProvider.state;
 
-    final guidedCount = appState.lecturerStudents.length;
-    final ungradedCount = appState.lecturerStudents.where((s) => !s.isGraded).length;
-    final todayTours = appState.lecturerTours.length;
+    final stats = appState.lecturerDashboardStats;
+    final guidedCount = stats?.tongSvHuongDan ?? appState.lecturerStudents.length;
+    final ungradedCount = stats?.baiCanCham ?? appState.lecturerStudents.where((s) => !s.isGraded).length;
+    final todayTours = stats?.doanDangDan ?? appState.lecturerTours.length;
+    final boardSessions = stats?.buoiBaoCao ?? appState.councilSessions.length;
     
     final ungradedList = appState.lecturerStudents.where((s) => !s.isGraded).toList();
 
@@ -37,82 +39,152 @@ class _DashboardGVScreenState extends State<DashboardGVScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Top Greeting
+          Row(
+            children: [
+              const CircleAvatar(
+                backgroundColor: Color(0xFFBCE77C),
+                radius: 20,
+                child: Icon(Icons.waving_hand, color: Color(0xFF3B711A), size: 18),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Chào thầy!', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87)),
+                    Text('Hôm nay có $ungradedCount sinh viên đang đợi chấm bài.', style: const TextStyle(fontSize: 11, color: Colors.black54)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
           // Filter Tabs (Scopes)
           Container(
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
               color: Colors.grey.shade200,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(24),
             ),
             child: Row(
               children: [
-                _buildScopeTab('led', 'Dẫn đoàn', Icons.directions_bus),
-                _buildScopeTab('guided', 'Hướng dẫn', Icons.school),
+                _buildScopeTab('led', 'Dẫn đoàn', Icons.groups),
+                _buildScopeTab('guided', 'Hướng dẫn', Icons.menu_book),
                 _buildScopeTab('council', 'Hội đồng', Icons.gavel),
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
 
           // Overview Stats Grid
           GridView.count(
-            crossAxisCount: 3,
+            crossAxisCount: 2,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: 8,
-            mainAxisSpacing: 8,
-            childAspectRatio: 1.1,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 1.25,
             children: [
-              _buildStatCard('Đoàn kiến tập', '$todayTours', AppColors.primary),
-              _buildStatCard('SV Hướng dẫn', '$guidedCount', AppColors.secondary),
-              _buildStatCard(
-                'Bài chờ chấm',
-                '$ungradedCount',
-                ungradedCount > 0 ? AppColors.warning : Colors.grey.shade400,
-                isHighlight: ungradedCount > 0,
-              ),
+              _buildStatCard('Đoàn đang dẫn', '$todayTours', Icons.flag, const Color(0xFF8CB654), const Color(0xFFF2F5ED)),
+              _buildStatCard('SV cần chấm bài', '$ungradedCount', Icons.assignment_turned_in, const Color(0xFFD6A461), const Color(0xFFFAF5ED)),
+              _buildStatCard('Buổi báo cáo tới', '$boardSessions', Icons.calendar_today, const Color(0xFFB76E79), const Color(0xFFF7EBED)),
+              _buildStatCard('Tổng SV hướng dẫn', '$guidedCount', Icons.school, const Color(0xFF3B711A), const Color(0xFFE8EFE5)),
             ],
           ),
           const SizedBox(height: 24),
 
-          // Conditional display based on Scope Selection
+          // Conditional Sections based on Scope
           if (_lecturerScope == 'led') ...[
-            const Text('Đoàn xe đang phụ trách dẫn đi', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.darkSlate)),
-            const SizedBox(height: 8),
-            _buildDashboardToursList(appState),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: const [
+                Text('Lịch trong tuần', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black87)),
+                Icon(Icons.chevron_right, size: 20, color: Colors.black54),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _buildTimelineCard('T5', '25', '[Dẫn đoàn] Tham quan', 'Vinamilk', '08:00', const Color(0xFFBCE77C), const Color(0xFF3B711A)),
+            _buildTimelineCard('T6', '26', '[Hội đồng] Chấm báo cáo', 'Khóa 46', '13:30', const Color(0xFFB76E79).withValues(alpha: 0.8), const Color(0xFF903B4C)),
+            _buildTimelineCard('T7', '27', '[Dẫn đoàn] Tham quan', 'Acecook', '08:30', const Color(0xFFBCE77C), const Color(0xFF3B711A)),
           ] else if (_lecturerScope == 'guided') ...[
-            const Text('Sinh viên hướng dẫn cần chấm điểm', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.darkSlate)),
-            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Text('Bài chờ chấm', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black87)),
+                const SizedBox(width: 8),
+                if (ungradedCount > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(color: const Color(0xFFFFEBEE), borderRadius: BorderRadius.circular(8)),
+                    child: Text('$ungradedCount Cần gấp', style: const TextStyle(color: Colors.red, fontSize: 9, fontWeight: FontWeight.bold)),
+                  ),
+                const Spacer(),
+                const Text('Xem tất cả', style: TextStyle(fontSize: 11, color: Color(0xFF3B711A), fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const SizedBox(height: 12),
             if (ungradedList.isEmpty)
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Text('Tất cả sinh viên hướng dẫn đã được nhập điểm đầy đủ.', style: TextStyle(fontSize: 13, color: Colors.grey.shade600), textAlign: TextAlign.center),
-                ),
-              )
+              const Center(child: Padding(padding: EdgeInsets.all(16.0), child: Text('Không có bài cần chấm.')))
             else
-              ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: ungradedList.length,
-                itemBuilder: (context, index) {
-                  final student = ungradedList[index];
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    child: ListTile(
-                      onTap: () => widget.onStudentTap(student.id),
-                      leading: CircleAvatar(backgroundImage: NetworkImage(student.avatar)),
-                      title: Text(student.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                      subtitle: Text('Doanh nghiệp: ${student.company} • ${student.className}', style: const TextStyle(fontSize: 11)),
-                      trailing: const Icon(Icons.chevron_right, color: AppColors.primary),
+              ...ungradedList.take(3).map((student) {
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Colors.grey.shade200)),
+                  elevation: 0,
+                  color: Colors.white,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          backgroundColor: const Color(0xFFF2F5ED),
+                          radius: 20,
+                          child: Text(student.name.isNotEmpty ? student.name.substring(0, 1).toUpperCase() : 'S', style: const TextStyle(color: Color(0xFF3B711A), fontWeight: FontWeight.bold)),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(student.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87)),
+                              Text('${student.company} • Nộp gần đây', style: const TextStyle(fontSize: 11, color: Colors.black54)),
+                            ],
+                          ),
+                        ),
+                        ElevatedButton.icon(
+                          onPressed: () => widget.onStudentTap(student.id),
+                          icon: const Icon(Icons.edit_note, size: 14),
+                          label: const Text('Chấm ngay', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF3B711A),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            minimumSize: Size.zero,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            elevation: 0,
+                          ),
+                        ),
+                      ],
                     ),
-                  );
-                },
-              ),
+                  ),
+                );
+              }),
           ] else ...[
-            const Text('Phiên chấm hội đồng tốt nghiệp', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.darkSlate)),
-            const SizedBox(height: 8),
-            _buildDashboardCouncilsList(appState),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: const [
+                Text('Hội đồng sắp tới', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black87)),
+                Icon(Icons.chevron_right, size: 20, color: Colors.black54),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (appState.councilSessions.isEmpty)
+              const Center(child: Padding(padding: EdgeInsets.all(16.0), child: Text('Không có hội đồng sắp tới.')))
+            else
+              ...appState.councilSessions.take(2).map((session) {
+                return _buildTimelineCard('T2', '30', '[Hội đồng] Chấm báo cáo', session.name, session.timeRange, const Color(0xFFB76E79).withValues(alpha: 0.8), const Color(0xFF903B4C));
+              }),
           ],
         ],
       ),
@@ -125,22 +197,22 @@ class _DashboardGVScreenState extends State<DashboardGVScreen> {
       child: GestureDetector(
         onTap: () => setState(() => _lecturerScope = scope),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: active ? AppColors.primary : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
+            color: active ? const Color(0xFF3B711A) : Colors.transparent,
+            borderRadius: BorderRadius.circular(20),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 14, color: active ? Colors.white : AppColors.darkSlate),
-              const SizedBox(width: 4),
+              Icon(icon, size: 14, color: active ? Colors.white : Colors.black54),
+              const SizedBox(width: 6),
               Text(
                 label,
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
-                  color: active ? Colors.white : AppColors.darkSlate,
+                  color: active ? Colors.white : Colors.black54,
                 ),
               ),
             ],
@@ -150,68 +222,77 @@ class _DashboardGVScreenState extends State<DashboardGVScreen> {
     );
   }
 
-  Widget _buildStatCard(String label, String value, Color color, {bool isHighlight = false}) {
+  Widget _buildStatCard(String label, String value, IconData icon, Color iconColor, Color bgColor) {
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isHighlight ? AppColors.danger.withValues(alpha: 0.2) : Colors.white,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
+        border: Border.all(color: Colors.grey.shade200),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.textMuted), maxLines: 2),
-          Text(value, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: color)),
+          CircleAvatar(
+            backgroundColor: bgColor,
+            radius: 16,
+            child: Icon(icon, color: iconColor, size: 16),
+          ),
+          const Spacer(),
+          Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87)),
+          const SizedBox(height: 4),
+          Text(label, style: const TextStyle(fontSize: 11, color: Colors.black54)),
         ],
       ),
     );
   }
 
-  Widget _buildDashboardToursList(AppState state) {
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: state.lecturerTours.length,
-      itemBuilder: (context, index) {
-        final tour = state.lecturerTours[index];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 10),
-          child: ListTile(
-            onTap: () => widget.onTourTap(tour.id),
-            leading: const Icon(Icons.directions_bus, color: AppColors.primary),
-            title: Text(tour.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-            subtitle: Text('Thời gian: ${tour.date} • ${tour.timeRange}', style: const TextStyle(fontSize: 11)),
-            trailing: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-              decoration: BoxDecoration(color: AppColors.secondary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-              child: const Text('Điểm danh →', style: TextStyle(color: AppColors.primary, fontSize: 9, fontWeight: FontWeight.bold)),
+  Widget _buildTimelineCard(String dow, String date, String tag, String title, String time, Color dateBg, Color tagColor) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.grey.shade200)),
+      elevation: 0,
+      color: Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: dateBg,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(dow, style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
+                  Text(date, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+                ],
+              ),
             ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildDashboardCouncilsList(AppState state) {
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: state.councilSessions.length,
-      itemBuilder: (context, index) {
-        final session = state.councilSessions[index];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 10),
-          child: ListTile(
-            onTap: () => widget.onCouncilTap(session.id),
-            leading: const Icon(Icons.gavel, color: AppColors.primary),
-            title: Text(session.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-            subtitle: Text('Hội trường: ${session.room} • ${session.timeRange}', style: const TextStyle(fontSize: 11)),
-            trailing: const Icon(Icons.arrow_forward_ios, size: 12, color: AppColors.textMuted),
-          ),
-        );
-      },
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(tag, style: TextStyle(fontSize: 10, color: tagColor, fontWeight: FontWeight.bold)),
+                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87)),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      const Icon(Icons.access_time, size: 10, color: Colors.black54),
+                      const SizedBox(width: 4),
+                      Text(time, style: const TextStyle(fontSize: 10, color: Colors.black54)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

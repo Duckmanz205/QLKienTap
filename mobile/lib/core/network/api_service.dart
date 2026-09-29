@@ -6,7 +6,7 @@ import 'secure_storage.dart';
 class ApiService {
   static const String _envApiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: kDebugMode ? 'http://10.0.2.2:3001/api' : '',
+    defaultValue: kDebugMode ? 'http://10.0.2.2:3000/api' : '',
   );
 
   static String? _cachedBaseUrl;
@@ -187,23 +187,32 @@ class ApiService {
   // Auth
   static Future<Map<String, dynamic>> login(
       String username, String password) async {
-    final result = await post('auth/login', {
-      'ten_dang_nhap': username,
-      'mat_khau': password,
-    });
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/login'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'ten_dang_nhap': username,
+        'mat_khau': password,
+      }),
+    ).timeout(const Duration(seconds: 4));
 
-    token = result['token'];
-    userId = result['user']?['id'];
-    role = result['user']?['vai_tro'];
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final result = jsonDecode(response.body);
+      token = result['token'];
+      userId = result['user']?['id'];
+      role = result['user']?['vai_tro'];
 
-    // Save values to SecureStorage
-    if (token != null && userId != null && role != null) {
-      await SecureStorage.write('token', token!);
-      await SecureStorage.write('userId', userId.toString());
-      await SecureStorage.write('role', role!);
+      // Save values to SecureStorage
+      if (token != null && userId != null && role != null) {
+        await SecureStorage.write('token', token!);
+        await SecureStorage.write('userId', userId.toString());
+        await SecureStorage.write('role', role!);
+      }
+
+      return result;
+    } else {
+      throw _handleErrorResponse(response);
     }
-
-    return result;
   }
 
   static Future<void> clearSession() async {
@@ -227,6 +236,10 @@ class ApiService {
   }
 
   // Student trips
+  static Future<dynamic> getFactories() async {
+    return await get('sinh-vien/factories');
+  }
+
   static Future<dynamic> getAvailableTrips(int studentId) async {
     return await get('sinh-vien/available-trips/$studentId');
   }
@@ -241,13 +254,25 @@ class ApiService {
     });
   }
 
+
+  static Future<dynamic> getProposals() async {
+    return await get('sinh-vien/proposals');
+  }
+
+  static Future<dynamic> requestCancel(Map<String, dynamic> data) async {
+    return await post('sinh-vien/request-cancel', data);
+  }
+
   static Future<dynamic> submitReport(int registrationId,
       String fileBaoCaoUrl, String? fileXacNhanUrl) async {
-    return await post('sinh-vien/submit-report', {
+    final data = <String, dynamic>{
       'registrationId': registrationId,
       'fileBaoCaoUrl': fileBaoCaoUrl,
-      if (fileXacNhanUrl != null) 'fileXacNhanUrl': fileXacNhanUrl,
-    });
+    };
+    if (fileXacNhanUrl != null) {
+      data['fileXacNhanUrl'] = fileXacNhanUrl;
+    }
+    return await post('sinh-vien/submit-report', data);
   }
 
   static Future<dynamic> selectRepresentativeTrips(
@@ -259,6 +284,10 @@ class ApiService {
   }
 
   // Student finance
+  static Future<dynamic> getPaymentConfig() async {
+    return await get('sinh-vien/payment-config');
+  }
+
   static Future<dynamic> getInvoices(int studentId) async {
     return await get('sinh-vien/invoices/$studentId');
   }
@@ -294,6 +323,21 @@ class ApiService {
   // Student grades
   static Future<dynamic> getStudentGrades(int studentId) async {
     return await get('sinh-vien/grades/$studentId');
+  }
+
+  // Student dashboard
+  static Future<dynamic> getStudentDashboardStats(int studentId) async {
+    return await get('sinh-vien/dashboard-stats/$studentId');
+  }
+
+  // Student propose trip
+  static Future<dynamic> proposeTrip(int studentId, String companyName, String address, String description) async {
+    return await post('sinh-vien/propose-trip', {
+      'sinh_vien_id': studentId,
+      'ten_doanh_nghiep': companyName,
+      'dia_chi': address,
+      'ly_do': description,
+    });
   }
 
   // Lecturer profile
@@ -337,10 +381,9 @@ class ApiService {
   // Lecturer guided reports
   static Future<dynamic> getGuidedReports(int lecturerId,
       {String? search, String? status}) async {
-    final queryParams = <String, String>{
-      if (search != null) 'search': search,
-      if (status != null) 'status': status,
-    };
+    final queryParams = <String, String>{};
+    if (search != null) queryParams['search'] = search;
+    if (status != null) queryParams['status'] = status;
     final uri = Uri.parse('$baseUrl/giang-vien/guided-reports/$lecturerId')
         .replace(queryParameters: queryParams);
     try {
@@ -383,6 +426,27 @@ class ApiService {
       'phieuId': phieuId,
       'score': score,
     });
+  }
+
+  // Lecturer notifications
+  static Future<dynamic> getLecturerNotifications(int lecturerId) async {
+    return await get('giang-vien/notifications/$lecturerId');
+  }
+
+  static Future<dynamic> markLecturerNotificationRead(
+      int notifId, int accountId) async {
+    return await post('giang-vien/notifications/$notifId/read', {
+      'accountId': accountId,
+    });
+  }
+
+  static Future<dynamic> markAllLecturerNotificationsRead(int lecturerId) async {
+    return await post('giang-vien/notifications/mark-all-read/$lecturerId', {});
+  }
+
+  // Lecturer dashboard
+  static Future<dynamic> getLecturerDashboardStats(int lecturerId) async {
+    return await get('giang-vien/dashboard-stats/$lecturerId');
   }
 
   // File Upload Helper
