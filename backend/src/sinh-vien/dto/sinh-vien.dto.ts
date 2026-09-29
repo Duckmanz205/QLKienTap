@@ -102,6 +102,10 @@ export class SubmitReportDto {
   @IsOptional()
   @IsString()
   fileXacNhanUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  extractedText?: string;
 }
 
 export class SelectRepresentativeTripsDto {

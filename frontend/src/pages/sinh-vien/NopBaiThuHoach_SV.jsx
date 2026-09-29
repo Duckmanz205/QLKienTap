@@ -21,6 +21,7 @@ export default function NopBaiThuHoach_SV() {
   const [leftWidth, setLeftWidth] = useState(50);
   const [isDragging, setIsDragging] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState({ show: false, tripId: null });
   const [rightFontSize, setRightFontSize] = useState(14);
   const rightScrollRef = useRef(null);
   const [searchText, setSearchText] = useState('');
@@ -265,6 +266,7 @@ export default function NopBaiThuHoach_SV() {
         registrationId: selectedTrip.id,
         fileBaoCaoUrl: uploadedFile.url || uploadedFile.name,
         fileXacNhanUrl: null,
+        extractedText: uploadedFile.text,
       });
       showPopup("Nộp bài thành công!", "success");
       setUploadedFile(null);
@@ -352,9 +354,16 @@ export default function NopBaiThuHoach_SV() {
                           </div>
                         )
                       ) : (
-                        <button 
-                          onClick={async () => {
-                            setSelectedTrip(trip);
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => setConfirmDelete({ show: true, tripId: trip.id })}
+                            className="px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-1.5 bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer shadow-sm border border-red-100"
+                          >
+                            Nộp lại <UploadCloud className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={async () => {
+                              setSelectedTrip(trip);
                             if (trip.baiThuHoach) {
                               const dbPath = trip.baiThuHoach.file_bao_cao;
                               let apiPath = '';
@@ -412,6 +421,7 @@ export default function NopBaiThuHoach_SV() {
                         >
                           Xem lại <FileText className="w-4 h-4" />
                         </button>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -801,6 +811,48 @@ export default function NopBaiThuHoach_SV() {
         type={popup.type}
         onClose={() => setPopup({ ...popup, show: false })}
       />
+
+      {/* Confirm Delete Modal */}
+      {confirmDelete.show && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6">
+              <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-4">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-black text-slate-800 mb-2">Xác nhận nộp lại</h3>
+              <p className="text-sm text-slate-500 font-medium leading-relaxed">
+                Bạn có chắc chắn muốn xóa bài thu hoạch này để nộp lại không? Dữ liệu và file báo cáo cũ sẽ bị xóa vĩnh viễn khỏi hệ thống.
+              </p>
+            </div>
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
+              <button 
+                onClick={() => setConfirmDelete({ show: false, tripId: null })}
+                className="px-4 py-2 rounded-xl text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition-colors cursor-pointer shadow-sm"
+              >
+                Hủy bỏ
+              </button>
+              <button 
+                onClick={async () => {
+                  try {
+                    await sinhVienApi.deleteReport(confirmDelete.tripId);
+                    showPopup('Đã xóa bài thu hoạch thành công', 'success');
+                    setConfirmDelete({ show: false, tripId: null });
+                    if (student) fetchTrips(student.id);
+                  } catch (err) {
+                    console.error(err);
+                    showPopup(err.response?.data?.message || 'Có lỗi xảy ra khi xóa bài thu hoạch', 'error');
+                    setConfirmDelete({ show: false, tripId: null });
+                  }
+                }}
+                className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-red-500 hover:bg-red-600 transition-colors cursor-pointer shadow-sm"
+              >
+                Xác nhận xóa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {selectedTrip ? renderSubmissionView() : renderListView()}
     </div>
