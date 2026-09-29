@@ -23,6 +23,7 @@ export const sinhVienApi = {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
   },
+  deleteReport: (registrationId) => api.delete(`/sinh-vien/report/${registrationId}`),
   selectRepresentativeTrips: (data) => api.post('/sinh-vien/select-representative-trips', data),
   getGrades: (studentId) => api.get(`/sinh-vien/grades/${studentId}`),
   getDashboardStats: (studentId) => api.get(`/sinh-vien/dashboard-stats/${studentId}`),
