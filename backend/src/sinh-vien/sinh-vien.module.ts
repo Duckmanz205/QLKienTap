@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
+import { UploadModule } from '../upload/upload.module';
 import { SinhVienController } from './sinh-vien.controller';
 import { SinhVienService } from './sinh-vien.service';
 import {
@@ -47,6 +48,7 @@ import {
       TaiKhoanThuHuong,
     ]),
     AuthModule,
+    UploadModule,
   ],
   controllers: [SinhVienController],
   providers: [SinhVienService],
