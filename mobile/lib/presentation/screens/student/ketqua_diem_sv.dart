@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/state/app_state.dart';
+import '../../widgets/paginated_list.dart';
 
 class KetQuaDiemSVScreen extends StatelessWidget {
   const KetQuaDiemSVScreen({super.key});
@@ -11,58 +12,64 @@ class KetQuaDiemSVScreen extends StatelessWidget {
     final appState = appStateProvider.state;
     final completedTrips = appState.studentTrips.where((t) => t.isCompleted).toList();
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Column(
-              children: [
-                const Text(
-                  'Điểm tổng kết học phần',
-                  style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  '8.4',
-                  style: TextStyle(color: Colors.white, fontSize: 44, fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppColors.secondary,
-                    borderRadius: BorderRadius.circular(20),
+    return PaginatedList<dynamic>(
+      items: completedTrips,
+      searchHint: 'Tìm chuyến đi...',
+      dropdownTitle: 'Loại',
+      dropdownOptions: const ['Tất cả', 'Trực tiếp', 'Trực tuyến', 'Tự do'],
+      itemName: 'chuyến đi',
+      filter: (trip, query, type) {
+        final matchQuery = trip.name.toLowerCase().contains(query.toLowerCase());
+        final matchType = type == 'Tất cả' || trip.type == type;
+        return matchQuery && matchType;
+      },
+      headerWidgetBuilder: (_) => Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: Column(
+                children: [
+                  const Text(
+                    'Điểm tổng kết học phần',
+                    style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold),
                   ),
-                  child: const Text(
-                    'Đạt',
-                    style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                  const SizedBox(height: 8),
+                  const Text(
+                    '8.4',
+                    style: TextStyle(color: Colors.white, fontSize: 44, fontWeight: FontWeight.w900),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.secondary,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Text(
+                      'Đạt',
+                      style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 24),
-
-          const Text(
-            'Chi tiết điểm các chuyến đi',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.darkSlate),
-          ),
-          const SizedBox(height: 12),
-
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: completedTrips.length,
-            itemBuilder: (context, index) {
-              final trip = completedTrips[index];
-              final hasGrade = trip.gradeDetails != null;
+            const SizedBox(height: 24),
+            const Text(
+              'Chi tiết điểm các chuyến đi',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.darkSlate),
+            ),
+          ],
+        ),
+      ),
+      itemBuilder: (trip) {
+        final hasGrade = trip.gradeDetails != null;
 
               return Card(
                 margin: const EdgeInsets.only(bottom: 16),
@@ -123,10 +130,7 @@ class KetQuaDiemSVScreen extends StatelessWidget {
                   ),
                 ),
               );
-            },
-          ),
-        ],
-      ),
+      },
     );
   }
 

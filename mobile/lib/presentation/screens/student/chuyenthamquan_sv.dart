@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/app_models.dart';
 import '../../../data/state/app_state.dart';
+import '../../widgets/paginated_list.dart';
 
 class ChuyenThamQuanSVScreen extends StatefulWidget {
   final Function(String) onTripTap;
@@ -20,6 +21,20 @@ class ChuyenThamQuanSVScreen extends StatefulWidget {
 }
 
 class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _companyNameCtrl = TextEditingController();
+  final _addressCtrl = TextEditingController();
+  final _descriptionCtrl = TextEditingController();
+  bool _isProposing = false;
+
+  @override
+  void dispose() {
+    _companyNameCtrl.dispose();
+    _addressCtrl.dispose();
+    _descriptionCtrl.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final appStateProvider = AppStateProvider.of(context);
@@ -40,70 +55,69 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
           ),
           child: Row(
             children: [
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => widget.onTabChanged('available'),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    decoration: BoxDecoration(
-                      color: widget.activeTab == 'available' ? AppColors.secondary : Colors.transparent,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      'Có thể đăng ký',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: widget.activeTab == 'available' ? Colors.white : AppColors.darkSlate,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => widget.onTabChanged('registered'),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    decoration: BoxDecoration(
-                      color: widget.activeTab == 'registered' ? AppColors.secondary : Colors.transparent,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      'Đã đăng ký',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: widget.activeTab == 'registered' ? Colors.white : AppColors.darkSlate,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+              _buildTab('available', 'Có thể đăng ký'),
+              _buildTab('registered', 'Đã đăng ký'),
+              _buildTab('propose', 'Đề xuất'),
             ],
           ),
         ),
 
         Expanded(
-          child: widget.activeTab == 'available'
-              ? _buildAvailableTripsTab(availableTrips, appStateProvider)
-              : _buildRegisteredTripsTab(registeredTrips, appStateProvider),
+          child: _buildCurrentTabContent(availableTrips, registeredTrips, appStateProvider),
         ),
       ],
     );
   }
 
-  Widget _buildAvailableTripsTab(List<Trip> trips, AppStateProviderState appStateProvider) {
-    if (trips.isEmpty) {
-      return const Center(child: Text('Không có chuyến nào có sẵn để đăng ký.'));
+  Widget _buildTab(String tabKey, String label) {
+    final isActive = widget.activeTab == tabKey;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => widget.onTabChanged(tabKey),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isActive ? AppColors.secondary : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: isActive ? Colors.white : AppColors.darkSlate,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCurrentTabContent(List<Trip> available, List<Trip> registered, AppStateProviderState appStateProvider) {
+    if (widget.activeTab == 'propose') {
+      return _buildProposeTab(appStateProvider);
+    } else if (widget.activeTab == 'registered') {
+      return _buildRegisteredTripsTab(registered, appStateProvider);
+    } else {
+      return _buildAvailableTripsTab(available, appStateProvider);
     }
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      itemCount: trips.length,
-      itemBuilder: (context, index) {
-        final trip = trips[index];
+  }
+
+  Widget _buildAvailableTripsTab(List<Trip> trips, AppStateProviderState appStateProvider) {
+    return PaginatedList<Trip>(
+      items: trips,
+      searchHint: 'Tìm kiếm chuyến...',
+      dropdownTitle: 'Loại',
+      dropdownOptions: const ['Tất cả', 'Trực tiếp', 'Trực tuyến'],
+      itemName: 'chuyến',
+      emptyWidget: const Center(child: Text('Không có chuyến nào có sẵn để đăng ký.')),
+      filter: (trip, query, type) {
+        final matchesQuery = trip.name.toLowerCase().contains(query.toLowerCase());
+        final matchesType = type == 'Tất cả' || trip.type == type;
+        return matchesQuery && matchesType;
+      },
+      itemBuilder: (trip) {
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
           child: Column(
@@ -185,14 +199,20 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
   }
 
   Widget _buildRegisteredTripsTab(List<Trip> trips, AppStateProviderState appStateProvider) {
-    if (trips.isEmpty) {
-      return const Center(child: Text('Bạn chưa đăng ký chuyến tham quan nào.'));
-    }
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      itemCount: trips.length,
-      itemBuilder: (context, index) {
-        final trip = trips[index];
+    return PaginatedList<Trip>(
+      items: trips,
+      searchHint: 'Tìm kiếm chuyến...',
+      dropdownTitle: 'Trạng thái',
+      dropdownOptions: const ['Tất cả', 'Hợp lệ/Hoàn thành', 'Chờ duyệt'],
+      itemName: 'chuyến',
+      emptyWidget: const Center(child: Text('Bạn chưa đăng ký chuyến tham quan nào.')),
+      filter: (trip, query, status) {
+        final matchesQuery = trip.name.toLowerCase().contains(query.toLowerCase());
+        final tripStatus = trip.isCompleted ? 'Hợp lệ/Hoàn thành' : 'Chờ duyệt';
+        final matchesStatus = status == 'Tất cả' || tripStatus == status;
+        return matchesQuery && matchesStatus;
+      },
+      itemBuilder: (trip) {
         final status = trip.isCompleted ? 'Hợp lệ/Hoàn thành' : 'Chờ duyệt';
         final statusColor = trip.isCompleted ? AppColors.secondary : AppColors.warning;
 
@@ -262,6 +282,106 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildProposeTab(AppStateProviderState appStateProvider) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Đề xuất doanh nghiệp/nhà máy',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.darkSlate),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Nếu bạn biết một doanh nghiệp phù hợp cho chuyên ngành, hãy đề xuất để khoa xem xét liên hệ tổ chức chuyến đi.',
+              style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+            ),
+            const SizedBox(height: 24),
+            TextFormField(
+              controller: _companyNameCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Tên doanh nghiệp / Nhà máy',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.business),
+              ),
+              validator: (v) => v == null || v.isEmpty ? 'Vui lòng nhập tên doanh nghiệp' : null,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _addressCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Địa chỉ (Tỉnh/Thành phố)',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.location_on),
+              ),
+              validator: (v) => v == null || v.isEmpty ? 'Vui lòng nhập địa chỉ' : null,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _descriptionCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Lý do đề xuất / Thông tin thêm',
+                border: OutlineInputBorder(),
+                alignLabelWithHint: true,
+              ),
+              maxLines: 4,
+              validator: (v) => v == null || v.isEmpty ? 'Vui lòng nhập lý do' : null,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: _isProposing
+                  ? null
+                  : () async {
+                      if (_formKey.currentState!.validate()) {
+                        setState(() => _isProposing = true);
+                        try {
+                          await appStateProvider.proposeTrip(
+                            _companyNameCtrl.text,
+                            _addressCtrl.text,
+                            _descriptionCtrl.text,
+                          );
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Đã gửi đề xuất thành công!')),
+                            );
+                            _companyNameCtrl.clear();
+                            _addressCtrl.clear();
+                            _descriptionCtrl.clear();
+                            widget.onTabChanged('available');
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Lỗi: $e'), backgroundColor: AppColors.danger),
+                            );
+                          }
+                        } finally {
+                          if (mounted) setState(() => _isProposing = false);
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              child: _isProposing
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    )
+                  : const Text('GỬI ĐỀ XUẤT', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

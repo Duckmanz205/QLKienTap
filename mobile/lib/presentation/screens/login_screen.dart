@@ -27,11 +27,11 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {
       _selectedRole = role;
       if (role == 'student') {
-        _usernameController.text = 'SV20261234';
-        _passwordController.text = 'SV20261234';
+        _usernameController.text = '2005190573';
+        _passwordController.text = '2005190573';
       } else {
-        _usernameController.text = 'GV2110432';
-        _passwordController.text = 'GV2110432';
+        _usernameController.text = 'gv019';
+        _passwordController.text = 'gv019';
       }
     });
   }
@@ -51,10 +51,11 @@ class _LoginScreenState extends State<LoginScreen> {
           setState(() {
             _isLoading = false;
           });
+          final isForced = AppStateProvider.of(context).state.phaiDoiMatKhau == true;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Đăng nhập thành công!'),
-              backgroundColor: AppColors.secondary,
+            SnackBar(
+              content: Text(isForced ? 'Vui lòng đổi mật khẩu để tiếp tục' : 'Đăng nhập thành công!'),
+              backgroundColor: isForced ? AppColors.warning : AppColors.secondary,
             ),
           );
         },

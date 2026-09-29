@@ -7,6 +7,9 @@ import 'diemdanhsv_gv.dart';
 import 'sinhvienhuongdan_gv.dart';
 import 'chambaithuhoach_gv.dart';
 import 'hoidongchambaocao_dsbuoi_gv.dart';
+import 'thongbao_gv.dart';
+import 'diemchuanbi_gv.dart';
+import '../../widgets/app_drawer.dart';
 
 class LecturerPortal extends StatefulWidget {
   const LecturerPortal({super.key});
@@ -24,6 +27,8 @@ class _LecturerPortalState extends State<LecturerPortal> {
   bool _notificationSubScreen = false;
   bool _profileSubScreen = false;
   String? _activeCouncilId;
+  bool _attendanceIntent = false;
+  bool _gradingPrepIntent = false;
 
   void _navigateTo(int index) {
     setState(() {
@@ -33,6 +38,8 @@ class _LecturerPortalState extends State<LecturerPortal> {
       _notificationSubScreen = false;
       _profileSubScreen = false;
       _activeCouncilId = null;
+      _attendanceIntent = false;
+      _gradingPrepIntent = false;
     });
   }
 
@@ -44,20 +51,23 @@ class _LecturerPortalState extends State<LecturerPortal> {
     // Determine titles & back button flags
     bool showBack = _attendanceActiveTourId != null ||
         _gradingActiveStudentId != null ||
-        _notificationSubScreen ||
-        _profileSubScreen ||
         _activeCouncilId != null;
 
     String pageTitle = 'Xin chào, ${_stateRoleLabel(appState)}';
     if (_currentIndex == 1) {
       if (_attendanceActiveTourId != null) {
         pageTitle = 'Điểm danh đoàn';
+      } else if (_attendanceIntent) {
+        pageTitle = 'Điểm danh sinh viên';
       } else {
         pageTitle = 'Lịch trình dẫn đoàn';
       }
     } else if (_currentIndex == 2) {
       if (_gradingActiveStudentId != null) {
-        pageTitle = 'Đánh giá & chấm bài';
+        final student = appState.lecturerStudents.firstWhere((s) => s.id == _gradingActiveStudentId);
+        pageTitle = student.name;
+      } else if (_gradingPrepIntent) {
+        pageTitle = 'Điểm chuẩn bị & Cộng';
       } else {
         pageTitle = 'Sinh viên hướng dẫn';
       }
@@ -76,6 +86,32 @@ class _LecturerPortalState extends State<LecturerPortal> {
 
     return Scaffold(
       backgroundColor: AppColors.appBackground,
+      drawer: AppDrawer(
+        role: 'GiangVien',
+        currentIndex: _currentIndex,
+        activeSubScreen: _notificationSubScreen 
+            ? 'notifications' 
+            : (_profileSubScreen 
+                ? 'profile' 
+                : (_attendanceIntent || _attendanceActiveTourId != null 
+                    ? 'attendance' 
+                    : (_gradingPrepIntent || _gradingActiveStudentId != null 
+                        ? 'grading_prep' 
+                        : null))),
+        onNavigate: (index, {subScreen}) {
+          if (subScreen != null) {
+            _navigateTo(index);
+            setState(() {
+              if (subScreen == 'notifications') _notificationSubScreen = true;
+              if (subScreen == 'profile') _profileSubScreen = true;
+              if (subScreen == 'attendance') _attendanceIntent = true;
+              if (subScreen == 'grading_prep') _gradingPrepIntent = true;
+            });
+          } else {
+            _navigateTo(index);
+          }
+        },
+      ),
       appBar: AppBar(
         leading: showBack
             ? IconButton(
@@ -95,30 +131,20 @@ class _LecturerPortalState extends State<LecturerPortal> {
                   });
                 },
               )
-            : IconButton(
-                icon: const Icon(Icons.menu, color: AppColors.primary),
-                onPressed: () => setState(() => _profileSubScreen = true),
-              ),
-        title: Row(
-          children: [
-            Image.asset(
-              'assets/images/huit_logo.png',
-              height: 28,
-              fit: BoxFit.contain,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                pageTitle,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: AppColors.primary,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w900,
+            : Builder(
+                builder: (context) => IconButton(
+                  icon: const Icon(Icons.menu, color: AppColors.primary),
+                  onPressed: () => Scaffold.of(context).openDrawer(),
                 ),
               ),
-            ),
-          ],
+        title: Text(
+          pageTitle,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: AppColors.primary,
+            fontSize: 15,
+            fontWeight: FontWeight.w900,
+          ),
         ),
         actions: [
           Stack(
@@ -216,7 +242,7 @@ class _LecturerPortalState extends State<LecturerPortal> {
       return _buildProfileSubScreen(appState, appStateProvider);
     }
     if (_notificationSubScreen) {
-      return _buildNotificationsSubScreen(appState, appStateProvider);
+      return const ThongBaoGVScreen();
     }
 
     switch (_currentIndex) {
@@ -238,7 +264,9 @@ class _LecturerPortalState extends State<LecturerPortal> {
       case 1:
         if (_attendanceActiveTourId != null) {
           final tour = appState.lecturerTours.firstWhere((t) => t.id == _attendanceActiveTourId);
-          return DiemDanhSVGVScreen(tour: tour, onBack: () => setState(() => _attendanceActiveTourId = null));
+          return DiemDanhSVGVScreen(initialTour: tour, onBack: () => setState(() => _attendanceActiveTourId = null));
+        } else if (_attendanceIntent) {
+          return const DiemDanhSVGVScreen();
         }
         return LichDanDoanGVScreen(onTourTap: (tourId) => setState(() => _attendanceActiveTourId = tourId));
       case 2:
@@ -252,6 +280,8 @@ class _LecturerPortalState extends State<LecturerPortal> {
               });
             },
           );
+        } else if (_gradingPrepIntent) {
+          return DiemChuanBiGVScreen(onBack: () => setState(() => _gradingPrepIntent = false));
         }
         return SinhVienHuongDanGVScreen(onStudentTap: (studentId) => setState(() => _gradingActiveStudentId = studentId));
       case 3:
@@ -280,115 +310,6 @@ class _LecturerPortalState extends State<LecturerPortal> {
     }
   }
 
-  Widget _buildNotificationsSubScreen(AppState appState, AppStateProviderState appStateProvider) {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: appState.lecturerNotifications.length + 1,
-      itemBuilder: (context, index) {
-        if (index == 0) {
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Thông báo đã nhận',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                ),
-                TextButton.icon(
-                  onPressed: () {
-                    appStateProvider.markAllLecturerNotificationsRead();
-                  },
-                  icon: const Icon(Icons.done_all, size: 16),
-                  label: const Text('Đọc tất cả', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ),
-          );
-        }
-
-        final notif = appState.lecturerNotifications[index - 1];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (notif.isUnread)
-                      Container(
-                        margin: const EdgeInsets.only(top: 4, right: 8),
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: AppColors.warning,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            notif.title,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: notif.isUnread ? FontWeight.bold : FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            notif.time,
-                            style: const TextStyle(fontSize: 10, color: AppColors.textMuted),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  notif.body,
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700, height: 1.4),
-                ),
-                if (notif.attachment != null) ...[
-                  const SizedBox(height: 8),
-                  GestureDetector(
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Đang tải tài liệu: ${notif.attachment}...')),
-                      );
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.05),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.attach_file, size: 14, color: AppColors.primary),
-                          const SizedBox(width: 4),
-                          Text(
-                            notif.attachment!,
-                            style: const TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
 
   Widget _buildProfileSubScreen(AppState appState, AppStateProviderState appStateProvider) {
     return SingleChildScrollView(

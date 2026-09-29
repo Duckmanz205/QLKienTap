@@ -9,6 +9,8 @@ import 'nopbaithuhoach_sv.dart';
 import 'ketqua_diem_sv.dart';
 import 'lichtrinhdoan_sv.dart';
 import 'taichinh_sv.dart';
+import 'thongbao_sv.dart';
+import '../../widgets/app_drawer.dart';
 
 class StudentPortal extends StatefulWidget {
   const StudentPortal({super.key});
@@ -72,16 +74,34 @@ class _StudentPortalState extends State<StudentPortal> {
       pageTitle = 'Kết quả & điểm';
     } else if (_currentIndex == 4) {
       if (_moreSubScreen == 'schedule') pageTitle = 'Lịch trình đoàn';
-      if (_moreSubScreen == 'finance') pageTitle = 'Tài chính';
+      if (_moreSubScreen == 'finance' || _moreSubScreen == 'finance_payment' || _moreSubScreen == 'finance_refund') pageTitle = 'Tài chính';
       if (_moreSubScreen == 'notifications') pageTitle = 'Thông báo';
       if (_moreSubScreen == 'profile') pageTitle = 'Hồ sơ cá nhân';
       if (_moreSubScreen == null) pageTitle = 'Thêm';
     }
 
-    final showBack = isTripDetailActive || isSubScreenActive;
+    final showBack = isTripDetailActive;
 
     return Scaffold(
       backgroundColor: AppColors.appBackground,
+      drawer: AppDrawer(
+        role: 'SinhVien',
+        currentIndex: _currentIndex,
+        activeSubScreen: _moreSubScreen,
+        onNavigate: (index, {subScreen}) {
+          if (subScreen != null) {
+            _navigateTo(index);
+            setState(() {
+              _moreSubScreen = subScreen;
+            });
+          } else {
+            _navigateTo(index);
+            if (index == 4) {
+               setState(() { _moreSubScreen = null; });
+            }
+          }
+        },
+      ),
       appBar: AppBar(
         leading: showBack
             ? IconButton(
@@ -94,30 +114,20 @@ class _StudentPortalState extends State<StudentPortal> {
                   }
                 },
               )
-            : IconButton(
-                icon: const Icon(Icons.menu, color: AppColors.primary),
-                onPressed: () => _openMoreScreen('profile'),
-              ),
-        title: Row(
-          children: [
-            Image.asset(
-              'assets/images/huit_logo.png',
-              height: 28,
-              fit: BoxFit.contain,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                pageTitle,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: AppColors.primary,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w900,
+            : Builder(
+                builder: (context) => IconButton(
+                  icon: const Icon(Icons.menu, color: AppColors.primary),
+                  onPressed: () => Scaffold.of(context).openDrawer(),
                 ),
               ),
-            ),
-          ],
+        title: Text(
+          pageTitle,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: AppColors.primary,
+            fontSize: 15,
+            fontWeight: FontWeight.w900,
+          ),
         ),
         actions: [
           Stack(
@@ -245,147 +255,18 @@ class _StudentPortalState extends State<StudentPortal> {
     if (_moreSubScreen == 'schedule') {
       return const LichTrinhDoanSVScreen();
     }
-    if (_moreSubScreen == 'finance') {
+    if (_moreSubScreen == 'finance' || _moreSubScreen == 'finance_payment' || _moreSubScreen == 'finance_refund') {
       return const TaiChinhSVScreen();
     }
     if (_moreSubScreen == 'notifications') {
-      return _buildNotificationsSubScreen(appState, appStateProvider);
+      return const ThongBaoSVScreen();
     }
     if (_moreSubScreen == 'profile') {
       return _buildProfileSubScreen(appState, appStateProvider);
     }
-    return Container();
+    return _buildMoreMenu(appState, appStateProvider);
   }
 
-  Widget _buildNotificationsSubScreen(AppState appState, AppStateProviderState appStateProvider) {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: appState.studentNotifications.length + 1,
-      itemBuilder: (context, index) {
-        if (index == 0) {
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Hộp thư thông báo',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                ),
-                TextButton.icon(
-                  onPressed: () {
-                    appStateProvider.markAllStudentNotificationsRead();
-                  },
-                  icon: const Icon(Icons.done_all, size: 16),
-                  label: const Text('Đọc tất cả', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ),
-          );
-        }
-
-        final notif = appState.studentNotifications[index - 1];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (!notif.isRead)
-                      Container(
-                        margin: const EdgeInsets.only(top: 4, right: 8),
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: AppColors.warning,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            notif.title,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: notif.isRead ? FontWeight.w600 : FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            notif.timeText,
-                            style: const TextStyle(fontSize: 10, color: AppColors.textMuted),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  notif.content,
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700, height: 1.4),
-                ),
-                if (notif.attachment != null) ...[
-                  const SizedBox(height: 8),
-                  GestureDetector(
-                    onTap: () async {
-                      final urlStr = notif.attachment!.startsWith('http')
-                          ? notif.attachment!
-                          : '${ApiService.baseUrl}/upload/file/attachments/${notif.attachment}';
-                      final uri = Uri.parse(urlStr);
-
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Đang tải xuống tệp: ${notif.attachment}...')),
-                      );
-
-                      try {
-                        if (await canLaunchUrl(uri)) {
-                          await launchUrl(uri, mode: LaunchMode.externalApplication);
-                        } else {
-                          throw 'Không thể khởi chạy đường dẫn';
-                        }
-                      } catch (e) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Lỗi tải xuống tệp: $e'),
-                            backgroundColor: AppColors.danger,
-                          ),
-                        );
-                      }
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.05),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.attach_file, size: 14, color: AppColors.primary),
-                          const SizedBox(width: 4),
-                          Text(
-                            notif.attachment!,
-                            style: const TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
 
   Widget _buildProfileSubScreen(AppState appState, AppStateProviderState appStateProvider) {
     return SingleChildScrollView(
