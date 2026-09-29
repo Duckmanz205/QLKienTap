@@ -25,6 +25,7 @@ import {
   LichKienTap,
   TaiKhoanThuHuong,
 } from '../entities/qlkt.entity';
+import { R2StorageService } from '../upload/r2-storage.service';
 
 @Injectable()
 export class SinhVienService {
@@ -54,6 +55,7 @@ export class SinhVienService {
     private blackListRepo: Repository<DanhSachDen>,
     @InjectRepository(LichKienTap) private lichRepo: Repository<LichKienTap>,
     @InjectRepository(TaiKhoanThuHuong) private taiKhoanThuHuongRepo: Repository<TaiKhoanThuHuong>,
+    private readonly r2Storage: R2StorageService,
   ) {}
 
   // Lay thong tin SV bang TaiKhoan ID
@@ -707,6 +709,7 @@ export class SinhVienService {
     registrationId: number,
     fileBaoCaoUrl: string,
     fileXacNhanUrl?: string,
+    extractedText?: string,
   ) {
     const phieu = await this.phieuRepo.findOne({
       where: { id: registrationId, sinh_vien_id: studentId },
@@ -772,6 +775,23 @@ export class SinhVienService {
 
     try {
       await this.baiThuRepo.save(report);
+
+      // Cập nhật file .txt lên Cloudflare nếu có extractedText
+      if (extractedText && this.r2Storage.isReady()) {
+        const txtKey = validBaoCaoRef.replace(/\.\w+$/, '.txt');
+        const txtBuffer = Buffer.from('\uFEFF' + extractedText, 'utf-8');
+        try {
+          await this.r2Storage.uploadFile(
+            this.r2Storage.BUCKET_REPORTS,
+            txtKey,
+            txtBuffer,
+            'text/plain; charset=utf-8'
+          );
+        } catch (r2Error) {
+          console.error('Lỗi khi ghi đè file text lên R2:', r2Error);
+        }
+      }
+
     } catch (error: any) {
       if (error.message && error.message.includes('quá thời hạn')) {
         throw new BadRequestException(error.message);
@@ -790,6 +810,57 @@ export class SinhVienService {
     }
 
     return { message: 'Nộp bài thu hoạch thành công', report };
+  }
+
+  // Sinh vien xoa bai thu hoach
+  async deleteReport(studentId: number, registrationId: number) {
+    const phieuTQ = await this.phieuTQRepo.findOne({
+      where: { phieu_dang_ky_id: registrationId },
+      relations: { baiThuHoach: true },
+    });
+
+    if (!phieuTQ || !phieuTQ.baiThuHoach) {
+      throw new NotFoundException('Không tìm thấy bài thu hoạch cần xóa');
+    }
+
+    const report = phieuTQ.baiThuHoach;
+
+    // Kiểm tra xem đã có điểm chưa
+    const diem = await this.diemPhieuRepo.findOne({
+      where: { phieu_tham_quan_id: phieuTQ.id },
+    });
+
+    if (diem && (diem.diem_chuan_bi != null || diem.diem_thu_hoach != null || diem.diem_hoi_dong_final != null)) {
+      throw new BadRequestException('Bài thu hoạch này đã được chấm điểm, không thể xóa để nộp lại.');
+    }
+
+    // Xóa file trên R2
+    if (this.r2Storage.isReady()) {
+      if (report.file_bao_cao) {
+        try {
+          await this.r2Storage.deleteFile(this.r2Storage.BUCKET_REPORTS, report.file_bao_cao);
+          
+          // Xóa file .txt tương ứng
+          const txtKey = report.file_bao_cao.replace(/\.\w+$/, '.txt');
+          await this.r2Storage.deleteFile(this.r2Storage.BUCKET_REPORTS, txtKey);
+        } catch (e) {
+          console.error('Lỗi khi xóa file báo cáo trên R2:', e);
+        }
+      }
+
+      if (report.file_xac_nhan_tham_quan) {
+        try {
+          await this.r2Storage.deleteFile(this.r2Storage.BUCKET_PAYMENTS, report.file_xac_nhan_tham_quan);
+        } catch (e) {
+          console.error('Lỗi khi xóa file xác nhận trên R2:', e);
+        }
+      }
+    }
+
+    // Xóa bản ghi trong DB
+    await this.baiThuRepo.remove(report);
+
+    return { message: 'Xóa bài thu hoạch thành công' };
   }
 
   // Chot bo 3 chuyen bao cao dai dien

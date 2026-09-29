@@ -6,6 +6,7 @@ import {
   Param,
   ParseIntPipe,
   UseGuards,
+  Delete,
 } from '@nestjs/common';
 import { SinhVienService } from './sinh-vien.service';
 import { AuthGuard } from '../auth/guards/auth.guard';
@@ -201,7 +202,17 @@ export class SinhVienController {
       body.registrationId,
       body.fileBaoCaoUrl,
       body.fileXacNhanUrl,
+      body.extractedText,
     );
+  }
+
+  @Delete('report/:registrationId')
+  async deleteReport(
+    @CurrentUser() user: JwtPayloadUser,
+    @Param('registrationId', ParseIntPipe) registrationId: number,
+  ) {
+    const student = await this.svService.getStudentByAccountId(user.sub);
+    return this.svService.deleteReport(student.id, registrationId);
   }
 
   @Post('select-representative-trips')
