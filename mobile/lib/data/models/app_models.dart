@@ -176,6 +176,8 @@ class Submission {
   final String? submittedAt;
   final bool hasConfirmationFile;
   final String? confirmationFileName;
+  final String? fileBaoCaoUrl;
+  final String? fileXacNhanUrl;
 
   Submission({
     required this.id,
@@ -189,6 +191,8 @@ class Submission {
     this.submittedAt,
     this.hasConfirmationFile = false,
     this.confirmationFileName,
+    this.fileBaoCaoUrl,
+    this.fileXacNhanUrl,
   });
 
   Submission copyWith({
@@ -199,6 +203,8 @@ class Submission {
     String? submittedAt,
     bool? hasConfirmationFile,
     String? confirmationFileName,
+    String? fileBaoCaoUrl,
+    String? fileXacNhanUrl,
   }) {
     return Submission(
       id: id,
@@ -212,6 +218,8 @@ class Submission {
       submittedAt: submittedAt ?? this.submittedAt,
       hasConfirmationFile: hasConfirmationFile ?? this.hasConfirmationFile,
       confirmationFileName: confirmationFileName ?? this.confirmationFileName,
+      fileBaoCaoUrl: fileBaoCaoUrl ?? this.fileBaoCaoUrl,
+      fileXacNhanUrl: fileXacNhanUrl ?? this.fileXacNhanUrl,
     );
   }
 }
@@ -288,6 +296,8 @@ class LecturerStudent {
   final String? comment;
   final bool isGraded;
   final String tourId;
+  final String? reportFileUrl;
+  final String? confirmationFileUrl;
 
   LecturerStudent({
     required this.id,
@@ -309,6 +319,8 @@ class LecturerStudent {
     this.comment,
     required this.isGraded,
     required this.tourId,
+    this.reportFileUrl,
+    this.confirmationFileUrl,
   });
 
   LecturerStudent copyWith({
@@ -321,6 +333,8 @@ class LecturerStudent {
     double? gvhdGrade,
     String? comment,
     bool? isGraded,
+    String? reportFileUrl,
+    String? confirmationFileUrl,
   }) {
     return LecturerStudent(
       id: id,
@@ -342,6 +356,8 @@ class LecturerStudent {
       comment: comment ?? this.comment,
       isGraded: isGraded ?? this.isGraded,
       tourId: tourId,
+      reportFileUrl: reportFileUrl ?? this.reportFileUrl,
+      confirmationFileUrl: confirmationFileUrl ?? this.confirmationFileUrl,
     );
   }
 }

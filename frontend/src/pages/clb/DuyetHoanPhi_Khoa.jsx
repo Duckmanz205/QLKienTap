@@ -24,8 +24,8 @@ export default function DuyetHoanPhi_Khoa() {
 
   const fetchRefunds = async () => {
     try {
-      const res = await khoaApi.getRefundRequests();
-      setRefunds(res.data);
+      const res = await khoaApi.getRefundRequests({ limit: 1000 });
+      setRefunds(res.data.data || res.data || []);
     } catch (err) {
       console.error(err);
     }
@@ -225,12 +225,12 @@ export default function DuyetHoanPhi_Khoa() {
                           Xem file
                         </button>
                       </td>
-                      <td className="p-4 font-medium text-slate-500">{new Date(r.ngay_yeu_cau).toLocaleDateString('vi-VN')}</td>
+                      <td className="p-4 font-medium text-slate-500">{new Date(r.ngay_nop).toLocaleDateString('vi-VN')}</td>
                       <td className="p-4 text-center">
                         {getStatusBadge(r.trang_thai)}
                       </td>
                       <td className="p-4 text-right pr-6">
-                        {r.trang_thai === 'Pending' ? (
+                        {r.trang_thai === 'ChoXuLy' ? (
                           <div className="flex items-center justify-end gap-2">
                             <button 
                               onClick={() => handleApprove(r.id)}

@@ -172,6 +172,12 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
                         isUploading: isUploadingReport,
                         fileName: _uploadedReports[sub.id] ?? sub.fileName,
                         fileSize: _reportFileSizes[sub.id] ?? sub.fileSize,
+                        onViewTap: sub.fileBaoCaoUrl != null ? () async {
+                          final uri = Uri.parse(sub.fileBaoCaoUrl!);
+                          if (await canLaunchUrl(uri)) {
+                            await launchUrl(uri, mode: LaunchMode.externalApplication);
+                          }
+                        } : null,
                         onTap: () async {
                           if (isUploadingReport) return;
                           try {
@@ -265,6 +271,12 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
                           isUploading: isUploadingConfirm,
                           fileName: _uploadedConfirms[sub.id] ?? sub.confirmationFileName,
                           fileSize: isConfirmUploaded ? 'Đã đính kèm' : null,
+                          onViewTap: sub.fileXacNhanUrl != null ? () async {
+                            final uri = Uri.parse(sub.fileXacNhanUrl!);
+                            if (await canLaunchUrl(uri)) {
+                              await launchUrl(uri, mode: LaunchMode.externalApplication);
+                            }
+                          } : null,
                           onTap: () async {
                             if (isUploadingConfirm) return;
                             try {
@@ -324,6 +336,7 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
     required String? fileName,
     required String? fileSize,
     required VoidCallback onTap,
+    VoidCallback? onViewTap,
   }) {
     return GestureDetector(
       onTap: onTap,
@@ -375,7 +388,20 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
               ),
             ),
             if (isUploaded && !isUploading)
-              const Icon(Icons.cached, size: 16, color: AppColors.textMuted),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (onViewTap != null)
+                    IconButton(
+                      icon: const Icon(Icons.remove_red_eye, size: 20, color: AppColors.primary),
+                      onPressed: onViewTap,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  if (onViewTap != null) const SizedBox(width: 12),
+                  const Icon(Icons.cached, size: 20, color: AppColors.textMuted),
+                ],
+              ),
           ],
         ),
       ),

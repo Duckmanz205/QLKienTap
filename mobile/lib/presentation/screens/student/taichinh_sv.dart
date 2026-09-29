@@ -97,7 +97,13 @@ class _TaiChinhSVScreenState extends State<TaiChinhSVScreen> {
   }
 
   Widget _buildPaymentsTab(AppState appState, AppStateProviderState appStateProvider) {
-    return PaginatedList<dynamic>(
+    return RefreshIndicator(
+      onRefresh: () async {
+        if (ApiService.userId != null) {
+          await appStateProvider.fetchStudentDataFromApi(ApiService.userId!);
+        }
+      },
+      child: PaginatedList<dynamic>(
       items: appState.payments,
       searchHint: 'Tìm kiếm hóa đơn...',
       dropdownTitle: 'Trạng thái',
@@ -251,14 +257,21 @@ class _TaiChinhSVScreenState extends State<TaiChinhSVScreen> {
           ),
         );
       },
-    );
+    ));
   }
 
   Widget _buildRefundsTab(AppState appState, AppStateProviderState appStateProvider) {
-    final violatedPayments = appState.payments.where((p) => p.status == 'Vi phạm' || p.status == 'Đã đóng đúng hạn').toList();
+    final violatedPayments = appState.payments.where((p) => p.status == 'Vi phạm').toList();
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+    return RefreshIndicator(
+      onRefresh: () async {
+        if (ApiService.userId != null) {
+          await appStateProvider.fetchStudentDataFromApi(ApiService.userId!);
+        }
+      },
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -372,27 +385,48 @@ class _TaiChinhSVScreenState extends State<TaiChinhSVScreen> {
                         setState(() {
                           _isUploadingRefund = true;
                         });
-                        final pay = appState.payments.firstWhere((p) => p.id == _refundSelectedInvoice);
-                        final success = await appStateProvider.addRefund(
-                          'HĐ: ${pay.name.replaceAll('Chuyến: ', '')}',
-                          '50.000đ',
-                          localPath: _refundLocalFilePath,
-                          fileName: _refundUploadedFile,
-                        );
-                        setState(() {
-                          _isUploadingRefund = false;
-                          if (success) {
-                            _refundSelectedInvoice = null;
-                            _refundUploadedFile = null;
-                            _refundLocalFilePath = null;
+                        try {
+                          final pay = appState.payments.firstWhere((p) => p.id == _refundSelectedInvoice);
+                          final success = await appStateProvider.addRefund(
+                            pay.id,
+                            'HĐ: ${pay.name.replaceAll('Chuyến: ', '')}',
+                            '50.000đ',
+                            localPath: _refundLocalFilePath,
+                            fileName: _refundUploadedFile,
+                          );
+                          if (mounted) {
+                            setState(() {
+                              _isUploadingRefund = false;
+                              if (success) {
+                                _refundSelectedInvoice = null;
+                                _refundUploadedFile = null;
+                                _refundLocalFilePath = null;
+                              }
+                            });
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(success ? 'Nộp đơn hoàn phí thành công!' : 'Nộp đơn hoàn phí thất bại.'),
+                                backgroundColor: success ? AppColors.secondary : AppColors.danger,
+                              ),
+                            );
                           }
-                        });
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(success ? 'Nộp đơn hoàn phí thành công!' : 'Nộp đơn hoàn phí thất bại.'),
-                            backgroundColor: success ? AppColors.secondary : AppColors.danger,
-                          ),
-                        );
+                        } catch (e) {
+                          if (mounted) {
+                            setState(() {
+                              _isUploadingRefund = false;
+                            });
+                            String errorMsg = e.toString();
+                            if (errorMsg.startsWith('Exception: ')) {
+                              errorMsg = errorMsg.substring(11);
+                            }
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(errorMsg),
+                                backgroundColor: AppColors.danger,
+                              ),
+                            );
+                          }
+                        }
                       }
                     : null,
                 style: ElevatedButton.styleFrom(
@@ -442,6 +476,6 @@ class _TaiChinhSVScreenState extends State<TaiChinhSVScreen> {
           },
         ),
       ],
-    ));
+    )));
   }
 }

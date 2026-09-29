@@ -184,6 +184,30 @@ class ApiService {
     }
   }
 
+  static Future<dynamic> delete(String path) async {
+    try {
+      final response = await http
+          .delete(
+            Uri.parse('$baseUrl/$path'),
+            headers: _headers,
+          )
+          .timeout(const Duration(seconds: 4));
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        if (response.body.isEmpty) return null;
+        return jsonDecode(response.body);
+      } else if (response.statusCode == 401) {
+        await _handleUnauthorized();
+        throw Exception(
+            'Phiên làm việc hết hạn. Vui lòng đăng nhập lại (401).');
+      } else {
+        throw _handleErrorResponse(response);
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   // Auth
   static Future<Map<String, dynamic>> login(
       String username, String password) async {
@@ -264,7 +288,7 @@ class ApiService {
   }
 
   static Future<dynamic> submitReport(int registrationId,
-      String fileBaoCaoUrl, String? fileXacNhanUrl) async {
+      String fileBaoCaoUrl, String? fileXacNhanUrl, {String? extractedText}) async {
     final data = <String, dynamic>{
       'registrationId': registrationId,
       'fileBaoCaoUrl': fileBaoCaoUrl,
@@ -272,7 +296,14 @@ class ApiService {
     if (fileXacNhanUrl != null) {
       data['fileXacNhanUrl'] = fileXacNhanUrl;
     }
+    if (extractedText != null) {
+      data['extractedText'] = extractedText;
+    }
     return await post('sinh-vien/submit-report', data);
+  }
+
+  static Future<dynamic> deleteReport(int registrationId) async {
+    return await delete('sinh-vien/report/$registrationId');
   }
 
   static Future<dynamic> selectRepresentativeTrips(
@@ -380,10 +411,12 @@ class ApiService {
 
   // Lecturer guided reports
   static Future<dynamic> getGuidedReports(int lecturerId,
-      {String? search, String? status}) async {
+      {String? search, String? status, int? page, int? limit}) async {
     final queryParams = <String, String>{};
     if (search != null) queryParams['search'] = search;
     if (status != null) queryParams['status'] = status;
+    if (page != null) queryParams['page'] = page.toString();
+    if (limit != null) queryParams['limit'] = limit.toString();
     final uri = Uri.parse('$baseUrl/giang-vien/guided-reports/$lecturerId')
         .replace(queryParameters: queryParams);
     try {

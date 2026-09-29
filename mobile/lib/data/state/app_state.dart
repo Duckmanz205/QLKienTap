@@ -210,23 +210,44 @@ class AppStateProviderState extends State<AppStateContainer> {
       }
       
       // Process registered trips
+      List<Submission> realSubmissions = [];
       for (var reg in regTripsJson) {
         if (reg['chuyenThamQuan'] != null) {
           final trip = _mapJsonToTrip(reg['chuyenThamQuan'], isRegistered: true);
           final status = reg['trang_thai'];
           final isCompleted = status == 'HoanThanh' || status == 'DaChamDiem' || trip.isCompleted;
           realTrips.add(trip.copyWith(isRegistered: true, isCompleted: isCompleted, registrationId: reg['id'].toString()));
+          
+          if (isCompleted) {
+             final bth = reg['baiThuHoach'];
+             realSubmissions.add(Submission(
+               id: reg['id'].toString(),
+               registrationId: reg['id'],
+               tripName: trip.name,
+               typeText: trip.type == 'TuDo' || trip.type == 'Tự do' ? 'Kiến tập tự do' : 'Kiến tập ${trip.type.toLowerCase()}',
+               dateText: trip.date,
+               status: bth != null ? 'Đã nộp' : 'Chưa nộp',
+               fileName: bth?['file_bao_cao']?.split('/').last ?? (bth != null ? 'baocao.pdf' : null),
+               fileSize: bth != null ? 'N/A' : null,
+               submittedAt: bth?['ngay_nop'] != null ? DateTime.tryParse(bth['ngay_nop'].toString())?.toLocal().toString().substring(0,16) : null,
+               hasConfirmationFile: bth != null && bth['file_xac_nhan_tham_quan'] != null,
+               confirmationFileName: bth?['file_xac_nhan_tham_quan']?.split('/').last,
+               fileBaoCaoUrl: bth?['file_bao_cao'],
+               fileXacNhanUrl: bth?['file_xac_nhan_tham_quan'],
+             ));
+          }
         }
       }
 
       setState(() {
         _state.studentTrips = realTrips;
+        _state.submissions = realSubmissions;
       });
 
       // 2. Fetch Invoices
       final List<dynamic> invoicesJson = await ApiService.getInvoices(studentId);
-      if (invoicesJson.isNotEmpty) {
-        setState(() {
+      setState(() {
+        if (invoicesJson.isNotEmpty) {
           _state.payments = invoicesJson.map((inv) {
             final chuyen = inv['chuyen_di'] ?? inv['phieuDangKy']?['chuyenThamQuan'] ?? {};
             return Payment(
@@ -236,16 +257,22 @@ class AppStateProviderState extends State<AppStateContainer> {
               code: inv['ma_hoa_don'] ?? inv['ma_giao_dich'] ?? 'KT-TRANSFER',
               amount: double.tryParse(inv['so_tien']?.toString() ?? '50000') ?? 50000,
               dueDate: inv['han_thanh_toan'] != null ? DateTime.tryParse(inv['han_thanh_toan'])?.toLocal().toString().substring(0, 10) ?? '15/12/2026' : '15/12/2026',
-              status: inv['trang_thai'] == 'DaThanhToan' ? 'Đã đóng đúng hạn' : 'Chưa đóng',
+              status: inv['trang_thai'] == 'ViPham' ? 'Vi phạm'
+                  : inv['trang_thai'] == 'DaHoanPhi' ? 'Đã hoàn phí'
+                  : (inv['trang_thai'] == 'DaDongDungHan' || inv['trang_thai'] == 'DaDongTreHan') ? 'Đã đóng đúng hạn' 
+                  : 'Chưa đóng',
             );
           }).toList();
-        });
-      }
+        } else {
+          _state.payments = [];
+        }
+      });
 
       // 3. Fetch Refund Requests
       try {
         final List<dynamic> refundsJson = await ApiService.getRefundRequests(studentId);
         setState(() {
+          if (refundsJson.isNotEmpty) {
           _state.refunds = refundsJson.map((ref) {
             final invoice = ref['hoaDon'] ?? {};
             String mappedStatus = 'Chờ xử lý';
@@ -260,14 +287,17 @@ class AppStateProviderState extends State<AppStateContainer> {
               status: mappedStatus,
             );
           }).toList();
+          } else {
+            _state.refunds = [];
+          }
         });
       } catch (e) {
         print('Error fetching refund requests: $e');
       }
 
       final List<dynamic> notifsJson = await ApiService.getStudentNotifications(studentId);
-      if (notifsJson.isNotEmpty) {
-        setState(() {
+      setState(() {
+        if (notifsJson.isNotEmpty) {
           _state.studentNotifications = notifsJson.map((n) {
             return StudentNotification(
               id: n['id'].toString(),
@@ -277,8 +307,10 @@ class AppStateProviderState extends State<AppStateContainer> {
               isRead: n['da_doc'] ?? false,
             );
           }).toList();
-        });
-      }
+        } else {
+          _state.studentNotifications = [];
+        }
+      });
 
       final Map<String, dynamic> statsJson = await ApiService.getStudentDashboardStats(studentId);
       setState(() {
@@ -315,30 +347,40 @@ class AppStateProviderState extends State<AppStateContainer> {
 
   Future<void> _fetchLecturerDataFromApi(int lecturerId) async {
     try {
-      final List<dynamic> studentsJson = await ApiService.getGuidedStudents(lecturerId);
-      if (studentsJson.isNotEmpty) {
+      final reportsRes = await ApiService.getGuidedReports(lecturerId, limit: 100);
+      final List<dynamic> reportsJson = reportsRes['data'] ?? [];
+      
+      if (reportsJson.isNotEmpty) {
         setState(() {
-          _state.lecturerStudents = studentsJson.map((s) {
+          _state.lecturerStudents = reportsJson.map((r) {
+            final phieuTQ = r['phieuThamQuan'] ?? {};
+            final phieu = phieuTQ['phieuDangKy'] ?? {};
+            final sv = phieu['sinhVien'] ?? {};
+            final chuyen = phieu['chuyenThamQuan'] ?? {};
+            final diem = phieuTQ['diemPhieuThamQuan'] ?? {};
+            
             return LecturerStudent(
-              id: s['mssv'] ?? 'SV-MOCK',
-              phieuId: s['phieu_id'] ?? s['phieu_dang_ky_id'] ?? s['id'],
-              reportId: s['report_id'] ?? s['bai_thu_hoach_id'],
-              name: s['ho_ten'] ?? 'Sinh viên',
-              className: s['lop'] ?? 'N/A',
-              company: s['ten_doanh_nghiep'] ?? 'Doanh nghiệp',
-              completedTours: '3/3',
+              id: sv['mssv'] ?? sv['id']?.toString() ?? 'SV',
+              phieuId: phieu['id'],
+              reportId: r['id'],
+              name: sv['ho_ten'] ?? 'Sinh viên',
+              className: sv['lop'] ?? 'N/A',
+              company: chuyen['nhaMay']?['ten_nha_may'] ?? 'Doanh nghiệp',
+              completedTours: '1/1',
               papersLeft: 0,
-              avatar: s['avatar'] ?? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100',
-              submittedDate: '10/10/2026',
-              attendanceStatus: 'present',
-              excuseReason: null,
-              prelimGrade: 8.5,
-              extraGrade: 0.5,
-              gvhdGrade: 8.0,
-              aiSuggestedGrade: 8.2,
-              comment: 'Bài làm tốt',
-              isGraded: true,
-              tourId: 'vinamilk-today',
+              avatar: sv['avatar'] ?? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100',
+              submittedDate: r['ngay_nop'] != null ? DateTime.tryParse(r['ngay_nop'].toString())?.toLocal().toString().substring(0, 10) ?? 'N/A' : 'N/A',
+              attendanceStatus: phieuTQ['diemDanh']?['trang_thai'] == 'CoMat' ? 'present' : (phieuTQ['diemDanh']?['trang_thai'] == 'Vang' ? 'absent' : 'none'),
+              excuseReason: phieuTQ['diemDanh']?['ly_do_vang'],
+              prelimGrade: double.tryParse(diem['diem_chuan_bi']?.toString() ?? '0') ?? 0,
+              extraGrade: double.tryParse(diem['diem_cong']?.toString() ?? '0') ?? 0,
+              gvhdGrade: double.tryParse(r['diem_thu_hoach']?.toString() ?? '0') ?? 0,
+              aiSuggestedGrade: 8.0,
+              comment: r['nhan_xet_cua_giang_vien'],
+              isGraded: r['trang_thai'] == 'DaCham',
+              tourId: chuyen['id']?.toString() ?? '',
+              reportFileUrl: r['file_bao_cao'],
+              confirmationFileUrl: r['file_xac_nhan_tham_quan'],
             );
           }).toList();
         });
@@ -566,7 +608,8 @@ class AppStateProviderState extends State<AppStateContainer> {
       rethrow;
     }
 
-    await ApiService.submitReport(regId, fileReference, null);
+    final sub = _state.submissions.firstWhere((s) => s.id == submissionId);
+    await ApiService.submitReport(regId, fileReference, sub.fileXacNhanUrl);
 
     setState(() {
       _state.submissions = _state.submissions.map((s) {
@@ -574,6 +617,7 @@ class AppStateProviderState extends State<AppStateContainer> {
           return s.copyWith(
             fileName: fileName,
             fileSize: fileSize,
+            fileBaoCaoUrl: fileReference,
             status: s.hasConfirmationFile || !s.tripName.contains('tự do') ? 'Đã nộp' : 'Chưa nộp',
             submittedAt: '${DateTime.now().hour}:${DateTime.now().minute} - ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
           );
@@ -601,7 +645,7 @@ class AppStateProviderState extends State<AppStateContainer> {
     }
 
     final sub = _state.submissions.firstWhere((s) => s.id == submissionId);
-    await ApiService.submitReport(regId, sub.fileName ?? 'baocao.pdf', fileReference);
+    await ApiService.submitReport(regId, sub.fileBaoCaoUrl ?? '', fileReference);
 
     setState(() {
       _state.submissions = _state.submissions.map((s) {
@@ -609,7 +653,8 @@ class AppStateProviderState extends State<AppStateContainer> {
           return s.copyWith(
             hasConfirmationFile: true,
             confirmationFileName: fileName,
-            status: s.fileName != null ? 'Đã nộp' : 'Chưa nộp',
+            fileXacNhanUrl: fileReference,
+            status: s.fileBaoCaoUrl != null ? 'Đã nộp' : 'Chưa nộp',
           );
         }
         return s;
@@ -617,6 +662,16 @@ class AppStateProviderState extends State<AppStateContainer> {
     });
 
     return true;
+  }
+
+  Future<void> deleteReport(String submissionId) async {
+    final regId = int.tryParse(submissionId);
+    if (regId != null) {
+      await ApiService.deleteReport(regId);
+      if (ApiService.userId != null) {
+        await fetchStudentDataFromApi(ApiService.userId!);
+      }
+    }
   }
 
   Future<void> payFee(String paymentId) async {
@@ -637,8 +692,8 @@ class AppStateProviderState extends State<AppStateContainer> {
     });
   }
 
-  Future<bool> addRefund(String invoiceName, String amountText, {String? localPath, String? fileName}) async {
-    final invoiceId = int.tryParse(invoiceName.replaceAll(RegExp(r'\D'), ''));
+  Future<bool> addRefund(String paymentId, String invoiceName, String amountText, {String? localPath, String? fileName}) async {
+    final invoiceId = int.tryParse(paymentId);
     if (invoiceId == null) {
       throw Exception('Không tìm thấy mã hóa đơn cần hoàn phí.');
     }

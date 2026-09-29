@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/app_models.dart';
 import '../../../data/state/app_state.dart';
@@ -20,11 +21,13 @@ class ChamBaiThuHoachGVScreen extends StatefulWidget {
 class _ChamBaiThuHoachGVScreenState extends State<ChamBaiThuHoachGVScreen> {
   String _gradeScreenTab = 'preparation'; // 'preparation' or 'report'
   late TextEditingController _commentController;
+  late TextEditingController _gradeController;
 
   @override
   void initState() {
     super.initState();
     _commentController = TextEditingController(text: widget.student.comment ?? '');
+    _gradeController = TextEditingController(text: widget.student.gvhdGrade.toString());
   }
 
   @override
@@ -33,11 +36,15 @@ class _ChamBaiThuHoachGVScreenState extends State<ChamBaiThuHoachGVScreen> {
     if (widget.student.comment != oldWidget.student.comment) {
       _commentController.text = widget.student.comment ?? '';
     }
+    if (widget.student.gvhdGrade != oldWidget.student.gvhdGrade) {
+      _gradeController.text = widget.student.gvhdGrade.toString();
+    }
   }
 
   @override
   void dispose() {
     _commentController.dispose();
+    _gradeController.dispose();
     super.dispose();
   }
 
@@ -114,23 +121,28 @@ class _ChamBaiThuHoachGVScreenState extends State<ChamBaiThuHoachGVScreen> {
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.red.shade100,
+                          color: widget.student.reportFileUrl != null ? Colors.red.shade100 : Colors.grey.shade300,
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Icon(Icons.picture_as_pdf, color: Colors.red, size: 24),
+                        child: Icon(Icons.picture_as_pdf, color: widget.student.reportFileUrl != null ? Colors.red : Colors.grey, size: 24),
                       ),
                       const SizedBox(height: 8),
-                      const Text('baocao_vinamilk.pdf', style: TextStyle(fontSize: 12, color: Colors.black54)),
+                      Text(widget.student.reportFileUrl?.split('/').last ?? 'Chưa nộp file báo cáo', style: const TextStyle(fontSize: 12, color: Colors.black54)),
                     ],
                   ),
                 ),
                 const SizedBox(height: 12),
                 OutlinedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.fullscreen, size: 16, color: Color(0xFF3B711A)),
-                  label: const Text('XEM TOÀN MÀN HÌNH', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF3B711A))),
+                  onPressed: widget.student.reportFileUrl == null ? null : () async {
+                    final uri = Uri.parse(widget.student.reportFileUrl!);
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    }
+                  },
+                  icon: Icon(Icons.fullscreen, size: 16, color: widget.student.reportFileUrl != null ? const Color(0xFF3B711A) : Colors.grey),
+                  label: Text('XEM TOÀN MÀN HÌNH', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: widget.student.reportFileUrl != null ? const Color(0xFF3B711A) : Colors.grey)),
                   style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFF3B711A)),
+                    side: BorderSide(color: widget.student.reportFileUrl != null ? const Color(0xFF3B711A) : Colors.grey),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     minimumSize: const Size.fromHeight(40),
@@ -185,6 +197,7 @@ class _ChamBaiThuHoachGVScreenState extends State<ChamBaiThuHoachGVScreen> {
                     children: [
                       Expanded(
                         child: TextField(
+                          controller: _gradeController,
                           keyboardType: TextInputType.number,
                           textAlign: TextAlign.center,
                           style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black45),
@@ -192,11 +205,6 @@ class _ChamBaiThuHoachGVScreenState extends State<ChamBaiThuHoachGVScreen> {
                             border: InputBorder.none,
                             hintText: widget.student.gvhdGrade.toString(),
                           ),
-                          onChanged: (val) {
-                            if (double.tryParse(val) != null) {
-                              appStateProvider.updateStudentGrade(widget.student.id, gvhdGrade: double.parse(val));
-                            }
-                          },
                         ),
                       ),
                       const Padding(
@@ -224,9 +232,6 @@ class _ChamBaiThuHoachGVScreenState extends State<ChamBaiThuHoachGVScreen> {
                       borderSide: const BorderSide(color: Color(0xFFE9E5D3)),
                     ),
                   ),
-                  onChanged: (val) {
-                    appStateProvider.updateStudentGrade(widget.student.id, comment: val);
-                  },
                 ),
               ],
             ),
@@ -237,7 +242,13 @@ class _ChamBaiThuHoachGVScreenState extends State<ChamBaiThuHoachGVScreen> {
           // Bottom Buttons
           ElevatedButton.icon(
             onPressed: () {
-              appStateProvider.updateStudentGrade(widget.student.id, isGraded: true);
+              final grade = double.tryParse(_gradeController.text) ?? widget.student.gvhdGrade;
+              appStateProvider.updateStudentGrade(
+                widget.student.id, 
+                gvhdGrade: grade,
+                comment: _commentController.text,
+                isGraded: true
+              );
               widget.onGradeSaved();
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Đã lưu điểm!'), backgroundColor: AppColors.secondary),

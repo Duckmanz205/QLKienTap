@@ -532,12 +532,28 @@ export class SinhVienService {
   async payInvoice(invoiceId: number) {
     const hd = await this.hoaDonRepo.findOne({
       where: { id: invoiceId },
-      relations: { phieuDangKy: true },
+      relations: { phieuDangKy: { chuyenThamQuan: true } },
     });
     if (!hd) throw new NotFoundException('Không tìm thấy hóa đơn');
 
     hd.ngay_dong_thuc_te = new Date();
-    if (hd.ngay_dong_thuc_te <= hd.han_dong) {
+    
+    let isDungHan = false;
+    if (hd.phieuDangKy?.chuyenThamQuan) {
+      const ctq = hd.phieuDangKy.chuyenThamQuan;
+      if (ctq.ngay_tham_quan && ctq.gio_bat_dau) {
+        const dateStr = typeof ctq.ngay_tham_quan === 'string' ? ctq.ngay_tham_quan : ctq.ngay_tham_quan.toISOString().split('T')[0];
+        const departureTime = new Date(`${dateStr}T${ctq.gio_bat_dau}`);
+        const deadline = new Date(departureTime.getTime() - 24 * 60 * 60 * 1000);
+        isDungHan = hd.ngay_dong_thuc_te <= deadline;
+      } else {
+        isDungHan = hd.han_dong ? (hd.ngay_dong_thuc_te <= hd.han_dong) : true;
+      }
+    } else {
+      isDungHan = hd.han_dong ? (hd.ngay_dong_thuc_te <= hd.han_dong) : true;
+    }
+
+    if (isDungHan) {
       hd.trang_thai = 'DaDongDungHan';
       hd.phieuDangKy.trang_thai = 'HopLe';
       await this.phieuRepo.save(hd.phieuDangKy);
@@ -565,7 +581,7 @@ export class SinhVienService {
   ) {
     const hd = await this.hoaDonRepo.findOne({
       where: { id: invoiceId },
-      relations: { phieuDangKy: true },
+      relations: { phieuDangKy: { sinhVien: true } },
     });
     if (!hd) throw new NotFoundException('Không tìm thấy hóa đơn');
     if (hd.phieuDangKy.sinh_vien_id !== studentId) {
@@ -591,6 +607,9 @@ export class SinhVienService {
     const don = new DonHoanPhi();
     don.hoa_don_id = invoiceId;
     don.file_don_da_duyet = fileScanUrl;
+    don.ngan_hang_nhan = 'Ngân hàng mặc định (Thiếu trên UI)';
+    don.so_tai_khoan_nhan = '000000000';
+    don.ten_chu_tai_khoan_nhan = hd.phieuDangKy?.sinhVien?.ho_ten ?? 'Sinh viên ẩn danh';
     don.ngay_nop = new Date();
     don.trang_thai = 'ChoXuLy';
     await this.hoanPhiRepo.save(don);

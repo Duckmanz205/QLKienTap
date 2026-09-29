@@ -2714,7 +2714,7 @@ export class KhoaService {
   async confirmManualPayment(hoaDonId: number) {
     const hd = await this.hoaDonRepo.findOne({
       where: { id: hoaDonId },
-      relations: { phieuDangKy: true },
+      relations: { phieuDangKy: { chuyenThamQuan: true } },
     });
     if (!hd) throw new NotFoundException('Không tìm thấy hóa đơn');
     if (hd.trang_thai !== 'ChuaDong') {
@@ -2722,7 +2722,22 @@ export class KhoaService {
     }
     
     const now = new Date();
-    hd.trang_thai = (hd.han_dong && now > hd.han_dong) ? 'DaDongTreHan' : 'DaDongDungHan';
+    let isDungHan = false;
+    if (hd.phieuDangKy?.chuyenThamQuan) {
+      const ctq = hd.phieuDangKy.chuyenThamQuan;
+      if (ctq.ngay_tham_quan && ctq.gio_bat_dau) {
+        const dateStr = typeof ctq.ngay_tham_quan === 'string' ? ctq.ngay_tham_quan : ctq.ngay_tham_quan.toISOString().split('T')[0];
+        const departureTime = new Date(`${dateStr}T${ctq.gio_bat_dau}`);
+        const deadline = new Date(departureTime.getTime() - 24 * 60 * 60 * 1000);
+        isDungHan = now <= deadline;
+      } else {
+        isDungHan = hd.han_dong ? (now <= hd.han_dong) : true;
+      }
+    } else {
+      isDungHan = hd.han_dong ? (now <= hd.han_dong) : true;
+    }
+
+    hd.trang_thai = isDungHan ? 'DaDongDungHan' : 'DaDongTreHan';
     hd.ngay_dong_thuc_te = now;
     await this.hoaDonRepo.save(hd);
     
