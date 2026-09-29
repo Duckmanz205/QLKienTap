@@ -412,6 +412,15 @@ export class SinhVienService {
     if (!trip) throw new NotFoundException('Không tìm thấy chuyến tham quan');
     const now = new Date();
 
+    // Leader's logic: if registration is still open, cancel immediately without approval or blacklist
+    if (trip.trang_thai === 'MoDangKy') {
+      phieu.trang_thai = 'DaHuy';
+      await this.phieuRepo.save(phieu);
+      return {
+        message: 'Đã hủy đăng ký thành công (Chuyến đi đang mở đăng ký)',
+      };
+    }
+
     if (trip.trang_thai === 'DaDienRa' || new Date(trip.ngay_tham_quan) < now) {
       throw new BadRequestException(
         'Không thể hủy chuyến tham quan đã diễn ra',

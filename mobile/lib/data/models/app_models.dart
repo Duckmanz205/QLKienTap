@@ -91,6 +91,7 @@ class Trip {
   final bool isRegistered;
   final bool isCompleted;
   final GradeDetail? gradeDetails;
+  final String? registrationId;
 
   Trip({
     required this.id,
@@ -105,12 +106,14 @@ class Trip {
     required this.isRegistered,
     required this.isCompleted,
     this.gradeDetails,
+    this.registrationId,
   });
 
   Trip copyWith({
     bool? isRegistered,
     bool? isCompleted,
     GradeDetail? gradeDetails,
+    String? registrationId,
   }) {
     return Trip(
       id: id,
@@ -125,6 +128,7 @@ class Trip {
       isRegistered: isRegistered ?? this.isRegistered,
       isCompleted: isCompleted ?? this.isCompleted,
       gradeDetails: gradeDetails ?? this.gradeDetails,
+      registrationId: registrationId ?? this.registrationId,
     );
   }
 }

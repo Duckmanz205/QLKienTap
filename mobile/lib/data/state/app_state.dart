@@ -138,7 +138,7 @@ class AppStateProviderState extends State<AppStateContainer> {
       setState(() {
         if (ApiService.role == 'SinhVien') {
           _state.currentRole = 'student';
-          _fetchStudentDataFromApi(ApiService.userId!);
+          fetchStudentDataFromApi(ApiService.userId!);
         } else if (ApiService.role == 'GiangVien') {
           _state.currentRole = 'lecturer';
           _fetchLecturerDataFromApi(ApiService.userId!);
@@ -188,36 +188,81 @@ class AppStateProviderState extends State<AppStateContainer> {
 
   // --- Hybrid API Helpers ---
 
-  Future<void> _fetchStudentDataFromApi(int studentId) async {
+  Future<void> fetchStudentDataFromApi(int studentId) async {
     try {
+      // 1. Fetch all available trips and registered trips
+      final List<dynamic> availableTripsJson = await ApiService.getAvailableTrips(studentId);
       final List<dynamic> regTripsJson = await ApiService.getRegisteredTrips(studentId);
-      final regIds = regTripsJson.map((t) => t['id'].toString()).toSet();
       
+      final Map<int, dynamic> regTripsMap = {
+        for (var t in regTripsJson)
+          if (t['chuyenThamQuan'] != null) t['chuyenThamQuan']['id']: t
+      };
+
+      // Combine available and registered to form the studentTrips list
+      List<Trip> realTrips = [];
+      
+      // Process available trips (not registered yet)
+      for (var t in availableTripsJson) {
+        if (!regTripsMap.containsKey(t['id'])) {
+          realTrips.add(_mapJsonToTrip(t, isRegistered: false));
+        }
+      }
+      
+      // Process registered trips
+      for (var reg in regTripsJson) {
+        if (reg['chuyenThamQuan'] != null) {
+          final trip = _mapJsonToTrip(reg['chuyenThamQuan'], isRegistered: true);
+          final status = reg['trang_thai'];
+          final isCompleted = status == 'HoanThanh' || status == 'DaChamDiem' || trip.isCompleted;
+          realTrips.add(trip.copyWith(isRegistered: true, isCompleted: isCompleted, registrationId: reg['id'].toString()));
+        }
+      }
+
       setState(() {
-        _state.studentTrips = _state.studentTrips.map((t) {
-          if (regIds.contains(t.id)) {
-            return t.copyWith(isRegistered: true);
-          } else {
-            return t.copyWith(isRegistered: false);
-          }
-        }).toList();
+        _state.studentTrips = realTrips;
       });
 
+      // 2. Fetch Invoices
       final List<dynamic> invoicesJson = await ApiService.getInvoices(studentId);
       if (invoicesJson.isNotEmpty) {
         setState(() {
           _state.payments = invoicesJson.map((inv) {
+            final chuyen = inv['chuyen_di'] ?? inv['phieuDangKy']?['chuyenThamQuan'] ?? {};
             return Payment(
               id: inv['id'].toString(),
-              tripId: inv['chuyen_id']?.toString() ?? '',
-              name: 'Đoàn: ${inv['chuyen_di']?['ten_chuyen_di'] ?? 'Kiến tập'}',
-              code: inv['ma_giao_dich'] ?? 'KT-TRANSFER',
+              tripId: chuyen['id']?.toString() ?? '',
+              name: 'Đoàn: ${chuyen['ten_chuyen_di'] ?? 'Kiến tập'}',
+              code: inv['ma_hoa_don'] ?? inv['ma_giao_dich'] ?? 'KT-TRANSFER',
               amount: double.tryParse(inv['so_tien']?.toString() ?? '50000') ?? 50000,
-              dueDate: inv['han_thanh_toan'] ?? '15/12/2026',
+              dueDate: inv['han_thanh_toan'] != null ? DateTime.tryParse(inv['han_thanh_toan'])?.toLocal().toString().substring(0, 10) ?? '15/12/2026' : '15/12/2026',
               status: inv['trang_thai'] == 'DaThanhToan' ? 'Đã đóng đúng hạn' : 'Chưa đóng',
             );
           }).toList();
         });
+      }
+
+      // 3. Fetch Refund Requests
+      try {
+        final List<dynamic> refundsJson = await ApiService.getRefundRequests(studentId);
+        setState(() {
+          _state.refunds = refundsJson.map((ref) {
+            final invoice = ref['hoaDon'] ?? {};
+            String mappedStatus = 'Chờ xử lý';
+            if (ref['trang_thai'] == 'Approved') mappedStatus = 'Đã hoàn tiền';
+            if (ref['trang_thai'] == 'Rejected') mappedStatus = 'Từ chối';
+            
+            return RefundRequest(
+              id: ref['id'].toString(),
+              invoiceName: invoice['ma_hoa_don'] ?? 'Hóa đơn #${invoice['id']}',
+              dateText: ref['ngay_yeu_cau'] != null ? DateTime.tryParse(ref['ngay_yeu_cau'])?.toLocal().toString().substring(0, 10) ?? 'N/A' : 'N/A',
+              amountText: invoice['so_tien']?.toString() ?? '50000',
+              status: mappedStatus,
+            );
+          }).toList();
+        });
+      } catch (e) {
+        print('Error fetching refund requests: $e');
       }
 
       final List<dynamic> notifsJson = await ApiService.getStudentNotifications(studentId);
@@ -248,6 +293,24 @@ class AppStateProviderState extends State<AppStateContainer> {
     } catch (e) {
       print('Failed to load student data from backend, staying with in-memory mock data: $e');
     }
+  }
+
+  Trip _mapJsonToTrip(Map<String, dynamic> json, {required bool isRegistered}) {
+    final nhaMay = json['nhaMay'] ?? {};
+    
+    return Trip(
+      id: json['id'].toString(),
+      name: nhaMay['ten_nha_may'] ?? json['ten_chuyen_di'] ?? 'Chuyến tham quan',
+      date: json['ngay_tham_quan'] != null ? DateTime.tryParse(json['ngay_tham_quan'])?.toLocal().toString().substring(0, 10) ?? 'N/A' : 'N/A',
+      time: '${json['gio_bat_dau']?.toString().substring(0, 5) ?? '08:00'} - ${json['gio_ket_thuc']?.toString().substring(0, 5) ?? '12:00'}',
+      type: json['hinh_thuc'] ?? 'Trực tiếp',
+      location: nhaMay['dia_chi'] ?? 'Địa chỉ chưa cập nhật',
+      industry: 'Công nghệ thực phẩm',
+      description: nhaMay['mo_ta'] ?? 'Chuyến tham quan thực tế doanh nghiệp',
+      heroImage: 'https://images.unsplash.com/photo-1563227812-0ea4c22e6cc8?w=500', // Default image
+      isRegistered: isRegistered,
+      isCompleted: json['trang_thai'] == 'DaDienRa' || json['trang_thai'] == 'HoanThanh',
+    );
   }
 
   Future<void> _fetchLecturerDataFromApi(int lecturerId) async {
@@ -342,7 +405,7 @@ class AppStateProviderState extends State<AppStateContainer> {
         if (!requiresPasswordChange) {
           final studentId = (details != null && details['id'] is int) ? details['id'] as int : ApiService.userId;
           if (studentId != null) {
-            _fetchStudentDataFromApi(studentId);
+            fetchStudentDataFromApi(studentId);
           }
         }
         onSuccess();
@@ -384,7 +447,7 @@ class AppStateProviderState extends State<AppStateContainer> {
       _state.phaiDoiMatKhau = false;
     });
     if (_state.currentRole == 'student' && ApiService.userId != null) {
-      _fetchStudentDataFromApi(ApiService.userId!);
+      fetchStudentDataFromApi(ApiService.userId!);
     } else if (_state.currentRole == 'lecturer' && ApiService.userId != null) {
       _fetchLecturerDataFromApi(ApiService.userId!);
     }
@@ -448,15 +511,27 @@ class AppStateProviderState extends State<AppStateContainer> {
     // but typically a success message is enough for proposals.
   }
 
-  Future<void> cancelTripRegistration(String tripId) async {
-    final regId = int.tryParse(tripId);
+  Future<void> cancelTripRegistration(String tripId, String? registrationId, {required String lyDo, String? fileMinhChung}) async {
+    final regId = int.tryParse(registrationId ?? '');
     if (regId == null) {
-      throw Exception('Mã đăng ký không hợp lệ ($tripId).');
+      throw Exception('Không tìm thấy mã phiếu đăng ký hợp lệ cho chuyến này.');
+    }
+
+    String? fileReference;
+    if (fileMinhChung != null) {
+      try {
+        final uploadRes = await ApiService.uploadFile('upload/attachment', fileMinhChung, 'file');
+        fileReference = uploadRes['key'] ?? uploadRes['url'] ?? fileMinhChung;
+      } catch (e) {
+        print('uploadConfirmationFile file upload failed: $e');
+        fileReference = fileMinhChung;
+      }
     }
 
     await ApiService.post('sinh-vien/request-cancel', {
       'registrationId': regId,
-      'lyDo': 'Hủy qua ứng dụng di động',
+      'lyDo': lyDo,
+      if (fileReference != null) 'fileMinhChung': fileReference,
     });
 
     setState(() {
@@ -586,6 +661,10 @@ class AppStateProviderState extends State<AppStateContainer> {
       );
       _state.refunds = [newRefund, ..._state.refunds];
     });
+
+    if (ApiService.userId != null) {
+      fetchStudentDataFromApi(ApiService.userId!);
+    }
 
     return true;
   }
