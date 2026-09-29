@@ -27,30 +27,187 @@ export default function ChamBaiThuHoach_GV() {
   const [limit, setLimit] = useState(15);
 
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  const [isGradingAI, setIsGradingAI] = useState(false);
+  const [aiGradingResult, setAiGradingResult] = useState(null);
+  const [isMockModalOpen, setIsMockModalOpen] = useState(false);
+  const [mockText, setMockText] = useState(`TRANG 20
+* BÁO CÁO KIẾN TẬP – HỌC KỲ 2 NĂM HỌC 2024 - 2025
 
-  const mockAiGrading = {
-    ai_score: 8.5,
-    ai_summary_comment: "Bài làm cấu trúc tốt, có số liệu thực tế rõ ràng. Tuy nhiên phần bài học kinh nghiệm còn sơ sài.",
-    ai_detailed_evaluation: [
-      {
-        criteria: "Hình thức trình bày",
-        max_score: 2,
-        ai_given_score: 2,
-        explanation: "Đúng chuẩn format, có đầy đủ mục lục, không lỗi chính tả."
-      },
-      {
-        criteria: "Nội dung chuyên môn",
-        max_score: 5,
-        ai_given_score: 4,
-        explanation: "Mô tả chi tiết quy trình của nhà máy, nhưng thiếu so sánh phân tích chuyên sâu."
-      },
-      {
-        criteria: "Kết luận & Kiến nghị",
-        max_score: 3,
-        ai_given_score: 2.5,
-        explanation: "Có bài học cá nhân rút ra, kiến nghị khá thực tế."
+* BÀI THU HOẠCH CƠ SỞ THAM QUAN THỨ HAI
+
+* NHÀ MÁY/CÔNG TY CỔ PHẦN ĐẦU TƯ VÀ THƯƠNG MẠI SATORI
+
+* 2.1. Giới thiệu về nhà máy/công ty
+
+   * 2.1.1. Tổng quan chung về công ty/nhà máy
+
+   * Địa chỉ nhà máy: Lô ..., đường số 3, khu công nghiệp Long Hậu, xã Long Hậu, huyện Cần Giuộc, tỉnh Long An.
+   * Thành lập năm 2017 Satori hoạt động trong lĩnh vực sản xuất và kinh doanh các sản phẩm nước uống, với sứ mệnh mang đến nhiều lựa chọn hơn cho người tiêu dùng về một thương hiệu không chỉ để giải khát mà còn tốt cho sức khỏe.
+   * Để giúp người tiêu dùng có những cảm nhận rõ hơn về những gì Satori đang thực hiện, nhà máy xây dựng mô hình nhà máy mở, hỗ trợ khách tham quan các hoạt động bên trong nhà máy, trực tiếp quan sát quy trình công nghệ tiên tiến của Satori.
+   * Công ty lắp đặt dây chuyền sản xuất tự động hóa từ nhà cung cấp sidel với công suất thiết kế 12.000 chai/ giờ cho dòng chai và 450 bình/ giờ cho dòng bình đáp ứng nhu cầu người tiêu dùng.
+      * Quy trình quản lý Satori:
+
+         * Nhằm mang lại sản phẩm chất lượng cao nhằm đến tay người tiêu dùng.
+         * Satori áp dụng những quy trình quản lý chất lượng tiên tiến nghiêm ngặt.
+         * Satori thường xuyên kiểm nghiệm chất lượng nước với tần suất 416 lần / ngày, 2912 lần / tuần, 151840 lần / năm.
+         * Chứng nhận chất lượng:
+
+            * Satori từng bước trên hành trình tiêu chuẩn vàng để mỗi chai nước đến tay người tiêu dùng đều là sản phẩm sạch.
+            4. Chứng nhận FSSC 22000
+            5. Chứng nhận ISO 22000
+            6. Chứng nhận HACCP
+            7. Thành viên hiệp hội nước đóng chai thế giới
+            * SVTH: Lê Thị Minh Yến
+TRANG 22
+            * BÁO CÁO KIẾN TẬP – HỌC KỲ 2 NĂM HỌC 2024 - 2025
+
+            * 2.1.2. Một số sản phẩm chủ yếu của công ty/nhà máy
+
+               * Satori là nước uống tinh khiết với công nghệ hoàn lưu khoáng SRO, giúp giữ lại một phần hàm lượng khoáng tự nhiên có sẵn trong nước.
+               * Được xử lý qua hệ thống thẩm thấu ngược RO từ Nhật Bản với màng siêu lọc UF, khử trùng bằng tia cực tím và Ozon.
+               * Các sản phẩm của Satori: nước Satori 350 ml, 500ml, nước Satori 1.5l, bình nước Satori 20l.
+               * SVTH: Lê Thị Minh Yến
+TRANG 24
+               * BÁO CÁO KIẾN TẬP – HỌC KỲ 2 NĂM HỌC 2024 - 2025
+
+               * 2.2. Quy trình công nghệ sản xuất nước tinh khiết với công nghệ hoàn lưu khoáng
+
+               * 2.2.1. Sơ đồ quy trình công nghệ
+
+                  * Nước ngầm đã xử lí
+                  * Tiền xử lý
+                  * Siêu lọc UF
+                  * Lọc thẩm thấu ngược RO
+                  * Hoàn lưu khoáng SRO
+                  * Tiệt trùng UV
+                  * Vi lọc
+                  * Ozon
+                  * Nước tinh khiết
+                  * SVTH: Lê Thị Minh Yến
+TRANG 25
+                  * BÁO CÁO KIẾN TẬP – HỌC KỲ 2 NĂM HỌC 2024 - 2025
+
+                  * 2.2.2. Thuyết minh quy trình công nghệ
+
+                     * Bước 1: Tiếp nhận nguồn nước ngầm đã được xử lý theo chuẩn Bộ Y tế.
+                     * Bước 2: Tiền xử lý. Mục đích: loại bỏ màu, mùi cho nước, giúp nước trở nên trong suốt.
+                     * Bước 3: Công nghệ màng siêu lọc UF (Ultra Filtration). Bản chất: kích thước 0,01 micron đến từ Nhật Bản giúp lọc sạch các vi khuẩn và tạp chất siêu nhỏ. Thiết bị: thiết bị siêu lọc dạng sợi rỗng cột đứng.
+                     * Bước 4: Công nghệ thẩm thấu ngược RO (Reverse Osmosis). Mục đích: giúp nước trở nên tinh khiết. Phương pháp: thẩm thấu ngược chỉ cho dung môi (nước) đi qua membrane, toàn bộ cấu tử hòa tan và không hòa tan bị giữ lại trên bề mặt membrane.
+                     * Bước 5: Công nghệ hoàn lưu khoáng SRO (Selective Reverse Osmosis). Mục đích: Đóng vai trò giữ lại một phần khoáng tự nhiên tốt cho cơ thể được hoàn lưu vào dòng nước tinh khiết.
+                     * Bước 6: Tiệt trùng bằng tia UV (Ultra Violet). Mục đích: Tiêu diệt VSV, ngăn ngừa tái nhiễm khuẩn. Bản chất: tia UV có khả năng ức chế vi sinh vật và tiêu diệt. Yếu tố ảnh hưởng: công suất đèn UV, độ dày lớp nước, thời gian tiếp xúc của nước với đèn UV.
+                     * Bước 7: Vi lọc. Mục đích: Lọc vi khuẩn bằng bộ vi lọc 0,2 µm. Hoàn thiện lọc tế bào vi sinh, giúp nước trở nên tinh khiết. Bản chất: vi lọc tạo ra nguồn nước đạt chuẩn vi sinh rất tốt, đảm bảo cho người dùng. Phương pháp: membrane dạng màng.
+                     * Bước 8: Công nghệ Ozon. Bản chất: Dùng ozon đảm bảo sự tinh khiết tối đa cho nước thành phẩm, sẵn sàng đưa vào cung cấp cho dây chuyền chiết rót. Mục đích: Hoàn thiện, đảm bảo tinh khiết tối đa cho sản phẩm.
+                     * SVTH: Lê Thị Minh Yến
+TRANG 26
+                     * BÁO CÁO KIẾN TẬP – HỌC KỲ 2 NĂM HỌC 2024 - 2025
+
+                     * 9 BƯỚC ĐÓNG CHAI THÀNH PHẨM (dòng chai 350ml, 500ml, 1.5 Lít)
+
+                        * Bước 1: Thổi chai, định hình chai, rửa chai bằng nước thành phẩm.
+                        * Bước 2: Chiết rót nước vào chai đã được làm sạch, hệ thống AHU hiện đại.
+                        * Bước 3: Tiến hành đóng nắp chai tự động hóa, được kiểm soát chặt chẽ.
+                        * Bước 4: Dán nhãn chai tự động.
+                        * Bước 5: Công đoạn phóng màng co nắp, giúp giữ khí và ngăn chặn bụi hay vi khuẩn xâm nhập.
+                        * Bước 6: In mã code, Hạn sử dụng, Ngày sản xuất lên chai nước.
+                        * Bước 7: Các chai nước được xếp ngăn nắp vào thùng carton.
+                        * Bước 8: In mã code, Hạn sử dụng, Ngày sản xuất lên từng thùng.
+                        * Bước 9: Chất xếp thùng bằng hệ thống robot hiện đại.
+                        * QUY TRÌNH 14 BƯỚC RỬA BÌNH 20 Lít
+
+                           * Bước 1: Rửa hai mặt trong và ngoài bình bằng nước nóng.
+                           * Bước 2: Rửa bằng dung dịch NaOH cả hai mặt để loại bỏ các hợp chất hữu cơ.
+                           * Bước 3, 4: Thổi khô bên trong và ngoài bình.
+                           * Bước 5, 6, 7, 8: Tất cả bình sẽ được rửa bằng nước nóng với nhiệt độ cao để đảm bảo làm sạch và diệt khuẩn tốt nhất.
+                           * Bước 9: Rửa bằng dung dịch HNO3 để loại bỏ các hợp chất vô cơ.
+                           * Bước 10: Thổi khô bên trong và bên ngoài bình trước khi tới bước tiếp theo.
+                           * Bước 11: Tiếp tục rửa bình với nước nóng.
+                           * Bước 12, 13: Rửa bình bằng nước Ozon để loại bỏ tối đa vi khuẩn.
+                           * Bước 14: Tráng rửa bằng nước thành phẩm.
+                           * SVTH: Lê Thị Minh Yến
+TỪ TRANG 31 ĐẾN TRANG 37 - ĐÁNH GIÁ THỰC TRẠNG
+                           * BÁO CÁO KIẾN TẬP – HỌC KỲ 2 NĂM HỌC 2024 - 2025
+
+                           * 2.3. Đánh giá thực trạng điều kiện đảm bảo vệ sinh an toàn thực phẩm tại cơ sở
+
+TT	Yêu cầu	Thực trạng (Mô tả thực trạng quan sát được tại nhà máy)	Đánh giá
+1.	KHÂU BAN ĐẦU, HOẠT ĐỘNG TRƯỚC CHẾ BIẾN
+1.1	Môi trường an toàn	Không nguồn lây nhiễm vào khu vực khai thác, nuôi trồng, thu hoạch. Điều kiện vệ sinh môi trường.	Đạt
+1.2	Nguyên liệu sản xuất hợp vệ sinh	Các nguồn thực phẩm được sản xuất một cách vệ sinh.	Đạt
+1.3	Phương pháp vận chuyển phù hợp	Hoạt động xử lý, bảo quản và vận chuyển nguyên vật liệu trước khi chế biến.	Đạt
+1.4	Nhà máy bố trí riêng biệt	Việc làm sạch, bảo dưỡng thiết bị sản xuất được thực hiện hiệu quả. Nhà máy bố trí riêng biệt.	Đạt
+1.5	Đảm bảo vệ sinh cá nhân được duy trì mức độ thích hợp	Duy trì mức vệ sinh cá nhân.	Đạt
+2.	CƠ SỞ: THIẾT KẾ VÀ PHƯƠNG TIỆN
+2.1	Vị trí xây dựng nhà xưởng	Tránh nơi xa, không ô nhiễm. Khu vực dễ ngập lụt: hoàn toàn cách biệt. Khu vực dễ bị sâu bệnh phá hoại: cách biệt.	Đạt
+2.2	Thiết kế, bố trí các khu vực/phòng sản xuất	Thuận lợi chế biến và làm vệ sinh. Đạt an toàn: ngăn ngừa lây nhiễm chéo.	Đạt
+2.3	Cấu trúc, lắp ráp bên trong nhà xưởng	Vật liệu bền, dễ bảo trì, sử dụng tường, vách ngăn phù hợp cho khai thác; trần thiết kế đơn giản, cửa sổ hạn chế tích bụi, trang bị màn chắn, thiết kế phù hợp. Sàn xây dựng thoát nước tốt. Cửa ra vào nhẵn, không thấm nước.	Đạt
+2.4	Trang thiết bị sản xuất chính	Phù hợp, thuận lợi sản xuất. Thiết bị hiện đại.	Đạt
+2.5	Thiết bị kiểm soát và giám sát thực phẩm (Thiết bị xử lý nhiệt, làm mát, bảo quản hoặc cấp đông thực phẩm...)	Nhiệt độ phù hợp. Thiết bị hiện đại.	Đạt
+2.6	Đồ đựng chất phế thải và các thứ không ăn được	Chuyên dụng. Thùng chứa chất thải được nhận diện và khóa.	Đạt
+2.7	Hệ thống cung cấp nước	Đầy đủ. An toàn. Cách biệt.	Đạt
+2.8	Hệ thống thoát nước và xử lý rác thải: Phải thiết kế tránh lây nhiễm chéo vào thực phẩm và nguồn nước sạch	Thiết kế hợp lý. Tách biệt.	Đạt
+2.9	Phương tiện làm vệ sinh thiết bị, nhà xưởng	Đầy đủ, chuyên dụng. Trang bị hệ thống nước nóng lạnh ở nơi cần thiết.	Đạt
+2.10	Phương tiện vệ sinh cá nhân và nhà vệ sinh	Đầy đủ. Sạch sẽ. Thiết kế và bố trí hợp lý.	Đạt
+2.11	Chất lượng không khí và sự thông gió	Hạn chế tối thiểu nhiễm bẩn thực phẩm do không khí. Kiểm soát nhiệt độ môi trường xung quanh, kiểm soát mùi và độ ẩm không khí ảnh hưởng tới thực phẩm. Dễ bảo trì, vệ sinh.	Đạt
+2.12	Hệ thống chiếu sáng	Đủ ánh sáng. Đảm bảo cho chế biến.	Đạt
+2.13	Phương tiện bảo quản thực phẩm	Thích hợp bảo quản theo tính chất thực phẩm. Dễ bảo trì và làm vệ sinh. Ngăn khuẩn xâm nhập của côn trùng và động vật gây hại. Bảo vệ thực phẩm không bị hư hỏng.	Đạt
+3.	KIỂM SOÁT CÁC HOẠT ĐỘNG SẢN XUẤT
+3.1	Kiểm soát các mối nguy ATTP trong quá trình sản xuất	ISO 22000. HACCP.	Đạt
+3.2	Kiểm soát thông số công nghệ trong quá trình sản xuất	Kiểm soát nhiệt độ và thời gian ở các công đoạn quan trọng: làm lạnh, gia nhiệt, chiếu xạ, bảo quản, bao gói, chân không được kiểm soát chặt chẽ. Các thiết bị được kiểm tra định kỳ.	Đạt
+3.3	Kiểm soát nhiễm chéo vi sinh vật	Môi trường khép kín. Có đồ bảo hộ.	Đạt
+3.4	Hoạt động kiểm soát nguyên liệu đầu vào	Nguyên liệu đạt chất lượng. Nguyên liệu đạt chuẩn.	Đạt
+3.5	Kiểm soát quá trình bao gói/đóng gói	Vật liệu bao bì an toàn. Bao bì tiệt trùng.	Đạt
+3.6	Kiểm soát an toàn nguồn nước, nước đá	Nước sạch. Đảm bảo an toàn.	Đạt
+4.	BẢO DƯỠNG VÀ LÀM VỆ SINH
+4.1	Quy trình và phương pháp làm vệ sinh nhà xưởng	Sạch, an toàn. Đúng quy định về hóa chất tẩy rửa. Quy trình phù hợp.	Đạt
+4.2	Quy trình và phương pháp làm vệ sinh thiết bị	Thiết lập chương trình làm vệ sinh phù hợp. Thực hiện giám sát đúng thông số.	Đạt
+4.3	Kiểm soát động vật gây hại	Biện pháp ngăn chặn hiệu quả. An toàn.	Đạt
+4.4	Quản lý chất thải	Thu gom theo quy định (chất thải). Khu chứa chất thải đảm bảo vệ sinh đạt chuẩn.	Đạt
+5.	VỆ SINH CÁ NHÂN
+5.1	Kiểm tra tình trạng sức khỏe của người lao động	Cá nhân vào khu sản xuất phải có sức khoẻ tốt, không mang mầm bệnh vào thực phẩm. Kiểm tra sức khỏe định kỳ cho công nhân.	Đạt
+5.2	Giám sát vệ sinh cá nhân của người lao động	Người tiếp xúc thực phẩm phải có bảo hộ lao động, ý thức tốt.	Đạt
+5.3	Giám sát vệ sinh cá nhân khách tham quan	Phải mặc đồ bảo hộ lao động đúng quy định vệ sinh.	Đạt
+6.	NHỮNG VẤN ĐỀ KHÁC (Nếu có)
+6.1	Vận chuyển	Thực phẩm bảo quản an toàn. Phương thức vận chuyển phù hợp.	Đạt
+6.2	Phương tiện vận chuyển	Dễ vệ sinh, khử trùng và bảo trì. Làm từ vật liệu không nhiễm bẩn. Chuyên dùng, sạch sẽ.	Đạt
+SVTH: Lê Thị Minh Yến (Lưu ý: Tên SVTH lặp lại ở chân các trang từ 31 đến 37)
+TRANG 38
+* BÁO CÁO KIẾN TẬP – HỌC KỲ 2 NĂM HỌC 2024 - 2025
+* 2.4. Nhận xét – Kiến nghị
+* Nhận xét:
+   * Sau chuyến tham quan nhà máy Satori em học hỏi được nhiều bài học quý báu cũng như trau dồi kiến thức thêm.
+   * Biết quy trình xử lý nước của nhà máy.
+   * Dây chuyền sản xuất hiện đại.
+   * Công nghệ xử lý nước hoàn lưu khoáng.
+   * Trực tiếp tham quan quy trình rửa chai chiết rót.
+   * Qua chuyến tham quan ta thấy nhà máy Satori trang bị dây chuyền sản xuất khép kín, hiện đại.
+* Kiến nghị:
+   * Tuy nhiên, tại thị trường Việt Nam, sản phẩm Satori chưa được người dùng biết đến rộng rãi vì vậy công ty cần đầu tư thêm vào mảng marketing để quảng bá thương hiệu đến người tiêu dùng.
+   * SVTH: Lê Thị Minh Yến
+`);
+
+  const handleAIGrading = async () => {
+    setIsGradingAI(true);
+    try {
+      const response = await fetch('http://localhost:8000/grade', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer satori_2026_secure_key'
+        },
+        body: JSON.stringify({ document_text: mockText })
+      });
+      if (!response.ok) {
+        throw new Error('Lỗi khi gọi AI service');
       }
-    ]
+      const data = await response.json();
+      setAiGradingResult(data);
+      toast.success('Đã chấm điểm xong bằng AI!');
+    } catch (err) {
+      console.error(err);
+      toast.error('Lỗi khi chấm điểm bằng AI');
+    } finally {
+      setIsGradingAI(false);
+    }
   };
 
   useEffect(() => {
@@ -501,18 +658,60 @@ export default function ChamBaiThuHoach_GV() {
                 <Sparkles className="w-4 h-4 text-[#407F3E]" />
                 <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">AI đề xuất điểm</h4>
               </div>
-              <div className="flex items-end justify-between">
-                <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-black text-[#407F3E] leading-none">--</span>
-                  <span className="text-sm font-bold text-slate-500">/ 10</span>
+              
+              {!aiGradingResult ? (
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <button 
+                      onClick={handleAIGrading}
+                      disabled={isGradingAI}
+                      className="flex-1 flex justify-center items-center gap-2 text-sm font-bold text-white bg-[#407F3E] px-4 py-2.5 rounded-lg shadow-sm hover:bg-[#407F3E]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isGradingAI ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          Đang tiến hành chấm điểm
+                        </>
+                      ) : (
+                        'Chấm tự động'
+                      )}
+                    </button>
+                    <button 
+                      onClick={() => setIsMockModalOpen(true)}
+                      className="ml-3 flex items-center gap-1.5 px-3 py-2 text-[11px] font-bold text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
+                      title="Chỉnh sửa Mock Data"
+                    >
+                      <Edit3Icon className="w-3.5 h-3.5" />
+                      Mock Data
+                    </button>
+                  </div>
                 </div>
-                <button 
-                  onClick={() => setIsAiModalOpen(true)}
-                  className="text-[11px] font-bold text-[#407F3E] bg-white border border-[#E7E0C4] px-2.5 py-1.5 rounded-md hover:bg-[#fdfcf8] transition-colors shadow-sm cursor-pointer"
-                >
-                  Xem chi tiết
-                </button>
-              </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-end justify-between">
+                    <div className="flex items-center gap-4">
+                      <button 
+                        onClick={() => {
+                          setAiGradingResult(null);
+                        }}
+                        className="text-[11px] font-bold text-slate-600 bg-white border border-slate-200 px-2 py-1.5 rounded-md hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
+                      >
+                        Thực hiện chấm lại
+                      </button>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-4xl font-black text-[#407F3E] leading-none">{aiGradingResult.diem_bao_cao_cuoi_cung}</span>
+                        <span className="text-sm font-bold text-slate-500">/ 10</span>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => setIsAiModalOpen(true)}
+                      className="text-[11px] font-bold text-[#407F3E] bg-white border border-[#E7E0C4] px-2.5 py-1.5 rounded-md hover:bg-[#fdfcf8] transition-colors shadow-sm cursor-pointer whitespace-nowrap ml-2"
+                    >
+                      Xem chi tiết
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Grading Form */}
@@ -583,8 +782,40 @@ export default function ChamBaiThuHoach_GV() {
     <div className={selectedReport ? '' : 'bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300'}>
       {selectedReport ? renderGradingView() : renderReportList()}
 
+      {/* Mock Text Modal */}
+      {isMockModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-3xl rounded-2xl shadow-xl overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-[#E7E0C4] bg-[#fdfcf8] flex items-center justify-between shrink-0">
+              <h2 className="font-bold text-slate-800">Chỉnh sửa Mock Data (Văn bản thay thế OCR)</h2>
+              <button 
+                onClick={() => setIsMockModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6">
+              <textarea
+                className="w-full h-96 p-4 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:border-[#407F3E] resize-none"
+                value={mockText}
+                onChange={(e) => setMockText(e.target.value)}
+              />
+            </div>
+            <div className="px-6 py-4 border-t border-[#E7E0C4] bg-slate-50 flex justify-end gap-3">
+              <button 
+                onClick={() => setIsMockModalOpen(false)}
+                className="px-5 py-2.5 rounded-lg bg-[#407F3E] text-white font-bold text-sm shadow-md hover:bg-[#407F3E]/90 transition-colors"
+              >
+                Lưu Mock Data
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* AI Grading Details Modal */}
-      {isAiModalOpen && (
+      {isAiModalOpen && aiGradingResult && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-5xl rounded-2xl shadow-xl overflow-hidden flex flex-col">
             {/* Header */}
@@ -609,13 +840,13 @@ export default function ChamBaiThuHoach_GV() {
               {/* Overview */}
               <div className="flex gap-6 items-center">
                 <div className="shrink-0 flex flex-col items-center justify-center w-28 h-28 rounded-full border-4 border-[#89B449]/30 bg-[#fdfcf8]">
-                  <span className="text-3xl font-black text-[#407F3E]">{mockAiGrading.ai_score}</span>
+                  <span className="text-3xl font-black text-[#407F3E]">{aiGradingResult.diem_bao_cao_cuoi_cung}</span>
                   <span className="text-xs font-bold text-slate-500 uppercase">/ 10 Điểm</span>
                 </div>
                 <div className="flex-1 bg-blue-50/50 p-4 rounded-xl border border-blue-100/50">
                   <h4 className="text-xs font-bold text-blue-800 uppercase mb-2">Nhận xét tổng quan</h4>
                   <p className="text-sm text-slate-700 leading-relaxed">
-                    {mockAiGrading.ai_summary_comment}
+                    AI đã chấm điểm xong. Dưới đây là kết quả chi tiết từng phần theo cấu trúc Rubric.
                   </p>
                 </div>
               </div>
@@ -626,17 +857,51 @@ export default function ChamBaiThuHoach_GV() {
               <div>
                 <h4 className="text-xs font-bold text-slate-800 uppercase mb-4">Chi tiết theo tiêu chí</h4>
                 <div className="space-y-3">
-                  {mockAiGrading.ai_detailed_evaluation.map((item, idx) => (
-                    <div key={idx} className="p-4 border border-[#E7E0C4] rounded-xl bg-white shadow-sm hover:shadow transition-shadow">
-                      <div className="flex items-center justify-between mb-2">
-                        <h5 className="font-bold text-slate-800 text-sm">{item.criteria}</h5>
-                        <span className="text-xs font-bold px-2.5 py-1 rounded-md bg-[#89B449]/10 text-[#407F3E]">
-                          {item.ai_given_score} / {item.max_score} đ
-                        </span>
-                      </div>
-                      <p className="text-sm text-slate-600">{item.explanation}</p>
+                  
+                  {/* Hình thức */}
+                  <div className="p-4 border border-[#E7E0C4] rounded-xl bg-white shadow-sm hover:shadow transition-shadow">
+                    <div className="flex items-center justify-between mb-2">
+                      <h5 className="font-bold text-slate-800 text-sm">Hình thức trình bày</h5>
+                      <span className="text-xs font-bold px-2.5 py-1 rounded-md bg-[#89B449]/10 text-[#407F3E]">
+                        {aiGradingResult.hinh_thuc_tong_quan.diem_hinh_thuc} / 10 đ
+                      </span>
                     </div>
-                  ))}
+                    <p className="text-sm text-slate-600">{aiGradingResult.hinh_thuc_tong_quan.ly_do_hinh_thuc}</p>
+                  </div>
+
+                  {/* Tổng quan */}
+                  <div className="p-4 border border-[#E7E0C4] rounded-xl bg-white shadow-sm hover:shadow transition-shadow">
+                    <div className="flex items-center justify-between mb-2">
+                      <h5 className="font-bold text-slate-800 text-sm">Tổng quan về nhà máy/công ty</h5>
+                      <span className="text-xs font-bold px-2.5 py-1 rounded-md bg-[#89B449]/10 text-[#407F3E]">
+                        {aiGradingResult.hinh_thuc_tong_quan.diem_tong_quan} / 10 đ
+                      </span>
+                    </div>
+                    <p className="text-sm text-slate-600">{aiGradingResult.hinh_thuc_tong_quan.ly_do_tong_quan}</p>
+                  </div>
+
+                  {/* Quy trình công nghệ */}
+                  <div className="p-4 border border-[#E7E0C4] rounded-xl bg-white shadow-sm hover:shadow transition-shadow">
+                    <div className="flex items-center justify-between mb-2">
+                      <h5 className="font-bold text-slate-800 text-sm">Thuyết minh quy trình công nghệ</h5>
+                      <span className="text-xs font-bold px-2.5 py-1 rounded-md bg-[#89B449]/10 text-[#407F3E]">
+                        {aiGradingResult.quy_trinh_cong_nghe.diem_quy_trinh} / 10 đ
+                      </span>
+                    </div>
+                    <p className="text-sm text-slate-600">{aiGradingResult.quy_trinh_cong_nghe.ly_do_quy_trinh}</p>
+                  </div>
+
+                  {/* VSATTP */}
+                  <div className="p-4 border border-[#E7E0C4] rounded-xl bg-white shadow-sm hover:shadow transition-shadow">
+                    <div className="flex items-center justify-between mb-2">
+                      <h5 className="font-bold text-slate-800 text-sm">Đánh giá thực trạng VSATTP</h5>
+                      <span className="text-xs font-bold px-2.5 py-1 rounded-md bg-[#89B449]/10 text-[#407F3E]">
+                        {aiGradingResult.vsattp.diem_vsattp} / 10 đ
+                      </span>
+                    </div>
+                    <p className="text-sm text-slate-600">{aiGradingResult.vsattp.ly_do_vsattp}</p>
+                  </div>
+
                 </div>
               </div>
 
@@ -652,8 +917,16 @@ export default function ChamBaiThuHoach_GV() {
               </button>
               <button 
                 onClick={() => {
-                  setScore(mockAiGrading.ai_score);
-                  setComments(mockAiGrading.ai_summary_comment);
+                  setScore(aiGradingResult.diem_bao_cao_cuoi_cung);
+                  setComments(
+                    `1. Hình thức: ${aiGradingResult.hinh_thuc_tong_quan.ly_do_hinh_thuc}
+` +
+                    `2. Tổng quan: ${aiGradingResult.hinh_thuc_tong_quan.ly_do_tong_quan}
+` +
+                    `3. Quy trình: ${aiGradingResult.quy_trinh_cong_nghe.ly_do_quy_trinh}
+` +
+                    `4. VSATTP: ${aiGradingResult.vsattp.ly_do_vsattp}`
+                  );
                   setIsAiModalOpen(false);
                   toast.success('Đã áp dụng đề xuất của AI vào form!');
                 }}
