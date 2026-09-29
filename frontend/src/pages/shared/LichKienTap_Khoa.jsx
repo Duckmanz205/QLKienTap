@@ -122,7 +122,8 @@ export default function LichKienTap_Khoa() {
       setCampaigns(campRes.data?.data || campRes.data || []);
       setCourses(courseRes.data?.data || courseRes.data || []);
       setFactories(factoryRes.data?.data || factoryRes.data || []);
-      setUnassignedTrips(tripRes.data?.data || tripRes.data || []);
+      const allTrips = tripRes.data?.data || tripRes.data || [];
+      setUnassignedTrips(allTrips.filter(t => t.trang_thai === 'Nhap' && !t.lich_kien_tap_id));
     } catch (err) {
       console.error(err);
     }

@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import React, { useState, useEffect } from 'react';
 import { 
   Paperclip, CheckCircle2, XCircle, AlertTriangle, Search, ChevronDown, Check
@@ -36,7 +37,7 @@ export default function DuyetHoanPhi_Khoa() {
       fetchRefunds();
     } catch (err) {
       console.error(err);
-      alert('Có lỗi xảy ra');
+      toast.error('Có lỗi xảy ra');
     }
   };
 
@@ -53,7 +54,7 @@ export default function DuyetHoanPhi_Khoa() {
       fetchRefunds();
     } catch (err) {
       console.error(err);
-      alert('Có lỗi xảy ra');
+      toast.error('Có lỗi xảy ra');
     }
   };
 

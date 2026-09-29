@@ -162,6 +162,19 @@ export class R2StorageService implements OnModuleInit {
     this.logger.log(`🗑️ Deleted: ${bucket}/${key}`);
   }
 
+  /** Lấy stream file từ R2 để proxy qua backend (tránh lỗi CORS ở client) */
+  async getFileStream(bucket: string, key: string): Promise<any> {
+    if (!this.isReady()) {
+      throw new Error('R2 Storage chưa được cấu hình.');
+    }
+    const response = await this.s3!.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+    return {
+      stream: response.Body,
+      contentType: response.ContentType,
+      contentLength: response.ContentLength,
+    };
+  }
+
   /**
    * Tạo key (đường dẫn file) chuẩn hóa.
    * Format: <loai>/<mssv-hoặc-magv>/<timestamp>-<originalname>

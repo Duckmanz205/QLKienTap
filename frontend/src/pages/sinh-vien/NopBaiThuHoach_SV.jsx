@@ -1,9 +1,11 @@
+import toast from 'react-hot-toast';
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   UploadCloud, FileText, CheckCircle2, AlertCircle, ChevronRight, Lock,
   ArrowLeft, Search, ZoomIn, ZoomOut, AlertTriangle, Send, Maximize2, Minimize2
 } from 'lucide-react';
 import { sinhVienApi } from '../../services/api';
+import Toast from '../../components/Toast';
 
 export default function NopBaiThuHoach_SV() {
   const [student, setStudent] = useState(null);
@@ -22,6 +24,78 @@ export default function NopBaiThuHoach_SV() {
   const [rightFontSize, setRightFontSize] = useState(14);
   const rightScrollRef = useRef(null);
   const [searchText, setSearchText] = useState('');
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(1);
+  const [matchCount, setMatchCount] = useState(0);
+  const [indexInput, setIndexInput] = useState("1");
+  const contentEditableRef = useRef(null);
+  const lastCaretOffset = useRef(0);
+
+  const getCaretCharacterOffsetWithin = (element) => {
+    let caretOffset = 0;
+    const doc = element.ownerDocument || element.document;
+    const win = doc.defaultView || doc.parentWindow;
+    let sel;
+    if (typeof win.getSelection !== "undefined") {
+      sel = win.getSelection();
+      if (sel.rangeCount > 0) {
+        const range = win.getSelection().getRangeAt(0);
+        const preCaretRange = range.cloneRange();
+        preCaretRange.selectNodeContents(element);
+        preCaretRange.setEnd(range.endContainer, range.endOffset);
+        caretOffset = preCaretRange.toString().length;
+      }
+    }
+    return caretOffset;
+  };
+
+  useEffect(() => {
+    if (!searchText.trim() || !uploadedFile?.text) {
+      setMatchCount(0);
+      setCurrentMatchIndex(1);
+      setIndexInput("1");
+      return;
+    }
+    
+    const escapeRegExp = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escapeRegExp(searchText), 'gi');
+    let matches = [];
+    let match;
+    while ((match = regex.exec(uploadedFile.text)) !== null) {
+      matches.push(match.index);
+    }
+    
+    const count = matches.length;
+    setMatchCount(count);
+    
+    if (count > 0) {
+      let closestIdx = 1;
+      let minDiff = Infinity;
+      matches.forEach((pos, idx) => {
+        const diff = Math.abs(pos - lastCaretOffset.current);
+        if (diff < minDiff) {
+          minDiff = diff;
+          closestIdx = idx + 1;
+        }
+      });
+      // Only set closest index if we are just starting a search
+      // To avoid resetting it while navigating, we can check if matchCount changed from 0 or just let it reset on search change
+      setCurrentMatchIndex(closestIdx);
+      setIndexInput(closestIdx.toString());
+    } else {
+      setCurrentMatchIndex(1);
+      setIndexInput("1");
+    }
+  }, [searchText, uploadedFile?.text]);
+
+  useEffect(() => {
+    if (matchCount > 0) {
+      const el = document.getElementById('current-search-match');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  }, [currentMatchIndex, matchCount]);
+
 
   useEffect(() => {
     const handleMouseMove = (e) => {
@@ -55,7 +129,6 @@ export default function NopBaiThuHoach_SV() {
 
   const showPopup = (message, type = 'error') => {
     setPopup({ show: true, message, type });
-    setTimeout(() => setPopup({ show: false, message: '', type: 'success' }), 3500);
   };
 
 
@@ -76,12 +149,13 @@ export default function NopBaiThuHoach_SV() {
       const validTrips = (res.data || []).filter(t => t.trang_thai === 'HopLe' || t.trang_thai === 'DaThamGia' || t.trang_thai === 'HoanThanh');
       setTrips(validTrips.map(trip => {
         let status = 'Chưa nộp';
-        if (trip.baiThuHoach) status = 'Đã nộp';
+        const baiThuHoach = trip.phieuThamQuan?.baiThuHoach;
+        if (baiThuHoach) status = 'Đã nộp';
         
         let hanNopStr = 'Chưa xác định';
         if (trip.chuyenThamQuan?.ngay_tham_quan) {
           const dateObj = new Date(trip.chuyenThamQuan.ngay_tham_quan);
-          dateObj.setDate(dateObj.getDate() + 7);
+          dateObj.setDate(dateObj.getDate() + 10);
           hanNopStr = dateObj.toLocaleDateString('vi-VN');
         }
 
@@ -93,7 +167,11 @@ export default function NopBaiThuHoach_SV() {
           hinhThuc: trip.chuyenThamQuan?.hinh_thuc === 'TrucTuyen' ? 'Trực tuyến' : 'Trực tiếp',
           trangThai: status,
           hanNop: hanNopStr,
-          baiThuHoach: trip.baiThuHoach
+          baiThuHoach: baiThuHoach,
+          cachToChuc: trip.chuyenThamQuan?.cach_to_chuc,
+          hoaDonStatus: trip.hoaDon?.trang_thai,
+          hasPhieuThamQuan: !!trip.phieuThamQuan,
+          diemDanhStatus: trip.phieuThamQuan?.diemDanh?.trang_thai
         };
       }));
     } catch (err) {
@@ -126,11 +204,15 @@ export default function NopBaiThuHoach_SV() {
     try {
       const res = await sinhVienApi.uploadReport(file);
       const url = res.data.url;
+      const previewUrl = URL.createObjectURL(file);
+      
       setUploadedFile({
         name: res.data.fileName || res.data.originalName || file.name,
         size: (file.size / (1024 * 1024)).toFixed(1) + ' MB',
-        text: res.data.extractedText || "Không thể trích xuất văn bản từ tệp PDF này. Vui lòng đảm bảo file PDF không bị khóa.",
-        url: url
+        text: res.data.extractedText || "",
+        url: url,
+        previewUrl: previewUrl,
+        rawFile: file
       });
     } catch (err) {
       console.error(err);
@@ -138,6 +220,41 @@ export default function NopBaiThuHoach_SV() {
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = null;
+    }
+  };
+
+  const [isExtracting, setIsExtracting] = useState(false);
+
+  const handleExtractText = async () => {
+    if (!uploadedFile || !uploadedFile.rawFile) {
+        showPopup('Vui lòng chọn file trước khi trích xuất', 'error');
+        return;
+    }
+    setIsExtracting(true);
+    try {
+        const formData = new FormData();
+        formData.append('file', uploadedFile.rawFile);
+        
+        const response = await fetch('http://localhost:8000/process-pdf', {
+            method: 'POST',
+            body: formData,
+        });
+        
+        if (!response.ok) {
+            throw new Error(`API lỗi: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        setUploadedFile(prev => ({
+            ...prev,
+            text: data.extracted_text || "Không tìm thấy nội dung."
+        }));
+        showPopup('Trích xuất thành công!', 'success');
+    } catch (err) {
+        console.error("Lỗi OCR:", err);
+        showPopup('Lỗi trích xuất văn bản AI', 'error');
+    } finally {
+        setIsExtracting(false);
     }
   };
 
@@ -179,6 +296,24 @@ export default function NopBaiThuHoach_SV() {
           ) : (
             trips.map(trip => {
               const isTuDo = trip.loaiChuyen === 'tu_do';
+              const isDoKhoa = trip.cachToChuc === 'DoKhoaToChuc';
+              let canSubmit = true;
+              let disabledReason = '';
+              
+              if (isDoKhoa) {
+                if (!trip.hasPhieuThamQuan) {
+                  canSubmit = false;
+                  disabledReason = trip.hoaDonStatus === 'ChuaDong' ? 'Chưa đóng lệ phí' : 'Chưa có PTQ';
+                } else if (trip.diemDanhStatus !== 'CoMat') {
+                  canSubmit = false;
+                  disabledReason = 'Chưa điểm danh';
+                }
+              } else {
+                if (!trip.hasPhieuThamQuan) {
+                  canSubmit = false;
+                  disabledReason = 'Chưa cấp PTQ';
+                }
+              }
               
               return (
                 <div key={trip.id} className="bg-white rounded-2xl border border-[#E7E0C4] shadow-sm overflow-hidden flex flex-col transition-all hover:border-[#407F3E]/50 group">
@@ -198,24 +333,78 @@ export default function NopBaiThuHoach_SV() {
                     <div className="flex items-center gap-4 shrink-0">
                       {getStatusBadge(trip.trangThai)}
                       {trip.trangThai !== 'Đã nộp' ? (
-                        <button 
-                          onClick={() => {
-                            setSelectedTrip(trip);
-                            setUploadedFile(null);
-                          }}
-                          className="px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-1.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 shadow-sm transition-colors cursor-pointer"
-                        >
-                          Nộp bài <ChevronRight className="w-4 h-4" />
-                        </button>
+                        canSubmit ? (
+                          <button 
+                            onClick={() => {
+                              setSelectedTrip(trip);
+                              setUploadedFile(null);
+                            }}
+                            className="px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-1.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 shadow-sm transition-colors cursor-pointer"
+                          >
+                            Nộp bài <ChevronRight className="w-4 h-4" />
+                          </button>
+                        ) : (
+                          <div className="flex flex-col items-end">
+                            <button disabled className="px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-1.5 bg-slate-200 text-slate-400 cursor-not-allowed">
+                              Nộp bài <ChevronRight className="w-4 h-4" />
+                            </button>
+                            <span className="text-[10px] text-red-500 font-bold mt-1 uppercase tracking-wide">{disabledReason}</span>
+                          </div>
+                        )
                       ) : (
                         <button 
-                          onClick={() => {
+                          onClick={async () => {
                             setSelectedTrip(trip);
                             if (trip.baiThuHoach) {
+                              const dbPath = trip.baiThuHoach.file_bao_cao;
+                              let apiPath = '';
+                              if (dbPath) {
+                                if (dbPath.startsWith('reports/')) {
+                                  apiPath = `/upload/file/${dbPath}`;
+                                } else {
+                                  apiPath = `/upload/file/reports/${dbPath}`;
+                                }
+                              }
+
+                              // Fetch PDF and TXT via axiosClient (auto-attaches JWT)
+                              let blobUrl = '';
+                              let extractedText = 'Đây là nội dung bài làm đã nộp (đã được lưu trên hệ thống).';
+
+                              if (apiPath) {
+                                try {
+                                  const { default: api } = await import('../../services/axiosClient');
+                                  
+                                  // 1. Fetch PDF
+                                  const respPdf = await api.get(apiPath, { responseType: 'blob' });
+                                  if (respPdf.data) {
+                                    blobUrl = URL.createObjectURL(respPdf.data);
+                                  }
+
+                                  // 2. Fetch Text File (.txt)
+                                  const txtApiPath = apiPath.replace(/\.\w+$/, '.txt');
+                                  try {
+                                    const respTxt = await api.get(txtApiPath, { responseType: 'text' });
+                                    if (respTxt.data) {
+                                      extractedText = respTxt.data;
+                                    }
+                                  } catch (txtErr) {
+                                    console.warn('Không tìm thấy file text trích xuất:', txtErr);
+                                    // Fallback if older report has it in DB
+                                    if (trip.baiThuHoach.noi_dung_trich_xuat) {
+                                      extractedText = trip.baiThuHoach.noi_dung_trich_xuat;
+                                    }
+                                  }
+                                } catch (err) {
+                                  console.error('Lỗi tải file preview:', err);
+                                }
+                              }
+                              
                               setUploadedFile({
                                 name: trip.baiThuHoach.file_bao_cao_url || 'BaoCao_ThuHoach.pdf',
                                 size: 'Đã nộp',
-                                text: trip.baiThuHoach.noi_dung_trich_xuat || 'Đây là nội dung bài làm đã nộp (đã được lưu trên hệ thống).'
+                                text: extractedText,
+                                previewUrl: blobUrl,
+                                url: apiPath
                               });
                             }
                           }}
@@ -282,7 +471,7 @@ export default function NopBaiThuHoach_SV() {
 
             {hasEnoughTrips && (
               <button 
-                onClick={() => alert('Chức năng đăng ký hội đồng đang được cập nhật (UI mới)')}
+                onClick={() => toast.error('Chức năng đăng ký hội đồng đang được cập nhật (UI mới)')}
                 className="w-full mt-6 py-3.5 bg-[#DBD468] hover:bg-[#c9c256] text-slate-900 rounded-xl font-black text-sm uppercase tracking-wider transition-colors shadow-lg cursor-pointer"
               >
                 Đăng ký Hội đồng ngay
@@ -293,6 +482,35 @@ export default function NopBaiThuHoach_SV() {
       </div>
     </div>
   );
+
+  const getHighlightedHtml = () => {
+    if (!uploadedFile?.text) return { __html: '' };
+    const escapeHtml = (text) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    
+    if (!searchText.trim()) {
+      return { __html: escapeHtml(uploadedFile.text) };
+    }
+
+    const escapeRegExp = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(${escapeRegExp(searchText)})`, 'gi');
+    const parts = uploadedFile.text.split(regex);
+    let matchIdx = 0;
+
+    const htmlParts = parts.map((part) => {
+      if (part.toLowerCase() === searchText.toLowerCase()) {
+        matchIdx++;
+        const isCurrent = matchIdx === currentMatchIndex;
+        if (isCurrent) {
+          return `<span id="current-search-match" class="bg-green-400 text-white font-bold shadow-sm rounded px-0.5">${escapeHtml(part)}</span>`;
+        } else {
+          return `<span class="bg-green-200 text-slate-800 rounded px-0.5">${escapeHtml(part)}</span>`;
+        }
+      }
+      return escapeHtml(part);
+    });
+
+    return { __html: htmlParts.join('') };
+  };
 
   // ---------------------------------------------------------
   // VIEW 2: SPLIT-PANE UPLOAD & COMPARISON VIEW
@@ -325,13 +543,24 @@ export default function NopBaiThuHoach_SV() {
               Bài nộp đã được ghi nhận
             </span>
           ) : (
-            <button 
-              onClick={handleSubmit}
-              disabled={!isConfirmed}
-              className={`px-3 py-1 rounded-md font-bold text-xs shadow-sm transition-all flex items-center gap-1.5 ${isConfirmed ? 'bg-[#407F3E] hover:bg-[#407F3E]/90 text-white cursor-pointer' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
-            >
-              <Send className="w-3.5 h-3.5" /> Xác nhận & Nộp bài
-            </button>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => {
+                   setUploadedFile(null);
+                   setIsConfirmed(false);
+                }}
+                className="px-3 py-1 rounded-md font-bold text-xs shadow-sm transition-all flex items-center gap-1.5 bg-slate-200 text-slate-700 hover:bg-slate-300 cursor-pointer"
+              >
+                <UploadCloud className="w-3.5 h-3.5" /> Chọn file khác
+              </button>
+              <button 
+                onClick={handleSubmit}
+                disabled={!isConfirmed}
+                className={`px-3 py-1 rounded-md font-bold text-xs shadow-sm transition-all flex items-center gap-1.5 ${isConfirmed ? 'bg-[#407F3E] hover:bg-[#407F3E]/90 text-white cursor-pointer' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
+              >
+                <Send className="w-3.5 h-3.5" /> Xác nhận & Nộp bài
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -398,9 +627,9 @@ export default function NopBaiThuHoach_SV() {
             // PDF Preview State
             <div className="flex-1 flex flex-col h-full">
               <div className="flex-1 flex w-full h-full bg-[#E7E0C4]/20">
-                {uploadedFile.url ? (
+                {uploadedFile.previewUrl ? (
                   <iframe 
-                    src={uploadedFile.url} 
+                    src={uploadedFile.previewUrl} 
                     className={`w-full h-full border-0 ${isDragging ? 'pointer-events-none' : ''}`} 
                     title="PDF Preview" 
                   />
@@ -438,7 +667,46 @@ export default function NopBaiThuHoach_SV() {
               <div className="flex items-center gap-3">
                 <div className="flex items-center bg-white border border-slate-200 rounded px-2 py-0.5">
                   <Search className="w-3 h-3 text-slate-400 mr-1" />
-                  <input type="text" placeholder="Tìm từ khóa..." className="text-xs focus:outline-none w-20" value={searchText} onChange={(e) => setSearchText(e.target.value)} />
+                  <input 
+                    type="text" 
+                    placeholder="Tìm từ khóa..." 
+                    className="text-xs focus:outline-none w-20" 
+                    value={searchText} 
+                    onChange={(e) => setSearchText(e.target.value)}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                            const next = currentMatchIndex < matchCount ? currentMatchIndex + 1 : 1;
+                            setCurrentMatchIndex(next);
+                            setIndexInput(next.toString());
+                        }
+                    }}
+                  />
+                  {searchText && matchCount > 0 && (
+                    <div className="flex items-center text-[10px] text-slate-500 border-l border-slate-200 pl-1 ml-1">
+                        <input 
+                            type="text" 
+                            className="w-5 text-center focus:outline-none bg-transparent font-medium"
+                            value={indexInput}
+                            onChange={(e) => setIndexInput(e.target.value)}
+                            onBlur={() => {
+                                let val = parseInt(indexInput);
+                                if (isNaN(val) || val < 1) val = 1;
+                                if (val > matchCount) val = matchCount;
+                                setCurrentMatchIndex(val);
+                                setIndexInput(val.toString());
+                            }}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.target.blur();
+                                }
+                            }}
+                        />
+                        <span>/ {matchCount}</span>
+                    </div>
+                  )}
+                  {searchText && matchCount === 0 && (
+                      <span className="text-[10px] text-red-400 border-l border-slate-200 pl-1 ml-1">0/0</span>
+                  )}
                 </div>
                 <div className="flex items-center gap-1 border border-slate-200 rounded bg-white">
                   <button onClick={() => setRightFontSize(Math.max(10, rightFontSize - 2))} className="p-1 hover:bg-slate-100"><ZoomOut className="w-3 h-3" /></button>
@@ -458,15 +726,17 @@ export default function NopBaiThuHoach_SV() {
             {/* AI Text Content */}
             <div className="flex-1 overflow-y-auto custom-scrollbar p-6 bg-slate-50 relative" ref={rightScrollRef}>
               
-              {!uploadedFile.text || uploadedFile.text.includes("Không thể trích xuất") ? (
+              {!uploadedFile.text || uploadedFile.text.includes("Không tìm thấy nội dung") ? (
                 <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
-                  <AlertTriangle className="w-12 h-12 text-[#E68A8C]" />
-                  <div>
-                    <h4 className="font-bold text-slate-800 text-lg">Không thể trích xuất văn bản</h4>
-                    <p className="text-sm text-slate-500 max-w-sm mx-auto mt-1">File PDF có thể là dạng ảnh scan quá mờ, chữ viết tay khó đọc, hoặc bị khóa bảo mật không cho phép copy nội dung.</p>
+                  <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center">
+                    <FileText className="w-8 h-8 text-blue-500" />
                   </div>
-                  <button onClick={() => fileInputRef.current?.click()} className="px-4 py-2 bg-white border border-[#E68A8C] text-[#E68A8C] rounded-lg font-bold text-sm hover:bg-red-50 transition-colors">
-                    Thử trích xuất lại
+                  <div>
+                    <h4 className="font-bold text-slate-800 text-lg">Trích xuất văn bản bằng AI</h4>
+                    <p className="text-sm text-slate-500 max-w-sm mx-auto mt-1">Hệ thống AI sẽ quét và đọc nội dung từ file PDF (kể cả ảnh scan hoặc chữ viết tay) để đối chiếu.</p>
+                  </div>
+                  <button onClick={handleExtractText} disabled={isExtracting} className="px-6 py-2.5 bg-blue-500 text-white rounded-lg font-bold text-sm hover:bg-blue-600 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                    {isExtracting ? 'Đang trích xuất...' : 'Trích xuất text'}
                   </button>
                 </div>
               ) : (
@@ -475,41 +745,48 @@ export default function NopBaiThuHoach_SV() {
                     <span>Trang 1</span>
                   </div>
                   <div 
-                    className="p-6 whitespace-pre-wrap leading-relaxed text-slate-800 font-serif focus:outline-none focus:bg-slate-50 transition-colors"
+                    ref={contentEditableRef}
+                    className="p-6 whitespace-pre-wrap leading-loose text-slate-900 font-sans tracking-wide focus:outline-none focus:bg-slate-50 transition-colors"
                     style={{ fontSize: `${rightFontSize}px` }}
                     contentEditable
                     suppressContentEditableWarning
-                    onBlur={(e) => setUploadedFile({...uploadedFile, text: e.target.innerText})}
-                  >
-                    {/* Mock Highlight logic: random highlight for demonstration */}
-                    {uploadedFile.text.split(' ').map((word, i) => (
-                      <React.Fragment key={i}>
-                        {i % 45 === 0 && i > 0 ? <span className="bg-yellow-200 px-0.5 rounded cursor-help" title="Độ tin cậy thấp - Cần kiểm tra lại">{word}</span> : word}{' '}
-                      </React.Fragment>
-                    ))}
-                  </div>
+                    onBlur={(e) => {
+                      if (e.target.innerText !== uploadedFile.text) {
+                          setUploadedFile({...uploadedFile, text: e.target.innerText});
+                      }
+                    }}
+                    onKeyUp={() => {
+                        if (contentEditableRef.current) lastCaretOffset.current = getCaretCharacterOffsetWithin(contentEditableRef.current);
+                    }}
+                    onClick={() => {
+                        if (contentEditableRef.current) lastCaretOffset.current = getCaretCharacterOffsetWithin(contentEditableRef.current);
+                    }}
+                    dangerouslySetInnerHTML={getHighlightedHtml()}
+                  />
                 </div>
               )}
               
             </div>
 
             {/* Checkbox Footer */}
-            <div className="h-16 border-t border-slate-200 bg-white flex items-center px-6 shrink-0 justify-between mt-auto">
-              <label className="flex items-center gap-3 cursor-pointer group">
-                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isConfirmed ? 'bg-[#407F3E] border-[#407F3E]' : 'border-slate-300 bg-white group-hover:border-[#407F3E]'}`}>
-                  {isConfirmed && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
-                </div>
-                <input 
-                  type="checkbox" 
-                  className="hidden" 
-                  checked={isConfirmed} 
-                  onChange={(e) => setIsConfirmed(e.target.checked)} 
-                />
-                <span className="text-sm font-bold text-slate-700 select-none group-hover:text-[#407F3E] transition-colors">
-                  Tôi đã đối chiếu văn bản trích xuất với file gốc và xác nhận nội dung chính xác
-                </span>
-              </label>
-            </div>
+            {uploadedFile.text && !uploadedFile.text.includes("Không tìm thấy nội dung") && (
+              <div className="h-16 border-t border-slate-200 bg-white flex items-center px-6 shrink-0 justify-between mt-auto">
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isConfirmed ? 'bg-[#407F3E] border-[#407F3E]' : 'border-slate-300 bg-white group-hover:border-[#407F3E]'}`}>
+                    {isConfirmed && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
+                  </div>
+                  <input 
+                    type="checkbox" 
+                    className="hidden" 
+                    checked={isConfirmed} 
+                    onChange={(e) => setIsConfirmed(e.target.checked)} 
+                  />
+                  <span className="text-sm font-bold text-slate-700 select-none group-hover:text-[#407F3E] transition-colors">
+                    Tôi đã đối chiếu văn bản trích xuất với file gốc và xác nhận nội dung chính xác
+                  </span>
+                </label>
+              </div>
+            )}
             
           </div>
         )}
@@ -519,18 +796,11 @@ export default function NopBaiThuHoach_SV() {
   return (
     <div className={selectedTrip ? '' : 'bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300'}>
       {/* Custom Popup Toast */}
-      {popup.show && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 pointer-events-none">
-          <div className="absolute inset-0 bg-white/5 backdrop-blur-[1px] pointer-events-auto" onClick={() => setPopup({ ...popup, show: false })}></div>
-          <div className={`relative z-10 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-4 animate-in slide-in-from-top-4 fade-in duration-300 pointer-events-auto ${popup.type === 'error' ? 'bg-[#E68A8C] text-white' : 'bg-[#407F3E] text-white'}`}>
-            <span className="font-bold text-sm">{popup.message}</span>
-            <button onClick={() => setPopup({ ...popup, show: false })} className="p-1 hover:bg-white/20 rounded-full transition-colors">
-              <span className="sr-only">Close</span>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
-          </div>
-        </div>
-      )}
+      <Toast 
+        message={popup.show ? popup.message : ''}
+        type={popup.type}
+        onClose={() => setPopup({ ...popup, show: false })}
+      />
 
       {selectedTrip ? renderSubmissionView() : renderListView()}
     </div>

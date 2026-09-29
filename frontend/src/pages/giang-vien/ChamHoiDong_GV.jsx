@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import React, { useState, useEffect } from 'react';
 import { 
   Users, MapPin, Calendar, Clock, ChevronRight, CheckCircle2, Save, ArrowRight
@@ -162,7 +163,7 @@ export default function ChamHoiDong_GV() {
         }
       }
       
-      alert('Đã lưu điểm thành công!');
+      toast.success('Đã lưu điểm thành công!');
       
       // Update student status to graded
       const updatedStudents = students.map(s => 
@@ -177,7 +178,7 @@ export default function ChamHoiDong_GV() {
       }
       
     } catch (err) {
-      alert('Có lỗi xảy ra khi lưu điểm');
+      toast.error('Có lỗi xảy ra khi lưu điểm');
       console.error(err);
     } finally {
       setSaving(false);

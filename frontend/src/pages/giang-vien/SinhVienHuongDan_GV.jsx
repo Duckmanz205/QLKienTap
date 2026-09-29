@@ -13,6 +13,7 @@ export default function SinhVienHuongDan_GV() {
   const [students, setStudents] = useState([]);
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [selectedStudentProfile, setSelectedStudentProfile] = useState(null);
 
   // Filter Popover States
   const [selectedClass, setSelectedClass] = useState('ALL');
@@ -61,19 +62,20 @@ export default function SinhVienHuongDan_GV() {
         const sv = st.sinhVien || {};
         
         // Find reports for this student
-        const studentReports = rpData.filter(r => r.phieuDangKy?.sinhVien?.id === sv.id);
+        const studentReports = rpData.filter(r => (r.phieuThamQuan?.phieuDangKy?.sinhVien?.id === sv.id) || (r.phieuDangKy?.sinhVien?.id === sv.id));
         const pendingReports = studentReports.filter(r => r.diem_thu_hoach === null);
         
         return {
           id: st.id,
           mssv: sv.mssv,
           name: sv.ho_ten,
-          lop: sv.lop || '--',
+          lop: sv.ten_lop || '--',
           soChuyenHT: studentReports.length, 
           soChuyenYC: 3, 
           baiChoCham: pendingReports.length,
           avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(sv.ho_ten || 'SV')}&background=f1f5f9&color=475569`,
-          rawSv: sv
+          rawSv: sv,
+          studentReports: studentReports
         };
       });
       
@@ -264,16 +266,15 @@ export default function SinhVienHuongDan_GV() {
       {/* Main Table */}
       <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-hidden">
         <div className="overflow-x-auto min-h-[300px]">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-collapse table-fixed">
             <thead>
               <tr className="bg-[#E7E0C4] text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
-                <th className="p-4 pl-6 w-12 text-center">Ảnh</th>
-                <th className="p-4 min-w-[120px]">MSSV</th>
-                <th className="p-4 min-w-[200px]">Họ tên</th>
-                <th className="p-4 min-w-[120px]">Lớp</th>
-                <th className="p-4 text-center min-w-[160px]">Số chuyến đã đi</th>
-                <th className="p-4 text-center min-w-[200px]">Bài thu hoạch chờ chấm</th>
-                <th className="p-4 pr-6 text-right min-w-[150px]">Hành động</th>
+                <th className="p-4 pl-6 w-[15%]">MSSV</th>
+                <th className="p-4 w-[25%]">Họ tên</th>
+                <th className="p-4 w-[15%]">Lớp</th>
+                <th className="p-4 text-center w-[15%]">Số chuyến đã đi</th>
+                <th className="p-4 text-center w-[15%]">Bài chờ chấm</th>
+                <th className="p-4 pr-6 text-right w-[15%]">Hành động</th>
               </tr>
             </thead>
             <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
@@ -296,15 +297,9 @@ export default function SinhVienHuongDan_GV() {
                   return (
                     <tr key={student.id} className="hover:bg-slate-50 transition-colors group">
                       
-                      <td className="p-4 pl-6 text-center">
-                        <div className="w-8 h-8 rounded-full border border-slate-200 overflow-hidden mx-auto shrink-0">
-                          <img src={student.avatar} alt={student.name} className="w-full h-full object-cover" />
-                        </div>
-                      </td>
-                      
-                      <td className="p-4 font-mono font-bold text-slate-600">{student.mssv}</td>
-                      <td className="p-4 font-bold text-slate-800">{student.name}</td>
-                      <td className="p-4 font-medium text-slate-500">{student.lop}</td>
+                      <td className="p-4 pl-6 font-mono font-bold text-slate-600 truncate">{student.mssv}</td>
+                      <td className="p-4 font-bold text-slate-800 truncate">{student.name}</td>
+                      <td className="p-4 font-medium text-slate-500 truncate">{student.lop}</td>
                       
                       {/* Số chuyến hoàn thành */}
                       <td className="p-4 text-center">
@@ -338,11 +333,11 @@ export default function SinhVienHuongDan_GV() {
                       {/* Hành động */}
                       <td className="p-4 pr-6 text-right">
                         <button 
-                          onClick={() => navigate('/giang-vien/grading')}
+                          onClick={() => setSelectedStudentProfile(student)}
                           className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-lg text-xs font-bold transition-colors shadow-sm cursor-pointer"
                         >
-                          {hasPendingReports ? <Edit3 className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                          Xem & chấm
+                          <FileText className="w-3.5 h-3.5" />
+                          Hồ sơ kiến tập
                         </button>
                       </td>
 
@@ -409,6 +404,144 @@ export default function SinhVienHuongDan_GV() {
           </div>
         </div>
       </div>
+
+      {/* Hồ sơ kiến tập Modal */}
+      {selectedStudentProfile && (
+        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4" onClick={() => setSelectedStudentProfile(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-slate-50/50">
+              <div className="flex items-center gap-4">
+                <img src={selectedStudentProfile.avatar} alt="Avatar" className="w-12 h-12 rounded-full border-2 border-white shadow-sm" />
+                <div>
+                  <h2 className="text-xl font-bold text-slate-800">{selectedStudentProfile.name}</h2>
+                  <p className="text-sm text-slate-500 font-medium">MSSV: {selectedStudentProfile.mssv} • Lớp: {selectedStudentProfile.lop}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSelectedStudentProfile(null)}
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-200 text-slate-500 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-slate-50/30">
+              
+              {/* Section 1: Lịch sử chuyến đi */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                  <div className="w-1.5 h-5 bg-[#89B449] rounded-full"></div>
+                  Lịch sử chuyến tham quan ({selectedStudentProfile.soChuyenHT}/3)
+                </h3>
+                <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-600">
+                      <tr>
+                        <th className="p-4 font-bold">Nhà máy</th>
+                        <th className="p-4 font-bold">Ngày đi</th>
+                        <th className="p-4 font-bold text-center">Điểm danh</th>
+                        <th className="p-4 font-bold text-center">Điểm chuẩn bị</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {selectedStudentProfile.studentReports.length === 0 ? (
+                        <tr><td colSpan="4" className="p-6 text-center text-slate-500">Chưa tham gia chuyến đi nào.</td></tr>
+                      ) : (
+                        selectedStudentProfile.studentReports.map((report, idx) => {
+                          const nhaMay = report.phieuThamQuan?.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || 'N/A';
+                          const thoiGian = report.phieuThamQuan?.phieuDangKy?.chuyenThamQuan?.ngay_tham_quan;
+                          const diemDanh = report.phieuThamQuan?.diemDanh?.trang_thai;
+                          const diemChuanBi = report.phieuThamQuan?.diemPhieuThamQuan?.diem_chuan_bi;
+                          
+                          return (
+                            <tr key={idx} className="hover:bg-slate-50">
+                              <td className="p-4 font-bold text-slate-700">{nhaMay}</td>
+                              <td className="p-4 text-slate-600">{thoiGian ? new Date(thoiGian).toLocaleDateString('vi-VN') : '--'}</td>
+                              <td className="p-4 text-center">
+                                {diemDanh === 'CoMat' ? (
+                                  <span className="inline-flex items-center px-2 py-1 rounded bg-green-100 text-green-700 text-xs font-bold">Có mặt</span>
+                                ) : diemDanh === 'Vang' ? (
+                                  <span className="inline-flex items-center px-2 py-1 rounded bg-red-100 text-red-700 text-xs font-bold">Vắng</span>
+                                ) : diemDanh === 'TuChoiThamGia' ? (
+                                  <span className="inline-flex items-center px-2 py-1 rounded bg-slate-100 text-slate-700 text-xs font-bold">Từ chối</span>
+                                ) : (
+                                  <span className="inline-flex items-center px-2 py-1 rounded bg-slate-100 text-slate-500 text-xs font-bold">Chưa ĐD</span>
+                                )}
+                              </td>
+                              <td className="p-4 text-center font-bold text-slate-700">
+                                {diemChuanBi !== undefined && diemChuanBi !== null ? diemChuanBi : '--'}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Section 2: Tiến độ bài thu hoạch */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                  <div className="w-1.5 h-5 bg-[#407F3E] rounded-full"></div>
+                  Tiến độ bài thu hoạch
+                </h3>
+                <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-600">
+                      <tr>
+                        <th className="p-4 font-bold">Tên bài báo cáo</th>
+                        <th className="p-4 font-bold text-center">Trạng thái</th>
+                        <th className="p-4 font-bold text-center">Điểm số</th>
+                        <th className="p-4 font-bold">Nhận xét</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {selectedStudentProfile.studentReports.length === 0 ? (
+                        <tr><td colSpan="4" className="p-6 text-center text-slate-500">Chưa nộp bài thu hoạch nào.</td></tr>
+                      ) : (
+                        selectedStudentProfile.studentReports.map((report, idx) => {
+                          const tenBai = report.file_bao_cao?.split('/').pop() || 'Báo cáo chưa rõ tên';
+                          const trangThai = report.diem_thu_hoach !== null ? 'Đã chấm' : 'Chờ chấm';
+                          
+                          return (
+                            <tr key={idx} className="hover:bg-slate-50">
+                              <td className="p-4 text-slate-700 font-medium truncate max-w-[200px]" title={tenBai}>
+                                <div className="flex items-center gap-2">
+                                  <FileText className="w-4 h-4 text-[#407F3E] shrink-0" />
+                                  <span className="truncate">{tenBai}</span>
+                                </div>
+                              </td>
+                              <td className="p-4 text-center">
+                                <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-bold ${
+                                  trangThai === 'Đã chấm' ? 'bg-[#89B449]/20 text-[#407F3E]' : 'bg-[#DBD468]/30 text-slate-700'
+                                }`}>
+                                  {trangThai}
+                                </span>
+                              </td>
+                              <td className="p-4 text-center">
+                                <span className="font-black text-lg text-[#407F3E]">
+                                  {report.diem_thu_hoach !== null ? report.diem_thu_hoach : '--'}
+                                </span>
+                              </td>
+                              <td className="p-4 text-slate-600 text-xs italic max-w-[250px] truncate" title={report.nhan_xet}>
+                                {report.nhan_xet || 'Chưa có nhận xét'}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

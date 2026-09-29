@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -57,7 +58,7 @@ export default function HoanPhi_SV() {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       if (file.size > 5 * 1024 * 1024) {
-        alert('Kích thước tệp vượt quá hạn mức 5MB.');
+        toast.error('Kích thước tệp vượt quá hạn mức 5MB.');
         return;
       }
       
@@ -77,7 +78,7 @@ export default function HoanPhi_SV() {
         setFileScanUrl(uploadRes.data.url);
       } catch (err) {
         console.error(err);
-        alert('Tải lên minh chứng thất bại.');
+        toast.error('Tải lên minh chứng thất bại.');
         setUploadedFileName('');
       } finally {
         setUploading(false);
@@ -88,7 +89,7 @@ export default function HoanPhi_SV() {
   const handleRefundSubmit = async (e) => {
     e.preventDefault();
     if (!selectedInvoiceId) {
-      alert('Vui lòng chọn hóa đơn liên quan.');
+      toast.success('Vui lòng chọn hóa đơn liên quan.');
       return;
     }
 

@@ -1,21 +1,23 @@
+import toast from 'react-hot-toast';
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   ArrowLeft, FileText, CheckCircle2, Save, Search, ChevronRight,
   ZoomIn, ZoomOut, Download, Sparkles, MessageSquareWarning, User,
-  Filter, Check, ChevronDown
+  Filter, Check, ChevronDown, X
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { giangVienApi } from '../../services/api';
+import { useNavigate, useLocation } from 'react-router-dom';
+import api, { giangVienApi } from '../../services/api';
 
 export default function ChamBaiThuHoach_GV() {
   const navigate = useNavigate();
+  const location = useLocation();
   
   const [lecturer, setLecturer] = useState(null);
   const [reports, setReports] = useState([]);
   const [selectedReport, setSelectedReport] = useState(null);
 
   // Filter & Pagination states
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(location.state?.filterMssv || '');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [searchStatusDropdown, setSearchStatusDropdown] = useState('');
@@ -23,6 +25,33 @@ export default function ChamBaiThuHoach_GV() {
 
   const [currentPage, setCurrentPage] = useState(1);
   const [limit, setLimit] = useState(15);
+
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+
+  const mockAiGrading = {
+    ai_score: 8.5,
+    ai_summary_comment: "Bài làm cấu trúc tốt, có số liệu thực tế rõ ràng. Tuy nhiên phần bài học kinh nghiệm còn sơ sài.",
+    ai_detailed_evaluation: [
+      {
+        criteria: "Hình thức trình bày",
+        max_score: 2,
+        ai_given_score: 2,
+        explanation: "Đúng chuẩn format, có đầy đủ mục lục, không lỗi chính tả."
+      },
+      {
+        criteria: "Nội dung chuyên môn",
+        max_score: 5,
+        ai_given_score: 4,
+        explanation: "Mô tả chi tiết quy trình của nhà máy, nhưng thiếu so sánh phân tích chuyên sâu."
+      },
+      {
+        criteria: "Kết luận & Kiến nghị",
+        max_score: 3,
+        ai_given_score: 2.5,
+        explanation: "Có bài học cá nhân rút ra, kiến nghị khá thực tế."
+      }
+    ]
+  };
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -38,6 +67,9 @@ export default function ChamBaiThuHoach_GV() {
   const [score, setScore] = useState('');
   const [comments, setComments] = useState('');
   const [zoomLevel, setZoomLevel] = useState(100);
+  const [reportText, setReportText] = useState('');
+  const [pdfBlobUrl, setPdfBlobUrl] = useState(null);
+  const [isLoadingText, setIsLoadingText] = useState(false);
 
   const TEMPLATE_COMMENT = `1. Giới thiệu tổng quan nhà máy: ...
 2. Thuyết minh quy trình công nghệ sản xuất: ...
@@ -69,16 +101,57 @@ export default function ChamBaiThuHoach_GV() {
     }
   };
 
-  const handleSelectReport = (report) => {
+  const handleSelectReport = async (report) => {
     setSelectedReport(report);
     setScore(report.diem_thu_hoach !== null ? report.diem_thu_hoach : '');
     setComments(report.nhan_xet_cua_giang_vien || '');
+
+    if (report.file_bao_cao) {
+      setIsLoadingText(true);
+      setReportText('');
+      setPdfBlobUrl(null);
+      try {
+        let apiPath = report.file_bao_cao;
+        if (apiPath.startsWith('reports/')) {
+          apiPath = `upload/file/${apiPath}`;
+        } else if (!apiPath.startsWith('upload/file/')) {
+          apiPath = `upload/file/reports/${apiPath}`;
+        }
+        if (apiPath.startsWith('/')) apiPath = apiPath.substring(1);
+        
+        // Fetch PDF Blob
+        try {
+          const respPdf = await api.get('/' + apiPath, { responseType: 'blob' });
+          if (respPdf.data) {
+            setPdfBlobUrl(URL.createObjectURL(respPdf.data));
+          }
+        } catch (pdfErr) {
+          console.warn('Không tải được file PDF:', pdfErr);
+        }
+
+        const txtApiPath = '/' + apiPath.replace(/\.\w+$/, '.txt');
+        const respTxt = await api.get(txtApiPath, { responseType: 'text' });
+        if (respTxt.data) {
+          setReportText(respTxt.data);
+        } else {
+          setReportText('Không tìm thấy nội dung bài thu hoạch.');
+        }
+      } catch (err) {
+        console.warn('Không tìm thấy file text trích xuất:', err);
+        setReportText('Hệ thống chưa trích xuất nội dung văn bản cho báo cáo này. Vui lòng tải file gốc để xem.');
+      } finally {
+        setIsLoadingText(false);
+      }
+    } else {
+      setReportText('Sinh viên chưa nộp file đính kèm.');
+      setPdfBlobUrl(null);
+    }
   };
 
   const handleSaveGrade = async (e) => {
     e.preventDefault();
     if (!score || score < 0 || score > 10) {
-      alert("Vui lòng nhập điểm hợp lệ (0-10)");
+      toast.error("Vui lòng nhập điểm hợp lệ (0-10)");
       return;
     }
     try {
@@ -87,17 +160,17 @@ export default function ChamBaiThuHoach_GV() {
         score: parseFloat(score),
         comment: comments
       });
-      alert('Đã lưu điểm thành công!');
+      toast.success('Đã lưu điểm thành công!');
       setSelectedReport(null);
       if (lecturer) fetchReports(lecturer.id);
     } catch (err) {
-      alert(err.response?.data?.message || 'Có lỗi xảy ra khi chấm điểm');
+      toast.error(err.response?.data?.message || 'Có lỗi xảy ra khi chấm điểm');
     }
   };
 
   const filteredReports = reports.filter(r => {
-    const sv = r.phieuDangKy?.sinhVien || {};
-    const nhaMay = r.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || '';
+    const sv = r.phieuThamQuan?.phieuDangKy?.sinhVien || r.phieuDangKy?.sinhVien || {};
+    const nhaMay = r.phieuThamQuan?.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || r.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || '';
     const matchSearch = !searchTerm || 
       (sv.ho_ten && sv.ho_ten.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (sv.mssv && sv.mssv.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -122,12 +195,14 @@ export default function ChamBaiThuHoach_GV() {
       {/* Header & Back Button */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
         <div>
-          <button 
-            onClick={() => navigate('/giang-vien')}
-            className="flex items-center gap-1.5 text-slate-500 hover:text-[#407F3E] font-bold text-sm mb-2 transition-colors cursor-pointer w-fit"
-          >
-            <ArrowLeft className="w-4 h-4" /> Quay lại trang chủ
-          </button>
+          {location.state?.filterMssv && (
+            <button 
+              onClick={() => navigate('/giang-vien/guided-students')}
+              className="flex items-center gap-1.5 text-slate-500 hover:text-[#407F3E] font-bold text-sm mb-2 transition-colors cursor-pointer w-fit"
+            >
+              <ArrowLeft className="w-4 h-4" /> Quay lại danh sách sinh viên hướng dẫn
+            </button>
+          )}
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-3">
             Danh sách Bài thu hoạch
           </h1>
@@ -232,8 +307,8 @@ export default function ChamBaiThuHoach_GV() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {paginatedReports.map((report) => {
             const isGraded = report.diem_thu_hoach !== null;
-            const sv = report.phieuDangKy?.sinhVien || {};
-            const nhaMay = report.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Chuyến đi';
+            const sv = report.phieuThamQuan?.phieuDangKy?.sinhVien || report.phieuDangKy?.sinhVien || {};
+            const nhaMay = report.phieuThamQuan?.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || report.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Chuyến đi';
             
             return (
               <div 
@@ -354,15 +429,21 @@ export default function ChamBaiThuHoach_GV() {
   // VIEW 2: GRADING A SINGLE REPORT (PDF + Sidebar)
   // ---------------------------------------------------------
   const renderGradingView = () => {
-    const sv = selectedReport.phieuDangKy?.sinhVien || {};
-    const nhaMay = selectedReport.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Chuyến đi';
+    const sv = selectedReport.phieuThamQuan?.phieuDangKy?.sinhVien || selectedReport.phieuDangKy?.sinhVien || {};
+    const nhaMay = selectedReport.phieuThamQuan?.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || selectedReport.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Chuyến đi';
 
     return (
-      <div className="h-[calc(100vh-80px)] flex flex-col animate-in fade-in zoom-in-95 duration-300 -m-6">
+      <div className="h-[calc(100vh-64px)] flex flex-col animate-in fade-in zoom-in-95 duration-300">
         
         {/* Top Breadcrumb Bar */}
         <div className="h-14 bg-white border-b border-[#E7E0C4] flex items-center justify-between px-6 shrink-0 z-10">
           <div className="flex items-center gap-2 text-sm font-bold text-slate-600">
+            <button 
+              onClick={() => setSelectedReport(null)}
+              className="flex items-center gap-1.5 text-slate-500 hover:text-[#407F3E] transition-colors cursor-pointer mr-2 pr-4 border-r border-slate-200"
+            >
+              <ArrowLeft className="w-4 h-4" /> Quay lại
+            </button>
             <button onClick={() => setSelectedReport(null)} className="hover:text-[#407F3E] transition-colors">
               Bài thu hoạch
             </button>
@@ -376,75 +457,24 @@ export default function ChamBaiThuHoach_GV() {
           {/* Left Side: Document Viewer */}
           <div className="flex-1 flex flex-col overflow-hidden relative">
             
-            {/* PDF Toolbar */}
-            <div className="h-12 bg-white/80 backdrop-blur-sm border-b border-[#E7E0C4] flex items-center justify-between px-4 shrink-0 absolute top-0 left-0 right-0 z-10">
-              <div className="flex items-center gap-3 text-slate-600">
-                <button 
-                  onClick={() => setZoomLevel(prev => Math.max(50, prev - 10))}
-                  className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                >
-                  <ZoomOut className="w-4 h-4" />
-                </button>
-                <span className="text-xs font-bold w-10 text-center">{zoomLevel}%</span>
-                <button 
-                  onClick={() => setZoomLevel(prev => Math.min(200, prev + 10))}
-                  className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                >
-                  <ZoomIn className="w-4 h-4" />
-                </button>
-              </div>
-              <div className="flex items-center gap-4 text-xs font-bold text-slate-600">
-                <span>Trang 1 / 1</span>
-                <button className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"><Download className="w-4 h-4" /></button>
-              </div>
-            </div>
-
-            {/* PDF Canvas (Simulated) */}
-            <div className="flex-1 overflow-y-auto p-8 pt-20 flex justify-center custom-scrollbar">
-              <div 
-                className="bg-white w-full max-w-[700px] h-fit min-h-[900px] shadow-lg text-slate-800 p-12 lg:p-16 relative"
-                style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center', transition: 'transform 0.15s ease' }}
-              >
-                <div className="absolute top-0 right-0 w-16 h-16 bg-[#E7E0C4]/50 rounded-bl-3xl"></div>
-                
-                <div className="text-center mb-12">
-                  <h3 className="font-bold text-sm uppercase tracking-widest mb-1">TRƯỜNG ĐẠI HỌC CÔNG THƯƠNG TP.HCM</h3>
-                  <p className="font-bold text-sm uppercase tracking-widest">KHOA CÔNG NGHỆ THỰC PHẨM</p>
-                  <div className="w-20 h-[1px] bg-slate-300 mx-auto my-6"></div>
-                  <h1 className="text-xl font-black uppercase tracking-wider mb-2">BÁO CÁO THU HOẠCH KIẾN TẬP</h1>
-                  <h2 className="text-lg font-bold uppercase tracking-wider">TẠI {nhaMay.toUpperCase()}</h2>
+            {/* PDF Canvas (Actual File) */}
+            <div className="flex-1 w-full h-full flex justify-center bg-slate-200">
+              {isLoadingText ? (
+                <div className="flex flex-col items-center justify-center py-20 text-slate-500 w-full h-full">
+                  <div className="w-8 h-8 border-4 border-[#E7E0C4] border-t-[#407F3E] rounded-full animate-spin mb-4"></div>
+                  <p>Đang tải file báo cáo...</p>
                 </div>
-
-                <div className="space-y-4 max-w-sm mx-auto mb-16 font-medium text-sm">
-                  <div className="flex">
-                    <span className="w-40 font-bold">Sinh viên thực hiện:</span>
-                    <span>{sv.ho_ten}</span>
-                  </div>
-                  <div className="flex">
-                    <span className="w-40 font-bold">MSSV:</span>
-                    <span>{sv.mssv}</span>
-                  </div>
-                  <div className="flex">
-                    <span className="w-40 font-bold">Lớp:</span>
-                    <span>{sv.lop || '--'}</span>
-                  </div>
-                  <div className="flex">
-                    <span className="w-40 font-bold">Ngày nộp:</span>
-                    <span>{new Date(selectedReport.ngay_nop).toLocaleDateString('vi-VN')}</span>
-                  </div>
+              ) : pdfBlobUrl ? (
+                <iframe 
+                  src={pdfBlobUrl} 
+                  className="w-full h-full border-0" 
+                  title="Báo cáo PDF" 
+                />
+              ) : (
+                <div className="flex items-center justify-center w-full h-full text-slate-500">
+                  {reportText || 'Không tìm thấy file PDF.'}
                 </div>
-
-                <div className="space-y-6 text-justify text-sm leading-relaxed whitespace-pre-wrap">
-                  {selectedReport.file_url_bao_cao 
-                    ? `[Hệ thống sẽ hiển thị file PDF thực tế ở đây: ${selectedReport.file_url_bao_cao}]\n\n(Nội dung mô phỏng bài thu hoạch...)` 
-                    : '(Không tìm thấy nội dung bài thu hoạch)'}
-                </div>
-
-                {/* Watermark Draft */}
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.03]">
-                  <span className="text-9xl font-black -rotate-45">HUIT</span>
-                </div>
-              </div>
+              )}
             </div>
           </div>
 
@@ -476,8 +506,11 @@ export default function ChamBaiThuHoach_GV() {
                   <span className="text-4xl font-black text-[#407F3E] leading-none">--</span>
                   <span className="text-sm font-bold text-slate-500">/ 10</span>
                 </div>
-                <button className="text-xs font-bold text-[#407F3E] hover:underline cursor-pointer">
-                  (Tính năng thử nghiệm)
+                <button 
+                  onClick={() => setIsAiModalOpen(true)}
+                  className="text-[11px] font-bold text-[#407F3E] bg-white border border-[#E7E0C4] px-2.5 py-1.5 rounded-md hover:bg-[#fdfcf8] transition-colors shadow-sm cursor-pointer"
+                >
+                  Xem chi tiết
                 </button>
               </div>
             </div>
@@ -536,10 +569,6 @@ export default function ChamBaiThuHoach_GV() {
                 >
                   <Save className="w-4 h-4" /> Lưu điểm
                 </button>
-                
-                <button type="button" className="w-full flex items-center justify-center gap-2 py-3 bg-white border border-[#407F3E] text-[#407F3E] hover:bg-[#407F3E]/5 rounded-lg text-sm font-bold transition-all cursor-pointer">
-                  <MessageSquareWarning className="w-4 h-4" /> Yêu cầu bổ sung
-                </button>
               </div>
 
             </form>
@@ -553,6 +582,90 @@ export default function ChamBaiThuHoach_GV() {
   return (
     <div className={selectedReport ? '' : 'bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300'}>
       {selectedReport ? renderGradingView() : renderReportList()}
+
+      {/* AI Grading Details Modal */}
+      {isAiModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-5xl rounded-2xl shadow-xl overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-[#E7E0C4] bg-[#fdfcf8] flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-[#89B449]/20 flex items-center justify-center">
+                  <Sparkles className="w-4 h-4 text-[#407F3E]" />
+                </div>
+                <h2 className="font-bold text-slate-800">Phân tích & Đề xuất từ AI</h2>
+              </div>
+              <button 
+                onClick={() => setIsAiModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            {/* Body */}
+            <div className="p-6 overflow-y-auto max-h-[75vh] custom-scrollbar space-y-6">
+              
+              {/* Overview */}
+              <div className="flex gap-6 items-center">
+                <div className="shrink-0 flex flex-col items-center justify-center w-28 h-28 rounded-full border-4 border-[#89B449]/30 bg-[#fdfcf8]">
+                  <span className="text-3xl font-black text-[#407F3E]">{mockAiGrading.ai_score}</span>
+                  <span className="text-xs font-bold text-slate-500 uppercase">/ 10 Điểm</span>
+                </div>
+                <div className="flex-1 bg-blue-50/50 p-4 rounded-xl border border-blue-100/50">
+                  <h4 className="text-xs font-bold text-blue-800 uppercase mb-2">Nhận xét tổng quan</h4>
+                  <p className="text-sm text-slate-700 leading-relaxed">
+                    {mockAiGrading.ai_summary_comment}
+                  </p>
+                </div>
+              </div>
+
+              <hr className="border-[#E7E0C4]" />
+
+              {/* Detailed Breakdown */}
+              <div>
+                <h4 className="text-xs font-bold text-slate-800 uppercase mb-4">Chi tiết theo tiêu chí</h4>
+                <div className="space-y-3">
+                  {mockAiGrading.ai_detailed_evaluation.map((item, idx) => (
+                    <div key={idx} className="p-4 border border-[#E7E0C4] rounded-xl bg-white shadow-sm hover:shadow transition-shadow">
+                      <div className="flex items-center justify-between mb-2">
+                        <h5 className="font-bold text-slate-800 text-sm">{item.criteria}</h5>
+                        <span className="text-xs font-bold px-2.5 py-1 rounded-md bg-[#89B449]/10 text-[#407F3E]">
+                          {item.ai_given_score} / {item.max_score} đ
+                        </span>
+                      </div>
+                      <p className="text-sm text-slate-600">{item.explanation}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-[#E7E0C4] bg-slate-50 flex items-center justify-end gap-3">
+              <button 
+                onClick={() => setIsAiModalOpen(false)}
+                className="px-5 py-2.5 rounded-lg border border-slate-300 text-slate-600 font-bold text-sm hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                Đóng
+              </button>
+              <button 
+                onClick={() => {
+                  setScore(mockAiGrading.ai_score);
+                  setComments(mockAiGrading.ai_summary_comment);
+                  setIsAiModalOpen(false);
+                  toast.success('Đã áp dụng đề xuất của AI vào form!');
+                }}
+                className="px-5 py-2.5 rounded-lg bg-[#407F3E] text-white font-bold text-sm shadow-md hover:bg-[#407F3E]/90 hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer"
+              >
+                <CheckCircle2 className="w-4 h-4" /> Sử dụng đề xuất này
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

@@ -270,7 +270,7 @@ export default function Layout() {
               className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 text-red-300 hover:bg-red-500 hover:text-white transition-all text-sm font-bold border border-red-500/20 cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
-              {!isSidebarCollapsed && <span>Đăng xuất</span>}
+              <span>Đăng xuất</span>
             </button>
           </div>
         </aside>
@@ -329,6 +329,7 @@ export default function Layout() {
       { to: '/giang-vien/attendance', label: 'Điểm danh sinh viên', icon: UserCheck, category: 'DẪN ĐOÀN' },
       { to: '/giang-vien/preparation', label: 'Điểm chuẩn bị & Cộng', icon: Star, category: 'DẪN ĐOÀN' },
       { to: '/giang-vien/guided-students', label: 'Sinh viên hướng dẫn', icon: User, category: 'HƯỚNG DẪN' },
+      { to: '/giang-vien/grading', label: 'Chấm bài thu hoạch', icon: FileCheck, category: 'HƯỚNG DẪN' },
       { to: '/giang-vien/board', label: 'Buổi báo cáo TQNM', icon: Presentation, category: 'HỘI ĐỒNG' },
       { to: '/giang-vien/notifications', label: 'Thông báo', icon: Bell, category: 'THÔNG BÁO' }
     ];
@@ -410,7 +411,7 @@ export default function Layout() {
               className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 text-red-300 hover:bg-red-500 hover:text-white transition-all text-sm font-bold border border-red-500/20 cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
-              {!isSidebarCollapsed && <span>Đăng xuất</span>}
+              <span>Đăng xuất</span>
             </button>
           </div>
         </aside>
@@ -670,7 +671,7 @@ export default function Layout() {
             className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 text-red-300 hover:bg-red-500 hover:text-white transition-all text-sm font-bold border border-red-500/20 cursor-pointer"
           >
             <LogOut className="w-4 h-4" />
-            {!isSidebarCollapsed && <span>Đăng xuất</span>}
+            <span>Đăng xuất</span>
           </button>
         </div>
       </aside>
@@ -925,7 +926,7 @@ function ForceChangePasswordView({ user, onPasswordChanged, onLogout }) {
                 className="flex items-center justify-center gap-1.5 py-2.5 px-4 border border-slate-200 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-100 transition-all cursor-pointer"
               >
                 <LogOut className="w-4 h-4" />
-                {!isSidebarCollapsed && <span>Đăng xuất</span>}
+                <span>Đăng xuất</span>
               </button>
             </div>
           </form>

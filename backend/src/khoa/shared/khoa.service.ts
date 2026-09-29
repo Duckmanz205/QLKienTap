@@ -1350,6 +1350,14 @@ export class KhoaService {
         phieu.hoaDon.ngay_dong_thuc_te = new Date();
         await this.hoaDonRepo.save(phieu.hoaDon);
       }
+      
+      let ptq = await this.phieuTQRepo.findOne({ where: { phieu_dang_ky_id: phieu.id } });
+      if (!ptq) {
+        ptq = new PhieuThamQuan();
+        ptq.phieu_dang_ky_id = phieu.id;
+        ptq.trang_thai = 'HopLe';
+        await this.phieuTQRepo.save(ptq);
+      }
     } else {
       phieu.trang_thai = 'BiLoai';
       if (phieu.hoaDon) {
@@ -1437,6 +1445,7 @@ export class KhoaService {
 
       if (penalties.bannedFromRegistration) {
         p.trang_thai = 'BiLoai';
+        (p as any).ly_do_loai = 'Vi phạm: Nằm trong danh sách đen';
         // await this.phieuRepo.save(p); // Do not save in preview
         continue;
       }
@@ -1444,6 +1453,7 @@ export class KhoaService {
       const studyYear = startYear - p.sinhVien.khoaHoc.nam_nhap_hoc + 1;
       if (studyYear < 2) {
         p.trang_thai = 'BiLoai';
+        (p as any).ly_do_loai = 'Năm 1 chưa được phép đi kiến tập';
         continue;
       }
 
@@ -1457,6 +1467,7 @@ export class KhoaService {
       const finishedCount = parseInt(finishedCountResult.count, 10) || 0;
       if (finishedCount >= 3) {
         p.trang_thai = 'BiLoai';
+        (p as any).ly_do_loai = 'Đã hoàn thành 3 chuyến kiến tập';
         continue;
       }
 
@@ -1475,6 +1486,7 @@ export class KhoaService {
       );
       if (overlap) {
         p.trang_thai = 'BiLoai';
+        (p as any).ly_do_loai = 'Trùng lịch với chuyến đã được duyệt';
         continue;
       }
 
@@ -1529,6 +1541,7 @@ export class KhoaService {
         suggestedAccepted.push(item.phieu);
         count++;
       } else {
+        (item.phieu as any).ly_do_loai = 'Vượt quá sức chứa chuyến đi';
         suggestedRejected.push(item.phieu);
       }
     }
@@ -2684,6 +2697,14 @@ export class KhoaService {
       if (hd.phieuDangKy) {
         hd.phieuDangKy.trang_thai = 'HopLe';
         await this.phieuRepo.save(hd.phieuDangKy);
+        
+        let ptq = await this.phieuTQRepo.findOne({ where: { phieu_dang_ky_id: hd.phieuDangKy.id } });
+        if (!ptq) {
+          ptq = new PhieuThamQuan();
+          ptq.phieu_dang_ky_id = hd.phieuDangKy.id;
+          ptq.trang_thai = 'HopLe';
+          await this.phieuTQRepo.save(ptq);
+        }
       }
       successCount++;
     }
@@ -2708,6 +2729,16 @@ export class KhoaService {
     if (hd.phieuDangKy) {
       hd.phieuDangKy.trang_thai = 'HopLe';
       await this.phieuRepo.save(hd.phieuDangKy);
+      
+      if (hd.trang_thai === 'DaDongDungHan' || hd.trang_thai === 'DaDongTreHan') {
+        let ptq = await this.phieuTQRepo.findOne({ where: { phieu_dang_ky_id: hd.phieuDangKy.id } });
+        if (!ptq) {
+          ptq = new PhieuThamQuan();
+          ptq.phieu_dang_ky_id = hd.phieuDangKy.id;
+          ptq.trang_thai = 'HopLe';
+          await this.phieuTQRepo.save(ptq);
+        }
+      }
     }
     
     return { message: 'Đã xác nhận thanh toán thủ công' };

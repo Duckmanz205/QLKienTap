@@ -1,5 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import toast, { Toaster, resolveValue } from 'react-hot-toast';
+import { CheckCircle2, XCircle, X } from 'lucide-react';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 
@@ -83,6 +85,30 @@ function NotFoundRedirect() {
 export default function App() {
   return (
     <BrowserRouter>
+      <Toaster position="top-right" toastOptions={{ duration: 3000 }}>
+        {(t) => {
+          const type = t.type === 'error' ? 'error' : 'success';
+          const bgColor = type === 'success' ? 'bg-[#407F3E]' : 'bg-red-500';
+          const Icon = type === 'success' ? CheckCircle2 : XCircle;
+
+          return (
+            <div
+              className={`${
+                t.visible ? 'animate-in slide-in-from-right-8 fade-in' : 'animate-out slide-out-to-right-8 fade-out'
+              } duration-300 ${bgColor} text-white px-4 py-3 rounded-xl shadow-lg shadow-black/10 flex items-center gap-3 min-w-[280px] pointer-events-auto`}
+            >
+              <Icon className="w-5 h-5 text-white/90" />
+              <span className="font-medium text-sm flex-1">{resolveValue(t.message, t)}</span>
+              <button
+                onClick={() => toast.dismiss(t.id)}
+                className="p-1 hover:bg-white/20 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          );
+        }}
+      </Toaster>
       <Routes>
         {/* Auth Route */}
         <Route path="/login" element={<LoginGuard />} />

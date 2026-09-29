@@ -1,0 +1,1341 @@
+
+> frontend@0.0.0 lint
+> oxlint
+
+
+  x Failed to open file /home/phamvanmanh/IdeaProjects/QLKienTap/frontend/scratch_functions.js with error "stream did not contain valid UTF-8"
+
+  ! eslint(no-unused-vars): Catch parameter 'e' is caught but never used.
+    ,-[src/utils/auth.js:37:12]
+ 36 |     }
+ 37 |   } catch (e) {
+    :            |
+    :            `-- 'e' is declared here
+ 38 |     // Malformed or corrupted JSON in localStorage
+    `----
+  help: Consider handling this error.
+
+  ! eslint(no-unused-vars): Variable 'lecturer' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/giang-vien/DiemDanhSV_GV.jsx:19:10]
+ 18 | 
+ 19 |   const [lecturer, setLecturer] = useState(null);
+    :          ^^^^|^^^
+    :              `-- 'lecturer' is declared here
+ 20 |   const [trips, setTrips] = useState([]);
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Identifier 'ChevronLeft' is imported but never used.
+   ,-[src/pages/shared/BaoCao_SVDatKhongDat_Khoa.jsx:2:86]
+ 1 | import React, { useState, useEffect, useMemo } from 'react';
+ 2 | import { ArrowLeft, Search, FileCheck, CheckCircle, XCircle, Clock, FileSpreadsheet, ChevronLeft, ChevronRight, BarChart2, PieChart, ArrowDownUp, ArrowUp, ArrowDown, ChevronDown, Check } from 'lucide-react';
+   :                                                                                      ^^^^^|^^^^^
+   :                                                                                           `-- 'ChevronLeft' is imported here
+ 3 | import { useNavigate, useLocation } from 'react-router-dom';
+   `----
+  help: Consider removing this import.
+
+  ! react-hooks(exhaustive-deps): React Hook useEffect has a missing dependency: 'fetchData'
+    ,-[src/pages/shared/BaoCao_SVDatKhongDat_Khoa.jsx:35:6]
+ 30 |     if (lichKienTapId) {
+ 31 |       fetchData();
+    :       ^^^^|^^^^
+    :           `-- useEffect uses `fetchData` here
+ 32 |     } else {
+ 33 |       setLoading(false);
+ 34 |     }
+ 35 |   }, [lichKienTapId]);
+    :      ^^^^^^^^^^^^^^^
+ 36 | 
+    `----
+  help: Either include it or remove the dependency array.
+
+  ! eslint(no-unused-vars): Identifier 'User' is imported but never used.
+   ,-[src/pages/giang-vien/DashBoard_GV.jsx:5:40]
+ 4 |   Users, Edit3, Presentation, GraduationCap, 
+ 5 |   MapPin, Calendar, Clock, ArrowRight, User
+   :                                        ^^|^
+   :                                          `-- 'User' is imported here
+ 6 | } from 'lucide-react';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Variable 'guidedStudentsCount' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/giang-vien/DashBoard_GV.jsx:17:10]
+ 16 |   const [boards, setBoards] = useState([]);
+ 17 |   const [guidedStudentsCount, setGuidedStudentsCount] = useState(0);
+    :          ^^^^^^^^^|^^^^^^^^^
+    :                   `-- 'guidedStudentsCount' is declared here
+ 18 |   const [stats, setStats] = useState({
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'grades' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/sinh-vien/DashBoard_SV.jsx:22:10]
+ 21 |   const [notifications, setNotifications] = useState([]);
+ 22 |   const [grades, setGrades] = useState([]);
+    :          ^^^|^^
+    :             `-- 'grades' is declared here
+ 23 |   const [stats, setStats] = useState({
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Identifier 'Save' is imported but never used.
+   ,-[src/pages/giang-vien/ChamHoiDong_GV.jsx:3:63]
+ 2 | import { 
+ 3 |   Users, MapPin, Calendar, Clock, ChevronRight, CheckCircle2, Save, ArrowRight
+   :                                                               ^^|^
+   :                                                                 `-- 'Save' is imported here
+ 4 | } from 'lucide-react';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Parameter 'allStudents' is declared but never used. Unused parameters should start with a '_'.
+     ,-[src/pages/giang-vien/ChamHoiDong_GV.jsx:132:41]
+ 131 | 
+ 132 |   const handleSelectStudent = (student, allStudents = students) => {
+     :                                         ^^^^^|^^^^^
+     :                                              `-- 'allStudents' is declared here
+ 133 |     setSelectedStudentId(student.id);
+     `----
+  help: Consider removing this parameter.
+
+  ! eslint(no-unused-vars): Variable 'lecturer' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/giang-vien/DiemChuanBi_DiemCong_GV.jsx:15:10]
+ 14 |   
+ 15 |   const [lecturer, setLecturer] = useState(null);
+    :          ^^^^|^^^
+    :              `-- 'lecturer' is declared here
+ 16 |   const [trips, setTrips] = useState([]);
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Identifier 'Calendar' is imported but never used.
+   ,-[src/pages/quan-ly-khoa/DanhMucNen_ThemMoiHocKy_Khoa.jsx:2:23]
+ 1 | import React, { useState, useEffect } from 'react';
+ 2 | import { Edit2, Plus, Calendar, Trash2, X, ChevronDown, Check, Search } from 'lucide-react';
+   :                       ^^^^|^^^
+   :                           `-- 'Calendar' is imported here
+ 3 | import { khoaApi } from '../../services/api';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Catch parameter 'e' is caught but never used.
+    ,-[src/services/khoa.service.js:10:12]
+  9 |     }
+ 10 |   } catch (e) {}
+    :            |
+    :            `-- 'e' is declared here
+ 11 |   return '/khoa';
+    `----
+  help: Consider handling this error.
+
+  ! react-hooks(exhaustive-deps): React Hook useEffect has a missing dependency: 'fetchData'
+    ,-[src/pages/qtv/TaiKhoanNguoiDung_Khoa.jsx:37:6]
+ 33 |     const delayDebounceFn = setTimeout(() => {
+ 34 |       fetchData(1);
+    :       ^^^^|^^^^
+    :           `-- useEffect uses `fetchData` here
+ 35 |     }, 500);
+ 36 |     return () => clearTimeout(delayDebounceFn);
+ 37 |   }, [searchTerm]);
+    :      ^^^^^^^^^^^^
+ 38 | 
+    `----
+  help: Either include it or remove the dependency array.
+
+  ! react-hooks(exhaustive-deps): React Hook useEffect has a missing dependency: 'fetchData'
+    ,-[src/pages/qtv/TaiKhoanNguoiDung_Khoa.jsx:41:6]
+ 39 |   useEffect(() => {
+ 40 |     fetchData(page);
+    :     ^^^^|^^^^
+    :         `-- useEffect uses `fetchData` here
+ 41 |   }, [page, limit, filterRole, filterTrangThai]);
+    :      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 42 | 
+    `----
+  help: Either include it or remove the dependency array.
+
+  ! eslint(no-unused-vars): Parameter 'idx' is declared but never used. Unused parameters should start with a '_'.
+     ,-[src/pages/shared/XemTruocBaoCaoThamQuan_Khoa.jsx:359:44]
+ 358 |                 )}
+ 359 |                 {paginatedTrips.map((trip, idx) => {
+     :                                            ^|^
+     :                                             `-- 'idx' is declared here
+ 360 |                   const rate = trip.registeredCount > 0 ? ((trip.actualCount / trip.registeredCount) * 100).toFixed(1) : 0;
+     `----
+  help: Consider removing this parameter.
+
+  ! eslint(no-unused-vars): Identifier 'ChevronRight' is imported but never used.
+   ,-[src/pages/quan-ly-khoa/PlanManagement_Khoa.jsx:4:9]
+ 3 | import { 
+ 4 |   Plus, ChevronRight, ChevronDown, Check, X, PlusCircle, Folder, Search,
+   :         ^^^^^^|^^^^^
+   :               `-- 'ChevronRight' is imported here
+ 5 |   Edit2, Trash2, Rocket, MoreVertical, Download
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'PlusCircle' is imported but never used.
+   ,-[src/pages/quan-ly-khoa/PlanManagement_Khoa.jsx:4:46]
+ 3 | import { 
+ 4 |   Plus, ChevronRight, ChevronDown, Check, X, PlusCircle, Folder, Search,
+   :                                              ^^^^^|^^^^
+   :                                                   `-- 'PlusCircle' is imported here
+ 5 |   Edit2, Trash2, Rocket, MoreVertical, Download
+   `----
+  help: Consider removing this import.
+
+  ! react-hooks(exhaustive-deps): React Hook useEffect has a missing dependency: 'fetchCampaigns'
+     ,-[src/pages/quan-ly-khoa/PlanManagement_Khoa.jsx:156:6]
+ 154 |   useEffect(() => {
+ 155 |     fetchCampaigns();
+     :     ^^^^^^^|^^^^^^
+     :            `-- useEffect uses `fetchCampaigns` here
+ 156 |   }, [campaignPage, campaignLimit, searchTerm, filterNamHoc, filterHocKy, filterTrangThai]);
+     :      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 157 | 
+     `----
+  help: Either include it or remove the dependency array.
+
+  ! eslint(no-unused-vars): Identifier 'ChevronLeft' is imported but never used.
+   ,-[src/pages/shared/BaoCao_SVChuaThamQuan_Khoa.jsx:2:73]
+ 1 | import React, { useState, useEffect } from 'react';
+ 2 | import { ArrowLeft, Search, UserX, CheckCircle, Clock, FileSpreadsheet, ChevronLeft, ChevronRight, Bell, Percent, ChevronDown, Check } from 'lucide-react';
+   :                                                                         ^^^^^|^^^^^
+   :                                                                              `-- 'ChevronLeft' is imported here
+ 3 | import { useNavigate, useLocation } from 'react-router-dom';
+   `----
+  help: Consider removing this import.
+
+  ! react-hooks(exhaustive-deps): React Hook useEffect has a missing dependency: 'fetchData'
+    ,-[src/pages/shared/BaoCao_SVChuaThamQuan_Khoa.jsx:41:6]
+ 36 |     if (lichKienTapId) {
+ 37 |       fetchData();
+    :       ^^^^|^^^^
+    :           `-- useEffect uses `fetchData` here
+ 38 |     } else {
+ 39 |       setLoading(false);
+ 40 |     }
+ 41 |   }, [lichKienTapId]);
+    :      ^^^^^^^^^^^^^^^
+ 42 | 
+    `----
+  help: Either include it or remove the dependency array.
+
+  ! eslint(no-unused-vars): Identifier 'ImageIcon' is imported but never used.
+   ,-[src/pages/sinh-vien/ChuyenThamQuan_DanhSachDangKy.jsx:3:45]
+ 2 | import { 
+ 3 |   MapPin, Laptop, Calendar, Clock, Image as ImageIcon, Users, ChevronDown, Check, Search, X, Banknote, Map,
+   :                                             ^^^^|^^^^
+   :                                                 `-- 'ImageIcon' is imported here
+ 4 |   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'ChevronLeft' is imported but never used.
+   ,-[src/pages/sinh-vien/ChuyenThamQuan_DanhSachDangKy.jsx:4:3]
+ 3 |   MapPin, Laptop, Calendar, Clock, Image as ImageIcon, Users, ChevronDown, Check, Search, X, Banknote, Map,
+ 4 |   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter
+   :   ^^^^^|^^^^^
+   :        `-- 'ChevronLeft' is imported here
+ 5 | } from 'lucide-react';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'ChevronRight' is imported but never used.
+   ,-[src/pages/sinh-vien/ChuyenThamQuan_DanhSachDangKy.jsx:4:16]
+ 3 |   MapPin, Laptop, Calendar, Clock, Image as ImageIcon, Users, ChevronDown, Check, Search, X, Banknote, Map,
+ 4 |   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter
+   :                ^^^^^^|^^^^^
+   :                      `-- 'ChevronRight' is imported here
+ 5 | } from 'lucide-react';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'ChevronsLeft' is imported but never used.
+   ,-[src/pages/sinh-vien/ChuyenThamQuan_DanhSachDangKy.jsx:4:30]
+ 3 |   MapPin, Laptop, Calendar, Clock, Image as ImageIcon, Users, ChevronDown, Check, Search, X, Banknote, Map,
+ 4 |   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter
+   :                              ^^^^^^|^^^^^
+   :                                    `-- 'ChevronsLeft' is imported here
+ 5 | } from 'lucide-react';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'ChevronsRight' is imported but never used.
+   ,-[src/pages/sinh-vien/ChuyenThamQuan_DanhSachDangKy.jsx:4:44]
+ 3 |   MapPin, Laptop, Calendar, Clock, Image as ImageIcon, Users, ChevronDown, Check, Search, X, Banknote, Map,
+ 4 |   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter
+   :                                            ^^^^^^|^^^^^^
+   :                                                  `-- 'ChevronsRight' is imported here
+ 5 | } from 'lucide-react';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'Filter' is imported but never used.
+   ,-[src/pages/sinh-vien/ChuyenThamQuan_DanhSachDangKy.jsx:4:59]
+ 3 |   MapPin, Laptop, Calendar, Clock, Image as ImageIcon, Users, ChevronDown, Check, Search, X, Banknote, Map,
+ 4 |   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter
+   :                                                           ^^^|^^
+   :                                                              `-- 'Filter' is imported here
+ 5 | } from 'lucide-react';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'AlertCircle' is imported but never used.
+   ,-[src/pages/clb/SupervisorAssignment_Khoa.jsx:3:70]
+ 2 | import { 
+ 3 |   ChevronDown, Check, Info, Search, UserCircle, UserPlus, RefreshCw, AlertCircle
+   :                                                                      ^^^^^|^^^^^
+   :                                                                           `-- 'AlertCircle' is imported here
+ 4 | } from 'lucide-react';
+   `----
+  help: Consider removing this import.
+
+  ! react-hooks(exhaustive-deps): React Hook useEffect has a missing dependency: 'fetchEnrollments'
+    ,-[src/pages/clb/SupervisorAssignment_Khoa.jsx:45:6]
+ 42 |     if (selectedCampaign) {
+ 43 |       fetchEnrollments();
+    :       ^^^^^^^^|^^^^^^^
+    :               `-- useEffect uses `fetchEnrollments` here
+ 44 |     }
+ 45 |   }, [selectedCampaign]);
+    :      ^^^^^^^^^^^^^^^^^^
+ 46 | 
+    `----
+  help: Either include it or remove the dependency array.
+
+  ! eslint(no-unused-vars): Identifier 'DollarSign' is imported but never used.
+   ,-[src/pages/clb/QuanLyLePhi_Khoa.jsx:3:58]
+ 2 | import { 
+ 3 |   ChevronDown, Check, ChevronRight, UploadCloud, Search, DollarSign, X
+   :                                                          ^^^^^|^^^^
+   :                                                               `-- 'DollarSign' is imported here
+ 4 | } from 'lucide-react';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'XLSX' is imported but never used.
+   ,-[src/pages/clb/QuanLyLePhi_Khoa.jsx:5:13]
+ 4 | } from 'lucide-react';
+ 5 | import * as XLSX from 'xlsx';
+   :             ^^|^
+   :               `-- 'XLSX' is imported here
+ 6 | import { khoaApi } from '../../services/api';
+   `----
+  help: Consider removing this import.
+
+  ! react-hooks(exhaustive-deps): React Hook useEffect has a missing dependency: 'fetchFees'
+    ,-[src/pages/clb/QuanLyLePhi_Khoa.jsx:63:6]
+ 60 |     if (selectedLich) {
+ 61 |       fetchFees();
+    :       ^^^^|^^^^
+    :           `-- useEffect uses `fetchFees` here
+ 62 |     }
+ 63 |   }, [selectedLich]);
+    :      ^^^^^^^^^^^^^^
+ 64 | 
+    `----
+  help: Either include it or remove the dependency array.
+
+  ! eslint(no-unused-vars): Identifier 'PlayCircle' is imported but never used.
+   ,-[src/pages/clb/ChuyenThamQuan_DSLoc.jsx:6:23]
+ 5 |   ChevronRight, Users, CheckCircle2, XCircle, RefreshCw, Search,
+ 6 |   MoreVertical, Edit, PlayCircle, Trash2, CheckCircle, RotateCcw, Download
+   :                       ^^^^^|^^^^
+   :                            `-- 'PlayCircle' is imported here
+ 7 | } from 'lucide-react';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'Download' is imported but never used.
+   ,-[src/pages/clb/ChuyenThamQuan_DSLoc.jsx:6:67]
+ 5 |   ChevronRight, Users, CheckCircle2, XCircle, RefreshCw, Search,
+ 6 |   MoreVertical, Edit, PlayCircle, Trash2, CheckCircle, RotateCcw, Download
+   :                                                                   ^^^^|^^^
+   :                                                                       `-- 'Download' is imported here
+ 7 | } from 'lucide-react';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'XLSX' is imported but never used.
+   ,-[src/pages/clb/ChuyenThamQuan_DSLoc.jsx:8:13]
+ 7 | } from 'lucide-react';
+ 8 | import * as XLSX from 'xlsx';
+   :             ^^|^
+   :               `-- 'XLSX' is imported here
+ 9 | import { khoaApi } from '../../services/api';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Variable 'isEmailModalOpen' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/clb/ChuyenThamQuan_DSLoc.jsx:14:10]
+ 13 |   const [activeTab, setActiveTab] = useState('khoa'); // 'khoa' | 'tudo'
+ 14 |   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+    :          ^^^^^^^^|^^^^^^^
+    :                  `-- 'isEmailModalOpen' is declared here
+ 15 |   const [emailSubject, setEmailSubject] = useState('');
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'setIsEmailModalOpen' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/clb/ChuyenThamQuan_DSLoc.jsx:14:28]
+ 13 |   const [activeTab, setActiveTab] = useState('khoa'); // 'khoa' | 'tudo'
+ 14 |   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+    :                            ^^^^^^^^^|^^^^^^^^^
+    :                                     `-- 'setIsEmailModalOpen' is declared here
+ 15 |   const [emailSubject, setEmailSubject] = useState('');
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'emailSubject' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/clb/ChuyenThamQuan_DSLoc.jsx:15:10]
+ 14 |   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+ 15 |   const [emailSubject, setEmailSubject] = useState('');
+    :          ^^^^^^|^^^^^
+    :                `-- 'emailSubject' is declared here
+ 16 |   const [emailBody, setEmailBody] = useState('');
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'setEmailSubject' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/clb/ChuyenThamQuan_DSLoc.jsx:15:24]
+ 14 |   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+ 15 |   const [emailSubject, setEmailSubject] = useState('');
+    :                        ^^^^^^^|^^^^^^^
+    :                               `-- 'setEmailSubject' is declared here
+ 16 |   const [emailBody, setEmailBody] = useState('');
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'emailBody' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/clb/ChuyenThamQuan_DSLoc.jsx:16:10]
+ 15 |   const [emailSubject, setEmailSubject] = useState('');
+ 16 |   const [emailBody, setEmailBody] = useState('');
+    :          ^^^^|^^^^
+    :              `-- 'emailBody' is declared here
+ 17 |   const [deadlineDate, setDeadlineDate] = useState('');
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'setEmailBody' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/clb/ChuyenThamQuan_DSLoc.jsx:16:21]
+ 15 |   const [emailSubject, setEmailSubject] = useState('');
+ 16 |   const [emailBody, setEmailBody] = useState('');
+    :                     ^^^^^^|^^^^^
+    :                           `-- 'setEmailBody' is declared here
+ 17 |   const [deadlineDate, setDeadlineDate] = useState('');
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'lichOptions' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/clb/ChuyenThamQuan_DSLoc.jsx:51:10]
+ 50 |   const [nhaMayOptions, setNhaMayOptions] = useState([]);
+ 51 |   const [lichOptions, setLichOptions] = useState([]);
+    :          ^^^^^|^^^^^
+    :               `-- 'lichOptions' is declared here
+ 52 |   
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'isLichDropdownOpen' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/clb/ChuyenThamQuan_DSLoc.jsx:57:10]
+ 56 |   
+ 57 |   const [isLichDropdownOpen, setIsLichDropdownOpen] = useState(false);
+    :          ^^^^^^^^^|^^^^^^^^
+    :                   `-- 'isLichDropdownOpen' is declared here
+ 58 |   const [selectedLich, setSelectedLich] = useState('');
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'selectedLich' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/clb/ChuyenThamQuan_DSLoc.jsx:58:10]
+ 57 |   const [isLichDropdownOpen, setIsLichDropdownOpen] = useState(false);
+ 58 |   const [selectedLich, setSelectedLich] = useState('');
+    :          ^^^^^^|^^^^^
+    :                `-- 'selectedLich' is declared here
+ 59 | 
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'setSelectedLich' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/clb/ChuyenThamQuan_DSLoc.jsx:58:24]
+ 57 |   const [isLichDropdownOpen, setIsLichDropdownOpen] = useState(false);
+ 58 |   const [selectedLich, setSelectedLich] = useState('');
+    :                        ^^^^^^^|^^^^^^^
+    :                               `-- 'setSelectedLich' is declared here
+ 59 | 
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'gioKetThuc' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/clb/ChuyenThamQuan_DSLoc.jsx:67:10]
+ 66 |   const [gioBatDau, setGioBatDau] = useState('');
+ 67 |   const [gioKetThuc, setGioKetThuc] = useState('');
+    :          ^^^^^|^^^^
+    :               `-- 'gioKetThuc' is declared here
+ 68 |   const [sucChua, setSucChua] = useState('');
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'setGioKetThuc' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/clb/ChuyenThamQuan_DSLoc.jsx:67:22]
+ 66 |   const [gioBatDau, setGioBatDau] = useState('');
+ 67 |   const [gioKetThuc, setGioKetThuc] = useState('');
+    :                      ^^^^^^|^^^^^^
+    :                            `-- 'setGioKetThuc' is declared here
+ 68 |   const [sucChua, setSucChua] = useState('');
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Identifier 'Calendar' is imported but never used.
+   ,-[src/pages/quan-ly-khoa/HoiDongChamBaoCao_Khoa.jsx:3:54]
+ 2 | import { 
+ 3 |   Plus, ChevronDown, Check, X, Search, ChevronRight, Calendar, MapPin
+   :                                                      ^^^^|^^^
+   :                                                          `-- 'Calendar' is imported here
+ 4 | } from 'lucide-react';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Variable 'isStudentsOpen' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/quan-ly-khoa/HoiDongChamBaoCao_Khoa.jsx:14:10]
+ 13 |   const [isMembersOpen, setIsMembersOpen] = useState(false);
+ 14 |   const [isStudentsOpen, setIsStudentsOpen] = useState(false); // To show the open state
+    :          ^^^^^^^|^^^^^^
+    :                 `-- 'isStudentsOpen' is declared here
+ 15 | 
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'selectedStudents' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/quan-ly-khoa/HoiDongChamBaoCao_Khoa.jsx:30:10]
+ 29 |   const [selectedMembers, setSelectedMembers] = useState([]);
+ 30 |   const [selectedStudents, setSelectedStudents] = useState([]); // if needed
+    :          ^^^^^^^^|^^^^^^^
+    :                  `-- 'selectedStudents' is declared here
+ 31 | 
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'setSelectedStudents' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/quan-ly-khoa/HoiDongChamBaoCao_Khoa.jsx:30:28]
+ 29 |   const [selectedMembers, setSelectedMembers] = useState([]);
+ 30 |   const [selectedStudents, setSelectedStudents] = useState([]); // if needed
+    :                            ^^^^^^^^^|^^^^^^^^^
+    :                                     `-- 'setSelectedStudents' is declared here
+ 31 | 
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Identifier 'X' is imported but never used.
+   ,-[src/pages/shared/BaoCaoThongKe_Khoa.jsx:5:62]
+ 4 |   ChevronDown, Check, Eye, Download,
+ 5 |   BarChart2, Users, UserX, CheckCircle, XOctagon, FileCheck, X
+   :                                                              |
+   :                                                              `-- 'X' is imported here
+ 6 | } from 'lucide-react';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Variable 'viewingReportData' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/shared/BaoCaoThongKe_Khoa.jsx:42:10]
+ 41 | 
+ 42 |   const [viewingReportData, setViewingReportData] = useState(null);
+    :          ^^^^^^^^|^^^^^^^^
+    :                  `-- 'viewingReportData' is declared here
+ 43 |   const [viewingReportTitle, setViewingReportTitle] = useState('');
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'setViewingReportData' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/shared/BaoCaoThongKe_Khoa.jsx:42:29]
+ 41 | 
+ 42 |   const [viewingReportData, setViewingReportData] = useState(null);
+    :                             ^^^^^^^^^^|^^^^^^^^^
+    :                                       `-- 'setViewingReportData' is declared here
+ 43 |   const [viewingReportTitle, setViewingReportTitle] = useState('');
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'viewingReportTitle' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/shared/BaoCaoThongKe_Khoa.jsx:43:10]
+ 42 |   const [viewingReportData, setViewingReportData] = useState(null);
+ 43 |   const [viewingReportTitle, setViewingReportTitle] = useState('');
+    :          ^^^^^^^^^|^^^^^^^^
+    :                   `-- 'viewingReportTitle' is declared here
+ 44 |   const [viewingReportType, setViewingReportType] = useState(''); // 'retake' | 'final' | 'students'
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'setViewingReportTitle' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/shared/BaoCaoThongKe_Khoa.jsx:43:30]
+ 42 |   const [viewingReportData, setViewingReportData] = useState(null);
+ 43 |   const [viewingReportTitle, setViewingReportTitle] = useState('');
+    :                              ^^^^^^^^^^|^^^^^^^^^^
+    :                                        `-- 'setViewingReportTitle' is declared here
+ 44 |   const [viewingReportType, setViewingReportType] = useState(''); // 'retake' | 'final' | 'students'
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'viewingReportType' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/shared/BaoCaoThongKe_Khoa.jsx:44:10]
+ 43 |   const [viewingReportTitle, setViewingReportTitle] = useState('');
+ 44 |   const [viewingReportType, setViewingReportType] = useState(''); // 'retake' | 'final' | 'students'
+    :          ^^^^^^^^|^^^^^^^^
+    :                  `-- 'viewingReportType' is declared here
+ 45 | 
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'setViewingReportType' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/shared/BaoCaoThongKe_Khoa.jsx:44:29]
+ 43 |   const [viewingReportTitle, setViewingReportTitle] = useState('');
+ 44 |   const [viewingReportType, setViewingReportType] = useState(''); // 'retake' | 'final' | 'students'
+    :                             ^^^^^^^^^^|^^^^^^^^^
+    :                                       `-- 'setViewingReportType' is declared here
+ 45 | 
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Identifier 'MapPin' is imported but never used.
+    ,-[src/pages/quan-ly-khoa/DashBoard_Khoa.jsx:10:3]
+  9 |   Clock,
+ 10 |   MapPin,
+    :   ^^^|^^
+    :      `-- 'MapPin' is imported here
+ 11 |   User,
+    `----
+  help: Consider removing this import.
+
+  ! react-hooks(exhaustive-deps): React Hook useEffect has a missing dependency: 'navigate'
+    ,-[src/pages/quan-ly-khoa/DashBoard_Khoa.jsx:55:6]
+ 42 |         if (parsed?.user?.vai_tro === 'QuanTriVienHeThong') {
+ 43 |           navigate('/qtv/accounts', { replace: true });
+    :           ^^^^|^^^
+    :               `-- useEffect uses `navigate` here
+ 44 |           return;
+ 45 |         }
+ 46 |         if (parsed.user && parsed.user.ten_hien_thi) {
+ 47 |           setUserProfile({ ho_ten: parsed.user.ten_hien_thi });
+ 48 |         } else if (parsed.ho_ten) {
+ 49 |           setUserProfile({ ho_ten: parsed.ho_ten });
+ 50 |         }
+ 51 |       } catch (e) {
+ 52 |         console.error(e);
+ 53 |       }
+ 54 |     }
+ 55 |   }, []);
+    :      ^^
+ 56 | 
+    `----
+  help: Either include it or remove the dependency array.
+
+  ! eslint(no-unused-vars): Identifier 'UserCircle' is imported but never used.
+   ,-[src/pages/clb/LeaderAssignment_Khoa.jsx:5:3]
+ 4 |   ChevronDown, Check, Search, MapPin, 
+ 5 |   UserCircle, UserPlus, Calendar, Clock, AlertCircle, Star,
+   :   ^^^^^|^^^^
+   :        `-- 'UserCircle' is imported here
+ 6 |   Trash2, XCircle, CheckCircle2, Zap, Lock, Edit3
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'Star' is imported but never used.
+   ,-[src/pages/clb/LeaderAssignment_Khoa.jsx:5:55]
+ 4 |   ChevronDown, Check, Search, MapPin, 
+ 5 |   UserCircle, UserPlus, Calendar, Clock, AlertCircle, Star,
+   :                                                       ^^|^
+   :                                                         `-- 'Star' is imported here
+ 6 |   Trash2, XCircle, CheckCircle2, Zap, Lock, Edit3
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Variable 'isTruongDoan' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/clb/LeaderAssignment_Khoa.jsx:33:10]
+ 32 |   const [selectedLecturerId, setSelectedLecturerId] = useState('');
+ 33 |   const [isTruongDoan, setIsTruongDoan] = useState(true);
+    :          ^^^^^^|^^^^^
+    :                `-- 'isTruongDoan' is declared here
+ 34 |   const [searchLecturer, setSearchLecturer] = useState('');
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'setIsTruongDoan' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/clb/LeaderAssignment_Khoa.jsx:33:24]
+ 32 |   const [selectedLecturerId, setSelectedLecturerId] = useState('');
+ 33 |   const [isTruongDoan, setIsTruongDoan] = useState(true);
+    :                        ^^^^^^^|^^^^^^^
+    :                               `-- 'setIsTruongDoan' is declared here
+ 34 |   const [searchLecturer, setSearchLecturer] = useState('');
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Catch parameter 'e' is caught but never used.
+    ,-[src/pages/clb/LeaderAssignment_Khoa.jsx:57:14]
+ 56 |       }
+ 57 |     } catch (e) {}
+    :              |
+    :              `-- 'e' is declared here
+ 58 |     fetchInitialData();
+    `----
+  help: Consider handling this error.
+
+  ! eslint(no-unused-vars): Identifier 'Key' is imported but never used.
+   ,-[src/pages/quan-ly-khoa/DanhMuc_GiangVien_Khoa.jsx:4:10]
+ 3 |   Upload, Plus, Search, ChevronDown, Check,
+ 4 |   Edit2, Key, Trash2, X, CloudUpload, FileSpreadsheet, Download
+   :          ^|^
+   :           `-- 'Key' is imported here
+ 5 | } from 'lucide-react';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Variable 'zoomLevel' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/sinh-vien/NopBaiThuHoach_SV.jsx:14:10]
+ 13 |   const [isTextMaximized, setIsTextMaximized] = useState(false);
+ 14 |   const [zoomLevel, setZoomLevel] = useState(100);
+    :          ^^^^|^^^^
+    :              `-- 'zoomLevel' is declared here
+ 15 |   const [uploading, setUploading] = useState(false);
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'setZoomLevel' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/sinh-vien/NopBaiThuHoach_SV.jsx:14:21]
+ 13 |   const [isTextMaximized, setIsTextMaximized] = useState(false);
+ 14 |   const [zoomLevel, setZoomLevel] = useState(100);
+    :                     ^^^^^^|^^^^^
+    :                           `-- 'setZoomLevel' is declared here
+ 15 |   const [uploading, setUploading] = useState(false);
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Identifier 'Filter' is imported but never used.
+   ,-[src/pages/clb/RegistrationManagement_Khoa.jsx:5:26]
+ 4 |   ChevronDown, Check, ChevronRight, Paperclip, 
+ 5 |   CheckCircle2, XCircle, Filter, Download, ArrowLeft, X,
+   :                          ^^^|^^
+   :                             `-- 'Filter' is imported here
+ 6 |   MapPin, Calendar, Clock, Search, Eye
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'ArrowLeft' is imported but never used.
+   ,-[src/pages/clb/RegistrationManagement_Khoa.jsx:5:44]
+ 4 |   ChevronDown, Check, ChevronRight, Paperclip, 
+ 5 |   CheckCircle2, XCircle, Filter, Download, ArrowLeft, X,
+   :                                            ^^^^|^^^^
+   :                                                `-- 'ArrowLeft' is imported here
+ 6 |   MapPin, Calendar, Clock, Search, Eye
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Variable 'handleDropdownClick' is declared but never used. Unused variables should start with a '_'.
+     ,-[src/pages/clb/RegistrationManagement_Khoa.jsx:212:9]
+ 211 | 
+ 212 |   const handleDropdownClick = (e, setter) => {
+     :         ^^^^^^^^^|^^^^^^^^^
+     :                  `-- 'handleDropdownClick' is declared here
+ 213 |     e.stopPropagation();
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Identifier 'MapPin' is imported but never used.
+    ,-[src/pages/clb/DashBoard_CLB.jsx:10:3]
+  9 |   Clock,
+ 10 |   MapPin,
+    :   ^^^|^^
+    :      `-- 'MapPin' is imported here
+ 11 |   User,
+    `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'AlertCircle' is imported but never used.
+   ,-[src/pages/quan-ly-khoa/SupervisorAssignment_Khoa.jsx:3:71]
+ 2 | import { 
+ 3 |   ChevronDown, Check, Info, Search, UserCircle, RefreshCw, X, Filter, AlertCircle, ChevronLeft, ChevronRight, UserPlus, Users
+   :                                                                       ^^^^^|^^^^^
+   :                                                                            `-- 'AlertCircle' is imported here
+ 4 | } from 'lucide-react';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'ChevronLeft' is imported but never used.
+   ,-[src/pages/quan-ly-khoa/SupervisorAssignment_Khoa.jsx:3:84]
+ 2 | import { 
+ 3 |   ChevronDown, Check, Info, Search, UserCircle, RefreshCw, X, Filter, AlertCircle, ChevronLeft, ChevronRight, UserPlus, Users
+   :                                                                                    ^^^^^|^^^^^
+   :                                                                                         `-- 'ChevronLeft' is imported here
+ 4 | } from 'lucide-react';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'ChevronRight' is imported but never used.
+   ,-[src/pages/quan-ly-khoa/SupervisorAssignment_Khoa.jsx:3:97]
+ 2 | import { 
+ 3 |   ChevronDown, Check, Info, Search, UserCircle, RefreshCw, X, Filter, AlertCircle, ChevronLeft, ChevronRight, UserPlus, Users
+   :                                                                                                 ^^^^^^|^^^^^
+   :                                                                                                       `-- 'ChevronRight' is imported here
+ 4 | } from 'lucide-react';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Variable 'progressPercent' is declared but never used. Unused variables should start with a '_'.
+     ,-[src/pages/quan-ly-khoa/SupervisorAssignment_Khoa.jsx:228:9]
+ 227 |   const rawUnassignedStudents = rawTotalStudents - rawAssignedStudents;
+ 228 |   const progressPercent = rawTotalStudents === 0 ? 0 : Math.round((rawAssignedStudents / rawTotalStudents) * 100);
+     :         ^^^^^^^|^^^^^^^
+     :                `-- 'progressPercent' is declared here
+ 229 | 
+     `----
+  help: Consider removing this declaration.
+
+  ! react-hooks(exhaustive-deps): React Hook useEffect has a missing dependency: 'fetchInitialData'
+    ,-[src/pages/quan-ly-khoa/SupervisorAssignment_Khoa.jsx:46:6]
+ 44 |   useEffect(() => {
+ 45 |     fetchInitialData();
+    :     ^^^^^^^^|^^^^^^^
+    :             `-- useEffect uses `fetchInitialData` here
+ 46 |   }, []);
+    :      ^^
+ 47 | 
+    `----
+  help: Either include it or remove the dependency array.
+
+  ! react-hooks(exhaustive-deps): React Hook useEffect has a missing dependency: 'fetchEnrollments'
+    ,-[src/pages/quan-ly-khoa/SupervisorAssignment_Khoa.jsx:52:6]
+ 49 |     if (selectedCampaign) {
+ 50 |       fetchEnrollments();
+    :       ^^^^^^^^|^^^^^^^
+    :               `-- useEffect uses `fetchEnrollments` here
+ 51 |     }
+ 52 |   }, [selectedCampaign]);
+    :      ^^^^^^^^^^^^^^^^^^
+ 53 | 
+    `----
+  help: Either include it or remove the dependency array.
+
+  ! eslint(no-unused-vars): Identifier 'FileText' is imported but never used.
+   ,-[src/pages/sinh-vien/ThongBao_SV.jsx:3:9]
+ 2 | import { 
+ 3 |   Bell, FileText, CheckCircle, AlertCircle, Paperclip, 
+   :         ^^^^|^^^
+   :             `-- 'FileText' is imported here
+ 4 |   CreditCard, Compass, Search, ChevronDown, Check
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'X' is imported but never used.
+   ,-[src/pages/giang-vien/SinhVienHuongDan_GV.jsx:3:43]
+ 2 | import { 
+ 3 |   Search, ChevronDown, Check, Eye, Edit3, X, FileText
+   :                                           |
+   :                                           `-- 'X' is imported here
+ 4 | } from 'lucide-react';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'FileText' is imported but never used.
+   ,-[src/pages/giang-vien/SinhVienHuongDan_GV.jsx:3:46]
+ 2 | import { 
+ 3 |   Search, ChevronDown, Check, Eye, Edit3, X, FileText
+   :                                              ^^^^|^^^
+   :                                                  `-- 'FileText' is imported here
+ 4 | } from 'lucide-react';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Variable 'lecturer' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/giang-vien/SinhVienHuongDan_GV.jsx:12:10]
+ 11 |   
+ 12 |   const [lecturer, setLecturer] = useState(null);
+    :          ^^^^|^^^
+    :              `-- 'lecturer' is declared here
+ 13 |   const [students, setStudents] = useState([]);
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'reports' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/giang-vien/SinhVienHuongDan_GV.jsx:14:10]
+ 13 |   const [students, setStudents] = useState([]);
+ 14 |   const [reports, setReports] = useState([]);
+    :          ^^^|^^^
+    :             `-- 'reports' is declared here
+ 15 |   const [loading, setLoading] = useState(false);
+    `----
+  help: Consider removing this declaration.
+
+  ! react-hooks(exhaustive-deps): React Hook useEffect has a missing dependency: 'fetchEnrollments'
+    ,-[src/pages/shared/KetQuaKienTap_MaTranDiem_Khoa.jsx:33:6]
+ 30 |     if (selectedLich) {
+ 31 |       fetchEnrollments();
+    :       ^^^^^^^^|^^^^^^^
+    :               `-- useEffect uses `fetchEnrollments` here
+ 32 |     }
+ 33 |   }, [selectedLich]);
+    :      ^^^^^^^^^^^^^^
+ 34 | 
+    `----
+  help: Either include it or remove the dependency array.
+
+  ! eslint(no-unused-vars): Identifier 'Key' is imported but never used.
+   ,-[src/pages/shared/DanhMuc_SinhVien_Khoa.jsx:4:10]
+ 3 |   Upload, Plus, Search, ChevronDown, Check,
+ 4 |   Edit2, Key, Trash2, X, CloudUpload, FileSpreadsheet, Download
+   :          ^|^
+   :           `-- 'Key' is imported here
+ 5 | } from 'lucide-react';
+   `----
+  help: Consider removing this import.
+
+  ! react-hooks(exhaustive-deps): React Hook useEffect has a missing dependency: 'fetchData'
+    ,-[src/pages/shared/DanhMuc_SinhVien_Khoa.jsx:52:6]
+ 48 |   useEffect(() => {
+ 49 |     fetchData(1);
+    :     ^^^^|^^^^
+    :         `-- useEffect uses `fetchData` here
+ 50 |     fetchCourses();
+ 51 |     fetchClasses();
+ 52 |   }, []);
+    :      ^^
+ 53 | 
+    `----
+  help: Either include it or remove the dependency array.
+
+  ! eslint(no-unused-vars): Variable 'student' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/sinh-vien/ThanhToan_SV.jsx:13:10]
+ 12 |   const [copiedId, setCopiedId] = useState(null);
+ 13 |   const [student, setStudent] = useState(null);
+    :          ^^^|^^^
+    :             `-- 'student' is declared here
+ 14 |   const [invoices, setInvoices] = useState([]);
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'lecturer' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/giang-vien/LichDanDoan_GV.jsx:14:10]
+ 13 |   const [loading, setLoading] = useState(false);
+ 14 |   const [lecturer, setLecturer] = useState(null);
+    :          ^^^^|^^^
+    :              `-- 'lecturer' is declared here
+ 15 |   const [currentMonth, setCurrentMonth] = useState(new Date());
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Identifier 'Clock' is imported but never used.
+   ,-[src/pages/shared/BaoCao_SVDuDieuKien_Khoa.jsx:2:42]
+ 1 | import React, { useState, useEffect } from 'react';
+ 2 | import { ArrowLeft, Search, CheckCircle, Clock, FileSpreadsheet, ChevronLeft, ChevronRight, Check, X, Users, Percent, FileText, ChevronDown } from 'lucide-react';
+   :                                          ^^|^^
+   :                                            `-- 'Clock' is imported here
+ 3 | import { useNavigate, useLocation } from 'react-router-dom';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'ChevronLeft' is imported but never used.
+   ,-[src/pages/shared/BaoCao_SVDuDieuKien_Khoa.jsx:2:66]
+ 1 | import React, { useState, useEffect } from 'react';
+ 2 | import { ArrowLeft, Search, CheckCircle, Clock, FileSpreadsheet, ChevronLeft, ChevronRight, Check, X, Users, Percent, FileText, ChevronDown } from 'lucide-react';
+   :                                                                  ^^^^^|^^^^^
+   :                                                                       `-- 'ChevronLeft' is imported here
+ 3 | import { useNavigate, useLocation } from 'react-router-dom';
+   `----
+  help: Consider removing this import.
+
+  ! react-hooks(exhaustive-deps): React Hook useEffect has a missing dependency: 'fetchData'
+    ,-[src/pages/shared/BaoCao_SVDuDieuKien_Khoa.jsx:38:6]
+ 33 |     if (lichKienTapId) {
+ 34 |       fetchData();
+    :       ^^^^|^^^^
+    :           `-- useEffect uses `fetchData` here
+ 35 |     } else {
+ 36 |       setLoading(false);
+ 37 |     }
+ 38 |   }, [lichKienTapId]);
+    :      ^^^^^^^^^^^^^^^
+ 39 | 
+    `----
+  help: Either include it or remove the dependency array.
+
+  ! eslint(no-unused-vars): Identifier 'ChevronLeft' is imported but never used.
+   ,-[src/pages/shared/BaoCao_SVKhongThucHien_Khoa.jsx:2:56]
+ 1 | import React, { useState, useEffect } from 'react';
+ 2 | import { ArrowLeft, Search, XOctagon, FileSpreadsheet, ChevronLeft, ChevronRight, Mail, AlertTriangle, ChevronDown, Check } from 'lucide-react';
+   :                                                        ^^^^^|^^^^^
+   :                                                             `-- 'ChevronLeft' is imported here
+ 3 | import { useNavigate } from 'react-router-dom';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'useRef' is imported but never used.
+   ,-[src/pages/shared/LichKienTap_Khoa.jsx:1:38]
+ 1 | import React, { useState, useEffect, useRef } from 'react';
+   :                                      ^^^|^^
+   :                                         `-- 'useRef' is imported here
+ 2 | import { createPortal } from 'react-dom';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'ChevronRight' is imported but never used.
+   ,-[src/pages/shared/LichKienTap_Khoa.jsx:4:9]
+ 3 | import { 
+ 4 |   Plus, ChevronRight, ChevronDown, Check, X, Upload, CloudUpload, ArrowLeft, Send, MoreVertical, Edit, Trash2, Search, FileSpreadsheet, RefreshCw
+   :         ^^^^^^|^^^^^
+   :               `-- 'ChevronRight' is imported here
+ 5 | } from 'lucide-react';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'Upload' is imported but never used.
+   ,-[src/pages/shared/LichKienTap_Khoa.jsx:4:46]
+ 3 | import { 
+ 4 |   Plus, ChevronRight, ChevronDown, Check, X, Upload, CloudUpload, ArrowLeft, Send, MoreVertical, Edit, Trash2, Search, FileSpreadsheet, RefreshCw
+   :                                              ^^^|^^
+   :                                                 `-- 'Upload' is imported here
+ 5 | } from 'lucide-react';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'CloudUpload' is imported but never used.
+   ,-[src/pages/shared/LichKienTap_Khoa.jsx:4:54]
+ 3 | import { 
+ 4 |   Plus, ChevronRight, ChevronDown, Check, X, Upload, CloudUpload, ArrowLeft, Send, MoreVertical, Edit, Trash2, Search, FileSpreadsheet, RefreshCw
+   :                                                      ^^^^^|^^^^^
+   :                                                           `-- 'CloudUpload' is imported here
+ 5 | } from 'lucide-react';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'ArrowLeft' is imported but never used.
+   ,-[src/pages/shared/LichKienTap_Khoa.jsx:4:67]
+ 3 | import { 
+ 4 |   Plus, ChevronRight, ChevronDown, Check, X, Upload, CloudUpload, ArrowLeft, Send, MoreVertical, Edit, Trash2, Search, FileSpreadsheet, RefreshCw
+   :                                                                   ^^^^|^^^^
+   :                                                                       `-- 'ArrowLeft' is imported here
+ 5 | } from 'lucide-react';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'FileSpreadsheet' is imported but never used.
+   ,-[src/pages/shared/LichKienTap_Khoa.jsx:4:120]
+ 3 | import { 
+ 4 |   Plus, ChevronRight, ChevronDown, Check, X, Upload, CloudUpload, ArrowLeft, Send, MoreVertical, Edit, Trash2, Search, FileSpreadsheet, RefreshCw
+   :                                                                                                                        ^^^^^^^|^^^^^^^
+   :                                                                                                                               `-- 'FileSpreadsheet' is imported here
+ 5 | } from 'lucide-react';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'RefreshCw' is imported but never used.
+   ,-[src/pages/shared/LichKienTap_Khoa.jsx:4:137]
+ 3 | import { 
+ 4 |   Plus, ChevronRight, ChevronDown, Check, X, Upload, CloudUpload, ArrowLeft, Send, MoreVertical, Edit, Trash2, Search, FileSpreadsheet, RefreshCw
+   :                                                                                                                                         ^^^^|^^^^
+   :                                                                                                                                             `-- 'RefreshCw' is imported here
+ 5 | } from 'lucide-react';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'XLSX' is imported but never used.
+   ,-[src/pages/shared/LichKienTap_Khoa.jsx:6:13]
+ 5 | } from 'lucide-react';
+ 6 | import * as XLSX from 'xlsx';
+   :             ^^|^
+   :               `-- 'XLSX' is imported here
+ 7 | import { khoaApi } from '../../services/api';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Variable 'courses' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/shared/LichKienTap_Khoa.jsx:18:10]
+ 17 |   const [campaigns, setCampaigns] = useState([]);
+ 18 |   const [courses, setCourses] = useState([]);
+    :          ^^^|^^^
+    :             `-- 'courses' is declared here
+ 19 |   const [factories, setFactories] = useState([]);
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'isKhoaDropdownOpen' is declared but never used. Unused variables should start with a '_'.
+     ,-[src/pages/shared/LichKienTap_Khoa.jsx:103:10]
+ 102 |   const [dotSearchTermModal, setDotSearchTermModal] = useState('');
+ 103 |   const [isKhoaDropdownOpen, setIsKhoaDropdownOpen] = useState(false);
+     :          ^^^^^^^^^|^^^^^^^^
+     :                   `-- 'isKhoaDropdownOpen' is declared here
+ 104 |   const [khoaSearchTerm, setKhoaSearchTerm] = useState('');
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'setIsKhoaDropdownOpen' is declared but never used. Unused variables should start with a '_'.
+     ,-[src/pages/shared/LichKienTap_Khoa.jsx:103:30]
+ 102 |   const [dotSearchTermModal, setDotSearchTermModal] = useState('');
+ 103 |   const [isKhoaDropdownOpen, setIsKhoaDropdownOpen] = useState(false);
+     :                              ^^^^^^^^^^|^^^^^^^^^^
+     :                                        `-- 'setIsKhoaDropdownOpen' is declared here
+ 104 |   const [khoaSearchTerm, setKhoaSearchTerm] = useState('');
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'khoaSearchTerm' is declared but never used. Unused variables should start with a '_'.
+     ,-[src/pages/shared/LichKienTap_Khoa.jsx:104:10]
+ 103 |   const [isKhoaDropdownOpen, setIsKhoaDropdownOpen] = useState(false);
+ 104 |   const [khoaSearchTerm, setKhoaSearchTerm] = useState('');
+     :          ^^^^^^^|^^^^^^
+     :                 `-- 'khoaSearchTerm' is declared here
+ 105 |   const [unassignedTrips, setUnassignedTrips] = useState([]);
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'setKhoaSearchTerm' is declared but never used. Unused variables should start with a '_'.
+     ,-[src/pages/shared/LichKienTap_Khoa.jsx:104:26]
+ 103 |   const [isKhoaDropdownOpen, setIsKhoaDropdownOpen] = useState(false);
+ 104 |   const [khoaSearchTerm, setKhoaSearchTerm] = useState('');
+     :                          ^^^^^^^^|^^^^^^^^
+     :                                  `-- 'setKhoaSearchTerm' is declared here
+ 105 |   const [unassignedTrips, setUnassignedTrips] = useState([]);
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Parameter 'index' is declared but never used. Unused parameters should start with a '_'.
+     ,-[src/pages/shared/LichKienTap_Khoa.jsx:359:49]
+ 358 | 
+ 359 |   const displayData = filteredSchedules.map((s, index) => {
+     :                                                 ^^|^^
+     :                                                   `-- 'index' is declared here
+ 360 |     return {
+     `----
+  help: Consider removing this parameter.
+
+  ! eslint(no-unused-vars): Identifier 'useEffect' is imported but never used.
+   ,-[src/components/VirtualList.jsx:1:35]
+ 1 | import React, { useState, useRef, useEffect } from 'react';
+   :                                   ^^^^|^^^^
+   :                                       `-- 'useEffect' is imported here
+ 2 | 
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'Building' is imported but never used.
+   ,-[src/pages/giang-vien/HoiDongChamBaoCao_DSBuoi_GV.jsx:3:3]
+ 2 | import { 
+ 3 |   Building, 
+   :   ^^^^|^^^
+   :       `-- 'Building' is imported here
+ 4 |   User, 
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'Save' is imported but never used.
+   ,-[src/pages/giang-vien/HoiDongChamBaoCao_DSBuoi_GV.jsx:7:3]
+ 6 |   Users, 
+ 7 |   Save, 
+   :   ^^|^
+   :     `-- 'Save' is imported here
+ 8 |   Check, 
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'FileSpreadsheet' is imported but never used.
+    ,-[src/pages/giang-vien/HoiDongChamBaoCao_DSBuoi_GV.jsx:10:3]
+  9 |   AlertTriangle,
+ 10 |   FileSpreadsheet,
+    :   ^^^^^^^|^^^^^^^
+    :          `-- 'FileSpreadsheet' is imported here
+ 11 |   Gavel,
+    `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Variable 'comments' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/giang-vien/HoiDongChamBaoCao_DSBuoi_GV.jsx:39:10]
+ 38 |   const [score3, setScore3] = useState('8.0');
+ 39 |   const [comments, setComments] = useState('Sinh viên trả lời lưu loát các câu hỏi phản biện của hội đồng.');
+    :          ^^^^|^^^
+    :              `-- 'comments' is declared here
+ 40 | 
+    `----
+  help: Consider removing this declaration.
+
+  x react-hooks(rules-of-hooks): React Hook "useMemo" is called conditionally. React Hooks must be called in the exact same order in every component render.
+     ,-[src/pages/giang-vien/HoiDongChamBaoCao_DSBuoi_GV.jsx:125:26]
+ 124 |       // Derived filter & pagination logic
+ 125 | ,->   const availableRoles = useMemo(() => {
+ 126 | |       return Array.from(new Set(boards.map(b => b.vai_tro).filter(Boolean)));
+ 127 | |->   }, [boards]);
+     : `---- This Hook call is not reachable on every render path.
+ 128 |     
+     `----
+  help: Move the Hook call before the condition, or call it unconditionally and branch inside the Hook/effect instead.
+
+  x react-hooks(rules-of-hooks): React Hook "useMemo" is called conditionally. React Hooks must be called in the exact same order in every component render.
+     ,-[src/pages/giang-vien/HoiDongChamBaoCao_DSBuoi_GV.jsx:129:26]
+ 128 |     
+ 129 | ,->   const filteredBoards = useMemo(() => {
+ 130 | |       return boards.filter(b => {
+ 131 | |         const q = searchQuery.toLowerCase();
+ 132 | |         const matchSearch = !searchQuery || 
+ 133 | |           (b.session?.ten_hoi_dong && b.session.ten_hoi_dong.toLowerCase().includes(q)) ||
+ 134 | |           (b.session?.dia_diem && b.session.dia_diem.toLowerCase().includes(q));
+ 135 | |         const matchRole = selectedRole === 'ALL' || b.vai_tro === selectedRole;
+ 136 | |         return matchSearch && matchRole;
+ 137 | |       });
+ 138 | |->   }, [boards, searchQuery, selectedRole]);
+     : `---- This Hook call is not reachable on every render path.
+ 139 |     
+     `----
+  help: Move the Hook call before the condition, or call it unconditionally and branch inside the Hook/effect instead.
+
+  ! eslint(no-unused-vars): Identifier 'NavLink' is imported but never used.
+   ,-[src/components/Layout.jsx:2:16]
+ 1 | import React, { useState, useEffect } from 'react';
+ 2 | import { Link, NavLink, useNavigate, Outlet, useLocation } from 'react-router-dom';
+   :                ^^^|^^^
+   :                   `-- 'NavLink' is imported here
+ 3 | import {
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'BookOpen' is imported but never used.
+    ,-[src/components/Layout.jsx:13:3]
+ 12 |   LogOut,
+ 13 |   BookOpen,
+    :   ^^^^|^^^
+    :       `-- 'BookOpen' is imported here
+ 14 |   ChevronRight,
+    `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'Menu' is imported but never used.
+    ,-[src/components/Layout.jsx:29:3]
+ 28 |   Key,
+ 29 |   Menu,
+    :   ^^|^
+    :     `-- 'Menu' is imported here
+ 30 |   PanelLeftClose,
+    `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'PanelLeftClose' is imported but never used.
+    ,-[src/components/Layout.jsx:30:3]
+ 29 |   Menu,
+ 30 |   PanelLeftClose,
+    :   ^^^^^^^|^^^^^^
+    :          `-- 'PanelLeftClose' is imported here
+ 31 |   PanelLeftOpen
+    `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'PanelLeftOpen' is imported but never used.
+    ,-[src/components/Layout.jsx:31:3]
+ 30 |   PanelLeftClose,
+ 31 |   PanelLeftOpen
+    :   ^^^^^^|^^^^^^
+    :         `-- 'PanelLeftOpen' is imported here
+ 32 | } from 'lucide-react';
+    `----
+  help: Consider removing this import.
+
+  x react-hooks(rules-of-hooks): React Hook "useEffect" is called conditionally. React Hooks must be called in the exact same order in every component render.
+    ,-[src/components/Layout.jsx:74:3]
+ 73 |       // Poll notifications for student count badge
+ 74 | ,->   useEffect(() => {
+ 75 | |       if (vai_tro === 'SinhVien' && details?.id && !phai_doi_mat_khau) {
+ 76 | |         sinhVienApi.getNotifications(details.id).then(res => {
+ 77 | |           const unread = res.data.filter(n => !n.da_doc).length;
+ 78 | |           setUnreadNotificationsCount(unread);
+ 79 | |         }).catch(err => console.error(err));
+ 80 | |       }
+ 81 | |->   }, [vai_tro, details, phai_doi_mat_khau]);
+    : `---- This Hook call is not reachable on every render path.
+ 82 |     
+    `----
+  help: Move the Hook call before the condition, or call it unconditionally and branch inside the Hook/effect instead.
+
+  x react-hooks(rules-of-hooks): React Hook "useEffect" is called conditionally. React Hooks must be called in the exact same order in every component render.
+    ,-[src/components/Layout.jsx:84:3]
+ 83 |       // Tự động thu gọn sidebar khi vào trang nộp bài để tiết kiệm không gian
+ 84 | ,->   useEffect(() => {
+ 85 | |       if (location.pathname === '/sinh-vien/reports') {
+ 86 | |         setIsSidebarCollapsed(true);
+ 87 | |       }
+ 88 | |->   }, [location.pathname]);
+    : `---- This Hook call is not reachable on every render path.
+ 89 |     
+    `----
+  help: Move the Hook call before the condition, or call it unconditionally and branch inside the Hook/effect instead.
+
+  ! react-hooks(exhaustive-deps): React Hook useEffect has a missing dependency: 'khoaMenuItems'
+     ,-[src/components/Layout.jsx:529:6]
+ 521 |     const currentPath = location.pathname;
+ 522 |     const activeItem = khoaMenuItems.find(item => item.to === currentPath);
+     :                        ^^^^^^|^^^^^^
+     :                              `-- useEffect uses `khoaMenuItems` here
+ 523 |     if (activeItem && activeItem.category && activeItem.category !== 'NONE' && activeItem.category !== 'TRANG CHỦ') {
+ 524 |       setCollapsedGroups(prev => ({
+ 525 |         ...prev,
+ 526 |         [activeItem.category]: false
+ 527 |       }));
+ 528 |     }
+ 529 |   }, [location.pathname]);
+     :      ^^^^^^^^^^^^^^^^^^^
+ 530 | 
+     `----
+  help: Either include it or remove the dependency array.
+
+  x react-hooks(rules-of-hooks): React Hook "useEffect" is called conditionally. React Hooks must be called in the exact same order in every component render.
+     ,-[src/components/Layout.jsx:519:3]
+ 518 |     
+ 519 | ,->   useEffect(() => {
+ 520 | |       // Automatically expand the group containing the active path on navigation
+ 521 | |       const currentPath = location.pathname;
+ 522 | |       const activeItem = khoaMenuItems.find(item => item.to === currentPath);
+ 523 | |       if (activeItem && activeItem.category && activeItem.category !== 'NONE' && activeItem.category !== 'TRANG CHỦ') {
+ 524 | |         setCollapsedGroups(prev => ({
+ 525 | |           ...prev,
+ 526 | |           [activeItem.category]: false
+ 527 | |         }));
+ 528 | |       }
+ 529 | |->   }, [location.pathname]);
+     : `---- This Hook call is not reachable on every render path.
+ 530 |     
+     `----
+  help: Move the Hook call before the condition, or call it unconditionally and branch inside the Hook/effect instead.
+
+  ! eslint(no-unused-vars): Identifier 'ChevronLeft' is imported but never used.
+   ,-[src/pages/shared/BaoCao_SVThamQuan_Khoa.jsx:2:77]
+ 1 | import React, { useState, useEffect } from 'react';
+ 2 | import { ArrowLeft, Search, Users, CheckCircle, BarChart2, FileSpreadsheet, ChevronLeft, ChevronRight, FileDown, ChevronDown, Check } from 'lucide-react';
+   :                                                                             ^^^^^|^^^^^
+   :                                                                                  `-- 'ChevronLeft' is imported here
+ 3 | import { useNavigate, useLocation } from 'react-router-dom';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'FileDown' is imported but never used.
+   ,-[src/pages/shared/BaoCao_SVThamQuan_Khoa.jsx:2:104]
+ 1 | import React, { useState, useEffect } from 'react';
+ 2 | import { ArrowLeft, Search, Users, CheckCircle, BarChart2, FileSpreadsheet, ChevronLeft, ChevronRight, FileDown, ChevronDown, Check } from 'lucide-react';
+   :                                                                                                        ^^^^|^^^
+   :                                                                                                            `-- 'FileDown' is imported here
+ 3 | import { useNavigate, useLocation } from 'react-router-dom';
+   `----
+  help: Consider removing this import.
+
+  ! react-hooks(exhaustive-deps): React Hook useEffect has a missing dependency: 'fetchData'
+    ,-[src/pages/shared/BaoCao_SVThamQuan_Khoa.jsx:38:6]
+ 33 |     if (lichKienTapId) {
+ 34 |       fetchData();
+    :       ^^^^|^^^^
+    :           `-- useEffect uses `fetchData` here
+ 35 |     } else {
+ 36 |       setLoading(false);
+ 37 |     }
+ 38 |   }, [lichKienTapId]);
+    :      ^^^^^^^^^^^^^^^
+ 39 | 
+    `----
+  help: Either include it or remove the dependency array.
+
+Found 119 warnings and 6 errors.
+Finished in 51ms on 65 files with 91 rules using 8 threads.

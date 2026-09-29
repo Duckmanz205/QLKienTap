@@ -388,7 +388,7 @@ export default function LichDanDoan_GV() {
                             </td>
                             <td className="p-4 text-center">
                               <span className="font-bold text-slate-600">
-                                {trip.so_luong_dang_ky_hien_tai || 0}/{trip.so_luong_sinh_vien_toi_da || 0}
+                                {trip.so_luong_dang_ky_hien_tai || 0} SV
                               </span>
                             </td>
                             <td className="p-4 text-center">
@@ -478,9 +478,9 @@ export default function LichDanDoan_GV() {
         <div className="xl:col-span-1 order-1 xl:order-2">
           <div className="bg-[#E7E0C4] rounded-2xl p-6 shadow-md border-2 border-white/50 relative overflow-hidden h-fit">
             <h2 className="text-lg font-black text-[#407F3E] mb-2">Lịch tháng này</h2>
-            <p className="text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-2 flex items-center gap-1">
+            <div className="text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-2 flex items-center gap-1">
               <div className="w-1.5 h-1.5 rounded-full bg-[#DBD468]"></div> Có chuyến dẫn đoàn
-            </p>
+            </div>
             
             {renderMiniCalendar()}
 
