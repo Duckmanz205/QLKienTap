@@ -194,7 +194,7 @@ TRANG 38
           'Content-Type': 'application/json',
           'Authorization': 'Bearer satori_2026_secure_key'
         },
-        body: JSON.stringify({ document_text: mockText })
+        body: JSON.stringify({ document_text: reportText })
       });
       if (!response.ok) {
         throw new Error('Lỗi khi gọi AI service');
@@ -661,51 +661,31 @@ TRANG 38
               
               {!aiGradingResult ? (
                 <div className="flex flex-col gap-3">
-                  <div className="flex items-center justify-between">
-                    <button 
-                      onClick={handleAIGrading}
-                      disabled={isGradingAI}
-                      className="flex-1 flex justify-center items-center gap-2 text-sm font-bold text-white bg-[#407F3E] px-4 py-2.5 rounded-lg shadow-sm hover:bg-[#407F3E]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {isGradingAI ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                          Đang tiến hành chấm điểm
-                        </>
-                      ) : (
-                        'Chấm tự động'
-                      )}
-                    </button>
-                    <button 
-                      onClick={() => setIsMockModalOpen(true)}
-                      className="ml-3 flex items-center gap-1.5 px-3 py-2 text-[11px] font-bold text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
-                      title="Chỉnh sửa Mock Data"
-                    >
-                      <Edit3Icon className="w-3.5 h-3.5" />
-                      Mock Data
-                    </button>
-                  </div>
+                  <button 
+                    onClick={handleAIGrading}
+                    disabled={isGradingAI}
+                    className="w-full flex justify-center items-center gap-2 text-sm font-bold text-white bg-[#407F3E] px-4 py-2.5 rounded-lg shadow-sm hover:bg-[#407F3E]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isGradingAI ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Đang tiến hành chấm điểm
+                      </>
+                    ) : (
+                      'Chấm tự động'
+                    )}
+                  </button>
                 </div>
               ) : (
                 <div className="flex flex-col gap-3">
                   <div className="flex items-end justify-between">
-                    <div className="flex items-center gap-4">
-                      <button 
-                        onClick={() => {
-                          setAiGradingResult(null);
-                        }}
-                        className="text-[11px] font-bold text-slate-600 bg-white border border-slate-200 px-2 py-1.5 rounded-md hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
-                      >
-                        Thực hiện chấm lại
-                      </button>
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-4xl font-black text-[#407F3E] leading-none">{aiGradingResult.diem_bao_cao_cuoi_cung}</span>
-                        <span className="text-sm font-bold text-slate-500">/ 10</span>
-                      </div>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-4xl font-black text-[#407F3E] leading-none">{aiGradingResult.diem_bao_cao_cuoi_cung}</span>
+                      <span className="text-sm font-bold text-slate-500">/ 10</span>
                     </div>
                     <button 
                       onClick={() => setIsAiModalOpen(true)}
-                      className="text-[11px] font-bold text-[#407F3E] bg-white border border-[#E7E0C4] px-2.5 py-1.5 rounded-md hover:bg-[#fdfcf8] transition-colors shadow-sm cursor-pointer whitespace-nowrap ml-2"
+                      className="text-[11px] font-bold text-[#407F3E] bg-white border border-[#E7E0C4] px-2.5 py-1.5 rounded-md hover:bg-[#fdfcf8] transition-colors shadow-sm cursor-pointer whitespace-nowrap"
                     >
                       Xem chi tiết
                     </button>
@@ -781,38 +761,6 @@ TRANG 38
   return (
     <div className={selectedReport ? '' : 'bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300'}>
       {selectedReport ? renderGradingView() : renderReportList()}
-
-      {/* Mock Text Modal */}
-      {isMockModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-3xl rounded-2xl shadow-xl overflow-hidden flex flex-col">
-            <div className="px-6 py-4 border-b border-[#E7E0C4] bg-[#fdfcf8] flex items-center justify-between shrink-0">
-              <h2 className="font-bold text-slate-800">Chỉnh sửa Mock Data (Văn bản thay thế OCR)</h2>
-              <button 
-                onClick={() => setIsMockModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1.5 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-6">
-              <textarea
-                className="w-full h-96 p-4 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:border-[#407F3E] resize-none"
-                value={mockText}
-                onChange={(e) => setMockText(e.target.value)}
-              />
-            </div>
-            <div className="px-6 py-4 border-t border-[#E7E0C4] bg-slate-50 flex justify-end gap-3">
-              <button 
-                onClick={() => setIsMockModalOpen(false)}
-                className="px-5 py-2.5 rounded-lg bg-[#407F3E] text-white font-bold text-sm shadow-md hover:bg-[#407F3E]/90 transition-colors"
-              >
-                Lưu Mock Data
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* AI Grading Details Modal */}
       {isAiModalOpen && aiGradingResult && (
@@ -902,38 +850,61 @@ TRANG 38
                     <p className="text-sm text-slate-600">{aiGradingResult.vsattp.ly_do_vsattp}</p>
                   </div>
 
+
+                </div>
+              </div>
+
+              <hr className="border-[#E7E0C4]" />
+
+              {/* Autograded text content */}
+              <div>
+                <h4 className="text-xs font-bold text-slate-800 uppercase mb-4">Nội dung được tự động chấm</h4>
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 font-mono whitespace-pre-wrap h-64 overflow-y-auto custom-scrollbar shadow-inner">
+                  {reportText || "Không có nội dung."}
                 </div>
               </div>
 
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-4 border-t border-[#E7E0C4] bg-slate-50 flex items-center justify-end gap-3">
-              <button 
-                onClick={() => setIsAiModalOpen(false)}
-                className="px-5 py-2.5 rounded-lg border border-slate-300 text-slate-600 font-bold text-sm hover:bg-slate-100 transition-colors cursor-pointer"
-              >
-                Đóng
-              </button>
+            <div className="px-6 py-4 border-t border-[#E7E0C4] bg-slate-50 flex items-center justify-between shrink-0">
               <button 
                 onClick={() => {
-                  setScore(aiGradingResult.diem_bao_cao_cuoi_cung);
-                  setComments(
-                    `1. Hình thức: ${aiGradingResult.hinh_thuc_tong_quan.ly_do_hinh_thuc}
-` +
-                    `2. Tổng quan: ${aiGradingResult.hinh_thuc_tong_quan.ly_do_tong_quan}
-` +
-                    `3. Quy trình: ${aiGradingResult.quy_trinh_cong_nghe.ly_do_quy_trinh}
-` +
-                    `4. VSATTP: ${aiGradingResult.vsattp.ly_do_vsattp}`
-                  );
+                  setAiGradingResult(null);
                   setIsAiModalOpen(false);
-                  toast.success('Đã áp dụng đề xuất của AI vào form!');
                 }}
-                className="px-5 py-2.5 rounded-lg bg-[#407F3E] text-white font-bold text-sm shadow-md hover:bg-[#407F3E]/90 hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer"
+                className="px-5 py-2.5 rounded-lg border border-slate-300 text-slate-600 font-bold text-sm hover:bg-slate-100 transition-colors cursor-pointer"
               >
-                <CheckCircle2 className="w-4 h-4" /> Sử dụng đề xuất này
+                Thực hiện chấm lại
               </button>
+              
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setIsAiModalOpen(false)}
+                  className="px-5 py-2.5 rounded-lg border border-slate-300 text-slate-600 font-bold text-sm hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  Đóng
+                </button>
+                <button 
+                  onClick={() => {
+                    setScore(aiGradingResult.diem_bao_cao_cuoi_cung);
+                    setComments(
+                      `1. Hình thức: ${aiGradingResult.hinh_thuc_tong_quan.ly_do_hinh_thuc}
+` +
+                      `2. Tổng quan: ${aiGradingResult.hinh_thuc_tong_quan.ly_do_tong_quan}
+` +
+                      `3. Quy trình: ${aiGradingResult.quy_trinh_cong_nghe.ly_do_quy_trinh}
+` +
+                      `4. VSATTP: ${aiGradingResult.vsattp.ly_do_vsattp}`
+                    );
+                    setIsAiModalOpen(false);
+                    toast.success('Đã áp dụng đề xuất của AI vào form!');
+                  }}
+                  className="px-5 py-2.5 rounded-lg bg-[#407F3E] text-white font-bold text-sm shadow-md hover:bg-[#407F3E]/90 hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer"
+                >
+                  <CheckCircle2 className="w-4 h-4" /> Sử dụng đề xuất này
+                </button>
+              </div>
             </div>
           </div>
         </div>
