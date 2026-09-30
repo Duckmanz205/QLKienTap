@@ -161,6 +161,7 @@ export class GiangVienService {
               id: score.id,
               diem_chuan_bi: score.diem_chuan_bi,
               diem_cong: score.diem_cong_final,
+              diem_ai_de_xuat: score.diem_ai_de_xuat,
             }
           : null,
       };
@@ -398,7 +399,6 @@ export class GiangVienService {
     search?: string,
     status?: string,
   ) {
-    // Tim tat ca sinh vien duoc huong dan
     const guidedSvIds = (
       await this.phanCongRepo.find({
         where: { giang_vien_id: lecturerId, trang_thai: 'DangHoatDong' },
@@ -406,7 +406,13 @@ export class GiangVienService {
       })
     ).map((a) => a.dotKienTapSinhVien.sinh_vien_id);
 
-    if (guidedSvIds.length === 0)
+    const ledTripIds = (
+      await this.danDoanRepo.find({
+        where: { giang_vien_id: lecturerId },
+      })
+    ).map(a => a.chuyen_tham_quan_id);
+
+    if (guidedSvIds.length === 0 && ledTripIds.length === 0)
       return { data: [], total: 0, page, limit, totalPages: 0 };
 
     const queryBuilder = this.baiThuRepo
@@ -417,8 +423,15 @@ export class GiangVienService {
       .leftJoinAndSelect('phieu.chuyenThamQuan', 'chuyen')
       .leftJoinAndSelect('chuyen.nhaMay', 'nhaMay')
       .leftJoinAndSelect('phieuTQ.diemPhieuThamQuan', 'diemPhieu')
-      .leftJoinAndMapOne('phieuTQ.diemDanh', DiemDanh, 'diemDanh', 'diemDanh.phieu_tham_quan_id = phieuTQ.id')
-      .where('phieu.sinh_vien_id IN (:...guidedSvIds)', { guidedSvIds });
+      .leftJoinAndMapOne('phieuTQ.diemDanh', DiemDanh, 'diemDanh', 'diemDanh.phieu_tham_quan_id = phieuTQ.id');
+      
+    if (guidedSvIds.length > 0 && ledTripIds.length > 0) {
+      queryBuilder.where('(phieu.sinh_vien_id IN (:...guidedSvIds) OR phieu.chuyen_tham_quan_id IN (:...ledTripIds))', { guidedSvIds, ledTripIds });
+    } else if (guidedSvIds.length > 0) {
+      queryBuilder.where('phieu.sinh_vien_id IN (:...guidedSvIds)', { guidedSvIds });
+    } else if (ledTripIds.length > 0) {
+      queryBuilder.where('phieu.chuyen_tham_quan_id IN (:...ledTripIds)', { ledTripIds });
+    }
 
     if (search) {
       queryBuilder.andWhere(

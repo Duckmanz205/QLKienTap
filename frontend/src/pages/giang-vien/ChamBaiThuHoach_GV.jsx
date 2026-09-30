@@ -269,6 +269,9 @@ TRANG 38
       setPdfBlobUrl(null);
       try {
         let apiPath = report.file_bao_cao;
+        if (apiPath.startsWith('/api/')) {
+          apiPath = apiPath.substring(5); // remove /api/
+        }
         if (apiPath.startsWith('reports/')) {
           apiPath = `upload/file/${apiPath}`;
         } else if (!apiPath.startsWith('upload/file/')) {
