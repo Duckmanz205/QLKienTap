@@ -5,6 +5,7 @@ import '../../../core/network/api_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/state/app_state.dart';
 import '../../widgets/paginated_list.dart';
+import 'kiemtra_baocao_sv.dart';
 
 class NopBaiThuHoachSVScreen extends StatefulWidget {
   const NopBaiThuHoachSVScreen({super.key});
@@ -183,45 +184,38 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
                           try {
                             final pickerResult = await FilePicker.pickFiles(
                               type: FileType.custom,
-                              allowedExtensions: ['pdf', 'docx', 'doc'],
+                              allowedExtensions: ['pdf'], // Only allow PDF for the new flow as requested
                             );
                             if (pickerResult != null && pickerResult.files.single.path != null) {
                               final file = pickerResult.files.single;
-                              setState(() {
-                                _uploadingReports[sub.id] = true;
-                              });
-
+                              
                               final sizeInMb = file.size / (1024 * 1024);
                               final fileSizeStr = '${sizeInMb.toStringAsFixed(1)} MB';
 
-                              final success = await appStateProvider.uploadReport(
-                                sub.id,
-                                file.path!,
-                                file.name,
-                                fileSizeStr,
-                              );
-
-                              setState(() {
-                                _uploadingReports[sub.id] = false;
-                                if (success) {
-                                  _uploadedReports[sub.id] = file.name;
-                                  _reportFileSizes[sub.id] = fileSizeStr;
-                                }
-                              });
-
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(success ? 'Nộp báo cáo thành công!' : 'Nộp báo cáo thất bại.'),
-                                  backgroundColor: success ? AppColors.secondary : AppColors.danger,
+                              if (!context.mounted) return;
+                              final success = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => KiemTraBaoCaoSVScreen(
+                                    submissionId: sub.id,
+                                    filePath: file.path!,
+                                    fileName: file.name,
+                                    fileSize: fileSizeStr,
+                                  ),
                                 ),
                               );
+
+                              if (success == true) {
+                                setState(() {
+                                  _uploadedReports[sub.id] = file.name;
+                                  _reportFileSizes[sub.id] = fileSizeStr;
+                                });
+                              }
                             }
                           } catch (e) {
-                            setState(() {
-                              _uploadingReports[sub.id] = false;
-                            });
+                            if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Lỗi chọn/tải file lên: $e'), backgroundColor: AppColors.danger),
+                              SnackBar(content: Text('Lỗi chọn file: $e'), backgroundColor: AppColors.danger),
                             );
                           }
                         },
@@ -296,6 +290,8 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
                                   file.name,
                                 );
 
+                                if (!context.mounted) return;
+
                                 setState(() {
                                   _uploadingConfirms[sub.id] = false;
                                   if (success) {
@@ -311,6 +307,7 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
                                 );
                               }
                             } catch (e) {
+                              if (!context.mounted) return;
                               setState(() {
                                 _uploadingConfirms[sub.id] = false;
                               });

@@ -795,19 +795,37 @@ export class SinhVienService {
     try {
       await this.baiThuRepo.save(report);
 
-      // Cập nhật file .txt lên Cloudflare nếu có extractedText
-      if (extractedText && this.r2Storage.isReady()) {
-        const txtKey = validBaoCaoRef.replace(/\.\w+$/, '.txt');
-        const txtBuffer = Buffer.from('\uFEFF' + extractedText, 'utf-8');
-        try {
-          await this.r2Storage.uploadFile(
-            this.r2Storage.BUCKET_REPORTS,
-            txtKey,
-            txtBuffer,
-            'text/plain; charset=utf-8'
-          );
-        } catch (r2Error) {
-          console.error('Lỗi khi ghi đè file text lên R2:', r2Error);
+      // Cập nhật file .txt lên Cloudflare hoặc Local nếu có extractedText
+      if (extractedText) {
+        if (this.r2Storage.isReady() && !validBaoCaoRef.startsWith('/api/')) {
+          const txtKey = validBaoCaoRef.replace(/\.\w+$/, '.txt');
+          const txtBuffer = Buffer.from('\uFEFF' + extractedText, 'utf-8');
+          try {
+            await this.r2Storage.uploadFile(
+              this.r2Storage.BUCKET_REPORTS,
+              txtKey,
+              txtBuffer,
+              'text/plain; charset=utf-8'
+            );
+          } catch (r2Error) {
+            console.error('Lỗi khi ghi đè file text lên R2:', r2Error);
+          }
+        } else {
+          // Ghi đè file local
+          try {
+            const fs = require('fs');
+            const path = require('path');
+            const filename = validBaoCaoRef.split('/').pop();
+            if (filename) {
+               const txtFilename = filename.replace(/\.\w+$/, '.txt');
+               // Folder theo MSSV hoac accountId (upload controller dùng MSSV nếu có)
+               const ownerId = phieu.sinhVien?.mssv || phieu.sinhVien?.taikhoan_id;
+               const txtPath = path.join(process.cwd(), 'uploads', 'reports', String(ownerId), txtFilename);
+               fs.writeFileSync(txtPath, '\uFEFF' + extractedText, 'utf-8');
+            }
+          } catch (localErr) {
+            console.error('Lỗi khi ghi đè file text local:', localErr);
+          }
         }
       }
 

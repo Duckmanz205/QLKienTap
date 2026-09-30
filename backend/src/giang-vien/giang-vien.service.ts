@@ -161,6 +161,7 @@ export class GiangVienService {
               id: score.id,
               diem_chuan_bi: score.diem_chuan_bi,
               diem_cong: score.diem_cong_final,
+              diem_ai_de_xuat: score.diem_ai_de_xuat,
             }
           : null,
       };

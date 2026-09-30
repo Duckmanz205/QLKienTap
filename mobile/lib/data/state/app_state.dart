@@ -375,7 +375,7 @@ class AppStateProviderState extends State<AppStateContainer> {
               prelimGrade: double.tryParse(diem['diem_chuan_bi']?.toString() ?? '0') ?? 0,
               extraGrade: double.tryParse(diem['diem_cong']?.toString() ?? '0') ?? 0,
               gvhdGrade: double.tryParse(r['diem_thu_hoach']?.toString() ?? '0') ?? 0,
-              aiSuggestedGrade: 8.0,
+              aiSuggestedGrade: diem['diem_ai_de_xuat'] != null ? double.tryParse(diem['diem_ai_de_xuat'].toString()) : null,
               comment: r['nhan_xet_cua_giang_vien'],
               isGraded: r['trang_thai'] == 'DaCham',
               tourId: chuyen['id']?.toString() ?? '',
@@ -593,7 +593,7 @@ class AppStateProviderState extends State<AppStateContainer> {
     });
   }
 
-  Future<bool> uploadReport(String submissionId, String localPath, String fileName, String fileSize) async {
+  Future<bool> uploadReport(String submissionId, String localPath, String fileName, String fileSize, {String? extractedText}) async {
     final regId = int.tryParse(submissionId);
     if (regId == null) {
       throw Exception('Mã bài nộp không hợp lệ ($submissionId).');
@@ -609,7 +609,7 @@ class AppStateProviderState extends State<AppStateContainer> {
     }
 
     final sub = _state.submissions.firstWhere((s) => s.id == submissionId);
-    await ApiService.submitReport(regId, fileReference, sub.fileXacNhanUrl);
+    await ApiService.submitReport(regId, fileReference, sub.fileXacNhanUrl, extractedText: extractedText);
 
     setState(() {
       _state.submissions = _state.submissions.map((s) {
@@ -692,7 +692,7 @@ class AppStateProviderState extends State<AppStateContainer> {
     });
   }
 
-  Future<bool> addRefund(String paymentId, String invoiceName, String amountText, {String? localPath, String? fileName}) async {
+  Future<bool> addRefund(String paymentId, String invoiceName, String amountText, {String? localPath, String? fileName, String? bankName, String? accountNumber, String? accountName, String? reason}) async {
     final invoiceId = int.tryParse(paymentId);
     if (invoiceId == null) {
       throw Exception('Không tìm thấy mã hóa đơn cần hoàn phí.');
@@ -704,7 +704,7 @@ class AppStateProviderState extends State<AppStateContainer> {
       fileReference = uploadRes['key'] ?? uploadRes['url'] ?? fileReference;
     }
 
-    await ApiService.requestRefund(invoiceId, fileReference);
+    await ApiService.requestRefund(invoiceId, fileReference, bankName: bankName, accountNumber: accountNumber, accountName: accountName, reason: reason);
 
     setState(() {
       final newRefund = RefundRequest(

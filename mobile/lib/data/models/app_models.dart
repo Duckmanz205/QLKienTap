@@ -292,7 +292,7 @@ class LecturerStudent {
   final double prelimGrade; // Điểm chuẩn bị
   final double extraGrade;  // Điểm cộng (max 1.0)
   final double gvhdGrade;   // Điểm GVHD chấm
-  final double aiSuggestedGrade;
+  final double? aiSuggestedGrade;
   final String? comment;
   final bool isGraded;
   final String tourId;
@@ -315,7 +315,7 @@ class LecturerStudent {
     required this.prelimGrade,
     required this.extraGrade,
     required this.gvhdGrade,
-    required this.aiSuggestedGrade,
+    this.aiSuggestedGrade,
     this.comment,
     required this.isGraded,
     required this.tourId,

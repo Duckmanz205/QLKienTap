@@ -328,11 +328,21 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                 child: ElevatedButton(
-                  onPressed: () {
-                    appStateProvider.registerTrip(trip.id);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Đăng ký thành công chuyến ${trip.name}')),
-                    );
+                  onPressed: () async {
+                    try {
+                      await appStateProvider.registerTrip(trip.id);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Đăng ký thành công chuyến ${trip.name}')),
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Đăng ký thất bại: $e')),
+                        );
+                      }
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
@@ -606,12 +616,22 @@ class ChuyenThamQuanDetailSVScreen extends StatelessWidget {
                 const SizedBox(height: 32),
                 if (!trip.isRegistered)
                   ElevatedButton(
-                    onPressed: () {
-                      appStateProvider.registerTrip(trip.id);
-                      onBack();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Đăng ký thành công chuyến ${trip.name}')),
-                      );
+                    onPressed: () async {
+                      try {
+                        await appStateProvider.registerTrip(trip.id);
+                        if (context.mounted) {
+                          onBack();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Đăng ký thành công chuyến ${trip.name}')),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Đăng ký thất bại: $e')),
+                          );
+                        }
+                      }
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
