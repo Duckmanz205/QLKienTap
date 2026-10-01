@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { 
-  Plus, ChevronRight, ChevronDown, Check, X, Upload, CloudUpload, ArrowLeft, Send, MoreVertical, Edit, Trash2, Search, FileSpreadsheet, RefreshCw
+  Plus, ChevronDown, Check, X, Send, MoreVertical, Edit, Trash2, Search
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import { khoaApi } from '../../services/api';
 import { getValidSession } from '../../utils/auth';
 
@@ -15,7 +14,6 @@ export default function LichKienTap_Khoa() {
 
   const [schedules, setSchedules] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
-  const [courses, setCourses] = useState([]);
   const [factories, setFactories] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -100,8 +98,6 @@ export default function LichKienTap_Khoa() {
   const [dotSearchTermFilter, setDotSearchTermFilter] = useState('');
   const [isDotModalDropdownOpen, setIsDotModalDropdownOpen] = useState(false);
   const [dotSearchTermModal, setDotSearchTermModal] = useState('');
-  const [isKhoaDropdownOpen, setIsKhoaDropdownOpen] = useState(false);
-  const [khoaSearchTerm, setKhoaSearchTerm] = useState('');
   const [unassignedTrips, setUnassignedTrips] = useState([]);
   const [selectedTripIds, setSelectedTripIds] = useState([]);
 
@@ -111,17 +107,16 @@ export default function LichKienTap_Khoa() {
 
   const fetchData = async () => {
     try {
-      const [schRes, campRes, courseRes, tripRes, factoryRes] = await Promise.all([
+      const [schRes, campRes, tripRes, factoryRes] = await Promise.all([
         khoaApi.getSchedules(),
         khoaApi.getCampaigns(),
-        khoaApi.getCourses(),
         khoaApi.getTrips({ status: 'Nhap' }),
         khoaApi.getFactories()
       ]);
       setSchedules(schRes.data?.data || schRes.data || []);
       setCampaigns(campRes.data?.data || campRes.data || []);
-      setCourses(courseRes.data?.data || courseRes.data || []);
       setFactories(factoryRes.data?.data || factoryRes.data || []);
+      
       const allTrips = tripRes.data?.data || tripRes.data || [];
       setUnassignedTrips(allTrips.filter(t => t.trang_thai === 'Nhap' && !t.lich_kien_tap_id));
     } catch (err) {
@@ -357,7 +352,7 @@ export default function LichKienTap_Khoa() {
     return true;
   });
 
-  const displayData = filteredSchedules.map((s, index) => {
+  const displayData = filteredSchedules.map((s) => {
     return {
       id: s.id,
       ten_lich: s.ten_lich,

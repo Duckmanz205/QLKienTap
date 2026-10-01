@@ -474,6 +474,9 @@ export class ChuyenThamQuan {
   @Column({ type: 'int', default: 0 })
   le_phi: number;
 
+  @Column({ type: 'datetime2', nullable: true })
+  han_dong_le_phi: Date;
+
   @Column({ nullable: true })
   dia_diem_tap_trung: string;
 
@@ -704,7 +707,11 @@ export class DanhSachDen {
   @Column()
   so_chuyen_con_lai: number;
 
-  @Column({ type: 'bit', generatedType: 'STORED', asExpression: 'CASE WHEN so_chuyen_con_lai > 0 THEN 1 ELSE 0 END' })
+  @Column({
+    type: 'bit',
+    generatedType: 'STORED',
+    asExpression: 'CASE WHEN so_chuyen_con_lai > 0 THEN 1 ELSE 0 END',
+  })
   con_hieu_luc: boolean;
 }
 

@@ -134,10 +134,12 @@ export class GiangVienService {
     const phieuIds = phieus.map((p) => p.id);
 
     const phieuTQs = await this.phieuTQRepo.find({
-      where: { phieu_dang_ky_id: In(phieuIds) }
+      where: { phieu_dang_ky_id: In(phieuIds) },
     });
-    const phieuTQIds = phieuTQs.map(ptq => ptq.id);
-    const phieuTQMap = new Map(phieuTQs.map(ptq => [ptq.phieu_dang_ky_id, ptq]));
+    const phieuTQIds = phieuTQs.map((ptq) => ptq.id);
+    const phieuTQMap = new Map(
+      phieuTQs.map((ptq) => [ptq.phieu_dang_ky_id, ptq]),
+    );
 
     const diemDanhs = await this.diemDanhRepo.find({
       where: { phieu_tham_quan_id: In(phieuTQIds) },
@@ -149,8 +151,12 @@ export class GiangVienService {
 
     return phieus.map((p) => {
       const ptq = phieuTQMap.get(p.id);
-      const dd = ptq ? diemDanhs.find((d) => d.phieu_tham_quan_id === ptq.id) : null;
-      const score = ptq ? diems.find((d) => d.phieu_tham_quan_id === ptq.id) : null;
+      const dd = ptq
+        ? diemDanhs.find((d) => d.phieu_tham_quan_id === ptq.id)
+        : null;
+      const score = ptq
+        ? diems.find((d) => d.phieu_tham_quan_id === ptq.id)
+        : null;
       return {
         ...p,
         diemDanh: dd
@@ -244,8 +250,10 @@ export class GiangVienService {
       const phieuTQs = await manager.find(PhieuThamQuan, {
         where: { phieu_dang_ky_id: In(Array.from(uniquePhieuIds)) },
       });
-      const phieuTQIds = phieuTQs.map(ptq => ptq.id);
-      const ptqMapByPhieuId = new Map(phieuTQs.map(ptq => [ptq.phieu_dang_ky_id, ptq]));
+      const phieuTQIds = phieuTQs.map((ptq) => ptq.id);
+      const ptqMapByPhieuId = new Map(
+        phieuTQs.map((ptq) => [ptq.phieu_dang_ky_id, ptq]),
+      );
 
       const existingDiemDanhs = await manager.find(DiemDanh, {
         where: { phieu_tham_quan_id: In(phieuTQIds) },
@@ -291,11 +299,7 @@ export class GiangVienService {
         dd.ngay_diem_danh = new Date();
         await manager.save(DiemDanh, dd);
 
-        if (
-          record.status === 'Vang' ||
-          record.status === 'TuChoiThamGia'
-        ) {
-
+        if (record.status === 'Vang' || record.status === 'TuChoiThamGia') {
           // Chỉ tự động thêm vào blacklist nếu chưa có blacklist DangKyKhongThamGia còn hiệu lực cho phiếu này
           if (!blacklistSet.has(phieu.id)) {
             const black = new DanhSachDen();
@@ -365,7 +369,9 @@ export class GiangVienService {
       );
     }
 
-    const phieuTQ = await this.phieuTQRepo.findOne({ where: { phieu_dang_ky_id: phieuId } });
+    const phieuTQ = await this.phieuTQRepo.findOne({
+      where: { phieu_dang_ky_id: phieuId },
+    });
     if (!phieuTQ) {
       throw new NotFoundException('Không tìm thấy phiếu tham quan');
     }
@@ -374,7 +380,9 @@ export class GiangVienService {
       where: { phieu_tham_quan_id: phieuTQ.id },
     });
     if (diem && diem.da_khoa) {
-      throw new BadRequestException('Điểm của chuyến đi này đã được khóa, không thể chỉnh sửa');
+      throw new BadRequestException(
+        'Điểm của chuyến đi này đã được khóa, không thể chỉnh sửa',
+      );
     }
     if (!diem) {
       diem = new DiemPhieuThamQuan();
@@ -417,7 +425,12 @@ export class GiangVienService {
       .leftJoinAndSelect('phieu.chuyenThamQuan', 'chuyen')
       .leftJoinAndSelect('chuyen.nhaMay', 'nhaMay')
       .leftJoinAndSelect('phieuTQ.diemPhieuThamQuan', 'diemPhieu')
-      .leftJoinAndMapOne('phieuTQ.diemDanh', DiemDanh, 'diemDanh', 'diemDanh.phieu_tham_quan_id = phieuTQ.id')
+      .leftJoinAndMapOne(
+        'phieuTQ.diemDanh',
+        DiemDanh,
+        'diemDanh',
+        'diemDanh.phieu_tham_quan_id = phieuTQ.id',
+      )
       .where('phieu.sinh_vien_id IN (:...guidedSvIds)', { guidedSvIds });
 
     if (search) {
@@ -448,10 +461,12 @@ export class GiangVienService {
       .skip(skip)
       .getManyAndCount();
 
-    const mappedData = data.map(report => ({
+    const mappedData = data.map((report) => ({
       ...report,
-      diem_thu_hoach: report.phieuThamQuan?.diemPhieuThamQuan?.diem_thu_hoach ?? null,
-      nhan_xet_cua_giang_vien: report.phieuThamQuan?.diemPhieuThamQuan?.nhan_xet_thu_hoach ?? null,
+      diem_thu_hoach:
+        report.phieuThamQuan?.diemPhieuThamQuan?.diem_thu_hoach ?? null,
+      nhan_xet_cua_giang_vien:
+        report.phieuThamQuan?.diemPhieuThamQuan?.nhan_xet_thu_hoach ?? null,
     }));
 
     return {
@@ -508,7 +523,9 @@ export class GiangVienService {
       );
     }
 
-    const phieuTQ = await this.phieuTQRepo.findOne({ where: { phieu_dang_ky_id: phieuId } });
+    const phieuTQ = await this.phieuTQRepo.findOne({
+      where: { phieu_dang_ky_id: phieuId },
+    });
     if (!phieuTQ) {
       throw new NotFoundException('Không tìm thấy phiếu tham quan');
     }
@@ -517,7 +534,9 @@ export class GiangVienService {
       where: { phieu_tham_quan_id: phieuTQ.id },
     });
     if (diem && diem.da_khoa) {
-      throw new BadRequestException('Điểm của phiếu tham quan này đã được khóa, không thể chỉnh sửa');
+      throw new BadRequestException(
+        'Điểm của phiếu tham quan này đã được khóa, không thể chỉnh sửa',
+      );
     }
     if (!diem) {
       diem = new DiemPhieuThamQuan();
@@ -548,7 +567,7 @@ export class GiangVienService {
       // Fetch all committee members for this board
       const committeeMembers = await this.hoiDongThanhVienRepo.find({
         where: { hoi_dong_id: map.hoi_dong_id },
-        relations: { giangVien: true }
+        relations: { giangVien: true },
       });
 
       // Lay danh sach cac phieu dang ky thuoc lich kien tap cua hoi dong nay
@@ -569,36 +588,43 @@ export class GiangVienService {
       });
 
       // Lay diem cua tat ca phieu trong hoi dong nay
-      const phieuTQIds = phieus.map(p => p.phieuThamQuan?.id).filter(id => id);
+      const phieuTQIds = phieus
+        .map((p) => p.phieuThamQuan?.id)
+        .filter((id) => id);
       let allScores: any[] = [];
       if (phieuTQIds.length > 0) {
         allScores = await this.diemHoiDongRepo.find({
           where: {
-            // Using In(phieuTQIds) from TypeORM would require importing In, 
+            // Using In(phieuTQIds) from TypeORM would require importing In,
             // instead we can just fetch all scores for the committee members
-            hoi_dong_thanhvien_id: map.hoi_dong_id // wait, no, the member id is different
-          }
+            hoi_dong_thanhvien_id: map.hoi_dong_id, // wait, no, the member id is different
+          },
         });
-        
+
         // Actually it's easier to just fetch all scores for these phieuTQIds
         // Let's do it using QueryBuilder to avoid importing In
-        allScores = await this.diemHoiDongRepo.createQueryBuilder('diem')
+        allScores = await this.diemHoiDongRepo
+          .createQueryBuilder('diem')
           .where('diem.phieu_tham_quan_id IN (:...ids)', { ids: phieuTQIds })
           .getMany();
       }
 
       // Map registrations with committee scores
-      const registrationsWithScores = phieus.map(phieu => {
+      const registrationsWithScores = phieus.map((phieu) => {
         const pTqId = phieu.phieuThamQuan?.id;
-        const committee = committeeMembers.map(cm => {
-          const scoreRecord = allScores.find(s => s.phieu_tham_quan_id === pTqId && s.hoi_dong_thanhvien_id === cm.id);
+        const committee = committeeMembers.map((cm) => {
+          const scoreRecord = allScores.find(
+            (s) =>
+              s.phieu_tham_quan_id === pTqId &&
+              s.hoi_dong_thanhvien_id === cm.id,
+          );
           return {
             id: cm.id,
             name: cm.giangVien?.ho_ten || 'Giảng viên',
             ma_gv: cm.giangVien?.ma_gv || '',
             vai_tro: cm.vai_tro,
             score: scoreRecord ? scoreRecord.diem : null,
-            status: scoreRecord ? 'Đã chấm' : 'Chưa chấm'
+            status: scoreRecord ? 'Đã chấm' : 'Chưa chấm',
           };
         });
 
@@ -669,7 +695,9 @@ export class GiangVienService {
       );
     }
 
-    const phieuTQ = await this.phieuTQRepo.findOne({ where: { phieu_dang_ky_id: phieuId } });
+    const phieuTQ = await this.phieuTQRepo.findOne({
+      where: { phieu_dang_ky_id: phieuId },
+    });
     if (!phieuTQ) {
       throw new NotFoundException('Không tìm thấy phiếu tham quan');
     }
@@ -678,11 +706,16 @@ export class GiangVienService {
       where: { phieu_tham_quan_id: phieuTQ.id },
     });
     if (diemPhieuCheck && diemPhieuCheck.da_khoa) {
-      throw new BadRequestException('Điểm của phiếu tham quan này đã được khóa, không thể chỉnh sửa');
+      throw new BadRequestException(
+        'Điểm của phiếu tham quan này đã được khóa, không thể chỉnh sửa',
+      );
     }
 
     let item = await this.diemHoiDongRepo.findOne({
-      where: { phieu_tham_quan_id: phieuTQ.id, hoi_dong_thanhvien_id: memberId },
+      where: {
+        phieu_tham_quan_id: phieuTQ.id,
+        hoi_dong_thanhvien_id: memberId,
+      },
     });
 
     if (!item) {
@@ -704,7 +737,9 @@ export class GiangVienService {
       const sum = allScores.reduce((acc, curr) => acc + Number(curr.diem), 0);
       const avg = sum / allScores.length;
 
-      const phieuTQ = await this.phieuTQRepo.findOne({ where: { phieu_dang_ky_id: phieuId } });
+      const phieuTQ = await this.phieuTQRepo.findOne({
+        where: { phieu_dang_ky_id: phieuId },
+      });
       if (phieuTQ) {
         let diemPhieu = await this.diemPhieuRepo.findOne({
           where: { phieu_tham_quan_id: phieuTQ.id },
@@ -773,7 +808,11 @@ export class GiangVienService {
         .createQueryBuilder('baiThu')
         .leftJoin('baiThu.phieuThamQuan', 'phieuTQ')
         .leftJoin('phieuTQ.phieuDangKy', 'phieu')
-        .leftJoin('DiemPhieuThamQuan', 'diem', 'diem.phieu_tham_quan_id = phieuTQ.id')
+        .leftJoin(
+          'DiemPhieuThamQuan',
+          'diem',
+          'diem.phieu_tham_quan_id = phieuTQ.id',
+        )
         .where('phieu.sinh_vien_id IN (:...guidedSvIds)', { guidedSvIds })
         .andWhere('diem.diem_thu_hoach IS NULL')
         .getCount();

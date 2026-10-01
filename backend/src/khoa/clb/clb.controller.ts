@@ -50,7 +50,7 @@ export class ClbController {
   constructor(
     private readonly khoaService: KhoaService,
     private readonly taskQueueService: TaskQueueService,
-  ) { }
+  ) {}
 
   @Get('factories')
   async getFactories() {
@@ -109,8 +109,6 @@ export class ClbController {
     return this.khoaService.deleteStudent(+id);
   }
 
-
-
   @Get('trips')
   async getTrips() {
     return this.khoaService.getTrips();
@@ -127,10 +125,7 @@ export class ClbController {
   }
 
   @Put('trips/:id')
-  async updateTrip(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() body: any,
-  ) {
+  async updateTrip(@Param('id', ParseIntPipe) id: number, @Body() body: any) {
     return this.khoaService.updateTrip(id, body);
   }
 
@@ -142,7 +137,6 @@ export class ClbController {
   async reopenTripRegistration(@Param('id', ParseIntPipe) id: number) {
     return this.khoaService.reopenTripRegistration(id);
   }
-
 
   @Post('approve-trip')
   async approveTrip(@Body() body: ApproveTripDto) {
@@ -207,8 +201,19 @@ export class ClbController {
   }
 
   @Post('confirm-assign-students')
-  async confirmAssignStudents(@Body() body: { tripId: number, acceptedStudentIds: number[], deadlineDate?: string }) {
-    return this.khoaService.confirmAssignStudents(body.tripId, body.acceptedStudentIds, body.deadlineDate);
+  async confirmAssignStudents(
+    @Body()
+    body: {
+      tripId: number;
+      acceptedStudentIds: number[];
+      deadlineDate?: string;
+    },
+  ) {
+    return this.khoaService.confirmAssignStudents(
+      body.tripId,
+      body.acceptedStudentIds,
+      body.deadlineDate,
+    );
   }
 
   @Get('retake-students-report')
@@ -227,21 +232,27 @@ export class ClbController {
   async getVisitedStudentsReport(
     @Query('lichKienTapId') lichKienTapId?: string,
   ) {
-    return this.khoaService.getVisitedStudentsReport(lichKienTapId ? parseInt(lichKienTapId) : undefined);
+    return this.khoaService.getVisitedStudentsReport(
+      lichKienTapId ? parseInt(lichKienTapId) : undefined,
+    );
   }
 
   @Get('report/not-visited-students')
   async getNotVisitedStudentsReport(
     @Query('lichKienTapId') lichKienTapId?: string,
   ) {
-    return this.khoaService.getNotVisitedStudentsReport(lichKienTapId ? parseInt(lichKienTapId) : undefined);
+    return this.khoaService.getNotVisitedStudentsReport(
+      lichKienTapId ? parseInt(lichKienTapId) : undefined,
+    );
   }
 
   @Get('report/eligible-students')
   async getEligibleStudentsReport(
     @Query('lichKienTapId') lichKienTapId?: string,
   ) {
-    return this.khoaService.getEligibleStudentsReport(lichKienTapId ? parseInt(lichKienTapId) : undefined);
+    return this.khoaService.getEligibleStudentsReport(
+      lichKienTapId ? parseInt(lichKienTapId) : undefined,
+    );
   }
 
   @Get('dashboard-stats')
@@ -317,7 +328,6 @@ export class ClbController {
     return this.khoaService.confirmManualPayment(id);
   }
 
-
   @Get('config')
   async getConfig() {
     return this.khoaService.getTaiKhoanThuHuong();
@@ -359,11 +369,11 @@ export class ClbController {
   }
 
   @Post('schedules/:id/submit')
-  async submitSchedule(
-    @Param('id', ParseIntPipe) id: number,
-    @Req() req: any
-  ) {
-    return this.khoaService.submitScheduleForApproval(id, req.user?.sub || req.user?.id);
+  async submitSchedule(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    return this.khoaService.submitScheduleForApproval(
+      id,
+      req.user?.sub || req.user?.id,
+    );
   }
 
   @Post('lock-grades')

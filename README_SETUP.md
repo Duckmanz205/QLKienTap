@@ -33,7 +33,7 @@ Hệ thống sử dụng CSDL với nhiều Trigger và Constraint phức tạp,
 Mở SQL Server Management Studio (SSMS) và thực thi lần lượt 2 script sau (nằm trong thư mục `TaiLieu/`):
 
 1. **`QLKienTap_Database_v2.sql`**: Chạy script này trước để tạo database `QLKienTap`, các bảng, view, constraint và triggers theo cấu trúc V2 mới nhất.
-2. **`QLKienTap_ImportData.sql`**: Chạy script này sau khi đã tạo schema để insert dữ liệu mẫu (danh mục nền, tài khoản, sinh viên, giảng viên...). Mật khẩu của admin và clb đã được đưa về mặc định là `123456`.
+2. **`QLKienTap_ImportData.sql`**: Chạy script này sau khi đã tạo schema để insert dữ liệu mẫu (danh mục, tài khoản, sinh viên, giảng viên...). Mật khẩu của admin và clb đã được đưa về mặc định là `123456`.
 
 ---
 

@@ -146,7 +146,7 @@ export default function Layout() {
     if (path === '/giang-vien/notifications') return 'Thông báo';
 
     if (path === '/khoa') return 'Trang chủ';
-    if (path === '/khoa/danh-muc-nen') return 'Danh mục nền';
+    if (path === '/khoa/danh-muc') return 'Danh mục';
     if (path === '/khoa/lich-kien-tap') return 'Lịch kiến tập';
     if (path === '/khoa/students') return 'Quản lý Sinh viên';
     if (path === '/khoa/plans') return 'Đợt kiến tập';
@@ -477,7 +477,7 @@ export default function Layout() {
     khoaMenuItems = [
       { to: '/khoa', label: 'Trang chủ', icon: Home, category: 'TRANG CHỦ' },
       // DANH MỤC HỆ THỐNG
-      { to: '/khoa/danh-muc-nen', label: 'Danh mục nền', icon: Layers, category: 'DANH MỤC HỆ THỐNG' },
+      { to: '/khoa/danh-muc', label: 'Danh mục', icon: Layers, category: 'DANH MỤC HỆ THỐNG' },
       { to: '/khoa/students', label: 'Sinh viên', icon: Users, category: 'DANH MỤC HỆ THỐNG' },
       { to: '/khoa/lecturers', label: 'Giảng viên', icon: User, category: 'DANH MỤC HỆ THỐNG' },
 

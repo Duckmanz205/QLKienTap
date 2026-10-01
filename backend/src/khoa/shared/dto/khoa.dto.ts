@@ -278,14 +278,17 @@ export class CreateTripDto {
   })
   gio_bat_dau: string;
 
-
   @IsString({ message: 'Hình thức không hợp lệ' })
-  @IsIn(['TrucTiep', 'TrucTuyen'], { message: 'Hình thức phải là TrucTiep hoặc TrucTuyen' })
+  @IsIn(['TrucTiep', 'TrucTuyen'], {
+    message: 'Hình thức phải là TrucTiep hoặc TrucTuyen',
+  })
   hinh_thuc: string;
 
   @IsOptional()
   @IsString({ message: 'Cách tổ chức không hợp lệ' })
-  @IsIn(['DoKhoaToChuc', 'TuDo'], { message: 'Cách tổ chức phải là DoKhoaToChuc hoặc TuDo' })
+  @IsIn(['DoKhoaToChuc', 'TuDo'], {
+    message: 'Cách tổ chức phải là DoKhoaToChuc hoặc TuDo',
+  })
   cach_to_chuc?: string;
 
   @IsInt({ message: 'Sức chứa phải là số' })
@@ -302,8 +305,24 @@ export class CreateTripDto {
   dia_diem_tap_trung?: string;
 
   @IsOptional()
+  @Type(() => Date)
+  @IsDate({ message: 'Hạn đóng lệ phí không hợp lệ' })
+  han_dong_le_phi?: Date;
+
+  @IsOptional()
   @IsString({ message: 'Trạng thái không hợp lệ' })
-  @IsIn(['Nhap', 'ChoDuyet', 'DaDuyet', 'MoDangKy', 'DaChotDanhSach', 'DaDienRa', 'DaHuy'], { message: 'Trạng thái phải thuộc danh sách hợp lệ' })
+  @IsIn(
+    [
+      'Nhap',
+      'ChoDuyet',
+      'DaDuyet',
+      'MoDangKy',
+      'DaChotDanhSach',
+      'DaDienRa',
+      'DaHuy',
+    ],
+    { message: 'Trạng thái phải thuộc danh sách hợp lệ' },
+  )
   trang_thai?: string;
 }
 
