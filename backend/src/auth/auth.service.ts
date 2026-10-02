@@ -154,7 +154,9 @@ export class AuthService {
 
     const isSameAsOld = await bcrypt.compare(newPass, user.mat_khau_hash);
     if (isSameAsOld) {
-      throw new BadRequestException('Mật khẩu mới không được trùng với mật khẩu cũ');
+      throw new BadRequestException(
+        'Mật khẩu mới không được trùng với mật khẩu cũ',
+      );
     }
 
     const salt = await bcrypt.genSalt(10);

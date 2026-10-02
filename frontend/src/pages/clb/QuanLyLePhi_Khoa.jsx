@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  ChevronDown, Check, ChevronRight, UploadCloud, Search, DollarSign, X
+  ChevronDown, Check, ChevronRight, UploadCloud, Search, DollarSign, X, Download, FileText
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
 import { khoaApi } from '../../services/api';
 import Toast from '../../components/Toast';
 
@@ -12,6 +14,78 @@ export default function QuanLyLePhi_Khoa() {
   const [fees, setFees] = useState([]);
   const [viewingDetail, setViewingDetail] = useState(null);
   const fileInputRef = useRef(null);
+  const invoiceRef = useRef(null);
+  const [invoiceDataForPDF, setInvoiceDataForPDF] = useState(null);
+
+  const handleExportExcel = () => {
+    if (!fees || fees.length === 0) {
+      setToast({ show: true, message: 'Không có dữ liệu để xuất', type: 'error' });
+      return;
+    }
+
+    const exportData = filteredFees.map((f, index) => {
+      const sv = f.sinhVien || {};
+      const chuyen = f.chuyenThamQuan?.nhaMay?.ten_nha_may || '';
+      const hoaDon = f.hoaDon || {};
+      
+      let trangThai = hoaDon.trang_thai;
+      if (trangThai === 'ChuaDong') trangThai = 'Chưa đóng';
+      else if (trangThai === 'DaDong') trangThai = 'Đã đóng';
+      else if (trangThai === 'Huy_ChoHoanPhi') trangThai = 'Hủy - Chờ hoàn phí';
+      else if (trangThai === 'DaHoanPhi') trangThai = 'Đã hoàn phí';
+
+      return {
+        'STT': index + 1,
+        'MSSV': sv.mssv || '',
+        'Họ và tên': sv.ho_ten || '',
+        'Chuyến tham quan': chuyen,
+        'Số tiền (VNĐ)': hoaDon.so_tien || 0,
+        'Nội dung CK (Mã hóa đơn)': hoaDon.noi_dung_chuyen_khoan || '',
+        'Trạng thái': trangThai,
+        'Ngày đóng thực tế': hoaDon.ngay_dong_thuc_te ? new Date(hoaDon.ngay_dong_thuc_te).toLocaleString('vi-VN') : ''
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "LePhi");
+
+    const wscols = [
+      {wch: 5}, {wch: 15}, {wch: 25}, {wch: 30}, 
+      {wch: 15}, {wch: 25}, {wch: 20}, {wch: 20}
+    ];
+    worksheet['!cols'] = wscols;
+
+    XLSX.writeFile(workbook, `Danh_Sach_Le_Phi_${new Date().getTime()}.xlsx`);
+    setToast({ show: true, message: 'Xuất file Excel thành công', type: 'success' });
+  };
+
+  const handleExportPDF = (feeData) => {
+    setInvoiceDataForPDF(feeData);
+    
+    setTimeout(async () => {
+      const element = invoiceRef.current;
+      if (!element) return;
+      
+      try {
+        const canvas = await html2canvas(element, { scale: 2, useCORS: true });
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF('p', 'mm', 'a5');
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+        
+        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+        pdf.save(`HoaDon_${feeData.sinhVien?.mssv || 'unknown'}.pdf`);
+        setToast({ show: true, message: 'Tải Hóa đơn PDF thành công', type: 'success' });
+      } catch (err) {
+        console.error(err);
+        setToast({ show: true, message: 'Lỗi tạo PDF', type: 'error' });
+      } finally {
+        setInvoiceDataForPDF(null);
+      }
+    }, 500);
+  };
+
   
   // Search & Pagination States
   const [searchTerm, setSearchTerm] = useState('');
@@ -212,6 +286,13 @@ export default function QuanLyLePhi_Khoa() {
           >
             Cấu hình thanh toán
           </button>
+          <button 
+            onClick={handleExportExcel}
+            className="px-5 py-2.5 bg-[#407F3E] hover:bg-[#407F3E]/90 text-white rounded-xl text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer"
+          >
+            <Download className="w-4 h-4" />
+            Xuất Excel
+          </button>
           <input type="file" accept=".xlsx,.xls" className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
           <button 
             onClick={() => fileInputRef.current?.click()}
@@ -390,13 +471,24 @@ export default function QuanLyLePhi_Khoa() {
                       {getStatusBadge(displayStatus)}
                     </td>
                     <td className="p-4 text-right pr-6">
-                      <button 
-                        className="p-1.5 text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer" 
-                        title="Xem chi tiết"
-                        onClick={() => setViewingDetail(f)}
-                      >
-                        <ChevronRight className="w-5 h-5" />
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        {currentStatus.startsWith('DaDong') && (
+                          <button 
+                            className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer" 
+                            title="Tải Hóa đơn PDF"
+                            onClick={() => handleExportPDF(f)}
+                          >
+                            <FileText className="w-5 h-5" />
+                          </button>
+                        )}
+                        <button 
+                          className="p-1.5 text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer" 
+                          title="Xem chi tiết"
+                          onClick={() => setViewingDetail(f)}
+                        >
+                          <ChevronRight className="w-5 h-5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 )
@@ -757,6 +849,73 @@ export default function QuanLyLePhi_Khoa() {
           </div>
         </div>
       )}
+
+      {/* Hidden Invoice Template for PDF Export */}
+      <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
+        <div 
+          ref={invoiceRef}
+          style={{ 
+            width: '148mm',
+            padding: '20px', 
+            backgroundColor: 'white',
+            fontFamily: 'sans-serif',
+            color: '#1e293b'
+          }}
+        >
+          {invoiceDataForPDF && (() => {
+            const sv = invoiceDataForPDF.sinhVien || {};
+            const hk = invoiceDataForPDF.hoaDon || {};
+            const ctq = invoiceDataForPDF.chuyenThamQuan?.nhaMay?.ten_nha_may || '';
+            const dt = hk.ngay_dong_thuc_te ? new Date(hk.ngay_dong_thuc_te) : new Date();
+            
+            return (
+              <div style={{ border: '2px solid #e2e8f0', borderRadius: '12px', padding: '24px' }}>
+                <div style={{ textAlign: 'center', marginBottom: '24px', borderBottom: '1px solid #e2e8f0', paddingBottom: '16px' }}>
+                  <h2 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0 0 8px 0', color: '#407F3E' }}>BIÊN LAI THU LỆ PHÍ</h2>
+                  <p style={{ margin: 0, fontSize: '14px', color: '#64748b' }}>Hệ thống Quản lý Kiến tập</p>
+                </div>
+                
+                <table style={{ width: '100%', fontSize: '14px', lineHeight: '1.8' }}>
+                  <tbody>
+                    <tr>
+                      <td style={{ width: '40%', fontWeight: 'bold' }}>Họ và tên sinh viên:</td>
+                      <td>{sv.ho_ten}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ fontWeight: 'bold' }}>MSSV:</td>
+                      <td>{sv.mssv}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ fontWeight: 'bold' }}>Chuyến tham quan:</td>
+                      <td>{ctq}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ fontWeight: 'bold' }}>Số tiền đã nộp:</td>
+                      <td style={{ fontSize: '16px', fontWeight: 'bold', color: '#89B449' }}>
+                        {hk.so_tien ? Number(hk.so_tien).toLocaleString('vi-VN') : '0'} VNĐ
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style={{ fontWeight: 'bold' }}>Mã giao dịch (Nội dung CK):</td>
+                      <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{hk.noi_dung_chuyen_khoan || 'N/A'}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ fontWeight: 'bold' }}>Ngày nộp thực tế:</td>
+                      <td>{dt.toLocaleDateString('vi-VN')} {dt.toLocaleTimeString('vi-VN')}</td>
+                    </tr>
+                  </tbody>
+                </table>
+                
+                <div style={{ marginTop: '32px', textAlign: 'right' }}>
+                  <p style={{ margin: '0 0 8px 0', fontSize: '14px', fontStyle: 'italic' }}>Ngày xuất hóa đơn: {new Date().toLocaleDateString('vi-VN')}</p>
+                  <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold', color: '#407F3E' }}>Người thu tiền</h4>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '14px', color: '#64748b' }}>(Đã thu qua chuyển khoản)</p>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      </div>
 
       {/* Toast */}
       <Toast 

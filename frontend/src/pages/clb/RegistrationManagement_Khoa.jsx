@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   ChevronDown, Check, ChevronRight, Paperclip, 
-  CheckCircle2, XCircle, Filter, Download, ArrowLeft, X,
+  CheckCircle2, XCircle, Filter, Download, X,
   MapPin, Calendar, Clock, Search, Eye, ArrowUp, ArrowDown
 } from 'lucide-react';
 import { khoaApi } from '../../services/api';
@@ -252,11 +252,6 @@ export default function RegistrationManagement_Khoa() {
     setSearchStatusDropdown('');
   };
 
-  const handleDropdownClick = (e, setter) => {
-    e.stopPropagation();
-    closeAllDropdowns();
-    setter(true);
-  };
 
   const moveStudent = (studentId, toAccepted) => {
     if (toAccepted) {

@@ -14,9 +14,12 @@ export class CronService {
       await this.dataSource.query('EXEC sp_TuDongDongMoDangKyLich');
       this.logger.log('Executed sp_TuDongDongMoDangKyLich successfully.');
     } catch (error) {
-      // It will throw an error if the procedure doesn't exist yet, 
+      // It will throw an error if the procedure doesn't exist yet,
       // but once the user adds it to their SQL it will work.
-      this.logger.error('Failed to execute sp_TuDongDongMoDangKyLich', error.stack);
+      this.logger.error(
+        'Failed to execute sp_TuDongDongMoDangKyLich',
+        error.stack,
+      );
     }
   }
 }

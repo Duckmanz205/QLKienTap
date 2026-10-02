@@ -12,7 +12,10 @@ import {
   BadRequestException,
   Patch,
 } from '@nestjs/common';
-import { CurrentUser, JwtPayloadUser } from '../../auth/decorators/user.decorator';
+import {
+  CurrentUser,
+  JwtPayloadUser,
+} from '../../auth/decorators/user.decorator';
 import { KhoaService } from '../shared/khoa.service';
 import { AuthGuard } from '../../auth/guards/auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
@@ -172,7 +175,9 @@ export class KhoaController {
   @Roles('QuanLyKhoa')
   @Get('lecturers-with-workload')
   async getLecturersWithWorkload(@Query('dotKienTapId') dotKienTapId?: string) {
-    return this.khoaService.getLecturersWithWorkload(dotKienTapId ? parseInt(dotKienTapId) : undefined);
+    return this.khoaService.getLecturersWithWorkload(
+      dotKienTapId ? parseInt(dotKienTapId) : undefined,
+    );
   }
 
   @Roles('QuanLyKhoa')
@@ -183,13 +188,19 @@ export class KhoaController {
 
   @Roles('QuanLyKhoa')
   @Put('lecturers/:id')
-  async updateLecturer(@Param('id') id: number, @Body() body: UpdateLecturerDto) {
+  async updateLecturer(
+    @Param('id') id: number,
+    @Body() body: UpdateLecturerDto,
+  ) {
     return this.khoaService.updateLecturer(+id, body);
   }
 
   @Roles('QuanLyKhoa')
   @Patch('lecturers/:id/board-eligibility')
-  async updateLecturerBoardEligibility(@Param('id') id: number, @Body('du_dk_hoi_dong') duDkHoiDong: boolean) {
+  async updateLecturerBoardEligibility(
+    @Param('id') id: number,
+    @Body('du_dk_hoi_dong') duDkHoiDong: boolean,
+  ) {
     return this.khoaService.updateLecturerBoardEligibility(+id, duDkHoiDong);
   }
 
@@ -227,7 +238,6 @@ export class KhoaController {
     return this.khoaService.deleteStudent(+id);
   }
 
-
   @Roles('QuanLyKhoa', 'QuanLyCLB')
   @Get('campaigns')
   async getCampaigns(
@@ -240,7 +250,14 @@ export class KhoaController {
   ) {
     const pageNum = page ? parseInt(page, 10) : 1;
     const limitNum = limit ? parseInt(limit, 10) : 15;
-    return this.khoaService.getCampaigns(pageNum, limitNum, search, namHoc, hocKy, trangThai);
+    return this.khoaService.getCampaigns(
+      pageNum,
+      limitNum,
+      search,
+      namHoc,
+      hocKy,
+      trangThai,
+    );
   }
 
   @Roles('QuanLyKhoa')
@@ -251,7 +268,10 @@ export class KhoaController {
 
   @Roles('QuanLyKhoa')
   @Put('campaigns/:id')
-  async updateCampaign(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateCampaignDto) {
+  async updateCampaign(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: UpdateCampaignDto,
+  ) {
     return this.khoaService.updateCampaign(id, body);
   }
 
@@ -276,7 +296,10 @@ export class KhoaController {
 
   @Roles('QuanLyKhoa')
   @Post('campaigns/:id/students')
-  async addStudentToCampaign(@Param('id', ParseIntPipe) id: number, @Body('mssv') mssv: string) {
+  async addStudentToCampaign(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('mssv') mssv: string,
+  ) {
     if (!mssv) throw new BadRequestException('Vui lòng cung cấp MSSV');
     return this.khoaService.addStudentToCampaign(id, mssv);
   }
@@ -285,11 +308,10 @@ export class KhoaController {
   @Delete('campaigns/:id/students/:studentId')
   async removeStudentFromCampaign(
     @Param('id', ParseIntPipe) id: number,
-    @Param('studentId', ParseIntPipe) studentId: number
+    @Param('studentId', ParseIntPipe) studentId: number,
   ) {
     return this.khoaService.removeStudentFromCampaign(id, studentId);
   }
-
 
   // [ĐÃ XÓA] POST campaigns/:id/publish — trạng thái đợt kiến tập
   // giờ được tự động chuyển bởi updateDotKienTapStatus() khi trạng thái
@@ -336,8 +358,6 @@ export class KhoaController {
   ) {
     return this.khoaService.rejectSchedule(id, lyDo);
   }
-
-
 
   @Roles('QuanLyKhoa', 'QuanLyCLB')
   @Get('trips')
@@ -393,8 +413,13 @@ export class KhoaController {
 
   @Roles('QuanLyCLB', 'QuanLyKhoa')
   @Post('confirm-assign-students')
-  async confirmAssignStudents(@Body() body: { tripId: number, acceptedStudentIds: number[] }) {
-    return this.khoaService.confirmAssignStudents(body.tripId, body.acceptedStudentIds);
+  async confirmAssignStudents(
+    @Body() body: { tripId: number; acceptedStudentIds: number[] },
+  ) {
+    return this.khoaService.confirmAssignStudents(
+      body.tripId,
+      body.acceptedStudentIds,
+    );
   }
 
   @Roles('QuanLyKhoa')
@@ -501,7 +526,9 @@ export class KhoaController {
   async getVisitedStudentsReport(
     @Query('lichKienTapId') lichKienTapId?: string,
   ) {
-    return this.khoaService.getVisitedStudentsReport(lichKienTapId ? parseInt(lichKienTapId) : undefined);
+    return this.khoaService.getVisitedStudentsReport(
+      lichKienTapId ? parseInt(lichKienTapId) : undefined,
+    );
   }
 
   @Roles('QuanLyKhoa')
@@ -509,7 +536,9 @@ export class KhoaController {
   async getNotVisitedStudentsReport(
     @Query('lichKienTapId') lichKienTapId?: string,
   ) {
-    return this.khoaService.getNotVisitedStudentsReport(lichKienTapId ? parseInt(lichKienTapId) : undefined);
+    return this.khoaService.getNotVisitedStudentsReport(
+      lichKienTapId ? parseInt(lichKienTapId) : undefined,
+    );
   }
 
   @Roles('QuanLyKhoa')
@@ -517,7 +546,9 @@ export class KhoaController {
   async getEligibleStudentsReport(
     @Query('lichKienTapId') lichKienTapId?: string,
   ) {
-    return this.khoaService.getEligibleStudentsReport(lichKienTapId ? parseInt(lichKienTapId) : undefined);
+    return this.khoaService.getEligibleStudentsReport(
+      lichKienTapId ? parseInt(lichKienTapId) : undefined,
+    );
   }
 
   @Roles('QuanLyKhoa')
@@ -563,12 +594,17 @@ export class KhoaController {
   @Roles('QuanLyKhoa')
   @Get('enrollments')
   async getEnrollments(@Query() query: GetEnrollmentsQueryDto) {
-    return this.khoaService.getEnrollments(
-      query.page || 1,
-      query.limit || 10,
-      query.search,
-      query.lichKienTapId,
-    );
+    try {
+      return await this.khoaService.getEnrollments(
+        query.page || 1,
+        query.limit || 10,
+        query.search,
+        query.lichKienTapId,
+      );
+    } catch (error) {
+      require('fs').writeFileSync('error-log.txt', String(error.stack || error));
+      throw error;
+    }
   }
 
   @Roles('QuanLyKhoa')
@@ -608,4 +644,3 @@ export class KhoaController {
     return this.khoaService.bulkConfirmPayments(records);
   }
 }
-

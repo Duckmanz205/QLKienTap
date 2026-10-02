@@ -64,10 +64,10 @@ export default function ChuyenThamQuan_DSLoc() {
   // Form states
   const [ngay, setNgay] = useState('');
   const [gioBatDau, setGioBatDau] = useState('');
-  const [gioKetThuc, setGioKetThuc] = useState('');
   const [sucChua, setSucChua] = useState('');
   const [lePhi, setLePhi] = useState(0);
   const [diaDiemTapTrung, setDiaDiemTapTrung] = useState('');
+  const [hanDongLePhi, setHanDongLePhi] = useState('');
   
   // Toast Popup State
   const [popup, setPopup] = useState({ show: false, message: '', type: 'success' });
@@ -137,6 +137,7 @@ export default function ChuyenThamQuan_DSLoc() {
     setSucChua('');
     setLePhi(0);
     setDiaDiemTapTrung('');
+    setHanDongLePhi('');
     setIsEditMode(false);
     setCurrentEditingTrip(null);
   };
@@ -156,6 +157,7 @@ export default function ChuyenThamQuan_DSLoc() {
     setSucChua(t.suc_chua);
     setLePhi(t.le_phi || 0);
     setDiaDiemTapTrung(t.dia_diem_tap_trung || '');
+    setHanDongLePhi(t.han_dong_le_phi ? new Date(t.han_dong_le_phi).toISOString().slice(0, 16) : '');
     setIsModalOpen(true);
   };
 
@@ -173,7 +175,8 @@ export default function ChuyenThamQuan_DSLoc() {
       hinh_thuc: selectedHinhThuc === 'Trực tuyến' ? 'TrucTuyen' : 'TrucTiep',
       suc_chua: Number(sucChua),
       le_phi: Number(lePhi),
-      dia_diem_tap_trung: diaDiemTapTrung
+      dia_diem_tap_trung: diaDiemTapTrung,
+      han_dong_le_phi: hanDongLePhi || null
     };
 
     try {
@@ -207,6 +210,13 @@ export default function ChuyenThamQuan_DSLoc() {
 
   const handlePreviewAssignStudents = async (tripId) => {
     try {
+      const currentTrip = tripsKhoa.find(t => t.id === tripId) || tripsTuDo.find(t => t.id === tripId);
+      if (currentTrip && currentTrip.han_dong_le_phi) {
+         setDeadlineDate(new Date(currentTrip.han_dong_le_phi).toISOString().slice(0, 16));
+      } else {
+         setDeadlineDate('');
+      }
+
       const res = await khoaApi.previewAssignStudents({ tripId });
       setPreviewData({
         tripId,
@@ -599,6 +609,9 @@ export default function ChuyenThamQuan_DSLoc() {
 
                                     {t.trang_thai === 'MoDangKy' && (
                                       <>
+                                        <button onClick={(e) => { e.stopPropagation(); handleEditClick(t); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors border-b border-slate-100">
+                                          <Edit className="w-4 h-4 text-orange-500" /> Sửa đổi khẩn cấp
+                                        </button>
                                         <button onClick={(e) => { e.stopPropagation(); handlePreviewAssignStudents(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#407F3E] hover:bg-green-50 flex items-center gap-2 transition-colors">
                                           <CheckCircle className="w-4 h-4" /> Xét duyệt danh sách
                                         </button>
@@ -610,6 +623,9 @@ export default function ChuyenThamQuan_DSLoc() {
 
                                     {t.trang_thai === 'DaChotDanhSach' && (
                                       <>
+                                        <button onClick={(e) => { e.stopPropagation(); handleEditClick(t); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors border-b border-slate-100">
+                                          <Edit className="w-4 h-4 text-orange-500" /> Sửa đổi khẩn cấp
+                                        </button>
                                         <button onClick={(e) => { e.stopPropagation(); handleReopenRegistration(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-orange-600 hover:bg-orange-50 flex items-center gap-2 transition-colors">
                                           <RotateCcw className="w-4 h-4" /> Mở đăng ký bổ sung
                                         </button>
@@ -617,9 +633,14 @@ export default function ChuyenThamQuan_DSLoc() {
                                     )}
 
                                     {t.trang_thai === 'DaDuyet' && (
-                                      <button onClick={(e) => { e.stopPropagation(); handleDeleteTrip(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#E68A8C] hover:bg-red-50 flex items-center gap-2 transition-colors border-t border-slate-100">
-                                        <Trash2 className="w-4 h-4" /> Hủy chuyến
-                                      </button>
+                                      <>
+                                        <button onClick={(e) => { e.stopPropagation(); handleEditClick(t); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors border-b border-slate-100">
+                                          <Edit className="w-4 h-4 text-orange-500" /> Sửa đổi khẩn cấp
+                                        </button>
+                                        <button onClick={(e) => { e.stopPropagation(); handleDeleteTrip(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#E68A8C] hover:bg-red-50 flex items-center gap-2 transition-colors border-t border-slate-100">
+                                          <Trash2 className="w-4 h-4" /> Hủy chuyến
+                                        </button>
+                                      </>
                                     )}
 
                                     {t.trang_thai !== 'Nhap' && t.trang_thai !== 'MoDangKy' && t.trang_thai !== 'DaDuyet' && t.trang_thai !== 'DaChotDanhSach' && (
@@ -1070,7 +1091,7 @@ export default function ChuyenThamQuan_DSLoc() {
               </div>
 
               {/* Row 4: Lệ phí & Địa điểm */}
-              <div className="grid grid-cols-2 gap-5 relative z-20">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5 relative z-20">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Lệ phí (VNĐ)</label>
                   <div className="relative">
@@ -1091,6 +1112,17 @@ export default function ChuyenThamQuan_DSLoc() {
                       value={diaDiemTapTrung}
                       onChange={(e) => setDiaDiemTapTrung(e.target.value)}
                       placeholder="Vd: Sảnh C, HUIT"
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-800 font-medium"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Hạn đóng lệ phí</label>
+                  <div className="relative">
+                    <input
+                      type="datetime-local"
+                      value={hanDongLePhi}
+                      onChange={(e) => setHanDongLePhi(e.target.value)}
                       className="w-full px-4 py-2.5 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-800 font-medium"
                     />
                   </div>

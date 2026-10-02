@@ -51,7 +51,6 @@ export class ProposeTripDto {
   })
   gioBatDau: string;
 
-
   @IsString()
   @IsIn(['TrucTiep', 'TrucTuyen'], {
     message: 'Hình thức phải là TrucTiep hoặc TrucTuyen',

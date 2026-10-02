@@ -169,7 +169,10 @@ export class GiangVienController {
   }
 
   @Post('notifications/:notifId/read')
-  async markNotificationRead(@Param('notifId') notifId: number, @Body('accountId') accountId: number) {
+  async markNotificationRead(
+    @Param('notifId') notifId: number,
+    @Body('accountId') accountId: number,
+  ) {
     return this.gvService.markNotificationRead(accountId, +notifId);
   }
 

@@ -189,7 +189,7 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
     <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-2" onClick={() => setIsDropdownOpen(false)}>
       <Toast show={toast.show} message={toast.message} type={toast.type} onClose={() => setToast({ show: false, message: '', type: 'success' })} />
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-800">Danh mục nền</h1>
+        <h1 className="text-2xl font-bold text-slate-800">Danh mục</h1>
         <p className="text-sm text-slate-500 mt-1">Quản lý các danh mục cơ sở của hệ thống</p>
       </div>
 
