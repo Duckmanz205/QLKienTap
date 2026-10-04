@@ -33,6 +33,7 @@ import {
   ImportStudentsDto,
   CreateTripDto,
   ApproveTripDto,
+  CancelTripDto,
   ApproveCancelDto,
   FilterAssignStudentsDto,
   AssignGvhdDto,
@@ -376,6 +377,14 @@ export class KhoaController {
   @Post('trips')
   async createTrip(@Body() body: CreateTripDto) {
     return this.khoaService.createTrip(body);
+  }
+
+  @Patch('trips/:id/cancel')
+  async cancelTrip(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: CancelTripDto,
+  ) {
+    return this.khoaService.cancelTrip(id, body.lyDoHuy);
   }
 
   @Roles('QuanLyCLB')

@@ -99,6 +99,7 @@ export default function LichKienTap_Khoa() {
   const [isDotModalDropdownOpen, setIsDotModalDropdownOpen] = useState(false);
   const [dotSearchTermModal, setDotSearchTermModal] = useState('');
   const [unassignedTrips, setUnassignedTrips] = useState([]);
+  const [allTrips, setAllTrips] = useState([]);
   const [selectedTripIds, setSelectedTripIds] = useState([]);
 
   useEffect(() => {
@@ -117,8 +118,9 @@ export default function LichKienTap_Khoa() {
       setCampaigns(campRes.data?.data || campRes.data || []);
       setFactories(factoryRes.data?.data || factoryRes.data || []);
       
-      const allTrips = tripRes.data?.data || tripRes.data || [];
-      setUnassignedTrips(allTrips.filter(t => t.trang_thai === 'Nhap' && !t.lich_kien_tap_id));
+      const allTripsData = tripRes.data?.data || tripRes.data || [];
+      setAllTrips(allTripsData);
+      setUnassignedTrips(allTripsData.filter(t => t.trang_thai === 'Nhap' && !t.lich_kien_tap_id));
     } catch (err) {
       console.error(err);
     }
@@ -1024,12 +1026,12 @@ export default function LichKienTap_Khoa() {
                       </tr>
                     </thead>
                     <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
-                      {unassignedTrips.filter(t => t.lich_kien_tap_id === viewingDetail.id).length === 0 ? (
+                      {allTrips.filter(t => t.lich_kien_tap_id === viewingDetail.id).length === 0 ? (
                         <tr>
                           <td colSpan="4" className="text-center py-6 text-slate-500 font-medium">Chưa có chuyến tham quan nào được gắn</td>
                         </tr>
                       ) : (
-                        unassignedTrips.filter(t => t.lich_kien_tap_id === viewingDetail.id).map(t => (
+                        allTrips.filter(t => t.lich_kien_tap_id === viewingDetail.id).map(t => (
                           <tr key={t.id} className="hover:bg-slate-50/50 transition-colors">
                             <td className="p-3 pl-4 font-bold text-slate-800">{t.nhaMay?.ten_nha_may}</td>
                             <td className="p-3 text-center">

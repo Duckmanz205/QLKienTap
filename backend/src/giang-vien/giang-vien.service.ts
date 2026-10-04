@@ -299,7 +299,11 @@ export class GiangVienService {
         dd.ngay_diem_danh = new Date();
         await manager.save(DiemDanh, dd);
 
-        if (record.status === 'Vang' || record.status === 'TuChoiThamGia') {
+        if (record.status === 'CoMat') {
+          phieu.trang_thai = 'DaThamGia';
+        } else if (record.status === 'Vang' || record.status === 'TuChoiThamGia') {
+          phieu.trang_thai = 'VangMat';
+
           // Chỉ tự động thêm vào blacklist nếu chưa có blacklist DangKyKhongThamGia còn hiệu lực cho phiếu này
           if (!blacklistSet.has(phieu.id)) {
             const black = new DanhSachDen();

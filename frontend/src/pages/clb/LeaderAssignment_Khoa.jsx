@@ -439,14 +439,14 @@ export default function LeaderAssignment_Khoa() {
                       </div>
                     </td>
                     <td className="p-4 text-center">
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-bold border ${
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-bold border whitespace-nowrap ${
                         hinhThuc === 'Trực tiếp' ? 'bg-[#89B449]/10 text-[#407F3E] border-[#89B449]/20' : 'bg-slate-100 text-slate-600 border-slate-200'
                       }`}>
                         {hinhThuc}
                       </span>
                     </td>
                     <td className="p-4 text-center">
-                      <span className={`inline-flex items-center px-2 py-1 rounded text-[10px] font-bold border ${
+                      <span className={`inline-flex items-center px-2 py-1 rounded text-[10px] font-bold border whitespace-nowrap ${
                         isKhoa ? 'bg-[#407F3E]/10 text-[#407F3E] border-[#407F3E]/20' : 'bg-indigo-50 text-indigo-700 border-indigo-200'
                       }`}>
                         {isKhoa ? 'Do khoa tổ chức' : 'Tự do'}

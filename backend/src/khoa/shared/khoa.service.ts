@@ -1434,6 +1434,93 @@ export class KhoaService {
     return await this.chuyenRepo.remove(trip);
   }
 
+  /**
+   * Hủy chuyến tham quan đã duyệt.
+   * Cascade: PhieuDangKy → PhieuThamQuan → PhanCongGVDanDoan → ThongBao
+   * KHÔNG phạt sinh viên (khác với SV tự hủy đăng ký sau khi đậu).
+   */
+  async cancelTrip(tripId: number, lyDoHuy: string) {
+    const trip = await this.chuyenRepo.findOne({
+      where: { id: tripId },
+      relations: { nhaMay: true },
+    });
+    if (!trip) throw new NotFoundException('Không tìm thấy chuyến tham quan');
+
+    const allowedStatuses = ['DaDuyet', 'MoDangKy', 'DaChotDanhSach'];
+    if (!allowedStatuses.includes(trip.trang_thai)) {
+      throw new BadRequestException(
+        `Không thể hủy chuyến ở trạng thái "${trip.trang_thai}". Chỉ cho phép hủy khi chuyến đang ở: ${allowedStatuses.join(', ')}`,
+      );
+    }
+
+    return this.dataSource.transaction(async (manager: EntityManager) => {
+      // Bước 2: Chuyển trạng thái chuyến
+      trip.trang_thai = 'DaHuy';
+      await manager.save(ChuyenThamQuan, trip);
+
+      // Bước 3: Cascade PhieuDangKy
+      const phieus = await manager.find(PhieuDangKy, {
+        where: {
+          chuyen_tham_quan_id: tripId,
+          trang_thai: In(['ChoDuyet', 'HopLe']),
+        },
+      });
+
+      for (const phieu of phieus) {
+        phieu.trang_thai = 'DaHuy';
+        await manager.save(PhieuDangKy, phieu);
+
+        // Bước 4: Cascade PhieuThamQuan
+        const ptq = await manager.findOne(PhieuThamQuan, {
+          where: { phieu_dang_ky_id: phieu.id, trang_thai: 'HopLe' },
+        });
+        if (ptq) {
+          ptq.trang_thai = 'DaHuy';
+          await manager.save(PhieuThamQuan, ptq);
+        }
+      }
+
+      // Bước 5: Xóa phân công GV dẫn đoàn
+      await manager.delete(PhanCongGiangVienDanDoan, {
+        chuyen_tham_quan_id: tripId,
+      });
+
+      // Bước 7: Gửi thông báo nội bộ
+      const nhaMayName = trip.nhaMay?.ten_nha_may || 'N/A';
+      const dateStr = trip.ngay_tham_quan
+        ? new Date(trip.ngay_tham_quan).toLocaleDateString('vi-VN')
+        : 'N/A';
+
+      let senderId = 1;
+      const adminAcc = await manager.findOne(TaiKhoan, {
+        where: { vaiTro: { ten_vai_tro: 'QuanTriVienHeThong' } },
+        relations: { vaiTro: true },
+      });
+      if (adminAcc) senderId = adminAcc.id;
+
+      const hasLePhi = trip.le_phi > 0;
+      const hoPhiNote = hasLePhi
+        ? ' Nếu bạn đã đóng lệ phí, vui lòng sử dụng thông tin hóa đơn hiện tại để tạo Đơn Hoàn Phí trên hệ thống.'
+        : '';
+
+      const notif = new ThongBao();
+      notif.tieu_de = '⚠️ CHUYẾN THAM QUAN BỊ HỦY';
+      notif.noi_dung = `Chuyến tham quan tại ${nhaMayName} ngày ${dateStr} đã bị HỦY.\n\nLý do: ${lyDoHuy}\n\nPhiếu đăng ký của bạn đã được chuyển sang trạng thái "Đã hủy". Bạn sẽ KHÔNG bị phạt do đây là sự kiện bất khả kháng.${hoPhiNote}`;
+      notif.nguoi_gui_id = senderId;
+      notif.ngay_gui = new Date();
+      notif.da_chinh_sua = false;
+      await manager.save(ThongBao, notif);
+
+      return {
+        message: 'Hủy chuyến tham quan thành công',
+        tripId,
+        cancelledRegistrations: phieus.length,
+        nhaMay: nhaMayName,
+        ngayThamQuan: dateStr,
+      };
+    });
+  }
+
   async reopenTripRegistration(id: number) {
     const trip = await this.chuyenRepo.findOne({ where: { id } });
     if (!trip) throw new NotFoundException('Không tìm thấy chuyến tham quan');
@@ -2549,6 +2636,14 @@ export class KhoaService {
 
       sumTripScores += tripScore;
 
+      // Cập nhật trạng thái phiếu đăng ký theo điểm số
+      if (tripScore >= 5.0) {
+        phieuTQ.phieuDangKy.trang_thai = 'HoanThanh';
+      } else {
+        phieuTQ.phieuDangKy.trang_thai = 'KhongDat';
+      }
+      await this.phieuRepo.save(phieuTQ.phieuDangKy);
+
       score.da_khoa = true;
       score.ngay_khoa = new Date();
       await this.diemPhieuRepo.save(score);
@@ -2989,6 +3084,17 @@ export class KhoaService {
       .getManyAndCount();
 
     if (data.length > 0 && dotKienTapId) {
+      const dksvIds = data.map((e) => e.id);
+      
+      // Map PhanCongGVHD
+      const phanCongs = await this.pcGvhdRepo.find({
+        where: {
+          dot_kien_tap_sinh_vien_id: In(dksvIds),
+          trang_thai: 'DangHoatDong',
+        },
+        relations: { giangVien: true },
+      });
+
       const sinhVienIds = data.map((e) => e.sinh_vien_id);
       let phieus: any[] = [];
       const chunkSize = 1000;
@@ -3010,6 +3116,13 @@ export class KhoaService {
       }
 
       data.forEach((e: any) => {
+        // Map GVHD
+        const pc = phanCongs.find((p) => p.dot_kien_tap_sinh_vien_id === e.id);
+        if (pc) {
+          if (!e.sinhVien.details) e.sinhVien.details = {};
+          e.sinhVien.details.giangVienHuongDan = pc.giangVien;
+        }
+
         const studentTrips = phieus.filter(
           (p) => p.sinh_vien_id === e.sinh_vien_id,
         );

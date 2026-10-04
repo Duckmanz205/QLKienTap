@@ -27,6 +27,7 @@ import {
   ImportStudentsDto,
   CreateTripDto,
   ApproveTripDto,
+  CancelTripDto,
   ApproveCancelDto,
   FilterAssignStudentsDto,
   ApproveRefundDto,
@@ -132,6 +133,14 @@ export class ClbController {
   @Delete('trips/:id')
   async deleteTrip(@Param('id', ParseIntPipe) id: number) {
     return this.khoaService.deleteTrip(id);
+  }
+
+  @Patch('trips/:id/cancel')
+  async cancelTrip(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: CancelTripDto,
+  ) {
+    return this.khoaService.cancelTrip(id, body.lyDoHuy);
   }
   @Patch('trips/:id/reopen')
   async reopenTripRegistration(@Param('id', ParseIntPipe) id: number) {

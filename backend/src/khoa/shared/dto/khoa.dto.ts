@@ -12,6 +12,7 @@ import {
   Length,
   IsArray,
   ArrayNotEmpty,
+  MinLength,
 } from 'class-validator';
 
 export class CreateYearDto {
@@ -324,6 +325,16 @@ export class CreateTripDto {
     { message: 'Trạng thái phải thuộc danh sách hợp lệ' },
   )
   trang_thai?: string;
+}
+
+export class CancelTripDto {
+  @IsInt()
+  @Min(1)
+  tripId: number;
+
+  @IsString({ message: 'Lý do hủy không được để trống' })
+  @MinLength(5, { message: 'Lý do hủy phải có ít nhất 5 ký tự' })
+  lyDoHuy: string;
 }
 
 export class ApproveTripDto {

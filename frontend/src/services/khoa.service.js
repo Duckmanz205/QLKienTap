@@ -59,6 +59,7 @@ export const khoaApi = {
   updateTrip: (id, data) => api.put(`${getAdminPrefix()}/trips/${id}`, data),
   deleteTrip: (id) => api.delete(`${getAdminPrefix()}/trips/${id}`),
   reopenTripRegistration: (id) => api.patch(`${getAdminPrefix()}/trips/${id}/reopen`),
+  cancelTrip: (id, lyDoHuy) => api.patch(`${getAdminPrefix()}/trips/${id}/cancel`, { lyDoHuy }),
   approveTrip: (data) => api.post(`${getAdminPrefix()}/approve-trip`, data),
   approveCancel: (data) => api.post(`${getAdminPrefix()}/approve-cancel`, data),
   previewAssignStudents: (data) => api.post(`${getAdminPrefix()}/preview-assign-students`, data),

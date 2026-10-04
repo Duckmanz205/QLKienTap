@@ -602,7 +602,7 @@ export default function RegistrationManagement_Khoa() {
                             <td className="p-4 text-right pr-6">
                               <button 
                                 onClick={(e) => { e.stopPropagation(); setSelectedTripForReg(trip); setActiveTab('chot'); }}
-                                className="px-3 py-1.5 bg-slate-100 text-slate-600 group-hover:bg-[#407F3E] group-hover:text-white rounded-lg text-xs font-bold transition-all shadow-sm inline-flex items-center gap-1.5 cursor-pointer"
+                                className="px-3 py-1.5 bg-slate-100 text-slate-600 group-hover:bg-[#407F3E] group-hover:text-white rounded-lg text-xs font-bold transition-all shadow-sm inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
                               >
                                 <Eye className="w-3.5 h-3.5" /> Quản lý
                               </button>
