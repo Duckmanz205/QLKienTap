@@ -533,9 +533,7 @@ export default function LeaderAssignment_Khoa() {
                                   className={`px-4 py-2.5 text-sm flex items-center justify-between transition-colors ${isBusy ? 'opacity-50 cursor-not-allowed bg-slate-50' : 'cursor-pointer hover:bg-[#E7E0C4]/30'} ${selectedLecturerId === gv.id ? 'bg-[#E7E0C4]/50' : ''}`}
                                 >
                                   <div className="flex items-center gap-2 truncate">
-                                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white ${isBusy ? 'bg-slate-400' : 'bg-[#407F3E]'}`}>
-                                      {gv.ho_ten?.charAt(0)}
-                                    </div>
+
                                     <div className="flex flex-col">
                                       <span className="font-bold text-slate-800">{gv.ho_ten}</span>
                                       <span className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
@@ -632,7 +630,7 @@ export default function LeaderAssignment_Khoa() {
 
       {/* Toast Popup */}
       {popup.show && createPortal(
-        <div className="fixed bottom-4 right-4 z-[9999] animate-in slide-in-from-right-8 fade-in duration-300">
+        <div className="fixed top-6 right-6 z-[9999] animate-in slide-in-from-right-8 fade-in duration-300">
           <div className={`flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg border text-sm font-bold ${
             popup.type === 'success' 
               ? 'bg-white border-[#407F3E]/20 text-[#407F3E]' 

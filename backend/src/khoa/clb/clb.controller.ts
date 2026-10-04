@@ -385,13 +385,7 @@ export class ClbController {
     );
   }
 
-  @Post('lock-grades')
-  async lockGrades(@Body() body: LockGradesDto) {
-    return this.khoaService.lockAndFinalizeGrades(
-      body.termStudentId,
-      body.userId,
-    );
-  }
+
 
   @Get('enrollments')
   async getEnrollments(@Query() query: GetEnrollmentsQueryDto) {

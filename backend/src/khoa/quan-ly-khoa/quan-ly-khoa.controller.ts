@@ -510,10 +510,7 @@ export class KhoaController {
   @Roles('QuanLyKhoa')
   @Post('lock-grades')
   async lockGrades(@Body() body: LockGradesDto) {
-    return this.khoaService.lockAndFinalizeGrades(
-      body.termStudentId,
-      body.userId,
-    );
+    return this.khoaService.lockAndFinalizeGrades(body.lichKienTapId);
   }
 
   @Roles('QuanLyKhoa')

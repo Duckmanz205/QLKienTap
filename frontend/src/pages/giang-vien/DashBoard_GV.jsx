@@ -259,9 +259,7 @@ export default function DashBoard_GV() {
                   className="flex items-center justify-between p-3.5 rounded-xl border border-[#E7E0C4] hover:bg-slate-50 transition-colors group"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-full bg-[#E7E0C4]/30 text-[#407F3E] font-bold border border-[#E7E0C4] flex items-center justify-center shrink-0">
-                      {report.phieuThamQuan?.phieuDangKy?.sinhVien?.ho_ten?.charAt(0) || 'S'}
-                    </div>
+
                     <div className="min-w-0">
                       <h4 className="text-sm font-bold text-slate-800 line-clamp-1">{report.phieuThamQuan?.phieuDangKy?.sinhVien?.ho_ten}</h4>
                       <p className="text-[11px] font-medium text-slate-500 truncate mt-0.5">

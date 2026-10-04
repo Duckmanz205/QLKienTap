@@ -430,9 +430,7 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
                     }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-8 h-8 rounded-full bg-slate-105 flex items-center justify-center font-bold text-xs shrink-0 shadow-inner">
-                        {reg.sinhVien?.ho_ten?.charAt(0) || 'S'}
-                      </div>
+
                       <div className="min-w-0">
                         <p className="font-bold text-xs text-on-surface truncate">{reg.sinhVien?.ho_ten}</p>
                         <p className="text-[10px] font-mono font-bold text-on-surface-variant mt-0.5">{reg.sinhVien?.mssv}</p>

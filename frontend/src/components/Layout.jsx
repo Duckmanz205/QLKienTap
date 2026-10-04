@@ -502,7 +502,6 @@ export default function Layout() {
       // KẾ HOẠCH KIẾN TẬP
       { to: '/clb/lich-kien-tap', label: 'Lịch kiến tập', icon: Calendar, category: 'KẾ HOẠCH KIẾN TẬP' },
       { to: '/clb/trips', label: 'Chuyến tham quan', icon: Compass, category: 'KẾ HOẠCH KIẾN TẬP' },
-      { to: '/clb/visit-report', label: 'Báo cáo tham quan', icon: Eye, category: 'KẾ HOẠCH KIẾN TẬP' },
       // ĐĂNG KÝ & PHÂN CÔNG
       { to: '/clb/registrations', label: 'Quản lý đăng ký', icon: FileCheck, category: 'ĐĂNG KÝ & PHÂN CÔNG' },
       { to: '/clb/leaders', label: 'Phân công GV dẫn đoàn', icon: UserCheck, category: 'ĐĂNG KÝ & PHÂN CÔNG' },

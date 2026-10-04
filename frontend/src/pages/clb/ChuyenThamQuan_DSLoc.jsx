@@ -368,9 +368,8 @@ export default function ChuyenThamQuan_DSLoc() {
 
       {/* Custom Popup Toast */}
       {popup.show && (
-        <div className="fixed inset-0 z-[9999] flex items-start justify-center pt-24 pointer-events-none">
-          <div className="absolute inset-0 bg-transparent pointer-events-auto" onClick={() => setPopup({ ...popup, show: false })}></div>
-          <div className={`relative z-10 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-4 animate-in slide-in-from-top-4 fade-in duration-300 pointer-events-auto ${popup.type === 'error' ? 'bg-[#E68A8C] text-white' : 'bg-[#407F3E] text-white'}`}>
+        <div className="fixed top-6 right-6 z-[9999] pointer-events-none">
+          <div className={`relative z-10 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-4 animate-in slide-in-from-right-8 fade-in duration-300 pointer-events-auto ${popup.type === 'error' ? 'bg-[#E68A8C] text-white' : 'bg-[#407F3E] text-white'}`}>
             <span className="font-bold text-sm">{popup.message}</span>
             <button onClick={() => setPopup({ ...popup, show: false })} className="p-1 hover:bg-white/20 rounded-full transition-colors">
               <span className="sr-only">Close</span>
@@ -870,9 +869,7 @@ export default function ChuyenThamQuan_DSLoc() {
                         <tr key={t.id} className="hover:bg-slate-50 transition-colors">
                           <td className="p-4 pl-6">
                             <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-[#E7E0C4] text-[#407F3E] flex items-center justify-center font-bold text-xs shadow-sm">
-                                {t.sinhVien?.ho_ten?.charAt(0) || '?'}
-                              </div>
+
                               <div>
                                 <div className="font-bold text-slate-800">{t.sinhVien?.ho_ten}</div>
                                 <div className="text-xs font-mono text-slate-500">{t.sinhVien?.mssv}</div>

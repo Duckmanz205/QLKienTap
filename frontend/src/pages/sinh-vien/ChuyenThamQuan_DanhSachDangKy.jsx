@@ -213,9 +213,8 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
       
       {/* Custom Popup Toast */}
       {popup.show && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 pointer-events-none">
-          <div className="absolute inset-0 bg-white/5 backdrop-blur-[1px] pointer-events-auto" onClick={() => setPopup({ ...popup, show: false })}></div>
-          <div className={`relative z-10 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-4 animate-in slide-in-from-top-4 fade-in duration-300 pointer-events-auto ${popup.type === 'error' ? 'bg-[#E68A8C] text-white' : 'bg-[#407F3E] text-white'}`}>
+        <div className="fixed top-6 right-6 z-[9999] pointer-events-none">
+          <div className={`relative z-10 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-4 animate-in slide-in-from-right-8 fade-in duration-300 pointer-events-auto ${popup.type === 'error' ? 'bg-[#E68A8C] text-white' : 'bg-[#407F3E] text-white'}`}>
             <span className="font-bold text-sm">{popup.message}</span>
             <button onClick={() => setPopup({ ...popup, show: false })} className="p-1 hover:bg-white/20 rounded-full transition-colors">
               <span className="sr-only">Close</span>

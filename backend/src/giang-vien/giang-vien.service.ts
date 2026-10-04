@@ -428,6 +428,8 @@ export class GiangVienService {
       .leftJoinAndSelect('phieu.sinhVien', 'sinhVien')
       .leftJoinAndSelect('phieu.chuyenThamQuan', 'chuyen')
       .leftJoinAndSelect('chuyen.nhaMay', 'nhaMay')
+      .leftJoinAndSelect('chuyen.lichKienTap', 'lich')
+      .leftJoinAndSelect('lich.dotKienTap', 'dot')
       .leftJoinAndSelect('phieuTQ.diemPhieuThamQuan', 'diemPhieu')
       .leftJoinAndMapOne(
         'phieuTQ.diemDanh',
@@ -435,7 +437,8 @@ export class GiangVienService {
         'diemDanh',
         'diemDanh.phieu_tham_quan_id = phieuTQ.id',
       )
-      .where('phieu.sinh_vien_id IN (:...guidedSvIds)', { guidedSvIds });
+      .where('phieu.sinh_vien_id IN (:...guidedSvIds)', { guidedSvIds })
+      .andWhere('CURRENT_TIMESTAMP > phieuTQ.han_nop_bao_cao');
 
     if (search) {
       queryBuilder.andWhere(

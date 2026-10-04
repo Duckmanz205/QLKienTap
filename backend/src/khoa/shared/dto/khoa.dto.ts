@@ -441,11 +441,7 @@ export class AddBoardMemberDto {
 export class LockGradesDto {
   @IsInt()
   @Min(1)
-  termStudentId: number;
-
-  @IsInt()
-  @Min(1)
-  userId: number;
+  lichKienTapId: number;
 }
 
 export class ApproveRefundDto {

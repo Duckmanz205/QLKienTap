@@ -19,10 +19,13 @@ export default function ChamBaiThuHoach_GV() {
   // Filter & Pagination states
   const [searchTerm, setSearchTerm] = useState(location.state?.filterMssv || '');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
-  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
-  const [searchStatusDropdown, setSearchStatusDropdown] = useState('');
-  const statusDropdownRef = useRef(null);
-
+  const [selectedDotId, setSelectedDotId] = useState('ALL');
+  const [isDotDropdownOpen, setIsDotDropdownOpen] = useState(false);
+  const [searchDotDropdown, setSearchDotDropdown] = useState('');
+  const [selectedTripId, setSelectedTripId] = useState('ALL');
+  const [isTripDropdownOpen, setIsTripDropdownOpen] = useState(false);
+  const [searchTripDropdown, setSearchTripDropdown] = useState('');
+  
   const [currentPage, setCurrentPage] = useState(1);
   const [limit, setLimit] = useState(15);
 
@@ -325,9 +328,34 @@ TRANG 38
     }
   };
 
+  const uniqueDots = React.useMemo(() => {
+    const dotsMap = new Map();
+    reports.forEach(r => {
+      const ctq = r.phieuThamQuan?.phieuDangKy?.chuyenThamQuan || r.phieuDangKy?.chuyenThamQuan;
+      const dot = ctq?.lichKienTap?.dotKienTap;
+      if (dot) {
+        dotsMap.set(dot.id, dot.ten_dot);
+      }
+    });
+    return Array.from(dotsMap.entries()).map(([id, name]) => ({ id, name }));
+  }, [reports]);
+
+  const uniqueTrips = React.useMemo(() => {
+    const tripsMap = new Map();
+    reports.forEach(r => {
+      const ctq = r.phieuThamQuan?.phieuDangKy?.chuyenThamQuan || r.phieuDangKy?.chuyenThamQuan;
+      const dot = ctq?.lichKienTap?.dotKienTap;
+      if (ctq && (selectedDotId === 'ALL' || (dot && dot.id === selectedDotId))) {
+        tripsMap.set(ctq.id, ctq.nhaMay?.ten_nha_may || 'Chuyến đi không tên');
+      }
+    });
+    return Array.from(tripsMap.entries()).map(([id, name]) => ({ id, name }));
+  }, [reports, selectedDotId]);
+
   const filteredReports = reports.filter(r => {
+    const ctq = r.phieuThamQuan?.phieuDangKy?.chuyenThamQuan || r.phieuDangKy?.chuyenThamQuan;
     const sv = r.phieuThamQuan?.phieuDangKy?.sinhVien || r.phieuDangKy?.sinhVien || {};
-    const nhaMay = r.phieuThamQuan?.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || r.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || '';
+    const nhaMay = ctq?.nhaMay?.ten_nha_may || '';
     const matchSearch = !searchTerm || 
       (sv.ho_ten && sv.ho_ten.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (sv.mssv && sv.mssv.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -338,11 +366,29 @@ TRANG 38
       (selectedStatus === 'PENDING' && !isGraded) || 
       (selectedStatus === 'GRADED' && isGraded);
 
-    return matchSearch && matchStatus;
+    const matchDot = selectedDotId === 'ALL' || ctq?.lichKienTap?.dotKienTap?.id === selectedDotId;
+    const matchTrip = selectedTripId === 'ALL' || ctq?.id === selectedTripId;
+
+    return matchSearch && matchStatus && matchDot && matchTrip;
   });
 
   const totalPages = Math.ceil(filteredReports.length / limit) || 1;
   const paginatedReports = filteredReports.slice((currentPage - 1) * limit, currentPage * limit);
+
+  const groupedPaginatedReports = React.useMemo(() => {
+    const groups = {};
+    paginatedReports.forEach(report => {
+      const ctq = report.phieuThamQuan?.phieuDangKy?.chuyenThamQuan || report.phieuDangKy?.chuyenThamQuan;
+      const tripId = ctq?.id || 'unknown';
+      const nhaMay = ctq?.nhaMay?.ten_nha_may || 'Chuyến đi khác';
+      
+      if (!groups[tripId]) {
+        groups[tripId] = { nhaMay, reports: [] };
+      }
+      groups[tripId].reports.push(report);
+    });
+    return groups;
+  }, [paginatedReports]);
 
   // ---------------------------------------------------------
   // VIEW 1: LIST OF REPORTS
@@ -366,162 +412,273 @@ TRANG 38
         </div>
       </div>
 
+      {/* Tabs */}
+      <div className="flex items-center gap-6 border-b border-[#E7E0C4] px-2 mb-6 mt-4">
+        {[
+          { id: 'ALL', label: 'Tất cả bài nộp', count: reports.length },
+          { id: 'PENDING', label: 'Chờ chấm', count: reports.filter(r => r.diem_thu_hoach === null).length },
+          { id: 'GRADED', label: 'Đã chấm', count: reports.filter(r => r.diem_thu_hoach !== null).length }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => {
+              setSelectedStatus(tab.id);
+              setCurrentPage(1);
+            }}
+            className={`pb-3 text-sm font-bold transition-all relative ${
+              selectedStatus === tab.id 
+                ? 'text-[#407F3E]' 
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            {tab.label} <span className={`ml-1.5 px-2 py-0.5 rounded-full text-xs ${selectedStatus === tab.id ? 'bg-[#407F3E]/10 text-[#407F3E]' : 'bg-slate-100 text-slate-500'}`}>{tab.count}</span>
+            {selectedStatus === tab.id && (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#407F3E] rounded-t-full" />
+            )}
+          </button>
+        ))}
+      </div>
+
       {/* Filter Bar */}
-      <div className="bg-white p-4 rounded-xl border border-[#E7E0C4] shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-        <div className="flex flex-1 flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          {/* Search Input */}
-          <div className="relative flex-1">
+      <div className="bg-white p-4 rounded-xl border border-[#E7E0C4] shadow-sm flex flex-col md:flex-row items-center justify-between gap-4 mb-4">
+        <div className="flex-1 w-full flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1 min-w-[200px]">
             <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Tìm kiếm sinh viên, MSSV, nhà máy..."
+              placeholder="Tìm sinh viên, MSSV..."
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full pl-9 pr-4 py-2 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E] bg-slate-50/50"
+              className="w-full pl-9 pr-4 py-2 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E] bg-slate-50/50 transition-colors hover:bg-white"
             />
           </div>
-
-          {/* Popover Dropdown Status */}
-          <div className="relative" ref={statusDropdownRef}>
-            <button
-              type="button"
-              onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
-              className="w-full sm:w-56 px-3.5 py-2 border border-[#E7E0C4] rounded-lg text-sm font-medium bg-slate-50/50 text-slate-700 flex items-center justify-between hover:bg-slate-100 transition-colors shadow-sm"
+          {/* Dot Kien Tap Dropdown */}
+          <div className="relative min-w-[160px] w-full sm:w-48" onClick={(e) => e.stopPropagation()}>
+            <div 
+              onClick={() => { setIsDotDropdownOpen(!isDotDropdownOpen); setIsTripDropdownOpen(false); }}
+              className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isDotDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
             >
-              <div className="flex items-center gap-2 truncate">
-                <Filter className="w-4 h-4 text-slate-400 shrink-0" />
-                <span className="truncate">
-                  {selectedStatus === 'ALL' && 'Tất cả trạng thái'}
-                  {selectedStatus === 'PENDING' && 'Chờ chấm'}
-                  {selectedStatus === 'GRADED' && 'Đã chấm'}
-                </span>
-              </div>
-              <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isStatusDropdownOpen ? 'rotate-180' : ''}`} />
-            </button>
-
-            {isStatusDropdownOpen && (
-              <div className="absolute left-0 right-0 sm:right-auto sm:w-56 mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-50 py-1 flex flex-col">
+              <span className="truncate pr-2 font-medium text-slate-700">
+                {selectedDotId === 'ALL' ? 'Tất cả đợt' : uniqueDots.find(d => d.id === selectedDotId)?.name || 'Đợt kiến tập'}
+              </span>
+              <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+            </div>
+            {isDotDropdownOpen && (
+              <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[220px]">
                 <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
                   <input 
                     type="text" 
-                    placeholder="Tìm trạng thái..." 
-                    value={searchStatusDropdown}
-                    onChange={(e) => setSearchStatusDropdown(e.target.value)}
+                    placeholder="Tìm đợt..." 
+                    value={searchDotDropdown}
+                    onChange={(e) => setSearchDotDropdown(e.target.value)}
                     onClick={(e) => e.stopPropagation()}
                     className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
                   />
                 </div>
                 <div className="max-h-60 overflow-y-auto">
-                  {[
-                    { value: 'ALL', label: 'Tất cả trạng thái' },
-                    { value: 'PENDING', label: 'Chờ chấm' },
-                    { value: 'GRADED', label: 'Đã chấm' }
-                  ]
-                    .filter(opt => opt.label.toLowerCase().includes(searchStatusDropdown.toLowerCase()))
-                    .map(opt => (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => {
-                          setSelectedStatus(opt.value);
-                          setIsStatusDropdownOpen(false);
-                          setSearchStatusDropdown('');
-                          setCurrentPage(1);
-                        }}
-                        className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between hover:bg-slate-50 transition-colors ${selectedStatus === opt.value ? 'bg-[#E7E0C4]/40 font-bold text-[#407F3E]' : 'text-slate-700'}`}
-                      >
-                        <span>{opt.label}</span>
-                        {selectedStatus === opt.value && <Check className="w-4 h-4 text-[#407F3E]" />}
-                      </button>
-                    ))}
-                  {[
-                    { value: 'ALL', label: 'Tất cả trạng thái' },
-                    { value: 'PENDING', label: 'Chờ chấm' },
-                    { value: 'GRADED', label: 'Đã chấm' }
-                  ].filter(opt => opt.label.toLowerCase().includes(searchStatusDropdown.toLowerCase())).length === 0 && (
-                    <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy</div>
+                  <div 
+                    onClick={() => { setSelectedDotId('ALL'); setSelectedTripId('ALL'); setIsDotDropdownOpen(false); setSearchDotDropdown(''); setCurrentPage(1); }}
+                    className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                      selectedDotId === 'ALL' ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                    }`}
+                  >
+                    <span>Tất cả đợt</span>
+                    {selectedDotId === 'ALL' && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                  </div>
+                  {uniqueDots
+                    .filter(d => d.name.toLowerCase().includes(searchDotDropdown.toLowerCase()))
+                    .map(d => (
+                    <div 
+                      key={d.id}
+                      onClick={() => { setSelectedDotId(d.id); setSelectedTripId('ALL'); setIsDotDropdownOpen(false); setSearchDotDropdown(''); setCurrentPage(1); }}
+                      className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                        selectedDotId === d.id ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                      }`}
+                    >
+                      <span className="truncate pr-2">{d.name}</span>
+                      {selectedDotId === d.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                    </div>
+                  ))}
+                  {uniqueDots.filter(d => d.name.toLowerCase().includes(searchDotDropdown.toLowerCase())).length === 0 && (
+                    <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy đợt</div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {/* Trip Dropdown */}
+          <div className="relative min-w-[200px] w-full sm:w-56" onClick={(e) => e.stopPropagation()}>
+            <div 
+              onClick={() => { setIsTripDropdownOpen(!isTripDropdownOpen); setIsDotDropdownOpen(false); }}
+              className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isTripDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+            >
+              <span className="truncate pr-2 font-medium text-slate-700">
+                {selectedTripId === 'ALL' ? 'Tất cả chuyến đi' : uniqueTrips.find(t => t.id === selectedTripId)?.name || 'Chuyến đi'}
+              </span>
+              <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+            </div>
+            {isTripDropdownOpen && (
+              <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[250px]">
+                <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
+                  <input 
+                    type="text" 
+                    placeholder="Tìm chuyến đi..." 
+                    value={searchTripDropdown}
+                    onChange={(e) => setSearchTripDropdown(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
+                  />
+                </div>
+                <div className="max-h-60 overflow-y-auto">
+                  <div 
+                    onClick={() => { setSelectedTripId('ALL'); setIsTripDropdownOpen(false); setSearchTripDropdown(''); setCurrentPage(1); }}
+                    className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                      selectedTripId === 'ALL' ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                    }`}
+                  >
+                    <span>Tất cả chuyến đi</span>
+                    {selectedTripId === 'ALL' && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                  </div>
+                  {uniqueTrips
+                    .filter(t => t.name.toLowerCase().includes(searchTripDropdown.toLowerCase()))
+                    .map(t => (
+                    <div 
+                      key={t.id}
+                      onClick={() => { setSelectedTripId(t.id); setIsTripDropdownOpen(false); setSearchTripDropdown(''); setCurrentPage(1); }}
+                      className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                        selectedTripId === t.id ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                      }`}
+                    >
+                      <span className="truncate pr-2">{t.name}</span>
+                      {selectedTripId === t.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                    </div>
+                  ))}
+                  {uniqueTrips.filter(t => t.name.toLowerCase().includes(searchTripDropdown.toLowerCase())).length === 0 && (
+                    <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy chuyến đi</div>
                   )}
                 </div>
               </div>
             )}
           </div>
         </div>
-
-        <div className="text-xs text-slate-500 font-medium">
-          Tìm thấy: <span className="font-bold text-slate-700">{filteredReports.length}</span> bài nộp
+        <div className="text-xs text-slate-500 font-medium shrink-0">
+          Đang hiển thị: <span className="font-bold text-[#407F3E]">{filteredReports.length}</span> bài
         </div>
       </div>
 
-      {/* Grid of Report Cards */}
+      {/* Table of Reports */}
       {paginatedReports.length === 0 ? (
-        <div className="p-8 text-center text-slate-500 bg-white rounded-2xl border border-[#E7E0C4]">
-          {reports.length === 0 ? 'Không có bài thu hoạch nào.' : 'Không tìm thấy bài thu hoạch nào phù hợp với bộ lọc.'}
+        <div className="p-12 text-center flex flex-col items-center justify-center bg-white rounded-2xl border border-[#E7E0C4] border-dashed">
+          <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+            <FileText className="w-8 h-8 text-slate-300" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-700 mb-1">Chưa có dữ liệu</h3>
+          <p className="text-sm text-slate-500 max-w-sm">
+            {reports.length === 0 ? 'Hiện chưa có bài thu hoạch nào được nộp.' : 'Không tìm thấy bài thu hoạch nào phù hợp với bộ lọc.'}
+          </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {paginatedReports.map((report) => {
-            const isGraded = report.diem_thu_hoach !== null;
-            const sv = report.phieuThamQuan?.phieuDangKy?.sinhVien || report.phieuDangKy?.sinhVien || {};
-            const nhaMay = report.phieuThamQuan?.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || report.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Chuyến đi';
-            
-            return (
-              <div 
-                key={report.id} 
-                onClick={() => handleSelectReport(report)}
-                className="bg-white border border-[#E7E0C4] rounded-2xl overflow-hidden shadow-sm hover:border-[#407F3E] hover:shadow-md transition-all cursor-pointer group flex flex-col h-full"
-              >
-                {/* Card Header */}
-                <div className={`px-6 py-4 border-b border-[#E7E0C4] flex items-center justify-between ${isGraded ? 'bg-slate-50/50' : 'bg-[#DBD468]/10'}`}>
-                  <div className="flex items-center gap-3 truncate">
-                    <h2 className="font-black text-slate-800 text-lg group-hover:text-[#407F3E] transition-colors truncate">{nhaMay}</h2>
-                  </div>
-                </div>
-                
-                {/* Card Body */}
-                <div className="p-6 flex-1 flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-8 h-8 rounded-full bg-[#E7E0C4]/30 text-[#407F3E] font-bold border border-[#E7E0C4] flex items-center justify-center shrink-0">
-                        {sv.ho_ten?.charAt(0) || <User className="w-4 h-4"/>}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold text-slate-800 truncate">{sv.ho_ten}</p>
-                        <p className="text-[10px] font-medium text-slate-500">MSSV: {sv.mssv}</p>
-                      </div>
-                    </div>
+        <div className="bg-white border border-[#E7E0C4] rounded-2xl shadow-sm overflow-hidden mb-6">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[800px]">
+              <thead>
+                <tr className="bg-slate-50 border-b border-[#E7E0C4] text-xs uppercase tracking-wider text-slate-500 font-bold">
+                  <th className="px-6 py-4 w-1/3">Sinh viên</th>
+                  <th className="px-6 py-4 w-1/3">Bài nộp</th>
+                  <th className="px-6 py-4 text-right">Trạng thái</th>
+                  <th className="px-6 py-4 text-center w-16"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#E7E0C4]">
+                {Object.values(groupedPaginatedReports).map((group, groupIdx) => (
+                  <React.Fragment key={groupIdx}>
+                    <tr className="bg-slate-100/50 border-y border-[#E7E0C4]">
+                      <td colSpan="4" className="px-6 py-2.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-700 text-sm">{group.nhaMay}</span>
+                          <span className="px-2 py-0.5 rounded-full bg-[#E7E0C4]/50 text-slate-600 text-[10px] uppercase font-bold tracking-wider">
+                            {group.reports.length} bài
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                    {group.reports.map((report) => {
+                      const isGraded = report.diem_thu_hoach !== null;
+                      const sv = report.phieuThamQuan?.phieuDangKy?.sinhVien || report.phieuDangKy?.sinhVien || {};
+                      
+                      // Tạo avatar chữ cái
+                      const initial = sv.ho_ten ? sv.ho_ten.charAt(0).toUpperCase() : 'U';
+                      const avatarColors = [
+                        'bg-blue-100 text-blue-700', 
+                        'bg-green-100 text-green-700', 
+                        'bg-purple-100 text-purple-700', 
+                        'bg-orange-100 text-orange-700', 
+                        'bg-pink-100 text-pink-700'
+                      ];
+                      const avatarColor = avatarColors[(sv.mssv || '0').charCodeAt(0) % avatarColors.length];
 
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Trạng thái:</span>
-                      {isGraded ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-[#89B449]/10 text-[#407F3E]">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Đã chấm ({report.diem_thu_hoach}/10)
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-[#DBD468] text-slate-800 shadow-sm">
-                          <div className="w-1.5 h-1.5 rounded-full bg-slate-800 animate-pulse"></div> Chờ chấm
-                        </span>
-                      )}
-                    </div>
-                    
-                    <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200 mb-6">
-                      <FileText className="w-8 h-8 text-[#407F3E]" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold text-slate-700 truncate">{report.file_url_bao_cao || 'BaoCao.pdf'}</p>
-                        <p className="text-[10px] font-medium text-slate-400 mt-0.5">{new Date(report.ngay_nop).toLocaleDateString('vi-VN')}</p>
-                      </div>
-                    </div>
-                  </div>
+                  return (
+                    <tr 
+                      key={report.id}
+                      onClick={() => handleSelectReport(report)}
+                      className="hover:bg-slate-50 transition-colors cursor-pointer group"
+                    >
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-lg shrink-0 ${avatarColor}`}>
+                            {initial}
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-slate-800 group-hover:text-[#407F3E] transition-colors">{sv.ho_ten}</p>
+                            <p className="text-[11px] font-medium text-slate-500">{sv.mssv}</p>
+                          </div>
+                        </div>
+                      </td>
+                      
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0 border border-red-100">
+                            <FileText className="w-4 h-4 text-red-500" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold text-slate-700 truncate max-w-[150px]">{report.file_url_bao_cao || 'BaoCao.pdf'}</p>
+                            <p className="text-[10px] font-medium text-slate-400 mt-0.5">{new Date(report.ngay_nop).toLocaleDateString('vi-VN')}</p>
+                          </div>
+                        </div>
+                      </td>
 
-                  <div className="flex items-center justify-end text-[#407F3E] font-bold text-sm mt-4">
-                    {isGraded ? 'Xem lại bài làm' : 'Bắt đầu chấm bài'} <ChevronRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+                      <td className="px-6 py-4 text-right">
+                        {isGraded ? (
+                          <div className="flex flex-col items-end">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-[#89B449]/10 text-[#407F3E]">
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Đã chấm
+                            </span>
+                            <span className="text-[13px] font-black text-slate-800 mt-1.5">{report.diem_thu_hoach}/10</span>
+                          </div>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-[#DBD468]/20 text-[#B8A31D] shadow-sm">
+                            <div className="w-1.5 h-1.5 rounded-full bg-[#B8A31D] animate-pulse"></div> Chờ chấm
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="px-6 py-4 text-center">
+                        <button className="w-8 h-8 rounded-full flex items-center justify-center text-slate-300 group-hover:bg-[#407F3E] group-hover:text-white transition-all ml-auto">
+                          <ChevronRight className="w-5 h-5" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -640,9 +797,7 @@ TRANG 38
             
             {/* Student Info Card */}
             <div className="bg-white rounded-xl p-4 border border-[#E7E0C4] shadow-sm flex items-start gap-3">
-              <div className="w-12 h-12 rounded-full bg-[#E7E0C4]/30 text-[#407F3E] font-bold border border-[#E7E0C4] flex items-center justify-center shrink-0 text-lg">
-                {sv.ho_ten?.charAt(0) || 'S'}
-              </div>
+
               <div>
                 <h3 className="font-bold text-slate-800 text-sm leading-tight mb-1">{sv.ho_ten}</h3>
                 <p className="text-[11px] font-medium text-slate-500 mb-1">MSSV: {sv.mssv}</p>
@@ -759,7 +914,10 @@ TRANG 38
   };
 
   return (
-    <div className={selectedReport ? '' : 'bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300'}>
+    <div 
+      className={selectedReport ? '' : 'bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300'}
+      onClick={() => { setIsTripDropdownOpen(false); setIsDotDropdownOpen(false); }}
+    >
       {selectedReport ? renderGradingView() : renderReportList()}
 
       {/* AI Grading Details Modal */}

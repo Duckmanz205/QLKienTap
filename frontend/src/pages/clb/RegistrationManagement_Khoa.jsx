@@ -1420,7 +1420,7 @@ export default function RegistrationManagement_Khoa() {
 
       {/* Toast Popup */}
       {popup.show && createPortal(
-        <div className="fixed bottom-4 right-4 z-[9999] animate-in slide-in-from-right-8 fade-in duration-300">
+        <div className="fixed top-6 right-6 z-[9999] animate-in slide-in-from-right-8 fade-in duration-300">
           <div className={`flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg border text-sm font-bold ${
             popup.type === 'success' 
               ? 'bg-white border-[#407F3E]/20 text-[#407F3E]' 

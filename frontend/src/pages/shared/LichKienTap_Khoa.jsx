@@ -320,30 +320,30 @@ export default function LichKienTap_Khoa() {
     switch (status) {
       case 'Nháp':
       case 'Nhap':
-        return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200">Nháp</span>;
+        return <span className="inline-flex whitespace-nowrap items-center px-3 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200">Nháp</span>;
       case 'Chờ duyệt':
       case 'ChoDuyet':
-        return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#E68A8C]/20 text-[#E68A8C] border border-[#E68A8C]/30 shadow-sm">Chờ duyệt</span>;
+        return <span className="inline-flex whitespace-nowrap items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#E68A8C]/20 text-[#E68A8C] border border-[#E68A8C]/30 shadow-sm">Chờ duyệt</span>;
       case 'Đã duyệt':
       case 'DaDuyet':
-        return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#407F3E]/20 text-[#407F3E] border border-[#407F3E]/30 shadow-sm">Đã duyệt</span>;
+        return <span className="inline-flex whitespace-nowrap items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#407F3E]/20 text-[#407F3E] border border-[#407F3E]/30 shadow-sm">Đã duyệt</span>;
       case 'Từ chối':
       case 'TuChoi':
-        return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-red-100 text-red-600 border border-red-200 shadow-sm">Từ chối</span>;
+        return <span className="inline-flex whitespace-nowrap items-center px-3 py-1 rounded-full text-[11px] font-bold bg-red-100 text-red-600 border border-red-200 shadow-sm">Từ chối</span>;
       case 'Mở đăng ký':
       case 'MoDangKy':
-        return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#89B449] text-white border border-[#89B449]/20 shadow-sm">Mở đăng ký</span>;
+        return <span className="inline-flex whitespace-nowrap items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#89B449] text-white border border-[#89B449]/20 shadow-sm">Mở đăng ký</span>;
       case 'Đang diễn ra':
       case 'DangDienRa':
-        return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#407F3E] text-white border border-[#407F3E]/20 shadow-sm">Đang diễn ra</span>;
+        return <span className="inline-flex whitespace-nowrap items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#407F3E] text-white border border-[#407F3E]/20 shadow-sm">Đang diễn ra</span>;
       case 'Đã kết thúc':
       case 'DaKetThuc':
-        return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#DBD468] text-slate-800 border border-[#DBD468]/20 shadow-sm">Đã kết thúc</span>;
+        return <span className="inline-flex whitespace-nowrap items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#DBD468] text-slate-800 border border-[#DBD468]/20 shadow-sm">Đã kết thúc</span>;
       case 'Đã khóa':
       case 'DaKhoa':
-        return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-slate-800 text-white shadow-sm">Đã khóa</span>;
+        return <span className="inline-flex whitespace-nowrap items-center px-3 py-1 rounded-full text-[11px] font-bold bg-slate-800 text-white shadow-sm">Đã khóa</span>;
       default:
-        return <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200">{status}</span>;
+        return <span className="inline-flex whitespace-nowrap items-center px-3 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200">{status}</span>;
     }
   };
 

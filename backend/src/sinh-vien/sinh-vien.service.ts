@@ -837,6 +837,12 @@ export class SinhVienService {
 
     const report = phieuTQ.baiThuHoach;
 
+    if (phieuTQ.han_nop_bao_cao && new Date() > phieuTQ.han_nop_bao_cao) {
+      throw new BadRequestException(
+        'Đã hết hạn 10 ngày để chỉnh sửa. Bài nộp đã được gửi cho giảng viên và không thể thu hồi.',
+      );
+    }
+
     // Kiểm tra xem đã có điểm chưa
     const diem = await this.diemPhieuRepo.findOne({
       where: { phieu_tham_quan_id: phieuTQ.id },
