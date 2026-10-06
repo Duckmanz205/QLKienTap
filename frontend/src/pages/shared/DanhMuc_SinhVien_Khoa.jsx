@@ -7,6 +7,7 @@ import * as XLSX from 'xlsx';
 import { khoaApi } from '../../services/api';
 import Toast from '../../components/Toast';
 import ConfirmModal from '../../components/ConfirmModal';
+import SearchableDropdown from '../../components/SearchableDropdown';
 
 export default function DanhMuc_SinhVien_Khoa() {
   const [students, setStudents] = useState([]);
@@ -16,11 +17,7 @@ export default function DanhMuc_SinhVien_Khoa() {
   // Filter States
   const [searchTerm, setSearchTerm] = useState('');
   const [filterKhoa, setFilterKhoa] = useState('All');
-  const [isKhoaDropdownOpen, setIsKhoaDropdownOpen] = useState(false);
-  const [searchKhoaDropdown, setSearchKhoaDropdown] = useState('');
   const [filterClass, setFilterClass] = useState('All');
-  const [isClassDropdownOpen, setIsClassDropdownOpen] = useState(false);
-  const [searchLopDropdown, setSearchLopDropdown] = useState('');
   const [filterHocLai, setFilterHocLai] = useState(false);
   
   // Pagination States
@@ -322,96 +319,30 @@ export default function DanhMuc_SinhVien_Khoa() {
         </div>
 
         {/* Khóa Dropdown */}
-        <div className="relative min-w-[160px]">
-          <div 
-            onClick={() => { setIsKhoaDropdownOpen(!isKhoaDropdownOpen); setIsClassDropdownOpen(false); }}
-            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isKhoaDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-          >
-            <span className="text-slate-700 font-medium">{filterKhoa === 'All' ? 'Tất cả khóa' : filterKhoa}</span>
-            <ChevronDown className="w-4 h-4 text-slate-400" />
-          </div>
-          {isKhoaDropdownOpen && (
-            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[200px]">
-              <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
-                <input 
-                  type="text" 
-                  placeholder="Tìm khóa..." 
-                  value={searchKhoaDropdown}
-                  onChange={(e) => setSearchKhoaDropdown(e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
-                />
-              </div>
-              <div className="max-h-60 overflow-y-auto">
-                {khoaOptions
-                  .filter(opt => opt.toLowerCase().includes(searchKhoaDropdown.toLowerCase()))
-                  .map(opt => (
-                  <div 
-                    key={opt}
-                    onClick={() => { setFilterKhoa(opt === 'Tất cả khóa' ? 'All' : opt); setIsKhoaDropdownOpen(false); setSearchKhoaDropdown(''); }}
-                    className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                      (filterKhoa === opt || (filterKhoa === 'All' && opt === 'Tất cả khóa')) 
-                        ? 'bg-[#E7E0C4] text-slate-800 font-bold' 
-                        : 'text-slate-700 hover:bg-[#E7E0C4]/50'
-                    }`}
-                  >
-                    {opt}
-                    {(filterKhoa === opt || (filterKhoa === 'All' && opt === 'Tất cả khóa')) && <Check className="w-4 h-4 text-[#407F3E]" />}
-                  </div>
-                ))}
-                {khoaOptions.filter(opt => opt.toLowerCase().includes(searchKhoaDropdown.toLowerCase())).length === 0 && (
-                  <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy</div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+        <SearchableDropdown
+          options={khoaOptions.map(opt => ({
+            value: opt === 'Tất cả khóa' ? 'All' : opt,
+            label: opt
+          }))}
+          value={filterKhoa}
+          onChange={(val) => setFilterKhoa(val)}
+          placeholder="Tất cả khóa"
+          searchPlaceholder="Tìm khóa..."
+          className="min-w-[160px]"
+        />
 
         {/* Lớp Dropdown */}
-        <div className="relative min-w-[160px]">
-          <div 
-            onClick={() => { setIsClassDropdownOpen(!isClassDropdownOpen); setIsKhoaDropdownOpen(false); }}
-            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isClassDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-          >
-            <span className="text-slate-700 font-medium">{filterClass === 'All' ? 'Tất cả lớp' : filterClass}</span>
-            <ChevronDown className="w-4 h-4 text-slate-400" />
-          </div>
-          {isClassDropdownOpen && (
-            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[200px]">
-              <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
-                <input 
-                  type="text" 
-                  placeholder="Tìm lớp..." 
-                  value={searchLopDropdown}
-                  onChange={(e) => setSearchLopDropdown(e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
-                />
-              </div>
-              <div className="max-h-60 overflow-y-auto">
-                {lopOptions
-                  .filter(opt => opt.toLowerCase().includes(searchLopDropdown.toLowerCase()))
-                  .map(opt => (
-                  <div 
-                    key={opt}
-                    onClick={() => { setFilterClass(opt === 'Tất cả lớp' ? 'All' : opt); setIsClassDropdownOpen(false); setSearchLopDropdown(''); }}
-                    className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                      (filterClass === opt || (filterClass === 'All' && opt === 'Tất cả lớp')) 
-                        ? 'bg-[#E7E0C4] text-slate-800 font-bold' 
-                        : 'text-slate-700 hover:bg-[#E7E0C4]/50'
-                    }`}
-                  >
-                    {opt}
-                    {(filterClass === opt || (filterClass === 'All' && opt === 'Tất cả lớp')) && <Check className="w-4 h-4 text-[#407F3E]" />}
-                  </div>
-                ))}
-                {lopOptions.filter(opt => opt.toLowerCase().includes(searchLopDropdown.toLowerCase())).length === 0 && (
-                  <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy</div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+        <SearchableDropdown
+          options={lopOptions.map(opt => ({
+            value: opt === 'Tất cả lớp' ? 'All' : opt,
+            label: opt
+          }))}
+          value={filterClass}
+          onChange={(val) => setFilterClass(val)}
+          placeholder="Tất cả lớp"
+          searchPlaceholder="Tìm lớp..."
+          className="min-w-[160px]"
+        />
 
         {/* Toggle Switch */}
         <div className="flex items-center gap-3 pl-4 border-l border-[#E7E0C4]">
@@ -495,20 +426,21 @@ export default function DanhMuc_SinhVien_Khoa() {
         <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
             <span>Hiển thị</span>
-            <select 
+            <SearchableDropdown 
+              options={[
+                { value: 15, label: '15' },
+                { value: 30, label: '30' },
+                { value: 50, label: '50' },
+                { value: 100, label: '100' }
+              ]}
               value={limit}
-              onChange={(e) => {
-                const newLimit = Number(e.target.value);
+              onChange={(newLimit) => {
                 setLimit(newLimit);
                 fetchData(1, newLimit);
               }}
-              className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
-            >
-              <option value={15}>15</option>
-              <option value={30}>30</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
+              searchPlaceholder="Tìm số lượng..."
+              className="min-w-[80px]"
+            />
             <span>/ {totalStudents} sinh viên</span>
           </div>
           <div className="flex items-center gap-1.5">

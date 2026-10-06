@@ -7,17 +7,18 @@ import {
 } from 'lucide-react';
 import { khoaApi } from '../../services/api';
 import ConfirmModal from '../../components/ConfirmModal';
+import * as XLSX from 'xlsx';
 
 export default function BaoCaoThongKe_Khoa() {
   // Dropdown States for Filters
   const [isNamHocDropdownOpen, setIsNamHocDropdownOpen] = useState(false);
   const [selectedNamHoc, setSelectedNamHoc] = useState(() => sessionStorage.getItem('report_selectedNamHoc') || 'Tất cả');
-  const namHocOptions = ["Tất cả", "2025-2026", "2024-2025", "2023-2024"];
+  const [namHocOptions, setNamHocOptions] = useState(["Tất cả"]);
   const [searchNamHoc, setSearchNamHoc] = useState('');
 
   const [isKhoaDropdownOpen, setIsKhoaDropdownOpen] = useState(false);
   const [selectedKhoa, setSelectedKhoa] = useState(() => sessionStorage.getItem('report_selectedKhoa') || 'Tất cả');
-  const khoaOptions = ["Tất cả", "Khóa 14", "Khóa 13", "Khóa 12"];
+  const [khoaOptions, setKhoaOptions] = useState(["Tất cả"]);
   const [searchKhoa, setSearchKhoa] = useState('');
 
   const [isLichDropdownOpen, setIsLichDropdownOpen] = useState(false);
@@ -78,6 +79,8 @@ export default function BaoCaoThongKe_Khoa() {
 
   useEffect(() => {
     khoaApi.getSchedules().then(res => setSchedules(res.data || [])).catch(console.error);
+    khoaApi.getYears().then(res => setNamHocOptions(["Tất cả", ...(res.data || []).map(y => y.ten_nam_hoc)])).catch(console.error);
+    khoaApi.getCourses().then(res => setKhoaOptions(["Tất cả", ...(res.data || []).map(c => c.ten_khoa_hoc)])).catch(console.error);
   }, []);
 
   const showAlert = (msg) => setAlertMessage(msg);
@@ -102,81 +105,96 @@ export default function BaoCaoThongKe_Khoa() {
       name: 'Tổng hợp dữ liệu tham quan',
       desc: 'Báo cáo tổng quan về số lượng chuyến đi, số sinh viên tham gia và thống kê theo từng doanh nghiệp liên kết.',
       icon: <BarChart2 className="w-6 h-6 text-[#407F3E]" />,
-      bgIcon: 'bg-[#407F3E]/10'
+      bgIcon: 'bg-[#407F3E]/10',
+      group: 'Vận hành'
     },
     {
       id: 2,
       name: 'Danh sách SV đã tham quan',
       desc: 'Danh sách chi tiết các sinh viên đã hoàn thành tối thiểu 1 chuyến tham quan thực tế tại doanh nghiệp.',
       icon: <Users className="w-6 h-6 text-[#89B449]" />,
-      bgIcon: 'bg-[#89B449]/10'
+      bgIcon: 'bg-[#89B449]/10',
+      group: 'Vận hành'
     },
     {
       id: 3,
       name: 'Danh sách SV chưa tham quan',
       desc: 'Danh sách các sinh viên đăng ký môn học nhưng chưa tham gia hoặc vắng mặt trong các chuyến đi.',
       icon: <UserX className="w-6 h-6 text-[#DBD468]" />,
-      bgIcon: 'bg-[#DBD468]/15'
+      bgIcon: 'bg-[#DBD468]/15',
+      group: 'Vận hành'
     },
     {
       id: 4,
       name: 'Danh sách SV đủ điều kiện báo cáo',
       desc: 'Sinh viên đã đáp ứng đủ các tiêu chí: đóng phí đầy đủ và tham gia ít nhất 1 chuyến tham quan để làm báo cáo.',
       icon: <CheckCircle className="w-6 h-6 text-teal-600" />,
-      bgIcon: 'bg-teal-50'
+      bgIcon: 'bg-teal-50',
+      group: 'Kết quả học tập'
     },
     {
       id: 5,
       name: 'Danh sách SV không thực hiện',
       desc: 'Những sinh viên vi phạm quy chế hoặc bị cấm thi, không đủ điều kiện làm báo cáo thu hoạch cuối kỳ (Sinh viên học lại).',
       icon: <XOctagon className="w-6 h-6 text-[#E68A8C]" />,
-      bgIcon: 'bg-[#E68A8C]/10'
+      bgIcon: 'bg-[#E68A8C]/10',
+      group: 'Kết quả học tập'
     },
     {
       id: 6,
       name: 'Danh sách SV đạt/không đạt',
       desc: 'Bảng điểm tổng kết cuối cùng, hiển thị rõ trạng thái Đạt hoặc Không Đạt của từng sinh viên.',
       icon: <FileCheck className="w-6 h-6 text-indigo-600" />,
-      bgIcon: 'bg-indigo-50'
+      bgIcon: 'bg-indigo-50',
+      group: 'Kết quả học tập'
     }
   ];
 
-  const exportToCSV = (data, reportType) => {
+  const exportToExcel = (data, reportType) => {
     if (!data || data.length === 0) {
       toast.error('Không có dữ liệu.');
       return;
     }
 
-    let csvContent = '\uFEFF'; // BOM for UTF-8
+    let formattedData = [];
 
     if (reportType === 'retake') {
-      csvContent += 'MSSV,Họ tên,Lớp,Email,Khoa\n';
-      data.forEach(s => {
-        csvContent += `"${s.mssv}","${s.ho_ten}","${s.ten_lop || ''}","${s.email || ''}","${s.khoaHoc?.ten_khoa_hoc || ''}"\n`;
-      });
+      formattedData = data.map(s => ({
+        'MSSV': s.mssv,
+        'Họ tên': s.ho_ten,
+        'Lớp': s.ten_lop || '',
+        'Email': s.email || '',
+        'Khóa': s.khoaHoc?.ten_khoa_hoc || ''
+      }));
     } else if (reportType === 'final') {
-      csvContent += 'MSSV,Họ tên,Điểm tổng kết,Kết quả\n';
-      data.forEach(r => {
+      formattedData = data.map(r => {
         let lbl = r.ket_qua || 'Đang học';
         if (r.ket_qua === 'Dat') lbl = 'Đạt';
         else if (r.ket_qua === 'KhongDat') lbl = 'Không Đạt';
-
-        csvContent += `"${r.sinhVien?.mssv}","${r.sinhVien?.ho_ten}","${r.diem_tong_ket !== null ? Number(r.diem_tong_ket).toFixed(2) : 'Chưa chốt'}","${lbl}"\n`;
+        return {
+          'MSSV': r.sinhVien?.mssv,
+          'Họ tên': r.sinhVien?.ho_ten,
+          'Điểm tổng kết': r.diem_tong_ket !== null ? Number(r.diem_tong_ket).toFixed(2) : 'Chưa chốt',
+          'Kết quả': lbl
+        };
       });
     } else if (reportType === 'students') {
-      csvContent += 'MSSV,Họ tên,Lớp,Khóa\n';
-      data.forEach(s => {
-        csvContent += `"${s.mssv}","${s.ho_ten}","${s.lop || ''}","${s.khoaHoc?.ten_khoa_hoc || ''}"\n`;
-      });
+      formattedData = data.map(s => ({
+        'MSSV': s.mssv,
+        'Họ tên': s.ho_ten,
+        'Lớp': s.lop || '',
+        'Khóa': s.khoaHoc?.ten_khoa_hoc || ''
+      }));
     }
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `BaoCao_${reportType}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+    const worksheet = XLSX.utils.json_to_sheet(formattedData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "BaoCao");
+    
+    const colWidths = Object.keys(formattedData[0] || {}).map(key => ({ wch: Math.max(key.length, 15) }));
+    worksheet['!cols'] = colWidths;
+
+    XLSX.writeFile(workbook, `BaoCao_${reportType}.xlsx`);
   };
 
   const handleExportExcel = async (reportId) => {
@@ -184,26 +202,26 @@ export default function BaoCaoThongKe_Khoa() {
       if (reportId === 5) {
         // Sinh viên học lại
         const res = await khoaApi.getRetakeReport();
-        exportToCSV(res.data || [], 'retake');
+        exportToExcel(res.data || [], 'retake');
       } else if (reportId === 6) {
         if (!selectedLich) {
           showAlert('Vui lòng chọn lịch kiến tập trước khi xuất báo cáo này!');
           return;
         }
         const res = await khoaApi.getFinalResultsReport(selectedLich);
-        exportToCSV(res.data || [], 'final');
+        exportToExcel(res.data || [], 'final');
       } else if (reportId === 2) {
         if (!selectedLich) { showAlert('Vui lòng chọn lịch kiến tập trước khi xuất báo cáo này!'); return; }
         const res = await khoaApi.getVisitedStudentsReport({ lichKienTapId: selectedLich });
-        exportToCSV(res.data || [], 'students');
+        exportToExcel(res.data || [], 'students');
       } else if (reportId === 3) {
         if (!selectedLich) { showAlert('Vui lòng chọn lịch kiến tập trước khi xuất báo cáo này!'); return; }
         const res = await khoaApi.getNotVisitedStudentsReport({ lichKienTapId: selectedLich });
-        exportToCSV(res.data || [], 'students');
+        exportToExcel(res.data || [], 'students');
       } else if (reportId === 4) {
         if (!selectedLich) { showAlert('Vui lòng chọn lịch kiến tập trước khi xuất báo cáo này!'); return; }
         const res = await khoaApi.getEligibleStudentsReport({ lichKienTapId: selectedLich });
-        exportToCSV(res.data || [], 'students');
+        exportToExcel(res.data || [], 'students');
       } else {
         showAlert('Tính năng xuất Excel cho báo cáo này đang phát triển!');
       }
@@ -397,38 +415,76 @@ export default function BaoCaoThongKe_Khoa() {
       </div>
 
       {/* Reports Grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 relative z-10">
-        {reports.map(report => (
-          <div key={report.id} className="bg-white rounded-2xl p-6 border border-[#E7E0C4] shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
-            <div>
-              <div className="flex items-center gap-4 mb-3">
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${report.bgIcon}`}>
-                  {report.icon}
+      <div className="mb-8">
+        <h2 className="text-xl font-bold text-slate-700 mb-4 border-l-4 border-[#407F3E] pl-3">Báo cáo Vận hành</h2>
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 relative z-10 mb-8">
+          {reports.filter(r => r.group === 'Vận hành').map(report => (
+            <div key={report.id} className="bg-white rounded-2xl p-6 border border-[#E7E0C4] shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
+              <div>
+                <div className="flex items-center gap-4 mb-3">
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${report.bgIcon}`}>
+                    {report.icon}
+                  </div>
+                  <h3 className="text-lg font-black text-slate-800">{report.name}</h3>
                 </div>
-                <h3 className="text-lg font-black text-slate-800">{report.name}</h3>
+                <p className="text-sm font-medium text-slate-500 mb-6 leading-relaxed">
+                  {report.desc}
+                </p>
               </div>
-              <p className="text-sm font-medium text-slate-500 mb-6 leading-relaxed">
-                {report.desc}
-              </p>
+              <div className="flex items-center gap-3 pt-4 border-t border-[#E7E0C4]/50">
+                <button
+                  onClick={() => handleView(report.id)}
+                  className="flex-1 py-2.5 border border-[#E7E0C4] hover:bg-slate-50 text-slate-600 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                >
+                  <Eye className="w-4 h-4" />
+                  Xem
+                </button>
+                <button
+                  onClick={() => handleExportExcel(report.id)}
+                  className="flex-1 py-2.5 bg-[#407F3E] hover:bg-[#407F3E]/90 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-sm cursor-pointer"
+                >
+                  <Download className="w-4 h-4" />
+                  Xuất Excel
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-3 pt-4 border-t border-[#E7E0C4]/50">
-              <button
-                onClick={() => handleView(report.id)}
-                className="flex-1 py-2.5 border border-[#E7E0C4] hover:bg-slate-50 text-slate-600 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
-              >
-                <Eye className="w-4 h-4" />
-                Xem
-              </button>
-              <button
-                onClick={() => handleExportExcel(report.id)}
-                className="flex-1 py-2.5 bg-[#407F3E] hover:bg-[#407F3E]/90 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-sm cursor-pointer"
-              >
-                <Download className="w-4 h-4" />
-                Xuất Excel
-              </button>
+          ))}
+        </div>
+
+        <h2 className="text-xl font-bold text-slate-700 mb-4 border-l-4 border-indigo-600 pl-3">Báo cáo Kết quả học tập</h2>
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 relative z-10">
+          {reports.filter(r => r.group === 'Kết quả học tập').map(report => (
+            <div key={report.id} className="bg-white rounded-2xl p-6 border border-[#E7E0C4] shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
+              <div>
+                <div className="flex items-center gap-4 mb-3">
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${report.bgIcon}`}>
+                    {report.icon}
+                  </div>
+                  <h3 className="text-lg font-black text-slate-800">{report.name}</h3>
+                </div>
+                <p className="text-sm font-medium text-slate-500 mb-6 leading-relaxed">
+                  {report.desc}
+                </p>
+              </div>
+              <div className="flex items-center gap-3 pt-4 border-t border-[#E7E0C4]/50">
+                <button
+                  onClick={() => handleView(report.id)}
+                  className="flex-1 py-2.5 border border-[#E7E0C4] hover:bg-slate-50 text-slate-600 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                >
+                  <Eye className="w-4 h-4" />
+                  Xem
+                </button>
+                <button
+                  onClick={() => handleExportExcel(report.id)}
+                  className="flex-1 py-2.5 bg-[#407F3E] hover:bg-[#407F3E]/90 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-sm cursor-pointer"
+                >
+                  <Download className="w-4 h-4" />
+                  Xuất Excel
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
 

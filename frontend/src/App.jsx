@@ -31,7 +31,7 @@ import DashBoard_CLB from './pages/clb/DashBoard_CLB';
 import DanhMuc_SinhVien_Khoa from './pages/shared/DanhMuc_SinhVien_Khoa';
 import DanhMuc_GiangVien_Khoa from './pages/quan-ly-khoa/DanhMuc_GiangVien_Khoa';
 import DanhMuc_NhaMay_Khoa from './pages/clb/DanhMuc_NhaMay_Khoa';
-import DanhMucNen_ThemMoiHocKy_Khoa from './pages/quan-ly-khoa/DanhMucNen_ThemMoiHocKy_Khoa';
+import DanhMuc_ThemMoiHocKy_Khoa from './pages/quan-ly-khoa/DanhMuc_ThemMoiHocKy_Khoa';
 import LichKienTap_Khoa from './pages/shared/LichKienTap_Khoa';
 import ChuyenThamQuan_DSLoc from './pages/clb/ChuyenThamQuan_DSLoc';
 import HoiDongChamBaoCao_Khoa from './pages/quan-ly-khoa/HoiDongChamBaoCao_Khoa';
@@ -54,6 +54,7 @@ import BaoCao_SVDatKhongDat_Khoa from './pages/shared/BaoCao_SVDatKhongDat_Khoa'
 
 import ProtectedRoute from './components/ProtectedRoute';
 import { getValidSession, getDashboardPathForRole } from './utils/auth';
+import { ErrorBoundary } from './ErrorBoundary';
 
 function LoginGuard() {
   const session = getValidSession();
@@ -109,8 +110,9 @@ export default function App() {
           );
         }}
       </Toaster>
-      <Routes>
-        {/* Auth Route */}
+      <ErrorBoundary>
+        <Routes>
+          {/* Auth Route */}
         <Route path="/login" element={<LoginGuard />} />
 
         {/* Root path redirect */}
@@ -145,7 +147,7 @@ export default function App() {
           {/* Khoa Portal Routes */}
           <Route element={<ProtectedRoute allowedRoles={['QuanLyKhoa', 'Khoa']} />}>
             <Route path="khoa" element={<DashBoard_Khoa />} />
-            <Route path="khoa/danh-muc-nen" element={<DanhMucNen_ThemMoiHocKy_Khoa />} />
+            <Route path="khoa/danh-muc" element={<DanhMuc_ThemMoiHocKy_Khoa />} />
             <Route path="khoa/plans" element={<PlanManagement_Khoa />} />
             <Route path="khoa/lich-kien-tap" element={<LichKienTap_Khoa />} />
             <Route path="khoa/lecturers" element={<DanhMuc_GiangVien_Khoa />} />
@@ -195,6 +197,7 @@ export default function App() {
         {/* Fallback wildcard route */}
         <Route path="*" element={<NotFoundRedirect />} />
       </Routes>
+      </ErrorBoundary>
     </BrowserRouter>
   );
 }

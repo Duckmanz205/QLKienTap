@@ -2,9 +2,10 @@ import toast from 'react-hot-toast';
 import React, { useState, useEffect } from 'react';
 import { 
   Plus, Search, ChevronDown, Check,
-  Edit2, Building2, Wifi, Users, X
+  Edit2, Wifi, Users, X
 } from 'lucide-react';
 import { khoaApi } from '../../services/api';
+import SearchableDropdown from '../../components/SearchableDropdown';
 
 export default function DanhMuc_NhaMay_Khoa() {
   const [factories, setFactories] = useState([]);
@@ -287,88 +288,92 @@ export default function DanhMuc_NhaMay_Khoa() {
         </div>
       </div>
 
-      {/* Main Grid Content */}
+      {/* Main Table Content */}
       <div className="relative z-10 space-y-6">
         {paginatedFactories.length === 0 ? (
           <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] p-12 text-center text-slate-500 font-medium">
             Không tìm thấy nhà máy nào khớp điều kiện
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {paginatedFactories.map(f => {
-              const isHoatDong = f.trang_thai === 'HoatDong';
-              return (
-                <div key={f.id} className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-hidden group hover:shadow-md transition-all relative flex flex-col">
-                  {/* Placeholder Image Header */}
-                  <div className="h-32 bg-slate-100 w-full flex items-center justify-center relative overflow-hidden">
-                    <Building2 className="w-12 h-12 text-slate-300" />
-                    {/* Background Pattern */}
-                    <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(#407F3E 1px, transparent 1px)', backgroundSize: '10px 10px' }}></div>
-                    
-                    {/* Status Pill */}
-                    <div className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-[10px] font-bold shadow-sm border cursor-pointer hover:opacity-80 ${
-                      isHoatDong 
-                        ? 'bg-[#89B449] text-white border-[#407F3E]/20' 
-                        : 'bg-slate-200 text-slate-500 border-slate-300'
-                    }`}
-                      title="Nhấn để đổi trạng thái"
-                      onClick={() => toggleStatus(f.id, f.trang_thai)}
-                    >
-                      {isHoatDong ? 'Hoạt động' : 'Ngừng hợp tác'}
-                    </div>
-                  </div>
-
-                  {/* Card Body */}
-                  <div className="p-5 flex-1 flex flex-col">
-                    <h3 className="text-lg font-bold text-slate-800 mb-1 leading-tight">{f.ten_nha_may}</h3>
-                    <p className="text-xs text-slate-500 mb-4 flex-1">{f.dia_chi}</p>
-                    
-                    <div className="space-y-3">
-                      {/* Nhóm ngành tag */}
-                      <div>
-                        <span className="inline-block px-2.5 py-1 bg-slate-100 text-slate-600 rounded text-xs font-semibold border border-slate-200 truncate max-w-full">
-                          {f.nhom_nganh}
-                        </span>
-                      </div>
-
-                      {/* Capabilities badges & Edit action */}
-                      <div className="flex items-center justify-between pt-3 border-t border-[#E7E0C4]/50">
-                        <div className="flex gap-2">
-                          {/* Trực tiếp Badge */}
-                          <div className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold transition-colors ${
-                            f.ho_tro_truc_tiep 
-                              ? 'bg-[#89B449]/20 text-[#407F3E] border border-[#89B449]/30' 
-                              : 'bg-white text-slate-400 border border-slate-200'
-                          }`}>
-                            <Users className="w-3 h-3" />
-                            Trực tiếp
+          <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-[#E7E0C4]">
+                    <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-12">STT</th>
+                    <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[25%]">Tên nhà máy</th>
+                    <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[30%]">Địa chỉ</th>
+                    <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">Nhóm ngành</th>
+                    <th className="px-3 py-3 text-center text-[11px] font-bold text-slate-500 uppercase tracking-wider">Hình thức</th>
+                    <th className="px-3 py-3 text-center text-[11px] font-bold text-slate-500 uppercase tracking-wider w-24">Trạng thái</th>
+                    <th className="px-3 py-3 text-center text-[11px] font-bold text-slate-500 uppercase tracking-wider w-16">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
+                  {paginatedFactories.map((f, index) => {
+                    const isHoatDong = f.trang_thai === 'HoatDong';
+                    return (
+                      <tr key={f.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-3 py-3 text-slate-500 font-mono text-xs text-center">{(page - 1) * limit + index + 1}</td>
+                        <td className="px-3 py-3">
+                          <span className="font-bold text-slate-800">{f.ten_nha_may}</span>
+                        </td>
+                        <td className="px-3 py-3">
+                          <span className="text-xs text-slate-500">{f.dia_chi || '—'}</span>
+                        </td>
+                        <td className="px-3 py-3">
+                          <span className="inline-block px-2.5 py-1 bg-slate-100 text-slate-600 rounded text-xs font-semibold border border-slate-200 truncate max-w-[150px]">
+                            {f.nhom_nganh || 'Chưa phân nhóm'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3">
+                          <div className="flex flex-col items-center justify-center gap-1.5">
+                            <div className={`flex items-center w-[85px] gap-1.5 px-2 py-1 rounded text-[10px] font-bold whitespace-nowrap transition-colors ${
+                              f.ho_tro_truc_tiep
+                                ? 'bg-[#89B449]/20 text-[#407F3E] border border-[#89B449]/30'
+                                : 'bg-white text-slate-400 border border-slate-200'
+                            }`}>
+                              <Users className="w-3 h-3 shrink-0" />
+                              Trực tiếp
+                            </div>
+                            <div className={`flex items-center w-[85px] gap-1.5 px-2 py-1 rounded text-[10px] font-bold whitespace-nowrap transition-colors ${
+                              f.ho_tro_truc_tuyen
+                                ? 'bg-[#89B449]/20 text-[#407F3E] border border-[#89B449]/30'
+                                : 'bg-white text-slate-400 border border-slate-200'
+                            }`}>
+                              <Wifi className="w-3 h-3 shrink-0" />
+                              Trực tuyến
+                            </div>
                           </div>
-                          
-                          {/* Trực tuyến Badge */}
-                          <div className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold transition-colors ${
-                            f.ho_tro_truc_tuyen 
-                              ? 'bg-[#89B449]/20 text-[#407F3E] border border-[#89B449]/30' 
-                              : 'bg-white text-slate-400 border border-slate-200'
-                          }`}>
-                            <Wifi className="w-3 h-3" />
-                            Trực tuyến
+                        </td>
+                        <td className="px-3 py-3 text-center">
+                          <div
+                            className={`inline-flex whitespace-nowrap items-center px-2.5 py-1 rounded-full text-[10px] font-bold shadow-sm border cursor-pointer hover:opacity-80 transition-colors ${
+                              isHoatDong
+                                ? 'bg-[#89B449] text-white border-[#407F3E]/20'
+                                : 'bg-slate-200 text-slate-500 border-slate-300'
+                            }`}
+                            title="Nhấn để đổi trạng thái"
+                            onClick={() => toggleStatus(f.id, f.trang_thai)}
+                          >
+                            {isHoatDong ? 'Hoạt động' : 'Ngưng hợp tác'}
                           </div>
-                        </div>
-
-                        {/* Edit Button */}
-                        <button 
-                          onClick={() => handleOpenEditModal(f)}
-                          className="p-2 text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer" 
-                          title="Chỉnh sửa thông tin"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+                        </td>
+                        <td className="px-3 py-3 text-center">
+                          <button
+                            onClick={() => handleOpenEditModal(f)}
+                            className="p-1.5 text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer"
+                            title="Chỉnh sửa thông tin"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
@@ -376,19 +381,21 @@ export default function DanhMuc_NhaMay_Khoa() {
         <div className="p-4 border border-[#E7E0C4] bg-white rounded-xl shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
             <span>Hiển thị</span>
-            <select 
+            <SearchableDropdown 
+              options={[
+                { value: 15, label: '15' },
+                { value: 30, label: '30' },
+                { value: 50, label: '50' },
+                { value: 100, label: '100' }
+              ]}
               value={limit}
-              onChange={(e) => {
-                setLimit(Number(e.target.value));
+              onChange={(newLimit) => {
+                setLimit(newLimit);
                 setPage(1);
               }}
-              className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
-            >
-              <option value={15}>15</option>
-              <option value={30}>30</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
+              searchPlaceholder="Tìm số lượng..."
+              className="min-w-[80px]"
+            />
             <span>/ {totalFactories} nhà máy</span>
           </div>
           <div className="flex items-center gap-1.5">
@@ -509,14 +516,16 @@ export default function DanhMuc_NhaMay_Khoa() {
               {editData && (
                 <div className="pt-2">
                   <label className="block text-sm font-bold text-slate-700 mb-2">Trạng thái</label>
-                  <select 
+                  <SearchableDropdown
                     value={trangThai}
-                    onChange={(e) => setTrangThai(e.target.value)}
-                    className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] text-sm transition-all cursor-pointer"
-                  >
-                    <option value="HoatDong">Hoạt động (Đang hợp tác)</option>
-                    <option value="NgungHopTac">Ngừng hợp tác</option>
-                  </select>
+                    onChange={(val) => setTrangThai(val)}
+                    options={[
+                      { value: 'HoatDong', label: 'Hoạt động (Đang hợp tác)' },
+                      { value: 'NgungHopTac', label: 'Ngừng hợp tác' }
+                    ]}
+                    className="w-full"
+                    searchPlaceholder="Tìm trạng thái..."
+                  />
                 </div>
               )}
 

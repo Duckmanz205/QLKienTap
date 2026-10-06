@@ -390,6 +390,7 @@ class CouncilSession {
   final String room;
   final int studentCount;
   final String status; // 'upcoming', 'ongoing', 'completed'
+  final String role;
 
   CouncilSession({
     required this.id,
@@ -399,6 +400,7 @@ class CouncilSession {
     required this.room,
     required this.studentCount,
     required this.status,
+    required this.role,
   });
 }
 
@@ -718,6 +720,7 @@ final List<CouncilSession> initialCouncils = [
     room: 'Phòng học A1.204',
     studentCount: 8,
     status: 'upcoming',
+    role: 'Chủ tịch',
   ),
 ];
 

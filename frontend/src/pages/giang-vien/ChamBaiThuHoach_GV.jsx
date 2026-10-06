@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import api, { giangVienApi } from '../../services/api';
+import SearchableDropdown from '../../components/SearchableDropdown';
 
 export default function ChamBaiThuHoach_GV() {
   const navigate = useNavigate();
@@ -19,10 +20,22 @@ export default function ChamBaiThuHoach_GV() {
   // Filter & Pagination states
   const [searchTerm, setSearchTerm] = useState(location.state?.filterMssv || '');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
-  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
-  const [searchStatusDropdown, setSearchStatusDropdown] = useState('');
-  const statusDropdownRef = useRef(null);
-
+  const [selectedDotId, setSelectedDotId] = useState('ALL');
+  const [isDotDropdownOpen, setIsDotDropdownOpen] = useState(false);
+  const [searchDotDropdown, setSearchDotDropdown] = useState('');
+  const [selectedTripId, setSelectedTripId] = useState('ALL');
+  const [isTripDropdownOpen, setIsTripDropdownOpen] = useState(false);
+  const [searchTripDropdown, setSearchTripDropdown] = useState('');
+  
+  // Bulk AI Grading states
+  const [selectedReportIds, setSelectedReportIds] = useState([]);
+  const [isBulkAiModalOpen, setIsBulkAiModalOpen] = useState(false);
+  const [bulkAiProgress, setBulkAiProgress] = useState(0);
+  const [bulkAiTotal, setBulkAiTotal] = useState(0);
+  const [bulkAiCurrentStudent, setBulkAiCurrentStudent] = useState('');
+  const [bulkAiStatusText, setBulkAiStatusText] = useState('');
+  const isBulkAiCanceled = React.useRef(false);
+  
   const [currentPage, setCurrentPage] = useState(1);
   const [limit, setLimit] = useState(15);
 
@@ -185,6 +198,97 @@ TRANG 38
    * SVTH: Lê Thị Minh Yến
 `);
 
+  const handleBulkAiGrading = async () => {
+    if (selectedReportIds.length === 0) return;
+    setIsBulkAiModalOpen(true);
+    setBulkAiTotal(selectedReportIds.length);
+    setBulkAiProgress(0);
+    setBulkAiStatusText('Khởi tạo quá trình chấm điểm hàng loạt...');
+    isBulkAiCanceled.current = false;
+
+    for (let i = 0; i < selectedReportIds.length; i++) {
+      if (isBulkAiCanceled.current) {
+        setBulkAiStatusText('Đã hủy quá trình.');
+        break;
+      }
+      const reportId = selectedReportIds[i];
+      const report = reports.find(r => r.id === reportId);
+      if (!report) continue;
+
+      const sv = report.phieuThamQuan?.phieuDangKy?.sinhVien || report.phieuDangKy?.sinhVien;
+      const studentName = sv?.ho_ten || 'Sinh viên';
+      setBulkAiCurrentStudent(studentName);
+      setBulkAiStatusText(`Đang tải dữ liệu bài nộp...`);
+      
+      try {
+        let apiPath = report.file_bao_cao;
+        if (!apiPath) {
+          setBulkAiStatusText(`Thất bại: Không có file đính kèm`);
+          continue;
+        }
+        if (apiPath.startsWith('reports/')) apiPath = `upload/file/${apiPath}`;
+        else if (!apiPath.startsWith('upload/file/')) apiPath = `upload/file/reports/${apiPath}`;
+        if (apiPath.startsWith('/')) apiPath = apiPath.substring(1);
+        
+        const txtApiPath = '/' + apiPath.replace(/\.\w+$/, '.txt');
+        let textToAnalyze = '';
+        try {
+          const respTxt = await api.get(txtApiPath, { responseType: 'text' });
+          if (respTxt.data) textToAnalyze = respTxt.data;
+        } catch (e) {
+          setBulkAiStatusText(`Thất bại: Chưa trích xuất được text cho bài này`);
+          continue;
+        }
+
+        if (!textToAnalyze) {
+           setBulkAiStatusText(`Thất bại: Nội dung văn bản trống`);
+           continue; 
+        }
+
+        setBulkAiStatusText(`Đang phân tích và chấm điểm bằng AI...`);
+        const aiRes = await fetch('http://localhost:8000/grade', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer satori_2026_secure_key'
+          },
+          body: JSON.stringify({ document_text: textToAnalyze })
+        });
+
+        if (!aiRes.ok) {
+           setBulkAiStatusText(`Thất bại: Lỗi từ máy chủ AI`);
+           continue;
+        }
+        
+        const aiData = await aiRes.json();
+        setBulkAiStatusText(`Đang lưu đề xuất điểm ${aiData.diem_bao_cao_cuoi_cung}...`);
+        
+        let aiComment = `1. Hình thức: ${aiData.hinh_thuc_tong_quan?.ly_do_hinh_thuc}\n` +
+                        `2. Tổng quan: ${aiData.hinh_thuc_tong_quan?.ly_do_tong_quan}\n` +
+                        `3. Quy trình: ${aiData.quy_trinh_cong_nghe?.ly_do_quy_trinh}\n` +
+                        `4. VSATTP: ${aiData.vsattp?.ly_do_vsattp}`;
+        
+        await api.post('/giang-vien/save-ai-grade', {
+            reportId: reportId,
+            score: aiData.diem_bao_cao_cuoi_cung,
+            comment: aiComment
+        });
+        
+        setBulkAiProgress(prev => prev + 1);
+        
+      } catch (err) {
+        console.error(err);
+        setBulkAiStatusText(`Thất bại: Có lỗi xảy ra trong quá trình xử lý`);
+      }
+    }
+    
+    if (!isBulkAiCanceled.current) {
+      setBulkAiStatusText('Hoàn tất chấm điểm hàng loạt!');
+    }
+    if (lecturer) fetchReports(lecturer.id);
+    setSelectedReportIds([]);
+  };
+
   const handleAIGrading = async () => {
     setIsGradingAI(true);
     try {
@@ -260,8 +364,8 @@ TRANG 38
 
   const handleSelectReport = async (report) => {
     setSelectedReport(report);
-    setScore(report.diem_thu_hoach !== null ? report.diem_thu_hoach : '');
-    setComments(report.nhan_xet_cua_giang_vien || '');
+    setScore(report.diem_thu_hoach !== null ? report.diem_thu_hoach : (report.diem_ai_de_xuat !== null ? report.diem_ai_de_xuat : ''));
+    setComments(report.nhan_xet_cua_giang_vien || report.nhan_xet_thu_hoach || '');
 
     if (report.file_bao_cao) {
       setIsLoadingText(true);
@@ -328,9 +432,34 @@ TRANG 38
     }
   };
 
+  const uniqueDots = React.useMemo(() => {
+    const dotsMap = new Map();
+    reports.forEach(r => {
+      const ctq = r.phieuThamQuan?.phieuDangKy?.chuyenThamQuan || r.phieuDangKy?.chuyenThamQuan;
+      const dot = ctq?.lichKienTap?.dotKienTap;
+      if (dot) {
+        dotsMap.set(dot.id, dot.ten_dot);
+      }
+    });
+    return Array.from(dotsMap.entries()).map(([id, name]) => ({ id, name }));
+  }, [reports]);
+
+  const uniqueTrips = React.useMemo(() => {
+    const tripsMap = new Map();
+    reports.forEach(r => {
+      const ctq = r.phieuThamQuan?.phieuDangKy?.chuyenThamQuan || r.phieuDangKy?.chuyenThamQuan;
+      const dot = ctq?.lichKienTap?.dotKienTap;
+      if (ctq && (selectedDotId === 'ALL' || (dot && dot.id === selectedDotId))) {
+        tripsMap.set(ctq.id, ctq.nhaMay?.ten_nha_may || 'Chuyến đi không tên');
+      }
+    });
+    return Array.from(tripsMap.entries()).map(([id, name]) => ({ id, name }));
+  }, [reports, selectedDotId]);
+
   const filteredReports = reports.filter(r => {
+    const ctq = r.phieuThamQuan?.phieuDangKy?.chuyenThamQuan || r.phieuDangKy?.chuyenThamQuan;
     const sv = r.phieuThamQuan?.phieuDangKy?.sinhVien || r.phieuDangKy?.sinhVien || {};
-    const nhaMay = r.phieuThamQuan?.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || r.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || '';
+    const nhaMay = ctq?.nhaMay?.ten_nha_may || '';
     const matchSearch = !searchTerm || 
       (sv.ho_ten && sv.ho_ten.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (sv.mssv && sv.mssv.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -341,11 +470,29 @@ TRANG 38
       (selectedStatus === 'PENDING' && !isGraded) || 
       (selectedStatus === 'GRADED' && isGraded);
 
-    return matchSearch && matchStatus;
+    const matchDot = selectedDotId === 'ALL' || ctq?.lichKienTap?.dotKienTap?.id === selectedDotId;
+    const matchTrip = selectedTripId === 'ALL' || ctq?.id === selectedTripId;
+
+    return matchSearch && matchStatus && matchDot && matchTrip;
   });
 
   const totalPages = Math.ceil(filteredReports.length / limit) || 1;
   const paginatedReports = filteredReports.slice((currentPage - 1) * limit, currentPage * limit);
+
+  const groupedPaginatedReports = React.useMemo(() => {
+    const groups = {};
+    paginatedReports.forEach(report => {
+      const ctq = report.phieuThamQuan?.phieuDangKy?.chuyenThamQuan || report.phieuDangKy?.chuyenThamQuan;
+      const tripId = ctq?.id || 'unknown';
+      const nhaMay = ctq?.nhaMay?.ten_nha_may || 'Chuyến đi khác';
+      
+      if (!groups[tripId]) {
+        groups[tripId] = { nhaMay, reports: [] };
+      }
+      groups[tripId].reports.push(report);
+    });
+    return groups;
+  }, [paginatedReports]);
 
   // ---------------------------------------------------------
   // VIEW 1: LIST OF REPORTS
@@ -369,162 +516,311 @@ TRANG 38
         </div>
       </div>
 
+      {/* Tabs */}
+      <div className="flex items-center gap-6 border-b border-[#E7E0C4] px-2 mb-6 mt-4">
+        {[
+          { id: 'ALL', label: 'Tất cả bài nộp', count: reports.length },
+          { id: 'PENDING', label: 'Chờ chấm', count: reports.filter(r => r.diem_thu_hoach === null).length },
+          { id: 'GRADED', label: 'Đã chấm', count: reports.filter(r => r.diem_thu_hoach !== null).length }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => {
+              setSelectedStatus(tab.id);
+              setCurrentPage(1);
+            }}
+            className={`pb-3 text-sm font-bold transition-all relative ${
+              selectedStatus === tab.id 
+                ? 'text-[#407F3E]' 
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            {tab.label} <span className={`ml-1.5 px-2 py-0.5 rounded-full text-xs ${selectedStatus === tab.id ? 'bg-[#407F3E]/10 text-[#407F3E]' : 'bg-slate-100 text-slate-500'}`}>{tab.count}</span>
+            {selectedStatus === tab.id && (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#407F3E] rounded-t-full" />
+            )}
+          </button>
+        ))}
+      </div>
+
       {/* Filter Bar */}
-      <div className="bg-white p-4 rounded-xl border border-[#E7E0C4] shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-        <div className="flex flex-1 flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          {/* Search Input */}
-          <div className="relative flex-1">
+      <div className="bg-white p-4 rounded-xl border border-[#E7E0C4] shadow-sm flex flex-col md:flex-row items-center justify-between gap-4 mb-4">
+        <div className="flex-1 w-full flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1 min-w-[200px]">
             <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Tìm kiếm sinh viên, MSSV, nhà máy..."
+              placeholder="Tìm sinh viên, MSSV..."
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full pl-9 pr-4 py-2 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E] bg-slate-50/50"
+              className="w-full pl-9 pr-4 py-2 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E] bg-slate-50/50 transition-colors hover:bg-white"
             />
           </div>
-
-          {/* Popover Dropdown Status */}
-          <div className="relative" ref={statusDropdownRef}>
-            <button
-              type="button"
-              onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
-              className="w-full sm:w-56 px-3.5 py-2 border border-[#E7E0C4] rounded-lg text-sm font-medium bg-slate-50/50 text-slate-700 flex items-center justify-between hover:bg-slate-100 transition-colors shadow-sm"
+          {/* Dot Kien Tap Dropdown */}
+          <div className="relative min-w-[160px] w-full sm:w-48" onClick={(e) => e.stopPropagation()}>
+            <div 
+              onClick={() => { setIsDotDropdownOpen(!isDotDropdownOpen); setIsTripDropdownOpen(false); }}
+              className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isDotDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
             >
-              <div className="flex items-center gap-2 truncate">
-                <Filter className="w-4 h-4 text-slate-400 shrink-0" />
-                <span className="truncate">
-                  {selectedStatus === 'ALL' && 'Tất cả trạng thái'}
-                  {selectedStatus === 'PENDING' && 'Chờ chấm'}
-                  {selectedStatus === 'GRADED' && 'Đã chấm'}
-                </span>
-              </div>
-              <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isStatusDropdownOpen ? 'rotate-180' : ''}`} />
-            </button>
-
-            {isStatusDropdownOpen && (
-              <div className="absolute left-0 right-0 sm:right-auto sm:w-56 mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-50 py-1 flex flex-col">
+              <span className="truncate pr-2 font-medium text-slate-700">
+                {selectedDotId === 'ALL' ? 'Tất cả đợt' : uniqueDots.find(d => d.id === selectedDotId)?.name || 'Đợt kiến tập'}
+              </span>
+              <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+            </div>
+            {isDotDropdownOpen && (
+              <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[220px]">
                 <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
                   <input 
                     type="text" 
-                    placeholder="Tìm trạng thái..." 
-                    value={searchStatusDropdown}
-                    onChange={(e) => setSearchStatusDropdown(e.target.value)}
+                    placeholder="Tìm đợt..." 
+                    value={searchDotDropdown}
+                    onChange={(e) => setSearchDotDropdown(e.target.value)}
                     onClick={(e) => e.stopPropagation()}
                     className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
                   />
                 </div>
                 <div className="max-h-60 overflow-y-auto">
-                  {[
-                    { value: 'ALL', label: 'Tất cả trạng thái' },
-                    { value: 'PENDING', label: 'Chờ chấm' },
-                    { value: 'GRADED', label: 'Đã chấm' }
-                  ]
-                    .filter(opt => opt.label.toLowerCase().includes(searchStatusDropdown.toLowerCase()))
-                    .map(opt => (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => {
-                          setSelectedStatus(opt.value);
-                          setIsStatusDropdownOpen(false);
-                          setSearchStatusDropdown('');
-                          setCurrentPage(1);
-                        }}
-                        className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between hover:bg-slate-50 transition-colors ${selectedStatus === opt.value ? 'bg-[#E7E0C4]/40 font-bold text-[#407F3E]' : 'text-slate-700'}`}
-                      >
-                        <span>{opt.label}</span>
-                        {selectedStatus === opt.value && <Check className="w-4 h-4 text-[#407F3E]" />}
-                      </button>
-                    ))}
-                  {[
-                    { value: 'ALL', label: 'Tất cả trạng thái' },
-                    { value: 'PENDING', label: 'Chờ chấm' },
-                    { value: 'GRADED', label: 'Đã chấm' }
-                  ].filter(opt => opt.label.toLowerCase().includes(searchStatusDropdown.toLowerCase())).length === 0 && (
-                    <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy</div>
+                  <div 
+                    onClick={() => { setSelectedDotId('ALL'); setSelectedTripId('ALL'); setIsDotDropdownOpen(false); setSearchDotDropdown(''); setCurrentPage(1); }}
+                    className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                      selectedDotId === 'ALL' ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                    }`}
+                  >
+                    <span>Tất cả đợt</span>
+                    {selectedDotId === 'ALL' && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                  </div>
+                  {uniqueDots
+                    .filter(d => d.name.toLowerCase().includes(searchDotDropdown.toLowerCase()))
+                    .map(d => (
+                    <div 
+                      key={d.id}
+                      onClick={() => { setSelectedDotId(d.id); setSelectedTripId('ALL'); setIsDotDropdownOpen(false); setSearchDotDropdown(''); setCurrentPage(1); }}
+                      className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                        selectedDotId === d.id ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                      }`}
+                    >
+                      <span className="truncate pr-2">{d.name}</span>
+                      {selectedDotId === d.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                    </div>
+                  ))}
+                  {uniqueDots.filter(d => d.name.toLowerCase().includes(searchDotDropdown.toLowerCase())).length === 0 && (
+                    <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy đợt</div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {/* Trip Dropdown */}
+          <div className="relative min-w-[200px] w-full sm:w-56" onClick={(e) => e.stopPropagation()}>
+            <div 
+              onClick={() => { setIsTripDropdownOpen(!isTripDropdownOpen); setIsDotDropdownOpen(false); }}
+              className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isTripDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+            >
+              <span className="truncate pr-2 font-medium text-slate-700">
+                {selectedTripId === 'ALL' ? 'Tất cả chuyến đi' : uniqueTrips.find(t => t.id === selectedTripId)?.name || 'Chuyến đi'}
+              </span>
+              <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+            </div>
+            {isTripDropdownOpen && (
+              <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[250px]">
+                <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
+                  <input 
+                    type="text" 
+                    placeholder="Tìm chuyến đi..." 
+                    value={searchTripDropdown}
+                    onChange={(e) => setSearchTripDropdown(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
+                  />
+                </div>
+                <div className="max-h-60 overflow-y-auto">
+                  <div 
+                    onClick={() => { setSelectedTripId('ALL'); setIsTripDropdownOpen(false); setSearchTripDropdown(''); setCurrentPage(1); }}
+                    className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                      selectedTripId === 'ALL' ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                    }`}
+                  >
+                    <span>Tất cả chuyến đi</span>
+                    {selectedTripId === 'ALL' && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                  </div>
+                  {uniqueTrips
+                    .filter(t => t.name.toLowerCase().includes(searchTripDropdown.toLowerCase()))
+                    .map(t => (
+                    <div 
+                      key={t.id}
+                      onClick={() => { setSelectedTripId(t.id); setIsTripDropdownOpen(false); setSearchTripDropdown(''); setCurrentPage(1); }}
+                      className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                        selectedTripId === t.id ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                      }`}
+                    >
+                      <span className="truncate pr-2">{t.name}</span>
+                      {selectedTripId === t.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                    </div>
+                  ))}
+                  {uniqueTrips.filter(t => t.name.toLowerCase().includes(searchTripDropdown.toLowerCase())).length === 0 && (
+                    <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy chuyến đi</div>
                   )}
                 </div>
               </div>
             )}
           </div>
         </div>
-
-        <div className="text-xs text-slate-500 font-medium">
-          Tìm thấy: <span className="font-bold text-slate-700">{filteredReports.length}</span> bài nộp
+        <div className="flex items-center gap-4 shrink-0">
+          {selectedReportIds.length > 0 && (
+            <button
+              onClick={handleBulkAiGrading}
+              className="px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white text-sm font-bold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer"
+            >
+              <Sparkles className="w-4 h-4" />
+              Chấm AI ({selectedReportIds.length})
+            </button>
+          )}
+          <div className="text-xs text-slate-500 font-medium">
+            Đang hiển thị: <span className="font-bold text-[#407F3E]">{filteredReports.length}</span> bài
+          </div>
         </div>
       </div>
 
-      {/* Grid of Report Cards */}
+      {/* Table of Reports */}
       {paginatedReports.length === 0 ? (
-        <div className="p-8 text-center text-slate-500 bg-white rounded-2xl border border-[#E7E0C4]">
-          {reports.length === 0 ? 'Không có bài thu hoạch nào.' : 'Không tìm thấy bài thu hoạch nào phù hợp với bộ lọc.'}
+        <div className="p-12 text-center flex flex-col items-center justify-center bg-white rounded-2xl border border-[#E7E0C4] border-dashed">
+          <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+            <FileText className="w-8 h-8 text-slate-300" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-700 mb-1">Chưa có dữ liệu</h3>
+          <p className="text-sm text-slate-500 max-w-sm">
+            {reports.length === 0 ? 'Hiện chưa có bài thu hoạch nào được nộp.' : 'Không tìm thấy bài thu hoạch nào phù hợp với bộ lọc.'}
+          </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {paginatedReports.map((report) => {
-            const isGraded = report.diem_thu_hoach !== null;
-            const sv = report.phieuThamQuan?.phieuDangKy?.sinhVien || report.phieuDangKy?.sinhVien || {};
-            const nhaMay = report.phieuThamQuan?.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || report.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Chuyến đi';
-            
-            return (
-              <div 
-                key={report.id} 
-                onClick={() => handleSelectReport(report)}
-                className="bg-white border border-[#E7E0C4] rounded-2xl overflow-hidden shadow-sm hover:border-[#407F3E] hover:shadow-md transition-all cursor-pointer group flex flex-col h-full"
-              >
-                {/* Card Header */}
-                <div className={`px-6 py-4 border-b border-[#E7E0C4] flex items-center justify-between ${isGraded ? 'bg-slate-50/50' : 'bg-[#DBD468]/10'}`}>
-                  <div className="flex items-center gap-3 truncate">
-                    <h2 className="font-black text-slate-800 text-lg group-hover:text-[#407F3E] transition-colors truncate">{nhaMay}</h2>
-                  </div>
-                </div>
-                
-                {/* Card Body */}
-                <div className="p-6 flex-1 flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-8 h-8 rounded-full bg-[#E7E0C4]/30 text-[#407F3E] font-bold border border-[#E7E0C4] flex items-center justify-center shrink-0">
-                        {sv.ho_ten?.charAt(0) || <User className="w-4 h-4"/>}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold text-slate-800 truncate">{sv.ho_ten}</p>
-                        <p className="text-[10px] font-medium text-slate-500">MSSV: {sv.mssv}</p>
-                      </div>
-                    </div>
+        <div className="bg-white border border-[#E7E0C4] rounded-2xl shadow-sm overflow-hidden mb-6">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[800px]">
+              <thead>
+                <tr className="bg-slate-50 border-b border-[#E7E0C4] text-xs uppercase tracking-wider text-slate-500 font-bold">
+                  <th className="px-6 py-4 w-12 text-center">
+                    <input 
+                      type="checkbox" 
+                      className="w-4 h-4 text-[#407F3E] rounded border-slate-300 focus:ring-[#407F3E] cursor-pointer"
+                      checked={paginatedReports.length > 0 && paginatedReports.filter(r => r.diem_thu_hoach === null).length > 0 && selectedReportIds.length >= paginatedReports.filter(r => r.diem_thu_hoach === null).length}
+                      onChange={(e) => {
+                        const pendingIds = paginatedReports.filter(r => r.diem_thu_hoach === null).map(r => r.id);
+                        if (e.target.checked) {
+                          setSelectedReportIds(Array.from(new Set([...selectedReportIds, ...pendingIds])));
+                        } else {
+                          setSelectedReportIds(selectedReportIds.filter(id => !pendingIds.includes(id)));
+                        }
+                      }}
+                    />
+                  </th>
+                  <th className="px-6 py-4 w-1/3">Sinh viên</th>
+                  <th className="px-6 py-4 w-1/3">Bài nộp</th>
+                  <th className="px-6 py-4 text-right">Trạng thái</th>
+                  <th className="px-6 py-4 text-center w-16"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#E7E0C4]">
+                {Object.values(groupedPaginatedReports).map((group, groupIdx) => (
+                  <React.Fragment key={groupIdx}>
+                    <tr className="bg-slate-100/50 border-y border-[#E7E0C4]">
+                      <td colSpan="5" className="px-6 py-2.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-700 text-sm">{group.nhaMay}</span>
+                          <span className="px-2 py-0.5 rounded-full bg-[#E7E0C4]/50 text-slate-600 text-[10px] uppercase font-bold tracking-wider">
+                            {group.reports.length} bài
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                    {group.reports.map((report) => {
+                      const isGraded = report.diem_thu_hoach !== null;
+                      const sv = report.phieuThamQuan?.phieuDangKy?.sinhVien || report.phieuDangKy?.sinhVien || {};
+                      
+                      // Tạo avatar chữ cái
+                      const initial = sv.ho_ten ? sv.ho_ten.charAt(0).toUpperCase() : 'U';
+                      const avatarColors = [
+                        'bg-blue-100 text-blue-700', 
+                        'bg-green-100 text-green-700', 
+                        'bg-purple-100 text-purple-700', 
+                        'bg-orange-100 text-orange-700', 
+                        'bg-pink-100 text-pink-700'
+                      ];
+                      const avatarColor = avatarColors[(sv.mssv || '0').charCodeAt(0) % avatarColors.length];
 
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Trạng thái:</span>
-                      {isGraded ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-[#89B449]/10 text-[#407F3E]">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Đã chấm ({report.diem_thu_hoach}/10)
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-[#DBD468] text-slate-800 shadow-sm">
-                          <div className="w-1.5 h-1.5 rounded-full bg-slate-800 animate-pulse"></div> Chờ chấm
-                        </span>
-                      )}
-                    </div>
-                    
-                    <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200 mb-6">
-                      <FileText className="w-8 h-8 text-[#407F3E]" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold text-slate-700 truncate">{report.file_url_bao_cao || 'BaoCao.pdf'}</p>
-                        <p className="text-[10px] font-medium text-slate-400 mt-0.5">{new Date(report.ngay_nop).toLocaleDateString('vi-VN')}</p>
-                      </div>
-                    </div>
-                  </div>
+                  return (
+                    <tr 
+                      key={report.id}
+                      onClick={() => handleSelectReport(report)}
+                      className="hover:bg-slate-50 transition-colors cursor-pointer group"
+                    >
+                      <td className="px-6 py-4 text-center" onClick={e => e.stopPropagation()}>
+                        <input 
+                          type="checkbox" 
+                          className="w-4 h-4 text-[#407F3E] rounded border-slate-300 focus:ring-[#407F3E] disabled:opacity-50 cursor-pointer"
+                          disabled={isGraded}
+                          checked={selectedReportIds.includes(report.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) setSelectedReportIds([...selectedReportIds, report.id]);
+                            else setSelectedReportIds(selectedReportIds.filter(id => id !== report.id));
+                          }}
+                        />
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-lg shrink-0 ${avatarColor}`}>
+                            {initial}
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-slate-800 group-hover:text-[#407F3E] transition-colors">{sv.ho_ten}</p>
+                            <p className="text-[11px] font-medium text-slate-500">{sv.mssv}</p>
+                          </div>
+                        </div>
+                      </td>
+                      
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0 border border-red-100">
+                            <FileText className="w-4 h-4 text-red-500" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold text-slate-700 truncate max-w-[150px]">{report.file_url_bao_cao || 'BaoCao.pdf'}</p>
+                            <p className="text-[10px] font-medium text-slate-400 mt-0.5">{new Date(report.ngay_nop).toLocaleDateString('vi-VN')}</p>
+                          </div>
+                        </div>
+                      </td>
 
-                  <div className="flex items-center justify-end text-[#407F3E] font-bold text-sm mt-4">
-                    {isGraded ? 'Xem lại bài làm' : 'Bắt đầu chấm bài'} <ChevronRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+                      <td className="px-6 py-4 text-right">
+                        {isGraded ? (
+                          <div className="flex flex-col items-end">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-[#89B449]/10 text-[#407F3E]">
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Đã chấm
+                            </span>
+                            <span className="text-[13px] font-black text-slate-800 mt-1.5">{report.diem_thu_hoach}/10</span>
+                          </div>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-[#DBD468]/20 text-[#B8A31D] shadow-sm">
+                            <div className="w-1.5 h-1.5 rounded-full bg-[#B8A31D] animate-pulse"></div> Chờ chấm
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="px-6 py-4 text-center">
+                        <button className="w-8 h-8 rounded-full flex items-center justify-center text-slate-300 group-hover:bg-[#407F3E] group-hover:text-white transition-all ml-auto">
+                          <ChevronRight className="w-5 h-5" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -532,20 +828,21 @@ TRANG 38
       <div className="p-4 border border-[#E7E0C4] bg-white rounded-xl shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
           <span>Hiển thị</span>
-          <select 
+          <SearchableDropdown 
+            options={[
+              { value: 15, label: '15' },
+              { value: 30, label: '30' },
+              { value: 50, label: '50' },
+              { value: 100, label: '100' }
+            ]}
             value={limit}
-            onChange={(e) => {
-              const newLimit = Number(e.target.value);
+            onChange={(newLimit) => {
               setLimit(newLimit);
               setCurrentPage(1);
             }}
-            className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
-          >
-            <option value={15}>15</option>
-            <option value={30}>30</option>
-            <option value={50}>50</option>
-            <option value={100}>100</option>
-          </select>
+            searchPlaceholder="Tìm số lượng..."
+            className="min-w-[80px]"
+          />
           <span>/ {filteredReports.length} bài thu hoạch</span>
         </div>
         <div className="flex items-center gap-1.5">
@@ -643,9 +940,7 @@ TRANG 38
             
             {/* Student Info Card */}
             <div className="bg-white rounded-xl p-4 border border-[#E7E0C4] shadow-sm flex items-start gap-3">
-              <div className="w-12 h-12 rounded-full bg-[#E7E0C4]/30 text-[#407F3E] font-bold border border-[#E7E0C4] flex items-center justify-center shrink-0 text-lg">
-                {sv.ho_ten?.charAt(0) || 'S'}
-              </div>
+
               <div>
                 <h3 className="font-bold text-slate-800 text-sm leading-tight mb-1">{sv.ho_ten}</h3>
                 <p className="text-[11px] font-medium text-slate-500 mb-1">MSSV: {sv.mssv}</p>
@@ -762,7 +1057,10 @@ TRANG 38
   };
 
   return (
-    <div className={selectedReport ? '' : 'bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300'}>
+    <div 
+      className={selectedReport ? '' : 'bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300'}
+      onClick={() => { setIsTripDropdownOpen(false); setIsDotDropdownOpen(false); }}
+    >
       {selectedReport ? renderGradingView() : renderReportList()}
 
       {/* AI Grading Details Modal */}
@@ -908,6 +1206,62 @@ TRANG 38
                   <CheckCircle2 className="w-4 h-4" /> Sử dụng đề xuất này
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Bulk AI Grading Modal */}
+      {isBulkAiModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-[#E7E0C4] bg-[#fdfcf8] flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                  <Sparkles className="w-4 h-4 text-blue-600" />
+                </div>
+                <h2 className="font-bold text-slate-800">Chấm điểm AI hàng loạt</h2>
+              </div>
+            </div>
+            
+            <div className="p-6">
+              <div className="mb-4">
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="font-semibold text-slate-600">Tiến trình</span>
+                  <span className="font-bold text-[#407F3E]">{bulkAiProgress} / {bulkAiTotal}</span>
+                </div>
+                <div className="w-full bg-slate-200 rounded-full h-3">
+                  <div 
+                    className="bg-gradient-to-r from-[#89B449] to-[#407F3E] h-3 rounded-full transition-all duration-300"
+                    style={{ width: `${(bulkAiTotal > 0 ? bulkAiProgress / bulkAiTotal : 0) * 100}%` }}
+                  ></div>
+                </div>
+              </div>
+              
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm">
+                <p className="font-semibold text-slate-700 mb-1 truncate">Đang xử lý: {bulkAiCurrentStudent}</p>
+                <p className="text-slate-500 animate-pulse">{bulkAiStatusText}</p>
+              </div>
+            </div>
+            
+            <div className="px-6 py-4 border-t border-[#E7E0C4] bg-slate-50 flex justify-end">
+              {bulkAiProgress === bulkAiTotal || isBulkAiCanceled.current ? (
+                <button
+                  onClick={() => setIsBulkAiModalOpen(false)}
+                  className="px-5 py-2 rounded-lg bg-[#407F3E] text-white font-bold hover:bg-[#407F3E]/90 transition-colors cursor-pointer"
+                >
+                  Đóng
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    isBulkAiCanceled.current = true;
+                    setBulkAiStatusText('Đang dừng tiến trình...');
+                  }}
+                  className="px-5 py-2 rounded-lg border border-red-200 text-red-600 font-bold hover:bg-red-50 transition-colors cursor-pointer"
+                >
+                  Hủy tiến trình
+                </button>
+              )}
             </div>
           </div>
         </div>

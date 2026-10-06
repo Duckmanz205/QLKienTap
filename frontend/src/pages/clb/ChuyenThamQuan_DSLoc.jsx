@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { 
-  Plus, ChevronDown, Check, X, Calendar, Clock, MapPin, 
+import {
+  Plus, ChevronDown, Check, X, Calendar, Clock, MapPin,
   ChevronRight, Users, CheckCircle2, XCircle, RefreshCw, Search,
   MoreVertical, Edit, PlayCircle, Trash2, CheckCircle, RotateCcw, Download
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { khoaApi } from '../../services/api';
 import { getValidSession } from '../../utils/auth';
+import SearchableDropdown from '../../components/SearchableDropdown';
 
 export default function ChuyenThamQuan_DSLoc() {
   const [activeTab, setActiveTab] = useState('khoa'); // 'khoa' | 'tudo'
@@ -23,7 +24,7 @@ export default function ChuyenThamQuan_DSLoc() {
   const [tripsKhoa, setTripsKhoa] = useState([]);
   const [tripsTuDo, setTripsTuDo] = useState([]);
   const [loading, setLoading] = useState(false);
-  
+
   // Tab 1 filters & pagination
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('ALL');
@@ -49,11 +50,11 @@ export default function ChuyenThamQuan_DSLoc() {
   // Modal Data
   const [nhaMayOptions, setNhaMayOptions] = useState([]);
   const [lichOptions, setLichOptions] = useState([]);
-  
+
   // Dropdown States for Modal
   const [isNhaMayDropdownOpen, setIsNhaMayDropdownOpen] = useState(false);
   const [selectedNhaMay, setSelectedNhaMay] = useState('');
-  
+
   const [isLichDropdownOpen, setIsLichDropdownOpen] = useState(false);
   const [selectedLich, setSelectedLich] = useState('');
 
@@ -64,11 +65,11 @@ export default function ChuyenThamQuan_DSLoc() {
   // Form states
   const [ngay, setNgay] = useState('');
   const [gioBatDau, setGioBatDau] = useState('');
-  const [gioKetThuc, setGioKetThuc] = useState('');
   const [sucChua, setSucChua] = useState('');
   const [lePhi, setLePhi] = useState(0);
   const [diaDiemTapTrung, setDiaDiemTapTrung] = useState('');
-  
+  const [hanDongLePhi, setHanDongLePhi] = useState('');
+
   // Toast Popup State
   const [popup, setPopup] = useState({ show: false, message: '', type: 'success' });
   const showPopup = (message, type = 'success') => {
@@ -93,6 +94,17 @@ export default function ChuyenThamQuan_DSLoc() {
   });
   const [selectedStudentIds, setSelectedStudentIds] = useState([]);
 
+  // Cancel Trip State
+  const [cancelTripId, setCancelTripId] = useState(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+
+  // Approve Trip (Lecturer Selection) Modal State
+  const [isLecturerModalOpen, setIsLecturerModalOpen] = useState(false);
+  const [lecturers, setLecturers] = useState([]);
+  const [selectedLecturerId, setSelectedLecturerId] = useState('');
+  const [pendingApprovalTripId, setPendingApprovalTripId] = useState(null);
+
 
   useEffect(() => {
     fetchInitialData();
@@ -101,12 +113,14 @@ export default function ChuyenThamQuan_DSLoc() {
 
   const fetchInitialData = async () => {
     try {
-      const [facRes, schRes] = await Promise.all([
+      const [facRes, schRes, lecRes] = await Promise.all([
         khoaApi.getFactories(),
-        khoaApi.getSchedules()
+        khoaApi.getSchedules(),
+        khoaApi.getLecturers()
       ]);
       setNhaMayOptions(facRes.data);
       setLichOptions(schRes.data);
+      setLecturers(lecRes.data);
     } catch (err) {
       console.error(err);
     }
@@ -137,6 +151,7 @@ export default function ChuyenThamQuan_DSLoc() {
     setSucChua('');
     setLePhi(0);
     setDiaDiemTapTrung('');
+    setHanDongLePhi('');
     setIsEditMode(false);
     setCurrentEditingTrip(null);
   };
@@ -156,6 +171,7 @@ export default function ChuyenThamQuan_DSLoc() {
     setSucChua(t.suc_chua);
     setLePhi(t.le_phi || 0);
     setDiaDiemTapTrung(t.dia_diem_tap_trung || '');
+    setHanDongLePhi(t.han_dong_le_phi ? new Date(t.han_dong_le_phi).toISOString().slice(0, 16) : '');
     setIsModalOpen(true);
   };
 
@@ -173,7 +189,8 @@ export default function ChuyenThamQuan_DSLoc() {
       hinh_thuc: selectedHinhThuc === 'Trực tuyến' ? 'TrucTuyen' : 'TrucTiep',
       suc_chua: Number(sucChua),
       le_phi: Number(lePhi),
-      dia_diem_tap_trung: diaDiemTapTrung
+      dia_diem_tap_trung: diaDiemTapTrung,
+      han_dong_le_phi: hanDongLePhi || null
     };
 
     try {
@@ -205,8 +222,41 @@ export default function ChuyenThamQuan_DSLoc() {
     });
   };
 
+  const handleCancelTrip = (id) => {
+    setCancelTripId(id);
+    setCancelReason('');
+    setIsCancelModalOpen(true);
+  };
+
+  const confirmCancelTrip = async () => {
+    if (!cancelReason || cancelReason.trim().length < 5) {
+      showPopup('Vui lòng nhập lý do hủy (ít nhất 5 ký tự)', 'error');
+      return;
+    }
+    try {
+      const res = await khoaApi.cancelTrip(cancelTripId, cancelReason.trim());
+      showPopup(
+        `Đã hủy chuyến thành công. ${res.data.cancelledRegistrations} phiếu đăng ký bị ảnh hưởng.`,
+        'success',
+      );
+      setIsCancelModalOpen(false);
+      setCancelTripId(null);
+      setCancelReason('');
+      fetchTrips();
+    } catch (err) {
+      showPopup(err.response?.data?.message || 'Lỗi khi hủy chuyến tham quan', 'error');
+    }
+  };
+
   const handlePreviewAssignStudents = async (tripId) => {
     try {
+      const currentTrip = tripsKhoa.find(t => t.id === tripId) || tripsTuDo.find(t => t.id === tripId);
+      if (currentTrip && currentTrip.han_dong_le_phi) {
+        setDeadlineDate(new Date(currentTrip.han_dong_le_phi).toISOString().slice(0, 16));
+      } else {
+        setDeadlineDate('');
+      }
+
       const res = await khoaApi.previewAssignStudents({ tripId });
       setPreviewData({
         tripId,
@@ -227,10 +277,10 @@ export default function ChuyenThamQuan_DSLoc() {
       return;
     }
     try {
-      await khoaApi.confirmAssignStudents({ 
-        tripId: previewData.tripId, 
+      await khoaApi.confirmAssignStudents({
+        tripId: previewData.tripId,
         acceptedStudentIds: selectedStudentIds,
-        deadlineDate 
+        deadlineDate
       });
       showPopup('Chốt danh sách thành công', 'success');
       setIsPreviewModalOpen(false);
@@ -257,11 +307,18 @@ export default function ChuyenThamQuan_DSLoc() {
       showPopup('Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.', 'error');
       return;
     }
-    
+
+    if (isApproved) {
+      setPendingApprovalTripId(tripId);
+      setSelectedLecturerId('');
+      setIsLecturerModalOpen(true);
+      return;
+    }
+
     const action = async () => {
       try {
         await khoaApi.approveTrip({ tripId, approverId: currentUser.id, isApproved });
-        showPopup(isApproved ? 'Duyệt chuyến tham quan thành công' : 'Từ chối chuyến tham quan thành công', 'success');
+        showPopup('Từ chối chuyến tham quan thành công', 'success');
         fetchTrips();
       } catch (err) {
         console.error(err);
@@ -269,10 +326,28 @@ export default function ChuyenThamQuan_DSLoc() {
       }
     };
 
-    if (!isApproved) {
-      showConfirm("Xác nhận từ chối", "Bạn có chắc chắn muốn từ chối chuyến tham quan này?", action);
-    } else {
-      action();
+    showConfirm("Xác nhận từ chối", "Bạn có chắc chắn muốn từ chối chuyến tham quan này?", action);
+  };
+
+  const submitApproveWithLecturer = async () => {
+    if (!selectedLecturerId) {
+      showPopup('Vui lòng chọn giảng viên dẫn đoàn', 'error');
+      return;
+    }
+    
+    try {
+      await khoaApi.approveTrip({ 
+        tripId: pendingApprovalTripId, 
+        approverId: currentUser.id, 
+        isApproved: true,
+        giangVienId: parseInt(selectedLecturerId)
+      });
+      showPopup('Duyệt chuyến tham quan và phân công giảng viên thành công', 'success');
+      setIsLecturerModalOpen(false);
+      fetchTrips();
+    } catch (err) {
+      console.error(err);
+      showPopup(err.response?.data?.message || 'Có lỗi xảy ra khi xử lý yêu cầu', 'error');
     }
   };
 
@@ -304,7 +379,7 @@ export default function ChuyenThamQuan_DSLoc() {
     }
     const rect = e.currentTarget.getBoundingClientRect();
     const spaceBelow = window.innerHeight - rect.bottom;
-    const menuHeight = 135; 
+    const menuHeight = 135;
     let top = rect.bottom + 4;
     if (spaceBelow < menuHeight) {
       top = rect.top - menuHeight - 4;
@@ -324,12 +399,11 @@ export default function ChuyenThamQuan_DSLoc() {
 
   return (
     <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300 relative" onClick={closeAllDropdowns}>
-      
+
       {/* Custom Popup Toast */}
       {popup.show && (
-        <div className="fixed inset-0 z-[9999] flex items-start justify-center pt-24 pointer-events-none">
-          <div className="absolute inset-0 bg-transparent pointer-events-auto" onClick={() => setPopup({ ...popup, show: false })}></div>
-          <div className={`relative z-10 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-4 animate-in slide-in-from-top-4 fade-in duration-300 pointer-events-auto ${popup.type === 'error' ? 'bg-[#E68A8C] text-white' : 'bg-[#407F3E] text-white'}`}>
+        <div className="fixed top-6 right-6 z-[9999] pointer-events-none">
+          <div className={`relative z-10 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-4 animate-in slide-in-from-right-8 fade-in duration-300 pointer-events-auto ${popup.type === 'error' ? 'bg-[#E68A8C] text-white' : 'bg-[#407F3E] text-white'}`}>
             <span className="font-bold text-sm">{popup.message}</span>
             <button onClick={() => setPopup({ ...popup, show: false })} className="p-1 hover:bg-white/20 rounded-full transition-colors">
               <span className="sr-only">Close</span>
@@ -363,22 +437,20 @@ export default function ChuyenThamQuan_DSLoc() {
 
       {/* Tabs */}
       <div className="flex items-center gap-6 border-b border-[#E7E0C4] mb-6">
-        <button 
+        <button
           onClick={() => setActiveTab('khoa')}
-          className={`pb-3 text-sm font-bold transition-all relative ${
-            activeTab === 'khoa' ? 'text-[#89B449]' : 'text-slate-500 hover:text-slate-700'
-          }`}
+          className={`pb-3 text-sm font-bold transition-all relative ${activeTab === 'khoa' ? 'text-[#89B449]' : 'text-slate-500 hover:text-slate-700'
+            }`}
         >
           Chuyến do khoa tổ chức
           {activeTab === 'khoa' && (
             <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[#89B449] rounded-t-full"></div>
           )}
         </button>
-        <button 
+        <button
           onClick={() => setActiveTab('tudo')}
-          className={`pb-3 text-sm font-bold transition-all relative flex items-center gap-2 ${
-            activeTab === 'tudo' ? 'text-[#89B449]' : 'text-slate-500 hover:text-slate-700'
-          }`}
+          className={`pb-3 text-sm font-bold transition-all relative flex items-center gap-2 ${activeTab === 'tudo' ? 'text-[#89B449]' : 'text-slate-500 hover:text-slate-700'
+            }`}
         >
           Đề xuất chuyến tự do
           <span className="bg-[#DBD468] text-slate-800 text-[10px] px-1.5 py-0.5 rounded-full font-bold shadow-sm">
@@ -397,9 +469,9 @@ export default function ChuyenThamQuan_DSLoc() {
             <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto flex-1">
               <div className="relative flex-1 sm:w-64 min-w-[200px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input 
-                  type="text" 
-                  placeholder="Tìm kiếm nhà máy..." 
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm nhà máy..."
                   value={searchQuery}
                   onChange={(e) => {
                     setSearchQuery(e.target.value);
@@ -411,26 +483,26 @@ export default function ChuyenThamQuan_DSLoc() {
 
               {/* Popover Filter Trạng thái Tab 1 */}
               <div className="relative min-w-[200px]" onClick={e => e.stopPropagation()}>
-                <div 
+                <div
                   onClick={() => setIsFilterStatusOpen(!isFilterStatusOpen)}
                   className={`w-full px-4 py-2 bg-white border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isFilterStatusOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
                 >
                   <span className={`truncate pr-2 font-medium ${filterStatus !== 'ALL' ? 'text-slate-800' : 'text-slate-600'}`}>
                     {filterStatus === 'ALL' ? 'Tất cả trạng thái' :
-                     filterStatus === 'Nhap' ? 'Nháp' :
-                     filterStatus === 'MoDangKy' ? 'Mở đăng ký' :
-                     filterStatus === 'DaChotDanhSach' ? 'Đã chốt danh sách' :
-                     filterStatus === 'DaDienRa' ? 'Đã diễn ra' :
-                     filterStatus === 'DaHuy' ? 'Đã huỷ' : filterStatus}
+                      filterStatus === 'Nhap' ? 'Nháp' :
+                        filterStatus === 'MoDangKy' ? 'Mở đăng ký' :
+                          filterStatus === 'DaChotDanhSach' ? 'Đã chốt danh sách' :
+                            filterStatus === 'DaDienRa' ? 'Đã diễn ra' :
+                              filterStatus === 'DaHuy' ? 'Đã huỷ' : filterStatus}
                   </span>
                   <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isFilterStatusOpen ? 'rotate-180 text-[#407F3E]' : ''}`} />
                 </div>
                 {isFilterStatusOpen && (
                   <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[200px]">
                     <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
-                      <input 
-                        type="text" 
-                        placeholder="Tìm trạng thái..." 
+                      <input
+                        type="text"
+                        placeholder="Tìm trạng thái..."
                         value={searchStatusKhoa}
                         onChange={(e) => setSearchStatusKhoa(e.target.value)}
                         onClick={(e) => e.stopPropagation()}
@@ -448,22 +520,21 @@ export default function ChuyenThamQuan_DSLoc() {
                       ]
                         .filter(opt => opt.label.toLowerCase().includes(searchStatusKhoa.toLowerCase()))
                         .map(opt => (
-                        <div
-                          key={opt.value}
-                          onClick={() => {
-                            setFilterStatus(opt.value);
-                            setIsFilterStatusOpen(false);
-                            setCurrentPageKhoa(1);
-                            setSearchStatusKhoa('');
-                          }}
-                          className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                            filterStatus === opt.value ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50 font-medium'
-                          }`}
-                        >
-                          <span className="truncate pr-2">{opt.label}</span>
-                          {filterStatus === opt.value && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                        </div>
-                      ))}
+                          <div
+                            key={opt.value}
+                            onClick={() => {
+                              setFilterStatus(opt.value);
+                              setIsFilterStatusOpen(false);
+                              setCurrentPageKhoa(1);
+                              setSearchStatusKhoa('');
+                            }}
+                            className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${filterStatus === opt.value ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50 font-medium'
+                              }`}
+                          >
+                            <span className="truncate pr-2">{opt.label}</span>
+                            {filterStatus === opt.value && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                          </div>
+                        ))}
                       {[
                         { value: 'ALL', label: 'Tất cả trạng thái' },
                         { value: 'Nhap', label: 'Nháp' },
@@ -472,15 +543,15 @@ export default function ChuyenThamQuan_DSLoc() {
                         { value: 'DaDienRa', label: 'Đã diễn ra' },
                         { value: 'DaHuy', label: 'Đã huỷ' },
                       ].filter(opt => opt.label.toLowerCase().includes(searchStatusKhoa.toLowerCase())).length === 0 && searchStatusKhoa && (
-                        <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy</div>
-                      )}
+                          <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy</div>
+                        )}
                     </div>
                   </div>
                 )}
               </div>
             </div>
 
-            <button 
+            <button
               onClick={(e) => { e.stopPropagation(); handleAddClick(); }}
               className="px-4 py-2 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer whitespace-nowrap"
             >
@@ -527,10 +598,10 @@ export default function ChuyenThamQuan_DSLoc() {
                           const used = t.dang_ky_count || 0;
                           const max = t.suc_chua || 0;
                           const percent = max > 0 ? (used / max) * 100 : 0;
-                          
+
                           const formatTime = (timeStr) => {
                             if (!timeStr) return '';
-                            return timeStr.substring(0, 5); 
+                            return timeStr.substring(0, 5);
                           };
 
                           return (
@@ -541,9 +612,8 @@ export default function ChuyenThamQuan_DSLoc() {
                               </td>
                               <td className="p-4 font-medium text-slate-600">{formatTime(t.gio_bat_dau)}</td>
                               <td className="p-4 text-center">
-                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-bold border ${
-                                  t.hinh_thuc === 'TrucTiep' ? 'bg-[#89B449]/10 text-[#407F3E] border-[#89B449]/20' : 'bg-slate-100 text-slate-600 border-slate-200'
-                                }`}>
+                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-bold border whitespace-nowrap ${t.hinh_thuc === 'TrucTiep' ? 'bg-[#89B449]/10 text-[#407F3E] border-[#89B449]/20' : 'bg-slate-100 text-slate-600 border-slate-200'
+                                  }`}>
                                   {t.hinh_thuc === 'TrucTiep' ? 'Trực tiếp' : 'Trực tuyến'}
                                 </span>
                               </td>
@@ -552,36 +622,35 @@ export default function ChuyenThamQuan_DSLoc() {
                                   <span>{used}/{max}</span>
                                 </div>
                                 <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                  <div 
-                                    className={`h-full rounded-full transition-all ${percent >= 100 ? 'bg-[#E68A8C]' : 'bg-[#89B449]'}`} 
+                                  <div
+                                    className={`h-full rounded-full transition-all ${percent >= 100 ? 'bg-[#E68A8C]' : 'bg-[#89B449]'}`}
                                     style={{ width: `${percent}%` }}
                                   ></div>
                                 </div>
                               </td>
                               <td className="p-4 text-center">
-                                <span className={`inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold shadow-sm border ${
-                                  t.trang_thai === 'MoDangKy' ? 'bg-[#89B449] text-white border-[#89B449]/20' : 
+                                <span className={`inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold shadow-sm border whitespace-nowrap ${t.trang_thai === 'MoDangKy' ? 'bg-[#89B449] text-white border-[#89B449]/20' :
                                   t.trang_thai === 'Nhap' ? 'bg-slate-400 text-white border-slate-400/20' :
-                                  t.trang_thai === 'DaHuy' ? 'bg-[#E68A8C] text-white border-[#E68A8C]/20' :
-                                  'bg-[#407F3E] text-white border-[#407F3E]/20'
-                                }`}>
-                                  {t.trang_thai === 'MoDangKy' ? 'Mở đăng ký' : 
-                                   t.trang_thai === 'DaChotDanhSach' ? 'Đã chốt danh sách' : 
-                                   t.trang_thai === 'DaDienRa' ? 'Đã diễn ra' : 
-                                   t.trang_thai === 'DaHuy' ? 'Đã huỷ' : 'Nháp'}
+                                    t.trang_thai === 'DaHuy' ? 'bg-[#E68A8C] text-white border-[#E68A8C]/20' :
+                                      'bg-[#407F3E] text-white border-[#407F3E]/20'
+                                  }`}>
+                                  {t.trang_thai === 'MoDangKy' ? 'Mở đăng ký' :
+                                    t.trang_thai === 'DaChotDanhSach' ? 'Đã chốt danh sách' :
+                                      t.trang_thai === 'DaDienRa' ? 'Đã diễn ra' :
+                                        t.trang_thai === 'DaHuy' ? 'Đã huỷ' : 'Nháp'}
                                 </span>
                               </td>
                               <td className="p-4 text-right pr-6 relative">
-                                <button 
-                                  className={`p-1.5 rounded-lg transition-colors cursor-pointer ${activeDropdown === t.id ? 'bg-[#407F3E]/10 text-[#407F3E]' : 'text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10'}`} 
+                                <button
+                                  className={`p-1.5 rounded-lg transition-colors cursor-pointer ${activeDropdown === t.id ? 'bg-[#407F3E]/10 text-[#407F3E]' : 'text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10'}`}
                                   title="Thao tác"
                                   onClick={(e) => handleActionClick(e, t.id)}
                                 >
                                   <MoreVertical className="w-5 h-5" />
                                 </button>
-                                
+
                                 {activeDropdown === t.id && createPortal(
-                                  <div 
+                                  <div
                                     className="dropdown-menu-container fixed w-48 bg-white rounded-xl shadow-lg border border-[#E7E0C4] overflow-hidden z-[9999] animate-in fade-in zoom-in-95 duration-200"
                                     style={{ top: dropdownPosition.top, right: dropdownPosition.right }}
                                     onClick={(e) => e.stopPropagation()}
@@ -599,10 +668,13 @@ export default function ChuyenThamQuan_DSLoc() {
 
                                     {t.trang_thai === 'MoDangKy' && (
                                       <>
+                                        <button onClick={(e) => { e.stopPropagation(); handleEditClick(t); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors border-b border-slate-100">
+                                          <Edit className="w-4 h-4 text-orange-500" /> Sửa đổi khẩn cấp
+                                        </button>
                                         <button onClick={(e) => { e.stopPropagation(); handlePreviewAssignStudents(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#407F3E] hover:bg-green-50 flex items-center gap-2 transition-colors">
                                           <CheckCircle className="w-4 h-4" /> Xét duyệt danh sách
                                         </button>
-                                        <button onClick={(e) => { e.stopPropagation(); handleDeleteTrip(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#E68A8C] hover:bg-red-50 flex items-center gap-2 transition-colors border-t border-slate-100">
+                                        <button onClick={(e) => { e.stopPropagation(); handleCancelTrip(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#E68A8C] hover:bg-red-50 flex items-center gap-2 transition-colors border-t border-slate-100">
                                           <Trash2 className="w-4 h-4" /> Hủy chuyến
                                         </button>
                                       </>
@@ -610,16 +682,27 @@ export default function ChuyenThamQuan_DSLoc() {
 
                                     {t.trang_thai === 'DaChotDanhSach' && (
                                       <>
+                                        <button onClick={(e) => { e.stopPropagation(); handleEditClick(t); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors border-b border-slate-100">
+                                          <Edit className="w-4 h-4 text-orange-500" /> Sửa đổi khẩn cấp
+                                        </button>
                                         <button onClick={(e) => { e.stopPropagation(); handleReopenRegistration(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-orange-600 hover:bg-orange-50 flex items-center gap-2 transition-colors">
                                           <RotateCcw className="w-4 h-4" /> Mở đăng ký bổ sung
+                                        </button>
+                                        <button onClick={(e) => { e.stopPropagation(); handleCancelTrip(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#E68A8C] hover:bg-red-50 flex items-center gap-2 transition-colors border-t border-slate-100">
+                                          <Trash2 className="w-4 h-4" /> Hủy chuyến
                                         </button>
                                       </>
                                     )}
 
                                     {t.trang_thai === 'DaDuyet' && (
-                                      <button onClick={(e) => { e.stopPropagation(); handleDeleteTrip(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#E68A8C] hover:bg-red-50 flex items-center gap-2 transition-colors border-t border-slate-100">
-                                        <Trash2 className="w-4 h-4" /> Hủy chuyến
-                                      </button>
+                                      <>
+                                        <button onClick={(e) => { e.stopPropagation(); handleEditClick(t); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors border-b border-slate-100">
+                                          <Edit className="w-4 h-4 text-orange-500" /> Sửa đổi khẩn cấp
+                                        </button>
+                                        <button onClick={(e) => { e.stopPropagation(); handleCancelTrip(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#E68A8C] hover:bg-red-50 flex items-center gap-2 transition-colors border-t border-slate-100">
+                                          <Trash2 className="w-4 h-4" /> Hủy chuyến
+                                        </button>
+                                      </>
                                     )}
 
                                     {t.trang_thai !== 'Nhap' && t.trang_thai !== 'MoDangKy' && t.trang_thai !== 'DaDuyet' && t.trang_thai !== 'DaChotDanhSach' && (
@@ -648,19 +731,21 @@ export default function ChuyenThamQuan_DSLoc() {
                 <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
                   <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
                     <span>Hiển thị</span>
-                    <select
+                    <SearchableDropdown
                       value={limitKhoa}
-                      onChange={e => {
-                        setLimitKhoa(Number(e.target.value));
+                      onChange={val => {
+                        setLimitKhoa(Number(val));
                         setCurrentPageKhoa(1);
                       }}
-                      className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
-                    >
-                      <option value={15}>15</option>
-                      <option value={30}>30</option>
-                      <option value={50}>50</option>
-                      <option value={100}>100</option>
-                    </select>
+                      options={[
+                        { value: 15, label: '15' },
+                        { value: 30, label: '30' },
+                        { value: 50, label: '50' },
+                        { value: 100, label: '100' }
+                      ]}
+                      className="min-w-[80px]"
+                      searchPlaceholder="Tìm..."
+                    />
                     <span>/ {totalKhoa} chuyến</span>
                   </div>
 
@@ -711,9 +796,9 @@ export default function ChuyenThamQuan_DSLoc() {
           <div className="flex flex-wrap items-center gap-3">
             <div className="relative flex-1 sm:w-64 min-w-[220px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input 
-                type="text" 
-                placeholder="Tìm theo SV, MSSV, Nhà máy..." 
+              <input
+                type="text"
+                placeholder="Tìm theo SV, MSSV, Nhà máy..."
                 value={searchQueryTuDo}
                 onChange={(e) => {
                   setSearchQueryTuDo(e.target.value);
@@ -725,24 +810,24 @@ export default function ChuyenThamQuan_DSLoc() {
 
             {/* Popover Filter Trạng thái Tab 2 */}
             <div className="relative min-w-[180px]" onClick={e => e.stopPropagation()}>
-              <div 
+              <div
                 onClick={() => setIsFilterStatusTuDoOpen(!isFilterStatusTuDoOpen)}
                 className={`w-full px-4 py-2 bg-white border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isFilterStatusTuDoOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
               >
                 <span className={`truncate pr-2 font-medium ${filterStatusTuDo !== 'ALL' ? 'text-slate-800' : 'text-slate-600'}`}>
                   {filterStatusTuDo === 'ALL' ? 'Tất cả trạng thái' :
-                   filterStatusTuDo === 'ChoDuyet' ? 'Chờ duyệt' :
-                   filterStatusTuDo === 'DaDuyet' ? 'Đã duyệt' :
-                   filterStatusTuDo === 'TuChoi' ? 'Từ chối' : filterStatusTuDo}
+                    filterStatusTuDo === 'ChoDuyet' ? 'Chờ duyệt' :
+                      filterStatusTuDo === 'DaDuyet' ? 'Đã duyệt' :
+                        filterStatusTuDo === 'TuChoi' ? 'Từ chối' : filterStatusTuDo}
                 </span>
                 <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isFilterStatusTuDoOpen ? 'rotate-180 text-[#407F3E]' : ''}`} />
               </div>
               {isFilterStatusTuDoOpen && (
                 <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[200px]">
                   <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
-                    <input 
-                      type="text" 
-                      placeholder="Tìm trạng thái..." 
+                    <input
+                      type="text"
+                      placeholder="Tìm trạng thái..."
                       value={searchStatusTuDo}
                       onChange={(e) => setSearchStatusTuDo(e.target.value)}
                       onClick={(e) => e.stopPropagation()}
@@ -758,30 +843,29 @@ export default function ChuyenThamQuan_DSLoc() {
                     ]
                       .filter(opt => opt.label.toLowerCase().includes(searchStatusTuDo.toLowerCase()))
                       .map(opt => (
-                      <div
-                        key={opt.value}
-                        onClick={() => {
-                          setFilterStatusTuDo(opt.value);
-                          setIsFilterStatusTuDoOpen(false);
-                          setCurrentPageTuDo(1);
-                          setSearchStatusTuDo('');
-                        }}
-                        className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                          filterStatusTuDo === opt.value ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50 font-medium'
-                        }`}
-                      >
-                        <span className="truncate pr-2">{opt.label}</span>
-                        {filterStatusTuDo === opt.value && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                      </div>
-                    ))}
+                        <div
+                          key={opt.value}
+                          onClick={() => {
+                            setFilterStatusTuDo(opt.value);
+                            setIsFilterStatusTuDoOpen(false);
+                            setCurrentPageTuDo(1);
+                            setSearchStatusTuDo('');
+                          }}
+                          className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${filterStatusTuDo === opt.value ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50 font-medium'
+                            }`}
+                        >
+                          <span className="truncate pr-2">{opt.label}</span>
+                          {filterStatusTuDo === opt.value && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                        </div>
+                      ))}
                     {[
                       { value: 'ALL', label: 'Tất cả trạng thái' },
                       { value: 'ChoDuyet', label: 'Chờ duyệt' },
                       { value: 'DaDuyet', label: 'Đã duyệt' },
                       { value: 'TuChoi', label: 'Từ chối' },
                     ].filter(opt => opt.label.toLowerCase().includes(searchStatusTuDo.toLowerCase())).length === 0 && searchStatusTuDo && (
-                      <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy</div>
-                    )}
+                        <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy</div>
+                      )}
                   </div>
                 </div>
               )}
@@ -793,8 +877,8 @@ export default function ChuyenThamQuan_DSLoc() {
               const sv = t.sinhVien || {};
               const factory = t.ten_nha_may_de_xuat || t.nhaMay?.ten_nha_may || '';
               const matchSearch = (sv.ho_ten || '').toLowerCase().includes(searchQueryTuDo.toLowerCase()) ||
-                                  (sv.mssv || '').toLowerCase().includes(searchQueryTuDo.toLowerCase()) ||
-                                  factory.toLowerCase().includes(searchQueryTuDo.toLowerCase());
+                (sv.mssv || '').toLowerCase().includes(searchQueryTuDo.toLowerCase()) ||
+                factory.toLowerCase().includes(searchQueryTuDo.toLowerCase());
               const matchStatus = filterStatusTuDo === 'ALL' || t.trang_thai_duyet === filterStatusTuDo;
               return matchSearch && matchStatus;
             });
@@ -821,9 +905,7 @@ export default function ChuyenThamQuan_DSLoc() {
                         <tr key={t.id} className="hover:bg-slate-50 transition-colors">
                           <td className="p-4 pl-6">
                             <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-[#E7E0C4] text-[#407F3E] flex items-center justify-center font-bold text-xs shadow-sm">
-                                {t.sinhVien?.ho_ten?.charAt(0) || '?'}
-                              </div>
+
                               <div>
                                 <div className="font-bold text-slate-800">{t.sinhVien?.ho_ten}</div>
                                 <div className="text-xs font-mono text-slate-500">{t.sinhVien?.mssv}</div>
@@ -835,7 +917,7 @@ export default function ChuyenThamQuan_DSLoc() {
                             {t.ngay_tham_quan_de_xuat ? new Date(t.ngay_tham_quan_de_xuat).toLocaleDateString('vi-VN') : 'N/A'}
                           </td>
                           <td className="p-4">
-                            <span className="inline-flex items-center px-2 py-1 rounded bg-slate-100 text-slate-500 text-[10px] font-bold border border-slate-200">
+                            <span className="inline-flex items-center px-2 py-1 rounded bg-slate-100 text-slate-500 text-[10px] font-bold border border-slate-200 whitespace-nowrap">
                               {t.trang_thai_duyet === 'ChoDuyet' ? 'Chờ duyệt' : t.trang_thai_duyet}
                             </span>
                           </td>
@@ -873,19 +955,21 @@ export default function ChuyenThamQuan_DSLoc() {
                 <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
                   <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
                     <span>Hiển thị</span>
-                    <select
+                    <SearchableDropdown
                       value={limitTuDo}
-                      onChange={e => {
-                        setLimitTuDo(Number(e.target.value));
+                      onChange={val => {
+                        setLimitTuDo(Number(val));
                         setCurrentPageTuDo(1);
                       }}
-                      className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
-                    >
-                      <option value={15}>15</option>
-                      <option value={30}>30</option>
-                      <option value={50}>50</option>
-                      <option value={100}>100</option>
-                    </select>
+                      options={[
+                        { value: 15, label: '15' },
+                        { value: 30, label: '30' },
+                        { value: 50, label: '50' },
+                        { value: 100, label: '100' }
+                      ]}
+                      className="min-w-[80px]"
+                      searchPlaceholder="Tìm..."
+                    />
                     <span>/ {totalTuDo} đề xuất</span>
                   </div>
 
@@ -932,12 +1016,12 @@ export default function ChuyenThamQuan_DSLoc() {
       {/* Modal - Tạo chuyến tham quan */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div 
+          <div
             className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200"
             onClick={(e) => { e.stopPropagation(); setIsModalOpen(false); }}
           ></div>
-          
-          <form 
+
+          <form
             onSubmit={handleSubmitTrip}
             className="bg-white w-full max-w-2xl rounded-2xl shadow-xl relative z-10 animate-in zoom-in-95 duration-200 flex flex-col"
             onClick={(e) => e.stopPropagation()}
@@ -948,7 +1032,7 @@ export default function ChuyenThamQuan_DSLoc() {
                 <Plus className="w-5 h-5 text-[#407F3E]" />
                 {isEditMode ? 'Cập nhật chuyến tham quan' : 'Tạo chuyến tham quan'}
               </h2>
-              <button 
+              <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setIsModalOpen(false); }}
                 className="p-1.5 text-slate-400 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg transition-colors cursor-pointer"
@@ -959,13 +1043,13 @@ export default function ChuyenThamQuan_DSLoc() {
 
             {/* Body */}
             <div className="p-6 space-y-5 overflow-visible">
-              
+
               {/* Row 1: Nhà máy */}
               <div className="grid grid-cols-1 gap-5 relative">
                 {/* Nhà máy */}
                 <div className="relative">
                   <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Nhà máy</label>
-                  <div 
+                  <div
                     onClick={(e) => handleDropdownClick(e, setIsNhaMayDropdownOpen)}
                     className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-sm flex justify-between items-center cursor-pointer transition-all ${isNhaMayDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
                   >
@@ -977,12 +1061,11 @@ export default function ChuyenThamQuan_DSLoc() {
                   {isNhaMayDropdownOpen && (
                     <div className="absolute top-[70px] left-0 w-full bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-50 py-1 overflow-hidden max-h-48 overflow-y-auto animate-in slide-in-from-top-1">
                       {nhaMayOptions.map(opt => (
-                        <div 
+                        <div
                           key={opt.id}
                           onClick={(e) => { e.stopPropagation(); setSelectedNhaMay(opt.id); setIsNhaMayDropdownOpen(false); }}
-                          className={`px-4 py-2.5 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                            selectedNhaMay === opt.id ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
-                          }`}
+                          className={`px-4 py-2.5 text-sm cursor-pointer flex justify-between items-center transition-colors ${selectedNhaMay === opt.id ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                            }`}
                         >
                           {opt.ten_nha_may}
                           {selectedNhaMay === opt.id && <Check className="w-4 h-4 text-[#407F3E]" />}
@@ -1026,7 +1109,7 @@ export default function ChuyenThamQuan_DSLoc() {
                 {/* Hình thức */}
                 <div className="relative">
                   <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Hình thức</label>
-                  <div 
+                  <div
                     onClick={(e) => handleDropdownClick(e, setIsHinhThucDropdownOpen)}
                     className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-sm flex justify-between items-center cursor-pointer transition-all ${isHinhThucDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
                   >
@@ -1038,12 +1121,11 @@ export default function ChuyenThamQuan_DSLoc() {
                   {isHinhThucDropdownOpen && (
                     <div className="absolute top-[70px] left-0 w-full bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-50 py-1 overflow-hidden animate-in slide-in-from-top-1">
                       {hinhThucOptions.map(opt => (
-                        <div 
+                        <div
                           key={opt}
                           onClick={(e) => { e.stopPropagation(); setSelectedHinhThuc(opt); setIsHinhThucDropdownOpen(false); }}
-                          className={`px-4 py-2.5 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                            selectedHinhThuc === opt ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
-                          }`}
+                          className={`px-4 py-2.5 text-sm cursor-pointer flex justify-between items-center transition-colors ${selectedHinhThuc === opt ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                            }`}
                         >
                           {opt}
                           {selectedHinhThuc === opt && <Check className="w-4 h-4 text-[#407F3E]" />}
@@ -1070,7 +1152,7 @@ export default function ChuyenThamQuan_DSLoc() {
               </div>
 
               {/* Row 4: Lệ phí & Địa điểm */}
-              <div className="grid grid-cols-2 gap-5 relative z-20">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5 relative z-20">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Lệ phí (VNĐ)</label>
                   <div className="relative">
@@ -1095,19 +1177,30 @@ export default function ChuyenThamQuan_DSLoc() {
                     />
                   </div>
                 </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Hạn đóng lệ phí</label>
+                  <div className="relative">
+                    <input
+                      type="datetime-local"
+                      value={hanDongLePhi}
+                      onChange={(e) => setHanDongLePhi(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-800 font-medium"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
             {/* Footer */}
             <div className="px-6 py-4 border-t border-[#E7E0C4] bg-slate-50/50 flex items-center justify-end gap-3 rounded-b-2xl z-10">
-              <button 
+              <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setIsModalOpen(false); }}
                 className="px-5 py-2.5 border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-bold transition-colors cursor-pointer"
               >
                 Hủy
               </button>
-              <button 
+              <button
                 type="submit"
                 className="px-6 py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl text-sm font-bold transition-colors shadow-sm cursor-pointer"
               >
@@ -1121,12 +1214,12 @@ export default function ChuyenThamQuan_DSLoc() {
       {/* Modal - Xem chi tiết */}
       {viewingDetail && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
-          <div 
+          <div
             className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200"
             onClick={(e) => { e.stopPropagation(); setViewingDetail(null); }}
           ></div>
-          
-          <div 
+
+          <div
             className="bg-white w-full max-w-4xl rounded-2xl shadow-xl relative z-10 animate-in zoom-in-95 duration-200 flex flex-col overflow-hidden max-h-[90vh]"
             onClick={(e) => e.stopPropagation()}
           >
@@ -1136,7 +1229,7 @@ export default function ChuyenThamQuan_DSLoc() {
                 <MapPin className="w-5 h-5 text-[#89B449]" />
                 Chi tiết chuyến tham quan
               </h2>
-              <button 
+              <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setViewingDetail(null); }}
                 className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
@@ -1144,7 +1237,7 @@ export default function ChuyenThamQuan_DSLoc() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
+
             {/* Body */}
             <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
               {/* Factory Name */}
@@ -1157,7 +1250,7 @@ export default function ChuyenThamQuan_DSLoc() {
 
               {/* Grid Details */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                
+
                 <div className="flex gap-3">
                   <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center shrink-0">
                     <Calendar className="w-4 h-4" />
@@ -1229,10 +1322,10 @@ export default function ChuyenThamQuan_DSLoc() {
                     <p className="text-sm font-medium text-slate-700 mt-0.5">
                       {
                         viewingDetail.trang_thai_duyet ? (viewingDetail.trang_thai_duyet === 'ChoDuyet' ? 'Chờ duyệt' : viewingDetail.trang_thai_duyet) :
-                        (viewingDetail.trang_thai === 'MoDangKy' ? 'Mở đăng ký' : 
-                        viewingDetail.trang_thai === 'DaChotDanhSach' ? 'Đã chốt danh sách' : 
-                        viewingDetail.trang_thai === 'DaDienRa' ? 'Đã diễn ra' : 
-                        viewingDetail.trang_thai === 'DaHuy' ? 'Đã huỷ' : 'Nháp')
+                          (viewingDetail.trang_thai === 'MoDangKy' ? 'Mở đăng ký' :
+                            viewingDetail.trang_thai === 'DaChotDanhSach' ? 'Đã chốt danh sách' :
+                              viewingDetail.trang_thai === 'DaDienRa' ? 'Đã diễn ra' :
+                                viewingDetail.trang_thai === 'DaHuy' ? 'Đã huỷ' : 'Nháp')
                       }
                     </p>
                   </div>
@@ -1241,10 +1334,10 @@ export default function ChuyenThamQuan_DSLoc() {
               </div>
 
             </div>
-            
+
             {/* Footer */}
             <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end">
-              <button 
+              <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setViewingDetail(null); }}
                 className="px-6 py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl text-sm font-bold transition-colors shadow-sm cursor-pointer"
@@ -1258,11 +1351,11 @@ export default function ChuyenThamQuan_DSLoc() {
 
       {/* Preview Modal for Assigning Students */}
       {isPreviewModalOpen && (
-        <div 
+        <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200"
           onClick={() => setIsPreviewModalOpen(false)}
         >
-          <div 
+          <div
             className="bg-white rounded-2xl shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
@@ -1277,20 +1370,20 @@ export default function ChuyenThamQuan_DSLoc() {
                   Đã chọn: <span className="font-bold text-[#407F3E]">{selectedStudentIds.length}</span> / {previewData.tripCapacity} sinh viên (Sức chứa tối đa)
                 </p>
                 <div className="w-64 h-1.5 bg-slate-200 rounded-full mt-2 overflow-hidden">
-                  <div 
-                    className={`h-full rounded-full transition-all ${selectedStudentIds.length > previewData.tripCapacity ? 'bg-red-500' : 'bg-[#407F3E]'}`} 
+                  <div
+                    className={`h-full rounded-full transition-all ${selectedStudentIds.length > previewData.tripCapacity ? 'bg-red-500' : 'bg-[#407F3E]'}`}
                     style={{ width: `${Math.min((selectedStudentIds.length / previewData.tripCapacity) * 100, 100)}%` }}
                   ></div>
                 </div>
               </div>
-              <button 
+              <button
                 onClick={() => setIsPreviewModalOpen(false)}
                 className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
+
             {/* Body */}
             <div className="p-6 overflow-y-auto flex-1 bg-white">
               <div className="space-y-6">
@@ -1314,8 +1407,8 @@ export default function ChuyenThamQuan_DSLoc() {
                         {previewData.suggestedAccepted.map(p => (
                           <tr key={p.id} className="hover:bg-slate-50">
                             <td className="p-3 text-center">
-                              <input 
-                                type="checkbox" 
+                              <input
+                                type="checkbox"
                                 className="w-4 h-4 text-[#407F3E] rounded border-slate-300 focus:ring-[#407F3E] cursor-pointer"
                                 checked={selectedStudentIds.includes(p.sinh_vien_id)}
                                 onChange={(e) => {
@@ -1361,8 +1454,8 @@ export default function ChuyenThamQuan_DSLoc() {
                         {previewData.suggestedRejected.map(p => (
                           <tr key={p.id} className="hover:bg-slate-50">
                             <td className="p-3 text-center">
-                              <input 
-                                type="checkbox" 
+                              <input
+                                type="checkbox"
                                 className="w-4 h-4 text-[#407F3E] rounded border-slate-300 focus:ring-[#407F3E] cursor-pointer"
                                 checked={selectedStudentIds.includes(p.sinh_vien_id)}
                                 onChange={(e) => {
@@ -1396,8 +1489,8 @@ export default function ChuyenThamQuan_DSLoc() {
               <label className="block text-sm font-bold text-slate-700 mb-1">
                 Hạn chót nộp lệ phí <span className="text-red-500">*</span>
               </label>
-              <input 
-                type="datetime-local" 
+              <input
+                type="datetime-local"
                 value={deadlineDate}
                 onChange={(e) => setDeadlineDate(e.target.value)}
                 className="w-full sm:w-1/2 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-[#407F3E]"
@@ -1411,20 +1504,19 @@ export default function ChuyenThamQuan_DSLoc() {
                 <span className="text-red-500 font-bold">* Lưu ý:</span> Nếu bạn xác nhận, hệ thống sẽ chốt cứng danh sách và xuất hóa đơn lệ phí ngay lập tức.
               </p>
               <div className="flex gap-3">
-                <button 
+                <button
                   onClick={() => setIsPreviewModalOpen(false)}
                   className="px-6 py-2.5 text-slate-600 hover:bg-slate-200 rounded-xl text-sm font-bold transition-colors cursor-pointer"
                 >
                   Hủy
                 </button>
-                <button 
+                <button
                   onClick={handleConfirmAssignStudents}
                   disabled={selectedStudentIds.length > previewData.tripCapacity}
-                  className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-colors shadow-sm flex items-center gap-2 ${
-                    selectedStudentIds.length > previewData.tripCapacity 
-                      ? 'bg-slate-300 text-slate-500 cursor-not-allowed' 
-                      : 'bg-[#407F3E] text-white hover:bg-[#407F3E]/90 cursor-pointer'
-                  }`}
+                  className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-colors shadow-sm flex items-center gap-2 ${selectedStudentIds.length > previewData.tripCapacity
+                    ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                    : 'bg-[#407F3E] text-white hover:bg-[#407F3E]/90 cursor-pointer'
+                    }`}
                 >
                   <CheckCircle2 className="w-4 h-4" />
                   Xác nhận chốt danh sách
@@ -1434,6 +1526,122 @@ export default function ChuyenThamQuan_DSLoc() {
           </div>
         </div>
       )}
+
+      {/* Cancel Trip Modal */}
+      {isCancelModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsCancelModalOpen(false)}></div>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg relative z-10 animate-in zoom-in-95 duration-200">
+            <div className="p-6">
+              <h3 className="text-xl font-bold text-slate-800 text-center mb-2">
+                Xác nhận Hủy chuyến tham quan
+              </h3>
+
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-5">
+                <p className="text-sm text-orange-800 font-medium flex items-start gap-2">
+                  Cảnh báo: Hành động này không thể hoàn tác. Tất cả phiếu đăng ký sẽ bị hủy và sinh viên sẽ nhận được thông báo hủy chuyến nội bộ trên hệ thống.
+                </p>
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-sm font-bold text-slate-700 mb-2">
+                  Lý do hủy chuyến <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  placeholder="Nhập lý do chi tiết để thông báo cho sinh viên (ít nhất 5 ký tự)..."
+                  className="w-full h-32 px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-colors resize-none"
+                ></textarea>
+                <p className="text-xs text-slate-500 mt-2">Lý do này sẽ được gửi trực tiếp đến hộp thư trên app của các sinh viên đã đăng ký.</p>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCancelModalOpen(false);
+                    setCancelReason('');
+                  }}
+                  className="px-6 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmCancelTrip}
+                  className="px-6 py-2.5 rounded-xl font-bold bg-[#E68A8C] text-white hover:bg-red-500 transition-colors shadow-sm cursor-pointer"
+                >
+                  Xác nhận hủy chuyến
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lecturer Selection Modal */}
+      {isLecturerModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between shrink-0">
+              <h2 className="text-xl font-bold text-gray-800">
+                Phân công Giảng viên dẫn đoàn
+              </h2>
+              <button
+                onClick={() => setIsLecturerModalOpen(false)}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto">
+              <p className="text-sm text-gray-600 mb-4">
+                Vui lòng chọn giảng viên dẫn đoàn cho chuyến tham quan tự do này trước khi duyệt.
+              </p>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Giảng viên dẫn đoàn <span className="text-red-500">*</span>
+                  </label>
+                  <SearchableDropdown
+                    value={selectedLecturerId}
+                    onChange={(val) => setSelectedLecturerId(val)}
+                    options={[
+                      { value: '', label: '-- Chọn giảng viên --' },
+                      ...lecturers.map(gv => ({
+                        value: gv.id,
+                        label: `${gv.ten_giang_vien} - ${gv.bo_mon}`
+                      }))
+                    ]}
+                    className="w-full"
+                    searchPlaceholder="Tìm giảng viên..."
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-3 shrink-0 rounded-b-2xl">
+              <button
+                onClick={() => setIsLecturerModalOpen(false)}
+                className="px-6 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-200 bg-gray-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={submitApproveWithLecturer}
+                className="px-6 py-2.5 text-sm font-medium text-white bg-[#89B449] hover:bg-[#89B449]/90 rounded-xl transition-colors cursor-pointer flex items-center gap-2"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                Xác nhận duyệt
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

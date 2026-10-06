@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Edit2, Plus, Calendar, Trash2, X, ChevronDown, Check, Search } from 'lucide-react';
 import { khoaApi } from '../../services/api';
 import Toast from '../../components/Toast';
+import SearchableDropdown from '../../components/SearchableDropdown';
 
 export default function DanhMucNen_ThemMoiHocKy_Khoa() {
   const [activeTab, setActiveTab] = useState('nam-hoc');
@@ -73,7 +74,7 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
         if (!tenNamHoc) { setToast({ show: true, message: 'Vui lòng nhập tên năm học', type: 'error' }); return; }
         if (!ngayBatDau || !ngayKetThuc) { setToast({ show: true, message: 'Vui lòng chọn ngày bắt đầu và kết thúc', type: 'error' }); return; }
         if (new Date(ngayKetThuc) <= new Date(ngayBatDau)) { setToast({ show: true, message: 'Ngày kết thúc phải lớn hơn ngày bắt đầu', type: 'error' }); return; }
-        
+
         await khoaApi.createYear({
           ten_nam_hoc: tenNamHoc,
           ngay_bat_dau: ngayBatDau,
@@ -101,7 +102,7 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
         });
         setToast({ show: true, message: 'Thêm mới khóa thành công!', type: 'success' });
       }
-      
+
       setShowModal(false);
       resetCreateForm();
       fetchData(); // Refresh list
@@ -172,7 +173,7 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
 
   const filteredYears = years.filter(y => y.ten_nam_hoc.toLowerCase().includes(searchTerm.toLowerCase()));
   const filteredTerms = terms.filter(t => t.ten_hoc_ky.toLowerCase().includes(searchTerm.toLowerCase()) || (t.namHoc && t.namHoc.ten_nam_hoc.toLowerCase().includes(searchTerm.toLowerCase())));
-  const filteredCourses = courses.filter(c => 
+  const filteredCourses = courses.filter(c =>
     (c.ma_khoa_hoc && c.ma_khoa_hoc.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (c.ten_khoa_hoc && c.ten_khoa_hoc.toLowerCase().includes(searchTerm.toLowerCase()))
   );
@@ -181,7 +182,7 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
   const paginatedYears = filteredYears.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   const paginatedTerms = filteredTerms.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   const paginatedCourses = filteredCourses.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-  
+
   const totalItems = activeTab === 'nam-hoc' ? filteredYears.length : activeTab === 'hoc-ky' ? filteredTerms.length : filteredCourses.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
 
@@ -189,27 +190,27 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
     <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-2" onClick={() => setIsDropdownOpen(false)}>
       <Toast show={toast.show} message={toast.message} type={toast.type} onClose={() => setToast({ show: false, message: '', type: 'success' })} />
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-800">Danh mục nền</h1>
+        <h1 className="text-2xl font-bold text-slate-800">Quản lý danh mục</h1>
         <p className="text-sm text-slate-500 mt-1">Quản lý các danh mục cơ sở của hệ thống</p>
       </div>
 
       <div className="flex flex-wrap justify-between items-end border-b border-[#E7E0C4] mb-6 pb-2 gap-4">
         <div className="flex gap-8 mt-auto">
-          <button 
+          <button
             onClick={() => setActiveTab('nam-hoc')}
             className={`pb-2 font-semibold text-sm transition-colors relative cursor-pointer ${activeTab === 'nam-hoc' ? 'text-[#89B449]' : 'text-slate-500 hover:text-slate-800'}`}
           >
             Năm học
             {activeTab === 'nam-hoc' && <div className="absolute -bottom-[9px] left-0 w-full h-[2px] bg-[#89B449]"></div>}
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab('hoc-ky')}
             className={`pb-2 font-semibold text-sm transition-colors relative cursor-pointer ${activeTab === 'hoc-ky' ? 'text-[#89B449]' : 'text-slate-500 hover:text-slate-800'}`}
           >
             Học kỳ
             {activeTab === 'hoc-ky' && <div className="absolute -bottom-[9px] left-0 w-full h-[2px] bg-[#89B449]"></div>}
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab('khoa')}
             className={`pb-2 font-semibold text-sm transition-colors relative cursor-pointer ${activeTab === 'khoa' ? 'text-[#89B449]' : 'text-slate-500 hover:text-slate-800'}`}
           >
@@ -221,15 +222,15 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
         <div className="flex items-center gap-4 relative z-10 w-full sm:w-auto">
           <div className="relative flex-1 sm:flex-none">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input 
-              type="text" 
+            <input
+              type="text"
               placeholder={activeTab === 'khoa' ? 'Tìm mã, tên khóa...' : 'Tìm kiếm...'}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full sm:w-64 pl-9 pr-4 py-2 bg-white border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E] transition-all shadow-sm"
             />
           </div>
-          <button 
+          <button
             onClick={() => setShowModal(true)}
             className="bg-[#407F3E] text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 hover:bg-[#407F3E]/90 transition-colors shadow-sm cursor-pointer whitespace-nowrap"
           >
@@ -340,27 +341,32 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
           <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
               <span>Hiển thị</span>
-              <select 
-                value={itemsPerPage} 
-                onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
-                className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
-              >
-                <option value={15}>15</option>
-                <option value={30}>30</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-              </select>
+              <SearchableDropdown 
+                options={[
+                  { value: 15, label: '15' },
+                  { value: 30, label: '30' },
+                  { value: 50, label: '50' },
+                  { value: 100, label: '100' }
+                ]}
+                value={itemsPerPage}
+                onChange={(newLimit) => {
+                  setItemsPerPage(newLimit);
+                  setCurrentPage(1);
+                }}
+                searchPlaceholder="Tìm số lượng..."
+                className="min-w-[80px]"
+              />
               <span>/ {totalItems} {activeTab === 'nam-hoc' ? 'năm học' : activeTab === 'hoc-ky' ? 'học kỳ' : 'khóa'}</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <button 
+              <button
                 disabled={currentPage === 1}
                 onClick={() => setCurrentPage(1)}
                 className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
               >
                 Trang đầu
               </button>
-              <button 
+              <button
                 disabled={currentPage === 1}
                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                 className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
@@ -370,14 +376,14 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
               <span className="px-4 py-1.5 rounded-lg bg-[#407F3E] text-white text-sm font-bold shadow-sm cursor-default mx-1">
                 Trang {currentPage} / {totalPages}
               </span>
-              <button 
+              <button
                 disabled={currentPage === totalPages}
                 onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                 className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
               >
                 Sau
               </button>
-              <button 
+              <button
                 disabled={currentPage === totalPages}
                 onClick={() => setCurrentPage(totalPages)}
                 className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
@@ -392,7 +398,7 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
       {/* Modal cho Thêm mới */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <form 
+          <form
             onSubmit={handleCreate}
             className="bg-white w-[480px] rounded-2xl shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
@@ -405,7 +411,7 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
+
             <div className="p-6 flex flex-col gap-5">
               {activeTab === 'nam-hoc' && (
                 <>
@@ -413,34 +419,34 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">
                       Tên năm học <span className="text-[#E68A8C]">*</span>
                     </label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       value={tenNamHoc}
                       onChange={(e) => setTenNamHoc(e.target.value)}
-                      placeholder="VD: 2024-2025" 
+                      placeholder="VD: 2024-2025"
                       required
-                      className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all" 
+                      className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">Ngày bắt đầu</label>
                     <div className="relative">
-                      <input 
+                      <input
                         type="date"
                         value={ngayBatDau}
                         onChange={(e) => setNgayBatDau(e.target.value)}
-                        className="w-full pl-4 pr-10 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all cursor-pointer" 
+                        className="w-full pl-4 pr-10 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all cursor-pointer"
                       />
                     </div>
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">Ngày kết thúc</label>
                     <div className="relative">
-                      <input 
+                      <input
                         type="date"
                         value={ngayKetThuc}
                         onChange={(e) => setNgayKetThuc(e.target.value)}
-                        className="w-full pl-4 pr-10 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all cursor-pointer" 
+                        className="w-full pl-4 pr-10 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all cursor-pointer"
                       />
                     </div>
                   </div>
@@ -453,13 +459,13 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">
                       Tên học kỳ <span className="text-[#E68A8C]">*</span>
                     </label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       value={tenHocKy}
                       onChange={(e) => setTenHocKy(e.target.value)}
-                      placeholder="Học kỳ 1" 
+                      placeholder="Học kỳ 1"
                       required
-                      className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all" 
+                      className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all"
                     />
                   </div>
 
@@ -467,7 +473,7 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">
                       Năm học <span className="text-[#E68A8C]">*</span>
                     </label>
-                    <div 
+                    <div
                       onClick={(e) => { e.stopPropagation(); setIsDropdownOpen(!isDropdownOpen); }}
                       className={`w-full px-4 py-2.5 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
                     >
@@ -476,16 +482,15 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
                       </span>
                       <ChevronDown className="w-4 h-4 text-slate-400" />
                     </div>
-                    
+
                     {isDropdownOpen && (
                       <div className="absolute top-[72px] left-0 w-full bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-10 py-1 overflow-hidden max-h-48 overflow-y-auto">
                         {years.map(y => (
-                          <div 
+                          <div
                             key={y.id}
                             onClick={() => { setSelectedNamHoc(y.id); setIsDropdownOpen(false); }}
-                            className={`px-4 py-2 text-sm flex justify-between items-center cursor-pointer transition-colors ${
-                              selectedNamHoc === y.id ? 'bg-[#E7E0C4] text-slate-800 font-medium' : 'text-slate-700 hover:bg-[#E7E0C4]/50'
-                            }`}
+                            className={`px-4 py-2 text-sm flex justify-between items-center cursor-pointer transition-colors ${selectedNamHoc === y.id ? 'bg-[#E7E0C4] text-slate-800 font-medium' : 'text-slate-700 hover:bg-[#E7E0C4]/50'
+                              }`}
                           >
                             {y.ten_nam_hoc}
                             {selectedNamHoc === y.id && <Check className="w-4 h-4 text-[#407F3E]" />}
@@ -498,11 +503,11 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">Ngày bắt đầu</label>
                     <div className="relative">
-                      <input 
+                      <input
                         type="date"
                         value={ngayBatDau}
                         onChange={(e) => setNgayBatDau(e.target.value)}
-                        className="w-full pl-4 pr-10 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all cursor-pointer" 
+                        className="w-full pl-4 pr-10 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all cursor-pointer"
                       />
                     </div>
                   </div>
@@ -510,11 +515,11 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">Ngày kết thúc</label>
                     <div className="relative">
-                      <input 
+                      <input
                         type="date"
                         value={ngayKetThuc}
                         onChange={(e) => setNgayKetThuc(e.target.value)}
-                        className="w-full pl-4 pr-10 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all cursor-pointer" 
+                        className="w-full pl-4 pr-10 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all cursor-pointer"
                       />
                     </div>
                   </div>
@@ -527,38 +532,38 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">
                       Mã khóa <span className="text-[#E68A8C]">*</span>
                     </label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       value={maKhoa}
                       onChange={(e) => setMaKhoa(e.target.value)}
-                      placeholder="VD: 14DHTP" 
+                      placeholder="VD: 14DHTP"
                       required
-                      className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all" 
+                      className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">
                       Tên khóa <span className="text-[#E68A8C]">*</span>
                     </label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       value={tenKhoa}
                       onChange={(e) => setTenKhoa(e.target.value)}
-                      placeholder="VD: 14ĐHTP" 
+                      placeholder="VD: 14ĐHTP"
                       required
-                      className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all" 
+                      className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">
                       Năm nhập học
                     </label>
-                    <input 
-                      type="number" 
+                    <input
+                      type="number"
                       value={namNhapHoc}
                       onChange={(e) => setNamNhapHoc(e.target.value)}
-                      placeholder="VD: 2023" 
-                      className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all" 
+                      placeholder="VD: 2023"
+                      className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all"
                     />
                   </div>
                 </>
@@ -580,7 +585,7 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
       {/* Modal cho Sửa Danh Mục */}
       {showEditModal && editingItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <form 
+          <form
             onSubmit={handleEditSubmit}
             className="bg-white w-[480px] rounded-2xl shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
@@ -594,36 +599,36 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
+
             <div className="p-6 flex flex-col gap-5">
               {editingItem.type === 'nam-hoc' && (
                 <>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">Tên năm học <span className="text-[#E68A8C]">*</span></label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       value={editFormData.ten_nam_hoc}
-                      onChange={(e) => setEditFormData({...editFormData, ten_nam_hoc: e.target.value})}
+                      onChange={(e) => setEditFormData({ ...editFormData, ten_nam_hoc: e.target.value })}
                       required
-                      className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:border-[#407F3E]" 
+                      className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:border-[#407F3E]"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">Ngày bắt đầu</label>
-                    <input 
-                      type="date" 
+                    <input
+                      type="date"
                       value={editFormData.ngay_bat_dau}
-                      onChange={(e) => setEditFormData({...editFormData, ngay_bat_dau: e.target.value})}
-                      className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:border-[#407F3E]" 
+                      onChange={(e) => setEditFormData({ ...editFormData, ngay_bat_dau: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:border-[#407F3E]"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">Ngày kết thúc</label>
-                    <input 
-                      type="date" 
+                    <input
+                      type="date"
                       value={editFormData.ngay_ket_thuc}
-                      onChange={(e) => setEditFormData({...editFormData, ngay_ket_thuc: e.target.value})}
-                      className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:border-[#407F3E]" 
+                      onChange={(e) => setEditFormData({ ...editFormData, ngay_ket_thuc: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:border-[#407F3E]"
                     />
                   </div>
                 </>
@@ -633,17 +638,17 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
                 <>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">Tên học kỳ <span className="text-[#E68A8C]">*</span></label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       value={editFormData.ten_hoc_ky}
-                      onChange={(e) => setEditFormData({...editFormData, ten_hoc_ky: e.target.value})}
+                      onChange={(e) => setEditFormData({ ...editFormData, ten_hoc_ky: e.target.value })}
                       required
-                      className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:border-[#407F3E]" 
+                      className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:border-[#407F3E]"
                     />
                   </div>
                   <div className="relative">
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">Năm học <span className="text-[#E68A8C]">*</span></label>
-                    <div 
+                    <div
                       onClick={(e) => { e.stopPropagation(); setIsDropdownOpen(!isDropdownOpen); }}
                       className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm flex justify-between items-center cursor-pointer"
                     >
@@ -655,9 +660,9 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
                     {isDropdownOpen && (
                       <div className="absolute top-[72px] left-0 w-full bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-10 py-1 overflow-hidden max-h-48 overflow-y-auto">
                         {years.map(y => (
-                          <div 
+                          <div
                             key={y.id}
-                            onClick={() => { setEditFormData({...editFormData, nam_hoc_id: y.id}); setIsDropdownOpen(false); }}
+                            onClick={() => { setEditFormData({ ...editFormData, nam_hoc_id: y.id }); setIsDropdownOpen(false); }}
                             className="px-4 py-2 text-sm flex justify-between items-center cursor-pointer hover:bg-[#E7E0C4]/50"
                           >
                             {y.ten_nam_hoc}
@@ -669,20 +674,20 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">Ngày bắt đầu</label>
-                    <input 
-                      type="date" 
+                    <input
+                      type="date"
                       value={editFormData.ngay_bat_dau}
-                      onChange={(e) => setEditFormData({...editFormData, ngay_bat_dau: e.target.value})}
-                      className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:border-[#407F3E]" 
+                      onChange={(e) => setEditFormData({ ...editFormData, ngay_bat_dau: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:border-[#407F3E]"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">Ngày kết thúc</label>
-                    <input 
-                      type="date" 
+                    <input
+                      type="date"
                       value={editFormData.ngay_ket_thuc}
-                      onChange={(e) => setEditFormData({...editFormData, ngay_ket_thuc: e.target.value})}
-                      className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:border-[#407F3E]" 
+                      onChange={(e) => setEditFormData({ ...editFormData, ngay_ket_thuc: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:border-[#407F3E]"
                     />
                   </div>
                 </>
@@ -692,31 +697,31 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
                 <>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">Mã khóa <span className="text-[#E68A8C]">*</span></label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       value={editFormData.ma_khoa_hoc}
-                      onChange={(e) => setEditFormData({...editFormData, ma_khoa_hoc: e.target.value})}
+                      onChange={(e) => setEditFormData({ ...editFormData, ma_khoa_hoc: e.target.value })}
                       required
-                      className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:border-[#407F3E]" 
+                      className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:border-[#407F3E]"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">Tên khóa <span className="text-[#E68A8C]">*</span></label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       value={editFormData.ten_khoa_hoc}
-                      onChange={(e) => setEditFormData({...editFormData, ten_khoa_hoc: e.target.value})}
+                      onChange={(e) => setEditFormData({ ...editFormData, ten_khoa_hoc: e.target.value })}
                       required
-                      className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:border-[#407F3E]" 
+                      className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:border-[#407F3E]"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">Năm nhập học</label>
-                    <input 
-                      type="number" 
+                    <input
+                      type="number"
                       value={editFormData.nam_nhap_hoc || ''}
-                      onChange={(e) => setEditFormData({...editFormData, nam_nhap_hoc: e.target.value ? parseInt(e.target.value) : ''})}
-                      className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:border-[#407F3E]" 
+                      onChange={(e) => setEditFormData({ ...editFormData, nam_nhap_hoc: e.target.value ? parseInt(e.target.value) : '' })}
+                      className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:border-[#407F3E]"
                     />
                   </div>
                 </>

@@ -5,6 +5,7 @@ import '../../../core/network/api_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/state/app_state.dart';
 import '../../widgets/paginated_list.dart';
+import '../../widgets/searchable_dropdown.dart';
 
 class TaiChinhSVScreen extends StatefulWidget {
   const TaiChinhSVScreen({super.key});
@@ -288,22 +289,14 @@ class _TaiChinhSVScreenState extends State<TaiChinhSVScreen> {
               const Text('Tạo đơn hoàn phí', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.primary)),
               const SizedBox(height: 12),
               
-              DropdownButtonFormField<String>(
-                value: _refundSelectedInvoice,
-                decoration: InputDecoration(
-                  labelText: 'Chọn hóa đơn liên quan',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  isDense: true,
-                ),
-                items: violatedPayments.map((p) {
-                  return DropdownMenuItem<String>(
-                    value: p.id,
-                    child: Text(p.name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
-                  );
-                }).toList(),
+              SearchableDropdown(
+                title: 'Hóa đơn liên quan',
+                value: _refundSelectedInvoice != null ? violatedPayments.firstWhere((p) => p.id == _refundSelectedInvoice).name : 'Chọn hóa đơn liên quan',
+                options: violatedPayments.map((p) => p.name).toList(),
                 onChanged: (val) {
+                  final p = violatedPayments.firstWhere((p) => p.name == val);
                   setState(() {
-                    _refundSelectedInvoice = val;
+                    _refundSelectedInvoice = p.id;
                   });
                 },
               ),
@@ -405,15 +398,15 @@ class _TaiChinhSVScreenState extends State<TaiChinhSVScreen> {
                                       child: Column(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          DropdownButtonFormField<String>(
-                                            decoration: const InputDecoration(labelText: 'Tên ngân hàng', border: OutlineInputBorder(), isDense: true),
-                                            items: banks.map((bank) => DropdownMenuItem(value: bank, child: Text(bank))).toList(),
+                                          SearchableDropdown(
+                                            title: 'Ngân hàng',
+                                            value: selectedBank ?? 'Chọn ngân hàng',
+                                            options: banks,
                                             onChanged: (val) {
                                               setStateDialog(() {
                                                 selectedBank = val;
                                               });
                                             },
-                                            validator: (v) => v == null || v.isEmpty ? 'Vui lòng chọn' : null,
                                           ),
                                           const SizedBox(height: 12),
                                           TextFormField(
@@ -446,6 +439,10 @@ class _TaiChinhSVScreenState extends State<TaiChinhSVScreen> {
                                     ElevatedButton(
                                       style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
                                       onPressed: () {
+                                        if (selectedBank == null) {
+                                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Vui lòng chọn ngân hàng')));
+                                          return;
+                                        }
                                         if (formKey.currentState?.validate() ?? false) {
                                           Navigator.pop(context, true);
                                         }

@@ -20,8 +20,8 @@ class HoiDongChamBaoCaoDSBuoiGVScreen extends StatelessWidget {
     return PaginatedList<dynamic>(
       items: appState.councilSessions,
       searchHint: 'Tìm phiên chấm...',
-      dropdownTitle: 'Hội trường',
-      dropdownOptions: const ['Tất cả', 'F.4.1', 'B.3.2'],
+      dropdownTitle: 'Vai trò',
+      dropdownOptions: const ['Tất cả vai trò', 'Chủ tịch', 'Thư ký', 'Ủy viên'],
       itemName: 'phiên chấm',
       verticalFilters: false,
       headerWidgetBuilder: (filteredItems) {
@@ -68,10 +68,10 @@ class HoiDongChamBaoCaoDSBuoiGVScreen extends StatelessWidget {
           ),
         );
       },
-      filter: (session, query, room) {
+      filter: (session, query, role) {
         final matchQuery = session.name.toLowerCase().contains(query.toLowerCase());
-        final matchRoom = room == 'Tất cả' || session.room.contains(room);
-        return matchQuery && matchRoom;
+        final matchRole = role == 'Tất cả vai trò' || session.role == role;
+        return matchQuery && matchRole;
       },
       itemBuilder: (session) {
         // Determine styles based on status
