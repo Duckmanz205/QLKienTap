@@ -45,7 +45,7 @@ export const khoaApi = {
   addStudentToCampaign: (id, payload) => api.post(`${getAdminPrefix()}/campaigns/${id}/students`, payload),
   removeStudentFromCampaign: (id, studentId) => api.delete(`${getAdminPrefix()}/campaigns/${id}/students/${studentId}`),
   // publishCampaign đã bị xóa — trạng thái đợt kiến tập giờ tự động chuyển
-  getSchedules: () => api.get(`${getAdminPrefix()}/schedules`),
+  getSchedules: (params = { excludeInactive: true }) => api.get(`${getAdminPrefix()}/schedules`, { params }),
   createSchedule: (data) => api.post(`${getAdminPrefix()}/schedules`, data),
   updateSchedule: (id, data) => api.put(`${getAdminPrefix()}/schedules/${id}`, data),
   deleteSchedule: (id) => api.delete(`${getAdminPrefix()}/schedules/${id}`),
@@ -72,6 +72,7 @@ export const khoaApi = {
   assignGvdd: (data) => api.post(`${getAdminPrefix()}/assign-gvdd`, data),
   unassignGvdd: (tripId, lecturerId) => api.delete(`${getAdminPrefix()}/assign-gvdd/${tripId}/${lecturerId}`),
   autoAssignGvdd: () => api.post(`${getAdminPrefix()}/auto-assign-gvdd`),
+  getBoards: () => api.get(`${getAdminPrefix()}/boards`),
   createBoard: (data) => api.post(`${getAdminPrefix()}/create-board`, data),
   addBoardMember: (data) => api.post(`${getAdminPrefix()}/add-board-member`, data),
   lockGrades: (data) => api.post(`${getAdminPrefix()}/lock-grades`, data),

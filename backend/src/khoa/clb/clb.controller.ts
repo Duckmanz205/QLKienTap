@@ -160,6 +160,7 @@ export class ClbController {
       body.tripId!,
       body.approverId!,
       body.isApproved!,
+      body.giangVienId,
     );
   }
 
@@ -355,8 +356,8 @@ export class ClbController {
   }
 
   @Get('schedules')
-  async getSchedules() {
-    return this.khoaService.getSchedules('QuanLyCLB');
+  async getSchedules(@Query('excludeInactive') excludeInactive: string) {
+    return this.khoaService.getSchedules('QuanLyCLB', excludeInactive === 'true');
   }
 
   @Post('schedules')

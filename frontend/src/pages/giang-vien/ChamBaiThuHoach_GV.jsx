@@ -26,6 +26,15 @@ export default function ChamBaiThuHoach_GV() {
   const [isTripDropdownOpen, setIsTripDropdownOpen] = useState(false);
   const [searchTripDropdown, setSearchTripDropdown] = useState('');
   
+  // Bulk AI Grading states
+  const [selectedReportIds, setSelectedReportIds] = useState([]);
+  const [isBulkAiModalOpen, setIsBulkAiModalOpen] = useState(false);
+  const [bulkAiProgress, setBulkAiProgress] = useState(0);
+  const [bulkAiTotal, setBulkAiTotal] = useState(0);
+  const [bulkAiCurrentStudent, setBulkAiCurrentStudent] = useState('');
+  const [bulkAiStatusText, setBulkAiStatusText] = useState('');
+  const isBulkAiCanceled = React.useRef(false);
+  
   const [currentPage, setCurrentPage] = useState(1);
   const [limit, setLimit] = useState(15);
 
@@ -188,6 +197,97 @@ TRANG 38
    * SVTH: Lê Thị Minh Yến
 `);
 
+  const handleBulkAiGrading = async () => {
+    if (selectedReportIds.length === 0) return;
+    setIsBulkAiModalOpen(true);
+    setBulkAiTotal(selectedReportIds.length);
+    setBulkAiProgress(0);
+    setBulkAiStatusText('Khởi tạo quá trình chấm điểm hàng loạt...');
+    isBulkAiCanceled.current = false;
+
+    for (let i = 0; i < selectedReportIds.length; i++) {
+      if (isBulkAiCanceled.current) {
+        setBulkAiStatusText('Đã hủy quá trình.');
+        break;
+      }
+      const reportId = selectedReportIds[i];
+      const report = reports.find(r => r.id === reportId);
+      if (!report) continue;
+
+      const sv = report.phieuThamQuan?.phieuDangKy?.sinhVien || report.phieuDangKy?.sinhVien;
+      const studentName = sv?.ho_ten || 'Sinh viên';
+      setBulkAiCurrentStudent(studentName);
+      setBulkAiStatusText(`Đang tải dữ liệu bài nộp...`);
+      
+      try {
+        let apiPath = report.file_bao_cao;
+        if (!apiPath) {
+          setBulkAiStatusText(`Thất bại: Không có file đính kèm`);
+          continue;
+        }
+        if (apiPath.startsWith('reports/')) apiPath = `upload/file/${apiPath}`;
+        else if (!apiPath.startsWith('upload/file/')) apiPath = `upload/file/reports/${apiPath}`;
+        if (apiPath.startsWith('/')) apiPath = apiPath.substring(1);
+        
+        const txtApiPath = '/' + apiPath.replace(/\.\w+$/, '.txt');
+        let textToAnalyze = '';
+        try {
+          const respTxt = await api.get(txtApiPath, { responseType: 'text' });
+          if (respTxt.data) textToAnalyze = respTxt.data;
+        } catch (e) {
+          setBulkAiStatusText(`Thất bại: Chưa trích xuất được text cho bài này`);
+          continue;
+        }
+
+        if (!textToAnalyze) {
+           setBulkAiStatusText(`Thất bại: Nội dung văn bản trống`);
+           continue; 
+        }
+
+        setBulkAiStatusText(`Đang phân tích và chấm điểm bằng AI...`);
+        const aiRes = await fetch('http://localhost:8000/grade', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer satori_2026_secure_key'
+          },
+          body: JSON.stringify({ document_text: textToAnalyze })
+        });
+
+        if (!aiRes.ok) {
+           setBulkAiStatusText(`Thất bại: Lỗi từ máy chủ AI`);
+           continue;
+        }
+        
+        const aiData = await aiRes.json();
+        setBulkAiStatusText(`Đang lưu đề xuất điểm ${aiData.diem_bao_cao_cuoi_cung}...`);
+        
+        let aiComment = `1. Hình thức: ${aiData.hinh_thuc_tong_quan?.ly_do_hinh_thuc}\n` +
+                        `2. Tổng quan: ${aiData.hinh_thuc_tong_quan?.ly_do_tong_quan}\n` +
+                        `3. Quy trình: ${aiData.quy_trinh_cong_nghe?.ly_do_quy_trinh}\n` +
+                        `4. VSATTP: ${aiData.vsattp?.ly_do_vsattp}`;
+        
+        await api.post('/giang-vien/save-ai-grade', {
+            reportId: reportId,
+            score: aiData.diem_bao_cao_cuoi_cung,
+            comment: aiComment
+        });
+        
+        setBulkAiProgress(prev => prev + 1);
+        
+      } catch (err) {
+        console.error(err);
+        setBulkAiStatusText(`Thất bại: Có lỗi xảy ra trong quá trình xử lý`);
+      }
+    }
+    
+    if (!isBulkAiCanceled.current) {
+      setBulkAiStatusText('Hoàn tất chấm điểm hàng loạt!');
+    }
+    if (lecturer) fetchReports(lecturer.id);
+    setSelectedReportIds([]);
+  };
+
   const handleAIGrading = async () => {
     setIsGradingAI(true);
     try {
@@ -263,8 +363,8 @@ TRANG 38
 
   const handleSelectReport = async (report) => {
     setSelectedReport(report);
-    setScore(report.diem_thu_hoach !== null ? report.diem_thu_hoach : '');
-    setComments(report.nhan_xet_cua_giang_vien || '');
+    setScore(report.diem_thu_hoach !== null ? report.diem_thu_hoach : (report.diem_ai_de_xuat !== null ? report.diem_ai_de_xuat : ''));
+    setComments(report.nhan_xet_cua_giang_vien || report.nhan_xet_thu_hoach || '');
 
     if (report.file_bao_cao) {
       setIsLoadingText(true);
@@ -565,8 +665,19 @@ TRANG 38
             )}
           </div>
         </div>
-        <div className="text-xs text-slate-500 font-medium shrink-0">
-          Đang hiển thị: <span className="font-bold text-[#407F3E]">{filteredReports.length}</span> bài
+        <div className="flex items-center gap-4 shrink-0">
+          {selectedReportIds.length > 0 && (
+            <button
+              onClick={handleBulkAiGrading}
+              className="px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white text-sm font-bold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer"
+            >
+              <Sparkles className="w-4 h-4" />
+              Chấm AI ({selectedReportIds.length})
+            </button>
+          )}
+          <div className="text-xs text-slate-500 font-medium">
+            Đang hiển thị: <span className="font-bold text-[#407F3E]">{filteredReports.length}</span> bài
+          </div>
         </div>
       </div>
 
@@ -587,6 +698,21 @@ TRANG 38
             <table className="w-full text-left border-collapse min-w-[800px]">
               <thead>
                 <tr className="bg-slate-50 border-b border-[#E7E0C4] text-xs uppercase tracking-wider text-slate-500 font-bold">
+                  <th className="px-6 py-4 w-12 text-center">
+                    <input 
+                      type="checkbox" 
+                      className="w-4 h-4 text-[#407F3E] rounded border-slate-300 focus:ring-[#407F3E] cursor-pointer"
+                      checked={paginatedReports.length > 0 && paginatedReports.filter(r => r.diem_thu_hoach === null).length > 0 && selectedReportIds.length >= paginatedReports.filter(r => r.diem_thu_hoach === null).length}
+                      onChange={(e) => {
+                        const pendingIds = paginatedReports.filter(r => r.diem_thu_hoach === null).map(r => r.id);
+                        if (e.target.checked) {
+                          setSelectedReportIds(Array.from(new Set([...selectedReportIds, ...pendingIds])));
+                        } else {
+                          setSelectedReportIds(selectedReportIds.filter(id => !pendingIds.includes(id)));
+                        }
+                      }}
+                    />
+                  </th>
                   <th className="px-6 py-4 w-1/3">Sinh viên</th>
                   <th className="px-6 py-4 w-1/3">Bài nộp</th>
                   <th className="px-6 py-4 text-right">Trạng thái</th>
@@ -597,7 +723,7 @@ TRANG 38
                 {Object.values(groupedPaginatedReports).map((group, groupIdx) => (
                   <React.Fragment key={groupIdx}>
                     <tr className="bg-slate-100/50 border-y border-[#E7E0C4]">
-                      <td colSpan="4" className="px-6 py-2.5">
+                      <td colSpan="5" className="px-6 py-2.5">
                         <div className="flex items-center gap-2">
                           <span className="font-bold text-slate-700 text-sm">{group.nhaMay}</span>
                           <span className="px-2 py-0.5 rounded-full bg-[#E7E0C4]/50 text-slate-600 text-[10px] uppercase font-bold tracking-wider">
@@ -627,6 +753,18 @@ TRANG 38
                       onClick={() => handleSelectReport(report)}
                       className="hover:bg-slate-50 transition-colors cursor-pointer group"
                     >
+                      <td className="px-6 py-4 text-center" onClick={e => e.stopPropagation()}>
+                        <input 
+                          type="checkbox" 
+                          className="w-4 h-4 text-[#407F3E] rounded border-slate-300 focus:ring-[#407F3E] disabled:opacity-50 cursor-pointer"
+                          disabled={isGraded}
+                          checked={selectedReportIds.includes(report.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) setSelectedReportIds([...selectedReportIds, report.id]);
+                            else setSelectedReportIds(selectedReportIds.filter(id => id !== report.id));
+                          }}
+                        />
+                      </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-lg shrink-0 ${avatarColor}`}>
@@ -1063,6 +1201,62 @@ TRANG 38
                   <CheckCircle2 className="w-4 h-4" /> Sử dụng đề xuất này
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Bulk AI Grading Modal */}
+      {isBulkAiModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-[#E7E0C4] bg-[#fdfcf8] flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                  <Sparkles className="w-4 h-4 text-blue-600" />
+                </div>
+                <h2 className="font-bold text-slate-800">Chấm điểm AI hàng loạt</h2>
+              </div>
+            </div>
+            
+            <div className="p-6">
+              <div className="mb-4">
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="font-semibold text-slate-600">Tiến trình</span>
+                  <span className="font-bold text-[#407F3E]">{bulkAiProgress} / {bulkAiTotal}</span>
+                </div>
+                <div className="w-full bg-slate-200 rounded-full h-3">
+                  <div 
+                    className="bg-gradient-to-r from-[#89B449] to-[#407F3E] h-3 rounded-full transition-all duration-300"
+                    style={{ width: `${(bulkAiTotal > 0 ? bulkAiProgress / bulkAiTotal : 0) * 100}%` }}
+                  ></div>
+                </div>
+              </div>
+              
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm">
+                <p className="font-semibold text-slate-700 mb-1 truncate">Đang xử lý: {bulkAiCurrentStudent}</p>
+                <p className="text-slate-500 animate-pulse">{bulkAiStatusText}</p>
+              </div>
+            </div>
+            
+            <div className="px-6 py-4 border-t border-[#E7E0C4] bg-slate-50 flex justify-end">
+              {bulkAiProgress === bulkAiTotal || isBulkAiCanceled.current ? (
+                <button
+                  onClick={() => setIsBulkAiModalOpen(false)}
+                  className="px-5 py-2 rounded-lg bg-[#407F3E] text-white font-bold hover:bg-[#407F3E]/90 transition-colors cursor-pointer"
+                >
+                  Đóng
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    isBulkAiCanceled.current = true;
+                    setBulkAiStatusText('Đang dừng tiến trình...');
+                  }}
+                  className="px-5 py-2 rounded-lg border border-red-200 text-red-600 font-bold hover:bg-red-50 transition-colors cursor-pointer"
+                >
+                  Hủy tiến trình
+                </button>
+              )}
             </div>
           </div>
         </div>

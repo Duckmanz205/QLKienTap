@@ -98,6 +98,12 @@ export default function ChuyenThamQuan_DSLoc() {
   const [cancelReason, setCancelReason] = useState('');
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
 
+  // Approve Trip (Lecturer Selection) Modal State
+  const [isLecturerModalOpen, setIsLecturerModalOpen] = useState(false);
+  const [lecturers, setLecturers] = useState([]);
+  const [selectedLecturerId, setSelectedLecturerId] = useState('');
+  const [pendingApprovalTripId, setPendingApprovalTripId] = useState(null);
+
 
   useEffect(() => {
     fetchInitialData();
@@ -106,12 +112,14 @@ export default function ChuyenThamQuan_DSLoc() {
 
   const fetchInitialData = async () => {
     try {
-      const [facRes, schRes] = await Promise.all([
+      const [facRes, schRes, lecRes] = await Promise.all([
         khoaApi.getFactories(),
-        khoaApi.getSchedules()
+        khoaApi.getSchedules(),
+        khoaApi.getLecturers()
       ]);
       setNhaMayOptions(facRes.data);
       setLichOptions(schRes.data);
+      setLecturers(lecRes.data);
     } catch (err) {
       console.error(err);
     }
@@ -299,10 +307,17 @@ export default function ChuyenThamQuan_DSLoc() {
       return;
     }
 
+    if (isApproved) {
+      setPendingApprovalTripId(tripId);
+      setSelectedLecturerId('');
+      setIsLecturerModalOpen(true);
+      return;
+    }
+
     const action = async () => {
       try {
         await khoaApi.approveTrip({ tripId, approverId: currentUser.id, isApproved });
-        showPopup(isApproved ? 'Duyệt chuyến tham quan thành công' : 'Từ chối chuyến tham quan thành công', 'success');
+        showPopup('Từ chối chuyến tham quan thành công', 'success');
         fetchTrips();
       } catch (err) {
         console.error(err);
@@ -310,10 +325,28 @@ export default function ChuyenThamQuan_DSLoc() {
       }
     };
 
-    if (!isApproved) {
-      showConfirm("Xác nhận từ chối", "Bạn có chắc chắn muốn từ chối chuyến tham quan này?", action);
-    } else {
-      action();
+    showConfirm("Xác nhận từ chối", "Bạn có chắc chắn muốn từ chối chuyến tham quan này?", action);
+  };
+
+  const submitApproveWithLecturer = async () => {
+    if (!selectedLecturerId) {
+      showPopup('Vui lòng chọn giảng viên dẫn đoàn', 'error');
+      return;
+    }
+    
+    try {
+      await khoaApi.approveTrip({ 
+        tripId: pendingApprovalTripId, 
+        approverId: currentUser.id, 
+        isApproved: true,
+        giangVienId: parseInt(selectedLecturerId)
+      });
+      showPopup('Duyệt chuyến tham quan và phân công giảng viên thành công', 'success');
+      setIsLecturerModalOpen(false);
+      fetchTrips();
+    } catch (err) {
+      console.error(err);
+      showPopup(err.response?.data?.message || 'Có lỗi xảy ra khi xử lý yêu cầu', 'error');
     }
   };
 
@@ -1537,6 +1570,67 @@ export default function ChuyenThamQuan_DSLoc() {
                   Xác nhận hủy chuyến
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lecturer Selection Modal */}
+      {isLecturerModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between shrink-0">
+              <h2 className="text-xl font-bold text-gray-800">
+                Phân công Giảng viên dẫn đoàn
+              </h2>
+              <button
+                onClick={() => setIsLecturerModalOpen(false)}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto">
+              <p className="text-sm text-gray-600 mb-4">
+                Vui lòng chọn giảng viên dẫn đoàn cho chuyến tham quan tự do này trước khi duyệt.
+              </p>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Giảng viên dẫn đoàn <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={selectedLecturerId}
+                    onChange={(e) => setSelectedLecturerId(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#407F3E]/20 focus:border-[#407F3E] transition-all bg-white text-gray-700"
+                  >
+                    <option value="">-- Chọn giảng viên --</option>
+                    {lecturers.map(gv => (
+                      <option key={gv.id} value={gv.id}>
+                        {gv.ten_giang_vien} - {gv.bo_mon}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-3 shrink-0 rounded-b-2xl">
+              <button
+                onClick={() => setIsLecturerModalOpen(false)}
+                className="px-6 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-200 bg-gray-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={submitApproveWithLecturer}
+                className="px-6 py-2.5 text-sm font-medium text-white bg-[#89B449] hover:bg-[#89B449]/90 rounded-xl transition-colors cursor-pointer flex items-center gap-2"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                Xác nhận duyệt
+              </button>
             </div>
           </div>
         </div>

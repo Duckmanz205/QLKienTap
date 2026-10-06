@@ -320,8 +320,8 @@ export class KhoaController {
 
   @Roles('QuanLyKhoa', 'QuanLyCLB')
   @Get('schedules')
-  async getSchedules() {
-    return this.khoaService.getSchedules('QuanLyKhoa');
+  async getSchedules(@Query('excludeInactive') excludeInactive: string) {
+    return this.khoaService.getSchedules('QuanLyKhoa', excludeInactive === 'true');
   }
 
   @Roles('QuanLyKhoa', 'QuanLyCLB')
@@ -486,11 +486,17 @@ export class KhoaController {
     return this.khoaService.autoAssignGvdd();
   }
 
+  @Roles('QuanLyKhoa', 'QuanLyCLB')
+  @Get('boards')
+  async getBoards() {
+    return this.khoaService.getBoards();
+  }
+
   @Roles('QuanLyKhoa')
   @Post('create-board')
   async createBoard(@Body() body: CreateBoardDto) {
     return this.khoaService.createBoard(
-      body.scheduleId,
+      body.dotKienTapId,
       body.name,
       body.date,
       body.room,
@@ -648,5 +654,10 @@ export class KhoaController {
   @Post('bulk-confirm-payments')
   async bulkConfirmPayments(@Body('records') records: any[]) {
     return this.khoaService.bulkConfirmPayments(records);
+  }
+
+  @Get('config')
+  async getConfig() {
+    return this.khoaService.getTaiKhoanThuHuong();
   }
 }

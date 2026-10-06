@@ -81,6 +81,18 @@ export class RequestRefundDto {
   @IsString()
   @IsNotEmpty({ message: 'Đường dẫn file scan không được để trống' })
   fileScanUrl: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Tên ngân hàng nhận không được để trống' })
+  nganHangNhan: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Số tài khoản nhận không được để trống' })
+  soTaiKhoanNhan: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Tên chủ tài khoản nhận không được để trống' })
+  tenChuTaiKhoanNhan: string;
 }
 
 export class MarkNotificationReadDto {

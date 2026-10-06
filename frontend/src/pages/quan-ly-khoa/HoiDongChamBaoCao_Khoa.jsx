@@ -31,21 +31,9 @@ export default function HoiDongChamBaoCao_Khoa() {
   const [selectedStudents, setSelectedStudents] = useState([]); // if needed
 
   // Data
-  const [schedules, setSchedules] = useState([]);
+  const [campaigns, setCampaigns] = useState([]);
   const [lecturers, setLecturers] = useState([]);
-  const [committees, setCommittees] = useState([
-    { 
-      id: 1, 
-      ten: 'HĐ Bảo vệ TQNM - K14 H1', 
-      lich: 'Đợt kiến tập - Học kỳ 1 - 2025-2026', 
-      ngay: '10/09/2026', 
-      gio: '08:00', 
-      diaDiem: 'Phòng A.101', 
-      members: ['https://i.pravatar.cc/150?u=1', 'https://i.pravatar.cc/150?u=2', 'https://i.pravatar.cc/150?u=3', 'https://i.pravatar.cc/150?u=4', 'https://i.pravatar.cc/150?u=5'],
-      sv: 15, 
-      trangThai: 'Sắp diễn ra' 
-    }
-  ]);
+  const [committees, setCommittees] = useState([]);
 
   useEffect(() => {
     fetchData();
@@ -53,12 +41,26 @@ export default function HoiDongChamBaoCao_Khoa() {
 
   const fetchData = async () => {
     try {
-      const [schRes, lecRes] = await Promise.all([
-        khoaApi.getSchedules(),
-        khoaApi.getLecturers()
+      const [campRes, lecRes, boardRes] = await Promise.all([
+        khoaApi.getCampaigns({ limit: 100 }),
+        khoaApi.getLecturers(),
+        khoaApi.getBoards()
       ]);
-      setSchedules(schRes.data);
+      setCampaigns(campRes.data?.data || campRes.data || []);
       setLecturers(lecRes.data);
+      
+      const formattedBoards = boardRes.data.map(b => ({
+        id: b.id,
+        ten: b.ten_hoi_dong,
+        lich: b.dotKienTap?.ten_dot || 'Đợt kiến tập',
+        ngay: b.ngay_bao_cao ? new Date(b.ngay_bao_cao).toLocaleDateString('vi-VN') : '',
+        gio: b.ngay_bao_cao ? new Date(b.ngay_bao_cao).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
+        diaDiem: b.dia_diem,
+        members: b.members || [],
+        sv: b.sv || 0,
+        trangThai: new Date(b.ngay_bao_cao) > new Date() ? 'Sắp diễn ra' : 'Đã hoàn thành'
+      }));
+      setCommittees(formattedBoards);
     } catch (err) {
       console.error(err);
     }
@@ -72,7 +74,7 @@ export default function HoiDongChamBaoCao_Khoa() {
     }
     try {
       const res = await khoaApi.createBoard({
-        scheduleId: selectedSchedule,
+        dotKienTapId: selectedSchedule,
         name: boardName,
         date: dateTime,
         room: room
@@ -81,26 +83,13 @@ export default function HoiDongChamBaoCao_Khoa() {
       const boardId = res.data.id;
       
       // add board members
-      for (const memberId of selectedMembers) {
+      for (const member of selectedMembers) {
         await khoaApi.addBoardMember({
           boardId,
-          lecturerId: memberId,
-          role: 'Thành viên'
+          lecturerId: member.id,
+          role: member.role
         });
       }
-      
-      const newCommittee = {
-        id: boardId || Date.now(),
-        ten: boardName,
-        lich: schedules.find(s => s.id === selectedSchedule)?.ten_lich || 'Đợt kiến tập',
-        ngay: dateTime ? new Date(dateTime).toLocaleDateString('vi-VN') : '',
-        gio: dateTime ? new Date(dateTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
-        diaDiem: room,
-        members: ['https://i.pravatar.cc/150?u=1', 'https://i.pravatar.cc/150?u=2'],
-        sv: 0,
-        trangThai: 'Sắp diễn ra'
-      };
-      setCommittees(prev => [newCommittee, ...prev]);
 
       toast.success('Tạo hội đồng thành công!');
       setIsModalOpen(false);
@@ -109,6 +98,8 @@ export default function HoiDongChamBaoCao_Khoa() {
       setDateTime('');
       setRoom('');
       setSelectedMembers([]);
+      fetchData();
+
     } catch (err) {
       console.error(err);
       toast.error('Lỗi tạo hội đồng');
@@ -289,7 +280,7 @@ export default function HoiDongChamBaoCao_Khoa() {
                       <td className="p-4">
                         <div className="flex items-center -space-x-2">
                           {displayMembers.map((m, idx) => (
-                            <img key={idx} src={m} alt="Avatar" className="w-8 h-8 rounded-full border-2 border-white shadow-sm z-10 relative" style={{ zIndex: 10 - idx }} />
+                            <img key={idx} src={m.giangVien?.anh_dai_dien || `https://i.pravatar.cc/150?u=${m.giang_vien_id}`} alt="Avatar" className="w-8 h-8 rounded-full border-2 border-white shadow-sm z-10 relative bg-slate-50" style={{ zIndex: 10 - idx }} />
                           ))}
                           {extraMembers > 0 && (
                             <div className="w-8 h-8 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500 relative z-0">
@@ -421,26 +412,35 @@ export default function HoiDongChamBaoCao_Khoa() {
                     />
                   </div>
 
-                  <div className="relative">
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Lịch kiến tập *</label>
+                  <div className="relative z-50">
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Đợt kiến tập *</label>
                     <div 
                       onClick={(e) => handleModalDropdownClick(e, setIsLichDropdownOpen)}
-                      className="w-full px-4 py-2 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm flex justify-between items-center cursor-pointer transition-all hover:border-[#407F3E]"
+                      className="w-full px-4 py-2 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm flex justify-between items-center cursor-pointer hover:border-[#407F3E]"
                     >
-                      <span className="text-slate-800 font-medium truncate pr-2">
-                        {selectedSchedule ? schedules.find(s => s.id === selectedSchedule)?.ten_dot || 'Đã chọn' : 'Chọn lịch kiến tập'}
+                      <span className="text-slate-800 font-bold truncate pr-2">
+                        {selectedSchedule 
+                          ? campaigns.find(c => c.id === selectedSchedule)?.ten_dot 
+                          : 'Chọn đợt kiến tập'}
                       </span>
                       <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
                     </div>
                     {isLichDropdownOpen && (
-                      <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-50 py-1 max-h-48 overflow-y-auto">
-                        {schedules.map(sch => (
+                      <div 
+                        className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-xl py-2 max-h-48 overflow-y-auto animate-in slide-in-from-top-1"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {campaigns.map(camp => (
                           <div 
-                            key={sch.id}
-                            onClick={() => { setSelectedSchedule(sch.id); setIsLichDropdownOpen(false); }}
-                            className="px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer"
+                            key={camp.id}
+                            onClick={() => {
+                              setSelectedSchedule(camp.id);
+                              setIsLichDropdownOpen(false);
+                            }}
+                            className="px-4 py-2.5 text-sm cursor-pointer hover:bg-slate-50 border-b border-slate-50 last:border-0"
                           >
-                            {sch.ten_dot} ({sch.namHoc?.nam_bat_dau}-{sch.namHoc?.nam_ket_thuc})
+                            <div className="font-bold text-slate-800">{camp.ten_dot}</div>
+                            <div className="text-xs font-medium text-slate-500 mt-0.5">{(camp.khoaHoc && camp.hocKy) ? `${camp.hocKy.ten_hoc_ky} - Khóa ${camp.khoaHoc.nien_khoa}` : ''}</div>
                           </div>
                         ))}
                       </div>
@@ -499,15 +499,15 @@ export default function HoiDongChamBaoCao_Khoa() {
                         onClick={(e) => e.stopPropagation()}
                       >
                         {lecturers.map(lec => {
-                          const isChecked = selectedMembers.includes(lec.id);
+                          const isChecked = selectedMembers.some(m => m.id === lec.id);
                           return (
                             <div 
                               key={lec.id}
                               onClick={() => {
                                 if (isChecked) {
-                                  setSelectedMembers(selectedMembers.filter(id => id !== lec.id));
+                                  setSelectedMembers(selectedMembers.filter(m => m.id !== lec.id));
                                 } else {
-                                  setSelectedMembers([...selectedMembers, lec.id]);
+                                  setSelectedMembers([...selectedMembers, { id: lec.id, role: 'Thành viên' }]);
                                 }
                               }}
                               className="px-4 py-1.5 text-sm flex items-center gap-2 cursor-pointer hover:bg-slate-50"
@@ -521,6 +521,30 @@ export default function HoiDongChamBaoCao_Khoa() {
                               <span className={isChecked ? "font-bold text-slate-800" : "font-medium text-slate-600"}>
                                 {lec.ho_ten} ({lec.ma_gv})
                               </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {selectedMembers.length > 0 && (
+                      <div className="mt-3 flex flex-col gap-2">
+                        {selectedMembers.map(m => {
+                          const lec = lecturers.find(l => l.id === m.id);
+                          return (
+                            <div key={m.id} className="flex items-center justify-between p-2 bg-slate-50 border border-[#E7E0C4] rounded-lg">
+                              <span className="text-sm font-semibold text-slate-800">{lec?.ho_ten}</span>
+                              <select
+                                value={m.role}
+                                onChange={(e) => {
+                                  const newRole = e.target.value;
+                                  setSelectedMembers(selectedMembers.map(item => item.id === m.id ? { ...item, role: newRole } : item));
+                                }}
+                                className="text-xs px-2 py-1.5 border border-slate-200 rounded font-bold text-slate-700 bg-white focus:outline-none focus:border-[#407F3E]"
+                              >
+                                <option value="Chủ tịch">Chủ tịch</option>
+                                <option value="Thư ký">Thư ký</option>
+                                <option value="Thành viên">Thành viên</option>
+                              </select>
                             </div>
                           );
                         })}
@@ -566,9 +590,9 @@ export default function HoiDongChamBaoCao_Khoa() {
             className="bg-white w-full max-w-2xl rounded-2xl shadow-xl relative z-10 animate-in zoom-in-95 duration-200 flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-6 py-4 border-b border-[#E7E0C4] flex items-center justify-between">
+            <div className="px-6 py-4 border-b border-[#E7E0C4] flex items-center justify-between bg-slate-50 rounded-t-2xl">
               <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                Chi tiết
+                Chi tiết Hội đồng
               </h2>
               <button 
                 type="button"
@@ -579,16 +603,55 @@ export default function HoiDongChamBaoCao_Khoa() {
               </button>
             </div>
             
-            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-              {Object.entries(viewingDetail).map(([key, value]) => {
-                if (typeof value === 'object' && value !== null) return null;
-                return (
-                  <div key={key} className="flex flex-col border-b border-slate-100 pb-2">
-                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{key}</span>
-                    <span className="text-sm font-medium text-slate-800 break-words">{String(value)}</span>
+            <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <h3 className="text-lg font-bold text-[#407F3E] mb-4">{viewingDetail.ten}</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-xs font-bold text-slate-500 uppercase">Đợt kiến tập</span>
+                    <p className="text-sm font-semibold text-slate-800 mt-1">{viewingDetail.lich}</p>
                   </div>
-                );
-              })}
+                  <div>
+                    <span className="text-xs font-bold text-slate-500 uppercase">Trạng thái</span>
+                    <p className="mt-1">{getStatusBadge(viewingDetail.trangThai)}</p>
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-slate-500 uppercase">Ngày giờ</span>
+                    <div className="flex items-center gap-1.5 mt-1 text-sm font-semibold text-slate-800">
+                      <Calendar className="w-4 h-4 text-slate-400" />
+                      {viewingDetail.ngay} - {viewingDetail.gio}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-slate-500 uppercase">Địa điểm</span>
+                    <div className="flex items-center gap-1.5 mt-1 text-sm font-semibold text-slate-800">
+                      <MapPin className="w-4 h-4 text-slate-400" />
+                      {viewingDetail.diaDiem}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-bold text-slate-700 mb-3 uppercase tracking-wide flex items-center gap-2">
+                  Danh sách Giảng viên
+                  <span className="bg-[#E7E0C4] text-slate-800 px-2 py-0.5 rounded-full text-xs">{viewingDetail.members?.length || 0}</span>
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {viewingDetail.members?.map((m, idx) => (
+                    <div key={idx} className="flex items-center gap-3 p-3 border border-slate-200 rounded-xl hover:border-[#407F3E] transition-colors bg-white">
+                      <img src={m.giangVien?.anh_dai_dien || `https://i.pravatar.cc/150?u=${m.giang_vien_id}`} alt="avatar" className="w-10 h-10 rounded-full border border-slate-200 object-cover bg-slate-50" />
+                      <div>
+                        <p className="text-sm font-bold text-slate-800">{m.giangVien?.ho_ten || 'Giảng viên'}</p>
+                        <p className={`text-xs font-bold mt-0.5 ${m.vai_tro === 'Chủ tịch' ? 'text-red-500' : m.vai_tro === 'Thư ký' ? 'text-blue-500' : 'text-slate-500'}`}>{m.vai_tro}</p>
+                      </div>
+                    </div>
+                  ))}
+                  {(!viewingDetail.members || viewingDetail.members.length === 0) && (
+                    <div className="col-span-2 text-sm text-slate-500 text-center py-4 italic border border-slate-200 rounded-xl border-dashed">Chưa có thành viên</div>
+                  )}
+                </div>
+              </div>
             </div>
             
             <div className="px-6 py-4 border-t border-[#E7E0C4] bg-slate-50/50 flex items-center justify-end rounded-b-2xl">

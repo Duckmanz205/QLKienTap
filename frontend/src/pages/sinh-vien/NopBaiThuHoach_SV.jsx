@@ -158,19 +158,12 @@ export default function NopBaiThuHoach_SV() {
               let canSubmit = true;
               let disabledReason = '';
               
-              if (isDoKhoa) {
-                if (!trip.hasPhieuThamQuan) {
-                  canSubmit = false;
-                  disabledReason = trip.hoaDonStatus === 'ChuaDong' ? 'Chưa đóng lệ phí' : 'Chưa có PTQ';
-                } else if (trip.diemDanhStatus !== 'CoMat') {
-                  canSubmit = false;
-                  disabledReason = 'Chưa điểm danh';
-                }
-              } else {
-                if (!trip.hasPhieuThamQuan) {
-                  canSubmit = false;
-                  disabledReason = 'Chưa cấp PTQ';
-                }
+              if (!trip.hasPhieuThamQuan) {
+                canSubmit = false;
+                disabledReason = isDoKhoa && trip.hoaDonStatus === 'ChuaDong' ? 'Chưa đóng lệ phí' : 'Chưa có PTQ';
+              } else if (trip.diemDanhStatus !== 'CoMat') {
+                canSubmit = false;
+                disabledReason = 'Chưa điểm danh';
               }
               
               return (

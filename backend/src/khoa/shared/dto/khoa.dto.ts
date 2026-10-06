@@ -244,6 +244,10 @@ export class CreateScheduleDto {
   @IsOptional()
   @IsBoolean()
   isSubmit?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  tai_khoan_thu_huong_id?: number;
 }
 
 export class ImportStudentsDto {
@@ -360,6 +364,11 @@ export class ApproveTripDto {
   @IsOptional()
   @IsString()
   hanhDong?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  giangVienId?: number;
 }
 
 export class ApproveCancelDto {
@@ -407,7 +416,7 @@ export class AssignGvddDto {
 export class CreateBoardDto {
   @IsInt()
   @Min(1)
-  scheduleId: number;
+  dotKienTapId: number;
 
   @IsString()
   @IsNotEmpty({ message: 'Tên hội đồng không được để trống' })

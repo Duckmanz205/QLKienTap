@@ -575,6 +575,7 @@ export class KhoaService {
       .createQueryBuilder('dot')
       .leftJoinAndSelect('dot.hocKy', 'hocKy')
       .leftJoinAndSelect('hocKy.namHoc', 'namHoc')
+      .leftJoinAndSelect('dot.khoaHoc', 'khoaHoc')
       .orderBy('dot.id', 'DESC');
 
     if (search) {
@@ -852,14 +853,18 @@ export class KhoaService {
   // chuyển bởi updateDotKienTapStatus() — không còn cho phép nhập tay.
   // Xem updateDotKienTapStatus() bên dưới.
 
-  async getSchedules(userRole?: string) {
+  async getSchedules(userRole?: string, excludeInactive: boolean = false) {
     const schedules = await this.lichRepo.find({
       relations: { dotKienTap: { khoaHoc: true } },
     });
+    let result = schedules;
     if (userRole === 'QuanLyKhoa') {
-      return schedules.filter((s) => s.trang_thai !== 'Nhap');
+      result = result.filter((s) => s.trang_thai !== 'Nhap');
     }
-    return schedules;
+    if (excludeInactive) {
+      result = result.filter((s) => !['Nhap', 'ChoDuyet', 'TuChoi', 'DaHuy'].includes(s.trang_thai));
+    }
+    return result;
   }
   async createSchedule(data: any) {
     return this.dataSource.transaction(async (manager: EntityManager) => {
@@ -936,6 +941,9 @@ export class KhoaService {
     if (!lich) throw new NotFoundException('Không tìm thấy lịch kiến tập');
     if (lich.trang_thai !== 'Nhap')
       throw new BadRequestException('Chỉ có thể xóa lịch ở trạng thái Nháp');
+      
+    // Khóa ngoại ở CSDL đã được cài đặt ON DELETE SET NULL, 
+    // nên không cần gỡ thủ công ở đây (và tránh lỗi TS2322 Type 'null' is not assignable to type 'number').
     await this.lichRepo.remove(lich);
     return { message: 'Xóa lịch thành công' };
   }
@@ -1027,10 +1035,10 @@ export class KhoaService {
     lich.ly_do_tu_choi = reason || 'Chưa nhập lý do';
     await this.lichRepo.save(lich);
 
-    // Trả trạng thái các chuyến tham quan thuộc lịch về Nháp
+    // Trả trạng thái các chuyến tham quan thuộc lịch về Nháp VÀ gỡ khỏi lịch (để có thể tái sử dụng)
     await this.chuyenRepo.update(
       { lich_kien_tap_id: id },
-      { trang_thai: 'Nhap' },
+      { trang_thai: 'Nhap', lich_kien_tap_id: null as any },
     );
     // Đồng bộ trạng thái đợt kiến tập cha
     await this.updateDotKienTapStatus(lich.dot_kien_tap_id);
@@ -1551,97 +1559,89 @@ export class KhoaService {
     deXuatId: number,
     approverId: number,
     isApproved: boolean,
+    giangVienId?: number,
   ) {
-    const dexuat = await this.deXuatRepo.findOne({
-      where: { id: deXuatId },
-    });
-    if (!dexuat) {
-      throw new NotFoundException('Không tìm thấy đề xuất chuyến đi tự do');
-    }
-
-    if (isApproved) {
-      let finalNhaMayId = dexuat.nha_may_id;
-      if (!finalNhaMayId && dexuat.ten_nha_may_de_xuat) {
-        const newNhaMay = new NhaMay();
-        newNhaMay.ten_nha_may = dexuat.ten_nha_may_de_xuat;
-        newNhaMay.dia_chi = dexuat.dia_chi_de_xuat;
-        newNhaMay.ho_tro_truc_tiep = dexuat.hinh_thuc === 'TrucTiep';
-        newNhaMay.ho_tro_truc_tuyen = dexuat.hinh_thuc === 'TrucTuyen';
-        const savedNhaMay = await this.nhaMayRepo.save(newNhaMay);
-        finalNhaMayId = savedNhaMay.id;
-      }
-
-      // Create ChuyenThamQuan
-      const trip = new ChuyenThamQuan();
-      trip.nha_may_id = finalNhaMayId;
-      trip.lich_kien_tap_id = dexuat.lich_kien_tap_id;
-      trip.ngay_tham_quan = dexuat.ngay_tham_quan_de_xuat;
-      trip.gio_bat_dau = dexuat.gio_bat_dau_de_xuat;
-      trip.hinh_thuc = dexuat.hinh_thuc;
-      trip.cach_to_chuc = 'TuDo';
-      trip.suc_chua = 1;
-      trip.trang_thai = 'MoDangKy';
-      trip.le_phi = 0;
-      const savedTrip = await this.chuyenRepo.save(trip);
-
-      dexuat.ngay_duyet = new Date();
-      dexuat.trang_thai_duyet = 'DaDuyet';
-      dexuat.chuyen_tham_quan_id = savedTrip.id;
-      await this.deXuatRepo.save(dexuat);
-
-      // Tu dong dang ky luon cho SV nay
-      const phieu = new PhieuDangKy();
-      phieu.sinh_vien_id = dexuat.sinh_vien_id;
-      phieu.chuyen_tham_quan_id = savedTrip.id;
-      phieu.trang_thai = 'HopLe';
-      const savedPhieu = await this.phieuRepo.save(phieu);
-
-      // Va cap luon phieu tham quan
-      const ptq = new PhieuThamQuan();
-      ptq.phieu_dang_ky_id = savedPhieu.id;
-      ptq.trang_thai = 'HopLe';
-      await this.phieuTQRepo.save(ptq);
-
-      const dksv = await this.dksvRepo.findOne({
-        where: {
-          sinh_vien_id: dexuat.sinh_vien_id,
-          trang_thai: 'DangThucHien',
-        },
+    try {
+      const dexuat = await this.deXuatRepo.findOne({
+        where: { id: deXuatId },
       });
-      if (dksv) {
-        const pc = await this.pcGvhdRepo.findOne({
-          where: {
-            dot_kien_tap_sinh_vien_id: dksv.id,
-            trang_thai: 'DangHoatDong',
-          },
-        });
-        if (pc) {
-          const exist = await this.danDoanRepo.findOne({
-            where: {
-              chuyen_tham_quan_id: savedTrip.id,
-              giang_vien_id: pc.giang_vien_id,
-            },
-          });
-          if (!exist) {
-            const addPc = new PhanCongGiangVienDanDoan();
-            addPc.chuyen_tham_quan_id = savedTrip.id;
-            addPc.giang_vien_id = pc.giang_vien_id;
-            addPc.la_truong_doan = true;
-            await this.danDoanRepo.save(addPc);
-          }
-        }
+      if (!dexuat) {
+        throw new NotFoundException('Không tìm thấy đề xuất chuyến đi tự do');
       }
-    } else {
-      dexuat.ngay_duyet = new Date();
-      dexuat.trang_thai_duyet = 'TuChoi';
-      await this.deXuatRepo.save(dexuat);
-    }
 
-    return {
-      message: isApproved
-        ? 'Duyệt chuyến đi tự do thành công'
-        : 'Từ chối chuyến đi tự do thành công',
-    };
+      if (isApproved) {
+        if (!giangVienId) {
+          throw new BadRequestException('Vui lòng chọn giảng viên dẫn đoàn khi duyệt chuyến đi');
+        }
+
+        let finalNhaMayId = dexuat.nha_may_id;
+        if (!finalNhaMayId && dexuat.ten_nha_may_de_xuat) {
+          const newNhaMay = new NhaMay();
+          newNhaMay.ten_nha_may = dexuat.ten_nha_may_de_xuat;
+          newNhaMay.dia_chi = dexuat.dia_chi_de_xuat;
+          newNhaMay.ho_tro_truc_tiep = dexuat.hinh_thuc === 'TrucTiep';
+          newNhaMay.ho_tro_truc_tuyen = dexuat.hinh_thuc === 'TrucTuyen';
+          const savedNhaMay = await this.nhaMayRepo.save(newNhaMay);
+          finalNhaMayId = savedNhaMay.id;
+        }
+
+        // Create ChuyenThamQuan
+        const trip = new ChuyenThamQuan();
+        trip.nha_may_id = finalNhaMayId;
+        trip.lich_kien_tap_id = dexuat.lich_kien_tap_id;
+        trip.ngay_tham_quan = dexuat.ngay_tham_quan_de_xuat;
+        trip.gio_bat_dau = dexuat.gio_bat_dau_de_xuat;
+        trip.hinh_thuc = dexuat.hinh_thuc;
+        trip.cach_to_chuc = 'TuDo';
+        trip.suc_chua = 1;
+        trip.trang_thai = 'MoDangKy';
+        trip.le_phi = 0;
+        const savedTrip = await this.chuyenRepo.save(trip);
+
+        dexuat.ngay_duyet = new Date();
+        dexuat.trang_thai_duyet = 'DaDuyet';
+        dexuat.chuyen_tham_quan_id = savedTrip.id;
+        dexuat.nha_may_id = finalNhaMayId;
+        await this.deXuatRepo.save(dexuat);
+
+        // Tu dong dang ky luon cho SV nay
+        const phieu = new PhieuDangKy();
+        phieu.sinh_vien_id = dexuat.sinh_vien_id;
+        phieu.chuyen_tham_quan_id = savedTrip.id;
+        phieu.trang_thai = 'HopLe';
+        const savedPhieu = await this.phieuRepo.save(phieu);
+
+        // Va cap luon phieu tham quan
+        const ptq = new PhieuThamQuan();
+        ptq.phieu_dang_ky_id = savedPhieu.id;
+        ptq.trang_thai = 'HopLe';
+        await this.phieuTQRepo.save(ptq);
+
+        // Phan cong giang vien dan doan
+        const dd = new PhanCongGiangVienDanDoan();
+        dd.chuyen_tham_quan_id = savedTrip.id;
+        dd.giang_vien_id = giangVienId;
+        await this.danDoanRepo.save(dd);
+      } else {
+        dexuat.ngay_duyet = new Date();
+        dexuat.trang_thai_duyet = 'TuChoi';
+        await this.deXuatRepo.save(dexuat);
+      }
+
+      return {
+        message: isApproved
+          ? 'Duyệt chuyến đi tự do thành công'
+          : 'Từ chối chuyến đi tự do thành công',
+      };
+    } catch (error) {
+      console.error('Lỗi khi duyệt chuyến đi:', error);
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new BadRequestException(
+        error.message || 'Lỗi không xác định khi duyệt chuyến đi tự do',
+      );
+    }
   }
 
   // Duyet thanh toan dang ky cua Sinh Vien
@@ -1695,7 +1695,7 @@ export class KhoaService {
     return this.dataSource.transaction(async (manager: EntityManager) => {
       const req = await manager.findOne(YeuCauHuyDangKy, {
         where: { id: requestId },
-        relations: { phieuDangKy: true },
+        relations: { phieuDangKy: { chuyenThamQuan: true } },
       });
       if (!req) throw new NotFoundException('Không tìm thấy yêu cầu hủy');
 
@@ -1704,21 +1704,28 @@ export class KhoaService {
       await manager.save(YeuCauHuyDangKy, req);
 
       const previousStatus = req.phieuDangKy.trang_thai;
-      
-      req.phieuDangKy.trang_thai = 'DaHuy';
-      await manager.save(PhieuDangKy, req.phieuDangKy);
+      if (isApproved) {
+        req.phieuDangKy.trang_thai = 'DaHuy';
+        await manager.save(PhieuDangKy, req.phieuDangKy);
+        
+        // Neu day la chuyen tham quan tu do thi huy luon chuyen di
+        if (req.phieuDangKy.chuyenThamQuan?.cach_to_chuc === 'TuDo') {
+            req.phieuDangKy.chuyenThamQuan.trang_thai = 'DaHuy';
+            await manager.save(ChuyenThamQuan, req.phieuDangKy.chuyenThamQuan);
+        }
 
-      // Nếu hủy sau khi đã chốt danh sách (Đã đậu - HopLe), sinh viên BẮT BUỘC bị phạt 3 chuyến
-      if (previousStatus === 'HopLe') {
-        const black = new DanhSachDen();
-        black.sinh_vien_id = req.phieuDangKy.sinh_vien_id;
-        black.ly_do = 'HuyKhongMinhChung';
-        black.phieu_dang_ky_id = req.phieu_dang_ky_id;
-        black.ngay_ghi_nhan = new Date();
-        black.so_chuyen_bi_cam = 3;
-        black.so_chuyen_con_lai = 3;
-        black.con_hieu_luc = true;
-        await manager.save(DanhSachDen, black);
+        // Nếu hủy sau khi đã chốt danh sách (Đã đậu - HopLe), sinh viên BẮT BUỘC bị phạt 3 chuyến
+        if (previousStatus === 'HopLe') {
+          const black = new DanhSachDen();
+          black.sinh_vien_id = req.phieuDangKy.sinh_vien_id;
+          black.ly_do = 'HuyKhongMinhChung';
+          black.phieu_dang_ky_id = req.phieu_dang_ky_id;
+          black.ngay_ghi_nhan = new Date();
+          black.so_chuyen_bi_cam = 3;
+          black.so_chuyen_con_lai = 3;
+          black.con_hieu_luc = true;
+          await manager.save(DanhSachDen, black);
+        }
       }
 
       return { message: 'Xử lý yêu cầu hủy thành công' };
@@ -1898,19 +1905,17 @@ export class KhoaService {
   ) {
     const trip = await this.chuyenRepo.findOne({
       where: { id: tripId },
-      relations: { nhaMay: true },
+      relations: { nhaMay: true, lichKienTap: { taiKhoanThuHuong: true } },
     });
     if (!trip) throw new NotFoundException('Không tìm thấy chuyến đi');
 
-    // 0. Kiem tra xem CLB da cau hinh thanh toan chua
-    const activeConfig = await this.taiKhoanThuHuongRepo.findOne({
-      where: { trang_thai: 'HoatDong' },
-    });
-    if (!activeConfig) {
+    // 0. Kiểm tra xem Lịch kiến tập đã được gắn tài khoản thụ hưởng chưa
+    if (!trip.lichKienTap || !trip.lichKienTap.tai_khoan_thu_huong_id) {
       throw new BadRequestException(
-        'Vui lòng cấu hình tài khoản thanh toán VietQR trước khi chốt danh sách!',
+        'Vui lòng cấu hình tài khoản thanh toán VietQR cho Lịch kiến tập này trước khi chốt danh sách!',
       );
     }
+    const activeConfig = trip.lichKienTap.taiKhoanThuHuong;
 
     const phieus = await this.phieuRepo.find({
       where: {
@@ -2317,7 +2322,7 @@ export class KhoaService {
 
     const trips = await this.chuyenRepo.find({
       where: {
-        cach_to_chuc: 'DoKhoaToChuc',
+        cach_to_chuc: In(['DoKhoaToChuc', 'TuDo']),
         trang_thai: In(['Nhap', 'ChoDuyet', 'DaDuyet', 'MoDangKy']),
       },
     });
@@ -2427,14 +2432,47 @@ export class KhoaService {
   // -------------------------------------------------------------
   // Hoi Dong Cham Bao Cao & Tong Ket Diem
   // -------------------------------------------------------------
+  async getBoards() {
+    const boards = await this.hdRepo.find({
+      relations: { dotKienTap: true },
+      order: { ngay_bao_cao: 'DESC' },
+    });
+
+    return Promise.all(
+      boards.map(async (b) => {
+        const thanhViens = await this.hdTvRepo.find({
+          where: { hoi_dong_id: b.id },
+          relations: { giangVien: true },
+        });
+
+        const studentCount = await this.phieuRepo.count({
+          where: {
+            chuyenThamQuan: {
+              lichKienTap: {
+                dotKienTap: { id: b.dot_kien_tap_id },
+              },
+            },
+            trang_thai: 'HopLe',
+          },
+        });
+
+        return {
+          ...b,
+          members: thanhViens,
+          sv: studentCount,
+        };
+      }),
+    );
+  }
+
   async createBoard(
-    scheduleId: number,
+    dotKienTapId: number,
     name: string,
     date: Date,
     room: string,
   ) {
     const hd = new HoiDongChamBaoCao();
-    hd.lich_kien_tap_id = scheduleId;
+    hd.dot_kien_tap_id = dotKienTapId;
     hd.ten_hoi_dong = name;
     hd.ngay_bao_cao = date;
     hd.dia_diem = room;
@@ -2956,8 +2994,7 @@ export class KhoaService {
       .leftJoinAndSelect('chuyen.nhaMay', 'nhaMay')
       .leftJoinAndSelect('chuyen.lichKienTap', 'lich')
       .leftJoinAndSelect('phieu.yeuCauHuy', 'yeuCauHuy')
-      .leftJoinAndSelect('phieu.hoaDon', 'hoaDon')
-      .leftJoinAndSelect('phieu.diemDanh', 'diemDanh');
+      .leftJoinAndSelect('phieu.hoaDon', 'hoaDon');
 
     if (search) {
       queryBuilder.andWhere(

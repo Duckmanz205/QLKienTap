@@ -123,7 +123,7 @@ async def process_pdf_endpoint(file: UploadFile = File(...)):
 
             try:
                 response = await client.chat.completions.create(
-                    model="qwen-vl-ocr",
+                    model="qvq-max",
                     messages=[
                         {
                             "role": "user",
