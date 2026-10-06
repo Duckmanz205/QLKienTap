@@ -123,7 +123,7 @@ async def process_pdf_endpoint(file: UploadFile = File(...)):
 
             try:
                 response = await client.chat.completions.create(
-                    model="qvq-max",
+                    model="qwen3-vl-flash",
                     messages=[
                         {
                             "role": "user",
@@ -134,9 +134,21 @@ async def process_pdf_endpoint(file: UploadFile = File(...)):
                         }
                     ],
                     temperature=0.01,
-                    max_tokens=2000
+                    max_tokens=2000,
+                    stream=True,
+                    extra_body={
+                        "enable_thinking": False
+                    }
                 )
-                ocr_text = response.choices[0].message.content.strip()
+
+                ocr_text = ""
+                async for chunk in response:
+                    if chunk.choices:
+                        delta = chunk.choices[0].delta
+                        if hasattr(delta, 'content') and delta.content:
+                            ocr_text += delta.content
+
+                ocr_text = ocr_text.strip()
 
                 if "EMPTY" not in ocr_text.upper() and len(ocr_text) >= 3:
                     ocr_text = re.sub(r'(?i)^(.*?trích xuất.*?:|.*?như sau:)\s*', '', ocr_text)
