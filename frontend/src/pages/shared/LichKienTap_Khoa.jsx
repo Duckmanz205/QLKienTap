@@ -792,7 +792,9 @@ export default function LichKienTap_Khoa() {
                       >
                         <option value="">Chọn tài khoản VietQR...</option>
                         {taiKhoanConfigs.map(tk => (
-                          <option key={tk.id} value={tk.id}>{tk.ten_ngan_hang} - {tk.so_tai_khoan} - {tk.ten_chu_tai_khoan}</option>
+                          <option key={tk.id} value={tk.id}>
+                            {tk.ghi_chu ? `[${tk.ghi_chu}] ` : ''}{tk.ten_ngan_hang} - {tk.so_tai_khoan} - {tk.ten_chu_tai_khoan}
+                          </option>
                         ))}
                       </select>
                     </div>

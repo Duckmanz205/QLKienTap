@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  ChevronDown, Check, ChevronRight, UploadCloud, Search, DollarSign, X, Download, FileText, Eye
+  ChevronDown, Check, ChevronRight, UploadCloud, Search, DollarSign, X, Download, FileText, Eye, Plus, Edit
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
@@ -152,11 +152,16 @@ export default function QuanLyLePhi_Khoa() {
 
   // Config States
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
+  const [paymentConfigs, setPaymentConfigs] = useState([]);
+  const [configViewMode, setConfigViewMode] = useState('list'); // 'list' or 'form'
+  const [configSearchTerm, setConfigSearchTerm] = useState('');
   const [paymentConfig, setPaymentConfig] = useState({
+    id: null,
     ma_ngan_hang: '',
     ten_ngan_hang: '',
     so_tai_khoan: '',
-    ten_chu_tai_khoan: ''
+    ten_chu_tai_khoan: '',
+    ghi_chu: ''
   });
   const [isLichDropdownOpen, setIsLichDropdownOpen] = useState(false);
   const [selectedLich, setSelectedLich] = useState('');
@@ -218,8 +223,8 @@ export default function QuanLyLePhi_Khoa() {
   const fetchConfig = async () => {
     try {
       const res = await khoaApi.getTaiKhoanThuHuong();
-      if (res.data && res.data.length > 0) {
-        setPaymentConfig(res.data[0]);
+      if (res.data) {
+        setPaymentConfigs(res.data);
       }
     } catch (err) {
       console.error(err);
@@ -230,12 +235,27 @@ export default function QuanLyLePhi_Khoa() {
     try {
       await khoaApi.saveTaiKhoanThuHuong(paymentConfig);
       setToast({ show: true, message: 'Đã lưu cấu hình thanh toán', type: 'success' });
-      setIsConfigModalOpen(false);
+      setConfigViewMode('list');
       fetchConfig();
     } catch (err) {
       console.error(err);
       setToast({ show: true, message: 'Lỗi lưu cấu hình', type: 'error' });
     }
+  };
+
+  const handleOpenConfigModal = () => {
+    setConfigViewMode('list');
+    setIsConfigModalOpen(true);
+  };
+
+  const handleCreateNewConfig = () => {
+    setPaymentConfig({ id: null, ma_ngan_hang: '', ten_ngan_hang: '', so_tai_khoan: '', ten_chu_tai_khoan: '', ghi_chu: '' });
+    setConfigViewMode('form');
+  };
+
+  const handleEditConfig = (config) => {
+    setPaymentConfig(config);
+    setConfigViewMode('form');
   };
 
   // Close all dropdowns
@@ -339,7 +359,7 @@ export default function QuanLyLePhi_Khoa() {
         <h1 className="text-2xl font-bold text-slate-800">Quản lý lệ phí</h1>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setIsConfigModalOpen(true)}
+            onClick={handleOpenConfigModal}
             className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-bold transition-colors shadow-sm cursor-pointer"
           >
             Cấu hình thanh toán
@@ -754,11 +774,13 @@ export default function QuanLyLePhi_Khoa() {
           ></div>
 
           <div
-            className="bg-white w-full max-w-lg rounded-2xl shadow-xl relative z-10 animate-in zoom-in-95 duration-200 flex flex-col"
+            className="bg-white w-full max-w-2xl rounded-2xl shadow-xl relative z-10 animate-in zoom-in-95 duration-200 flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="px-6 py-4 border-b border-[#E7E0C4] flex items-center justify-between">
-              <h2 className="text-xl font-bold text-slate-800">Cấu hình thanh toán VietQR</h2>
+              <h2 className="text-xl font-bold text-slate-800">
+                {configViewMode === 'list' ? 'Danh sách Tài khoản thanh toán' : (paymentConfig.id ? 'Cập nhật cấu hình' : 'Thêm cấu hình thanh toán')}
+              </h2>
               <button
                 type="button"
                 onClick={() => setIsConfigModalOpen(false)}
@@ -768,109 +790,199 @@ export default function QuanLyLePhi_Khoa() {
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
-              <div className="relative">
-                <label className="block text-sm font-bold text-slate-700 mb-1">Ngân hàng thụ hưởng</label>
-                <div
-                  onClick={(e) => { e.stopPropagation(); setIsBankDropdownOpen(!isBankDropdownOpen); setBankSearchTerm(''); }}
-                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg flex justify-between items-center cursor-pointer hover:bg-slate-100 transition-colors"
-                >
-                  <span className={`truncate ${!paymentConfig.ma_ngan_hang ? 'text-slate-400' : 'text-slate-700'}`}>
-                    {paymentConfig.ma_ngan_hang
-                      ? `${bankList.find(b => b.bin === paymentConfig.ma_ngan_hang)?.shortName || paymentConfig.ten_ngan_hang} (${paymentConfig.ma_ngan_hang})`
-                      : '-- Chọn ngân hàng --'}
-                  </span>
-                  <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-                </div>
-
-                {isBankDropdownOpen && (
-                  <div
-                    className="absolute z-50 top-full left-0 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden flex flex-col animate-in slide-in-from-top-1 max-h-64"
-                    onClick={(e) => e.stopPropagation()}
+            {configViewMode === 'list' ? (
+              <div className="p-6">
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 mb-4">
+                  <div className="relative w-full sm:w-72">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Tìm kiếm cấu hình..."
+                      value={configSearchTerm}
+                      onChange={(e) => setConfigSearchTerm(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-[#407F3E]"
+                    />
+                  </div>
+                  <button
+                    onClick={handleCreateNewConfig}
+                    className="px-4 py-2 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors cursor-pointer shadow-sm shrink-0"
                   >
-                    <div className="p-2 border-b border-slate-100 shrink-0 sticky top-0 bg-white z-10">
-                      <div className="relative">
-                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <input
-                          type="text"
-                          placeholder="Tìm ngân hàng (Tên hoặc mã BIN)..."
-                          value={bankSearchTerm}
-                          onChange={(e) => setBankSearchTerm(e.target.value)}
-                          className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-[#407F3E]"
-                        />
-                      </div>
-                    </div>
-                    <div className="overflow-y-auto custom-scrollbar relative z-0">
-                      {bankList.filter(b =>
-                        b.shortName.toLowerCase().includes(bankSearchTerm.toLowerCase()) ||
-                        b.name.toLowerCase().includes(bankSearchTerm.toLowerCase()) ||
-                        b.bin.includes(bankSearchTerm)
-                      ).map(bank => (
-                        <div
-                          key={bank.bin}
-                          onClick={() => {
-                            setPaymentConfig({
-                              ...paymentConfig,
-                              ma_ngan_hang: bank.bin,
-                              ten_ngan_hang: bank.shortName
-                            });
-                            setIsBankDropdownOpen(false);
-                          }}
-                          className={`px-4 py-2.5 text-sm cursor-pointer hover:bg-slate-50 border-b border-slate-50 last:border-0 flex items-center gap-3 transition-colors ${paymentConfig.ma_ngan_hang === bank.bin ? 'bg-slate-50 font-bold text-[#407F3E]' : 'text-slate-700'}`}
-                        >
-                          {bank.logo && (
-                            <img src={bank.logo} alt={bank.shortName} className="w-8 h-8 object-contain shrink-0 rounded bg-white border border-slate-100" />
+                    <Plus className="w-4 h-4" />
+                    Thêm cấu hình mới
+                  </button>
+                </div>
+                
+                {paymentConfigs.length > 0 ? (
+                  <div className="space-y-3 max-h-[50vh] overflow-y-auto custom-scrollbar">
+                    {paymentConfigs.filter(c => 
+                      (c.ghi_chu || '').toLowerCase().includes(configSearchTerm.toLowerCase()) || 
+                      c.ten_chu_tai_khoan.toLowerCase().includes(configSearchTerm.toLowerCase()) || 
+                      c.so_tai_khoan.includes(configSearchTerm) ||
+                      (c.ten_ngan_hang || '').toLowerCase().includes(configSearchTerm.toLowerCase())
+                    ).map(config => (
+                      <div key={config.id} className="flex items-center justify-between p-4 border border-slate-200 rounded-xl hover:border-[#407F3E]/50 transition-colors bg-slate-50 shadow-sm">
+                        <div className="flex flex-col">
+                          {config.ghi_chu && (
+                            <span className="text-sm font-bold text-[#407F3E] mb-1">{config.ghi_chu}</span>
                           )}
-                          <div className="flex flex-col overflow-hidden">
-                            <span className="truncate font-medium">{bank.shortName} ({bank.bin})</span>
-                            <span className="text-[11px] text-slate-400 truncate font-normal leading-tight mt-0.5">{bank.name}</span>
-                          </div>
+                          <span className="font-bold text-slate-800 text-base">{config.ten_chu_tai_khoan}</span>
+                          <span className="text-sm text-slate-600 font-mono mt-1">{config.so_tai_khoan}</span>
+                          <span className="text-xs text-slate-500 font-medium mt-1">{bankList.find(b => b.bin === config.ma_ngan_hang)?.shortName || config.ten_ngan_hang}</span>
                         </div>
-                      ))}
-                      {bankList.filter(b => b.shortName.toLowerCase().includes(bankSearchTerm.toLowerCase()) || b.name.toLowerCase().includes(bankSearchTerm.toLowerCase()) || b.bin.includes(bankSearchTerm)).length === 0 && (
-                        <div className="p-4 text-center text-sm text-slate-500">
-                          Không tìm thấy ngân hàng phù hợp.
-                        </div>
-                      )}
-                    </div>
+                        <button
+                          onClick={() => handleEditConfig(config)}
+                          className="p-2 bg-white border border-slate-200 text-slate-600 hover:text-[#407F3E] hover:border-[#407F3E] hover:bg-[#E7E0C4]/20 rounded-lg transition-all cursor-pointer shadow-sm"
+                          title="Sửa cấu hình"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                    {paymentConfigs.filter(c => 
+                      (c.ghi_chu || '').toLowerCase().includes(configSearchTerm.toLowerCase()) || 
+                      c.ten_chu_tai_khoan.toLowerCase().includes(configSearchTerm.toLowerCase()) || 
+                      c.so_tai_khoan.includes(configSearchTerm) ||
+                      (c.ten_ngan_hang || '').toLowerCase().includes(configSearchTerm.toLowerCase())
+                    ).length === 0 && (
+                      <div className="py-8 text-center text-slate-500 text-sm">
+                        Không tìm thấy cấu hình phù hợp với từ khóa tìm kiếm.
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="py-12 text-center flex flex-col items-center justify-center text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                    <p className="font-medium text-slate-600">Chưa có cấu hình thanh toán nào.</p>
+                    <p className="text-sm mt-1">Vui lòng thêm tài khoản để sinh viên có thể nộp lệ phí.</p>
                   </div>
                 )}
               </div>
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">Số Tài Khoản</label>
-                <input
-                  type="text"
-                  value={paymentConfig.so_tai_khoan}
-                  onChange={(e) => setPaymentConfig({ ...paymentConfig, so_tai_khoan: e.target.value })}
-                  placeholder="Nhập số tài khoản"
-                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#407F3E]"
-                />
+            ) : (
+              <div className="p-6 space-y-4">
+                <div className="relative">
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Ngân hàng thụ hưởng</label>
+                  <div
+                    onClick={(e) => { e.stopPropagation(); setIsBankDropdownOpen(!isBankDropdownOpen); setBankSearchTerm(''); }}
+                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg flex justify-between items-center cursor-pointer hover:bg-slate-100 transition-colors"
+                  >
+                    <span className={`truncate ${!paymentConfig.ma_ngan_hang ? 'text-slate-400' : 'text-slate-700'}`}>
+                      {paymentConfig.ma_ngan_hang
+                        ? `${bankList.find(b => b.bin === paymentConfig.ma_ngan_hang)?.shortName || paymentConfig.ten_ngan_hang} (${paymentConfig.ma_ngan_hang})`
+                        : '-- Chọn ngân hàng --'}
+                    </span>
+                    <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+                  </div>
+
+                  {isBankDropdownOpen && (
+                    <div
+                      className="absolute z-50 top-full left-0 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden flex flex-col animate-in slide-in-from-top-1 max-h-64"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="p-2 border-b border-slate-100 shrink-0 sticky top-0 bg-white z-10">
+                        <div className="relative">
+                          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                          <input
+                            type="text"
+                            placeholder="Tìm ngân hàng (Tên hoặc mã BIN)..."
+                            value={bankSearchTerm}
+                            onChange={(e) => setBankSearchTerm(e.target.value)}
+                            className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-[#407F3E]"
+                          />
+                        </div>
+                      </div>
+                      <div className="overflow-y-auto custom-scrollbar relative z-0">
+                        {bankList.filter(b =>
+                          b.shortName.toLowerCase().includes(bankSearchTerm.toLowerCase()) ||
+                          b.name.toLowerCase().includes(bankSearchTerm.toLowerCase()) ||
+                          b.bin.includes(bankSearchTerm)
+                        ).map(bank => (
+                          <div
+                            key={bank.bin}
+                            onClick={() => {
+                              setPaymentConfig({
+                                ...paymentConfig,
+                                ma_ngan_hang: bank.bin,
+                                ten_ngan_hang: bank.shortName
+                              });
+                              setIsBankDropdownOpen(false);
+                            }}
+                            className={`px-4 py-2.5 text-sm cursor-pointer hover:bg-slate-50 border-b border-slate-50 last:border-0 flex items-center gap-3 transition-colors ${paymentConfig.ma_ngan_hang === bank.bin ? 'bg-slate-50 font-bold text-[#407F3E]' : 'text-slate-700'}`}
+                          >
+                            {bank.logo && (
+                              <img src={bank.logo} alt={bank.shortName} className="w-8 h-8 object-contain shrink-0 rounded bg-white border border-slate-100" />
+                            )}
+                            <div className="flex flex-col overflow-hidden">
+                              <span className="truncate font-medium">{bank.shortName} ({bank.bin})</span>
+                              <span className="text-[11px] text-slate-400 truncate font-normal leading-tight mt-0.5">{bank.name}</span>
+                            </div>
+                          </div>
+                        ))}
+                        {bankList.filter(b => b.shortName.toLowerCase().includes(bankSearchTerm.toLowerCase()) || b.name.toLowerCase().includes(bankSearchTerm.toLowerCase()) || b.bin.includes(bankSearchTerm)).length === 0 && (
+                          <div className="p-4 text-center text-sm text-slate-500">
+                            Không tìm thấy ngân hàng phù hợp.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Số Tài Khoản</label>
+                  <input
+                    type="text"
+                    value={paymentConfig.so_tai_khoan}
+                    onChange={(e) => setPaymentConfig({ ...paymentConfig, so_tai_khoan: e.target.value })}
+                    placeholder="Nhập số tài khoản"
+                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#407F3E]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Tên Chủ Tài Khoản (In hoa không dấu)</label>
+                  <input
+                    type="text"
+                    value={paymentConfig.ten_chu_tai_khoan}
+                    onChange={(e) => setPaymentConfig({ ...paymentConfig, ten_chu_tai_khoan: e.target.value })}
+                    placeholder="VD: NGUYEN VAN A"
+                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#407F3E]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Ghi chú / Tên gợi nhớ (Tùy chọn)</label>
+                  <input
+                    type="text"
+                    value={paymentConfig.ghi_chu || ''}
+                    onChange={(e) => setPaymentConfig({ ...paymentConfig, ghi_chu: e.target.value })}
+                    placeholder="VD: Tài khoản quỹ CLB năm 2026"
+                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#407F3E]"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">Tên Chủ Tài Khoản (In hoa không dấu)</label>
-                <input
-                  type="text"
-                  value={paymentConfig.ten_chu_tai_khoan}
-                  onChange={(e) => setPaymentConfig({ ...paymentConfig, ten_chu_tai_khoan: e.target.value })}
-                  placeholder="VD: NGUYEN VAN A"
-                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#407F3E]"
-                />
-              </div>
-            </div>
+            )}
 
             <div className="px-6 py-4 bg-slate-50 border-t border-[#E7E0C4] flex justify-end gap-3 rounded-b-2xl">
-              <button
-                onClick={() => setIsConfigModalOpen(false)}
-                className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg font-bold text-sm transition-colors cursor-pointer"
-              >
-                Hủy
-              </button>
-              <button
-                onClick={handleSaveConfig}
-                className="px-4 py-2 bg-[#407F3E] hover:bg-[#407F3E]/90 text-white rounded-lg font-bold text-sm transition-colors cursor-pointer"
-              >
-                Lưu cấu hình
-              </button>
+              {configViewMode === 'form' ? (
+                <>
+                  <button
+                    onClick={() => setConfigViewMode('list')}
+                    className="px-5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-bold text-sm transition-colors cursor-pointer"
+                  >
+                    Hủy bỏ
+                  </button>
+                  <button
+                    onClick={handleSaveConfig}
+                    className="px-5 py-2.5 bg-[#407F3E] hover:bg-[#407F3E]/90 text-white rounded-xl font-bold text-sm transition-colors cursor-pointer flex items-center gap-2"
+                  >
+                    <Check className="w-4 h-4" />
+                    Lưu cấu hình
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => setIsConfigModalOpen(false)}
+                  className="px-5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-bold text-sm transition-colors cursor-pointer"
+                >
+                  Đóng
+                </button>
+              )}
             </div>
           </div>
         </div>
