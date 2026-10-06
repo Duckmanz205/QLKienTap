@@ -24,8 +24,8 @@ export default function DuyetHoanPhi_Khoa() {
 
   const fetchRefunds = async () => {
     try {
-      const res = await khoaApi.getRefundRequests();
-      setRefunds(res.data);
+      const res = await khoaApi.getRefundRequests({ page: 1, limit: 10000 });
+      setRefunds(res.data?.data || []);
     } catch (err) {
       console.error(err);
     }

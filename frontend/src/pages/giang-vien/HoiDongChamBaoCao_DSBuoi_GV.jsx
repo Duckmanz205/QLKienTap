@@ -71,12 +71,19 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
     setError('');
     setActiveBoard(board);
     setSelectedReg(reg);
+    const existingScore = board.scores?.find(s => s.phieu_tham_quan_id === reg.phieuThamQuan?.id);
+    if (existingScore) {
+      setScore1(existingScore.diem.toString());
+      setScore2(existingScore.diem.toString());
+      setScore3(existingScore.diem.toString());
+      setComments(existingScore.nhan_xet || '');
+    } else {
+      setScore1('');
+      setScore2('');
+      setScore3('');
+      setComments('');
+    }
     
-    // Default starting rubrics
-    setScore1('8.0');
-    setScore2('8.0');
-    setScore3('8.0');
-    setComments('Sinh viên trả lời lưu loát các câu hỏi phản biện của hội đồng.');
     setActiveTab('grading');
   };
 
@@ -114,14 +121,6 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
     }
   };
 
-  if (!lecturer) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px] text-slate-500 font-semibold">
-        Đang tải thông tin hội đồng...
-      </div>
-    );
-  }
-
   // Derived filter & pagination logic
   const availableRoles = useMemo(() => {
     return Array.from(new Set(boards.map(b => b.vai_tro).filter(Boolean)));
@@ -140,6 +139,14 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
 
   const totalPages = Math.ceil(filteredBoards.length / limit) || 1;
   const paginatedBoards = filteredBoards.slice((currentPage - 1) * limit, currentPage * limit);
+
+  if (!lecturer) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px] text-slate-500 font-semibold">
+        Đang tải thông tin hội đồng...
+      </div>
+    );
+  }
 
   // Calculated average helper
   const currentAvg = Math.round(((parseFloat(score1) || 0) * 0.4 + (parseFloat(score2) || 0) * 0.3 + (parseFloat(score3) || 0) * 0.3) * 10) / 10;
@@ -305,8 +312,14 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
 
                       <div className="space-y-2 text-xs font-medium text-on-surface-variant">
                         <p className="flex items-center gap-1.5">
+                          <Building className="w-4 h-4 text-slate-400" />
+                          <span className="truncate" title={b.session?.dotKienTap?.ten_dot}>Đợt kiến tập: <strong className="text-on-surface font-semibold">{b.session?.dotKienTap?.ten_dot || 'Chưa cập nhật'}</strong></span>
+                        </p>
+                        <p className="flex items-center gap-1.5">
                           <User className="w-4 h-4 text-slate-400" />
-                          <span>Chủ tịch: <strong className="text-on-surface font-semibold">Thầy/Cô Hội đồng</strong></span>
+                          <span className="truncate">Chủ tịch: <strong className="text-on-surface font-semibold">
+                            {b.committeeMembers?.find(m => m.vai_tro === 'ChuTich')?.giangVien?.ho_ten || 'Đang cập nhật'}
+                          </strong></span>
                         </p>
                         <p className="flex items-center gap-1.5">
                           <Calendar className="w-4 h-4 text-slate-400" />
@@ -430,9 +443,7 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
                     }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-8 h-8 rounded-full bg-slate-105 flex items-center justify-center font-bold text-xs shrink-0 shadow-inner">
-                        {reg.sinhVien?.ho_ten?.charAt(0) || 'S'}
-                      </div>
+
                       <div className="min-w-0">
                         <p className="font-bold text-xs text-on-surface truncate">{reg.sinhVien?.ho_ten}</p>
                         <p className="text-[10px] font-mono font-bold text-on-surface-variant mt-0.5">{reg.sinhVien?.mssv}</p>

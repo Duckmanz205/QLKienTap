@@ -183,16 +183,14 @@ export default function Layout() {
   if (vai_tro === 'SinhVien') {
     const studentMenuItems = [
       { to: '/sinh-vien', label: 'Trang chủ', icon: Home, category: 'TRANG CHỦ' },
-      { to: '/sinh-vien/register', label: 'Chuyến tham quan', icon: Compass, category: 'KIẾN TẬP CỦA TÔI' },
-      { to: '/sinh-vien/schedule', label: 'Lịch trình đoàn', icon: Calendar, category: 'KIẾN TẬP CỦA TÔI' },
-      { to: '/sinh-vien/reports', label: 'Nộp bài thu hoạch', icon: UploadCloud, category: 'KIẾN TẬP CỦA TÔI' },
-      { to: '/sinh-vien/grades', label: 'Kết quả & điểm', icon: GraduationCap, category: 'KIẾN TẬP CỦA TÔI' },
-      { to: '/sinh-vien/payment', label: 'Thanh toán', icon: CreditCard, category: 'TÀI CHÍNH' },
-      { to: '/sinh-vien/refund', label: 'Hoàn phí', icon: RotateCcw, category: 'TÀI CHÍNH' },
-      { to: '/sinh-vien/notifications', label: 'Thông báo', icon: Bell, category: 'THÔNG BÁO', badge: unreadNotificationsCount }
+      { to: '/sinh-vien/register', label: 'Chuyến tham quan', icon: Compass, category: 'NONE' },
+      { to: '/sinh-vien/schedule', label: 'Lịch trình đoàn', icon: Calendar, category: 'NONE' },
+      { to: '/sinh-vien/reports', label: 'Nộp bài thu hoạch', icon: UploadCloud, category: 'NONE' },
+      { to: '/sinh-vien/grades', label: 'Kết quả & điểm', icon: GraduationCap, category: 'NONE' },
+      { to: '/sinh-vien/payment', label: 'Thanh toán', icon: CreditCard, category: 'NONE' },
+      { to: '/sinh-vien/refund', label: 'Hoàn phí', icon: RotateCcw, category: 'NONE' },
+      { to: '/sinh-vien/notifications', label: 'Thông báo', icon: Bell, category: 'NONE', badge: unreadNotificationsCount }
     ];
-
-    const studentCategories = ['TRANG CHỦ', 'KIẾN TẬP CỦA TÔI', 'TÀI CHÍNH', 'THÔNG BÁO'];
 
     return (
       <div className="min-h-screen bg-[#f8faf1] flex font-sans">
@@ -218,39 +216,29 @@ export default function Layout() {
             </div>
           </div>
 
-          <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-5 sidebar-scrollbar">
-            {studentCategories.map((cat) => {
-              const items = studentMenuItems.filter((item) => item.category === cat);
+          <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-2 sidebar-scrollbar">
+            {studentMenuItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = location.pathname === item.to;
               return (
-                <div key={cat} className="space-y-1">
-                  <p className="px-4 text-[10px] font-bold tracking-widest uppercase text-[#e5ffdc]/50 mb-2">
-                    {cat}
-                  </p>
-                  {items.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = location.pathname === item.to;
-                    return (
-                      <Link
-                        key={item.to}
-                        to={item.to}
-                        className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${isActive
-                          ? 'bg-white text-[#407F3E] shadow-md font-bold scale-[1.02]'
-                          : 'text-white/80 hover:bg-[#89B449]/25 hover:text-white'
-                          }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <Icon className="w-[18px] h-[18px]" />
-                          {!isSidebarCollapsed && <span>{item.label}</span>}
-                        </div>
-                        {item.badge !== undefined && item.badge > 0 && !isSidebarCollapsed && (
-                          <span className="bg-[#DBD468] text-[#191d17] font-bold text-[10px] px-2 py-0.5 rounded-full shadow-sm">
-                            {item.badge}
-                          </span>
-                        )}
-                      </Link>
-                    );
-                  })}
-                </div>
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${isActive
+                    ? 'bg-white text-[#407F3E] shadow-md font-bold scale-[1.02]'
+                    : 'text-white/80 hover:bg-[#89B449]/25 hover:text-white'
+                    }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Icon className="w-[18px] h-[18px]" />
+                    {!isSidebarCollapsed && <span>{item.label}</span>}
+                  </div>
+                  {item.badge !== undefined && item.badge > 0 && !isSidebarCollapsed && (
+                    <span className="bg-[#DBD468] text-[#191d17] font-bold text-[10px] px-2 py-0.5 rounded-full shadow-sm">
+                      {item.badge}
+                    </span>
+                  )}
+                </Link>
               );
             })}
           </nav>
@@ -325,16 +313,16 @@ export default function Layout() {
   if (vai_tro === 'GiangVien') {
     const gvMenuItems = [
       { to: '/giang-vien', label: 'Trang chủ', icon: Home, category: 'TRANG CHỦ' },
-      { to: '/giang-vien/led-trips', label: 'Lịch dẫn đoàn', icon: Calendar, category: 'DẪN ĐOÀN' },
-      { to: '/giang-vien/attendance', label: 'Điểm danh sinh viên', icon: UserCheck, category: 'DẪN ĐOÀN' },
-      { to: '/giang-vien/preparation', label: 'Điểm chuẩn bị & Cộng', icon: Star, category: 'DẪN ĐOÀN' },
-      { to: '/giang-vien/guided-students', label: 'Sinh viên hướng dẫn', icon: User, category: 'HƯỚNG DẪN' },
-      { to: '/giang-vien/grading', label: 'Chấm bài thu hoạch', icon: FileCheck, category: 'HƯỚNG DẪN' },
-      { to: '/giang-vien/board', label: 'Buổi báo cáo TQNM', icon: Presentation, category: 'HỘI ĐỒNG' },
+      { to: '/giang-vien/led-trips', label: 'Lịch dẫn đoàn', icon: Calendar, category: 'NHIỆM VỤ DẪN ĐOÀN' },
+      { to: '/giang-vien/attendance', label: 'Điểm danh sinh viên', icon: UserCheck, category: 'NHIỆM VỤ DẪN ĐOÀN' },
+      { to: '/giang-vien/preparation', label: 'Điểm chuẩn bị & Cộng', icon: Star, category: 'NHIỆM VỤ DẪN ĐOÀN' },
+      { to: '/giang-vien/guided-students', label: 'Sinh viên hướng dẫn', icon: User, category: 'CHUYÊN MÔN & HỘI ĐỒNG' },
+      { to: '/giang-vien/grading', label: 'Chấm bài thu hoạch', icon: FileCheck, category: 'CHUYÊN MÔN & HỘI ĐỒNG' },
+      { to: '/giang-vien/board', label: 'Buổi báo cáo TQNM', icon: Presentation, category: 'CHUYÊN MÔN & HỘI ĐỒNG' },
       { to: '/giang-vien/notifications', label: 'Thông báo', icon: Bell, category: 'THÔNG BÁO' }
     ];
 
-    const gvCategories = ['TRANG CHỦ', 'DẪN ĐOÀN', 'HƯỚNG DẪN', 'HỘI ĐỒNG', 'THÔNG BÁO'];
+    const gvCategories = ['TRANG CHỦ', 'NHIỆM VỤ DẪN ĐOÀN', 'CHUYÊN MÔN & HỘI ĐỒNG', 'THÔNG BÁO'];
 
     return (
       <div className="min-h-screen bg-[#f8faf1] flex font-sans">
@@ -476,16 +464,15 @@ export default function Layout() {
   } else if (isKhoa) {
     khoaMenuItems = [
       { to: '/khoa', label: 'Trang chủ', icon: Home, category: 'TRANG CHỦ' },
-      // DANH MỤC HỆ THỐNG
-      { to: '/khoa/danh-muc', label: 'Danh mục', icon: Layers, category: 'DANH MỤC HỆ THỐNG' },
-      { to: '/khoa/students', label: 'Sinh viên', icon: Users, category: 'DANH MỤC HỆ THỐNG' },
-      { to: '/khoa/lecturers', label: 'Giảng viên', icon: User, category: 'DANH MỤC HỆ THỐNG' },
+      // QUẢN LÝ DANH MỤC
+      { to: '/khoa/danh-muc', label: 'Danh mục', icon: Layers, category: 'QUẢN LÝ DANH MỤC' },
+      { to: '/khoa/students', label: 'Sinh viên', icon: Users, category: 'QUẢN LÝ DANH MỤC' },
+      { to: '/khoa/lecturers', label: 'Giảng viên', icon: User, category: 'QUẢN LÝ DANH MỤC' },
 
-      // KẾ HOẠCH KIẾN TẬP
-      { to: '/khoa/plans', label: 'Đợt kiến tập', icon: Calendar, category: 'KẾ HOẠCH KIẾN TẬP' },
-      { to: '/khoa/lich-kien-tap', label: 'Lịch kiến tập', icon: Layers, category: 'KẾ HOẠCH KIẾN TẬP' },
-      // ĐĂNG KÝ & PHÂN CÔNG
-      { to: '/khoa/supervisors', label: 'Phân công GVHD', icon: GraduationCap, category: 'ĐĂNG KÝ & PHÂN CÔNG' },
+      // TỔ CHỨC KIẾN TẬP
+      { to: '/khoa/plans', label: 'Đợt kiến tập', icon: Calendar, category: 'TỔ CHỨC KIẾN TẬP' },
+      { to: '/khoa/lich-kien-tap', label: 'Lịch kiến tập', icon: Layers, category: 'TỔ CHỨC KIẾN TẬP' },
+      { to: '/khoa/supervisors', label: 'Phân công GVHD', icon: GraduationCap, category: 'TỔ CHỨC KIẾN TẬP' },
       // ĐÁNH GIÁ & KẾT QUẢ
       { to: '/khoa/boards', label: 'Hội đồng chấm báo cáo', icon: Presentation, category: 'ĐÁNH GIÁ & KẾT QUẢ' },
       { to: '/khoa/results', label: 'Kết quả kiến tập', icon: Award, category: 'ĐÁNH GIÁ & KẾT QUẢ' },
@@ -496,21 +483,18 @@ export default function Layout() {
   } else {
     khoaMenuItems = [
       { to: '/clb', label: 'Trang chủ', icon: Home, category: 'TRANG CHỦ' },
-      // DANH MỤC HỆ THỐNG
-      { to: '/clb/students', label: 'Sinh viên', icon: Users, category: 'DANH MỤC HỆ THỐNG' },
-      { to: '/clb/factories', label: 'Nhà máy', icon: Compass, category: 'DANH MỤC HỆ THỐNG' },
-      // KẾ HOẠCH KIẾN TẬP
-      { to: '/clb/lich-kien-tap', label: 'Lịch kiến tập', icon: Calendar, category: 'KẾ HOẠCH KIẾN TẬP' },
-      { to: '/clb/trips', label: 'Chuyến tham quan', icon: Compass, category: 'KẾ HOẠCH KIẾN TẬP' },
-      { to: '/clb/visit-report', label: 'Báo cáo tham quan', icon: Eye, category: 'KẾ HOẠCH KIẾN TẬP' },
-      // ĐĂNG KÝ & PHÂN CÔNG
-      { to: '/clb/registrations', label: 'Quản lý đăng ký', icon: FileCheck, category: 'ĐĂNG KÝ & PHÂN CÔNG' },
-      { to: '/clb/leaders', label: 'Phân công GV dẫn đoàn', icon: UserCheck, category: 'ĐĂNG KÝ & PHÂN CÔNG' },
+      // QUẢN LÝ DANH MỤC
+      { to: '/clb/students', label: 'Sinh viên', icon: Users, category: 'QUẢN LÝ DANH MỤC' },
+      { to: '/clb/factories', label: 'Nhà máy', icon: Compass, category: 'QUẢN LÝ DANH MỤC' },
+      // VẬN HÀNH KIẾN TẬP
+      { to: '/clb/lich-kien-tap', label: 'Lịch kiến tập', icon: Calendar, category: 'VẬN HÀNH KIẾN TẬP' },
+      { to: '/clb/trips', label: 'Chuyến tham quan', icon: Compass, category: 'VẬN HÀNH KIẾN TẬP' },
+      { to: '/clb/registrations', label: 'Quản lý đăng ký', icon: FileCheck, category: 'VẬN HÀNH KIẾN TẬP' },
+      { to: '/clb/leaders', label: 'Phân công GV dẫn đoàn', icon: UserCheck, category: 'VẬN HÀNH KIẾN TẬP' },
+      { to: '/clb/results', label: 'Kết quả kiến tập', icon: Award, category: 'VẬN HÀNH KIẾN TẬP' },
       // TÀI CHÍNH
       { to: '/clb/fees', label: 'Quản lý lệ phí', icon: CreditCard, category: 'TÀI CHÍNH' },
       { to: '/clb/refund-approval', label: 'Duyệt hoàn phí', icon: RotateCcw, category: 'TÀI CHÍNH' },
-      // ĐÁNH GIÁ & KẾT QUẢ
-      { to: '/clb/results', label: 'Kết quả kiến tập', icon: Award, category: 'ĐÁNH GIÁ & KẾT QUẢ' },
       // Standalone top-levels below the groups
       { to: '/clb/notifications', label: 'Thông báo', icon: Bell, category: 'NONE', badge: true },
       { to: '/clb/reports', label: 'Báo cáo thống kê', icon: Activity, category: 'NONE' }
@@ -579,7 +563,7 @@ export default function Layout() {
           })()}
 
           {/* Collapsible Groups */}
-          {['DANH MỤC HỆ THỐNG', 'KẾ HOẠCH KIẾN TẬP', 'ĐĂNG KÝ & PHÂN CÔNG', 'ĐÁNH GIÁ & KẾT QUẢ', 'TÀI CHÍNH'].map((group) => {
+          {['QUẢN LÝ DANH MỤC', 'TỔ CHỨC KIẾN TẬP', 'VẬN HÀNH KIẾN TẬP', 'ĐÁNH GIÁ & KẾT QUẢ', 'TÀI CHÍNH'].map((group) => {
             const items = khoaMenuItems.filter((item) => item.category === group);
             if (items.length === 0) return null;
             const isCollapsed = collapsedGroups[group];

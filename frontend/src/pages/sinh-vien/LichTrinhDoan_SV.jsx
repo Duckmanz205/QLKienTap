@@ -3,7 +3,7 @@ import {
   MapPin, Calendar, Clock, Laptop, Phone, 
   ChevronDown, Check, User, Users
 } from 'lucide-react';
-import { sinhVienApi, giangVienApi } from '../../services/api';
+import { sinhVienApi } from '../../services/api';
 
 export default function LichTrinhDoan_SV() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -12,6 +12,7 @@ export default function LichTrinhDoan_SV() {
   const [trips, setTrips] = useState([]);
   const [selectedTrip, setSelectedTrip] = useState(null);
   const [students, setStudents] = useState([]);
+  const [lecturers, setLecturers] = useState([]);
 
   useEffect(() => {
     const userJson = localStorage.getItem('user');
@@ -39,27 +40,60 @@ export default function LichTrinhDoan_SV() {
 
   useEffect(() => {
     if (selectedTrip?.chuyenThamQuan?.id) {
-      giangVienApi.getTripRegistrations(selectedTrip.chuyenThamQuan.id).then(res => {
-        const list = (res.data || []).map(r => ({
-          id: r.sinhVien.id,
-          name: r.sinhVien.ho_ten,
+      sinhVienApi.getTripInfo(selectedTrip.chuyenThamQuan.id).then(res => {
+        const listSv = (res.data.students || []).map(r => ({
+          id: r.id,
+          name: r.ho_ten,
           role: r.truong_nhom ? 'Trưởng nhóm' : 'Đoàn viên'
         }));
-        setStudents(list);
+        setStudents(listSv);
+        setLecturers(res.data.lecturers || []);
       }).catch(err => console.error(err));
     } else {
       setStudents([]);
+      setLecturers([]);
     }
   }, [selectedTrip]);
 
-  const itinerary = [
-    { time: '07:00', task: 'Tập trung', desc: 'Sinh viên có mặt đúng giờ, điểm danh.' },
-    { time: '07:30', task: 'Di chuyển', desc: 'Xe khởi hành. Vui lòng giữ trật tự.' },
-    { time: '08:30', task: 'Đến nơi', desc: 'Nghe phổ biến nội quy.' },
-    { time: '09:00', task: 'Tham quan', desc: 'Quan sát quy trình.' },
-    { time: '10:30', task: 'Giao lưu', desc: 'Hỏi đáp với doanh nghiệp.' },
-    { time: '11:30', task: 'Kết thúc', desc: 'Lên xe về lại trường.' },
-  ];
+  const generateItinerary = (trip) => {
+    if (!trip || !trip.chuyenThamQuan) return [];
+    const gioBatDau = trip.chuyenThamQuan.gio_bat_dau || '08:00:00';
+    const hinhThuc = trip.chuyenThamQuan.hinh_thuc;
+    
+    // Hàm cộng/trừ phút từ chuỗi giờ HH:mm
+    const addMinutes = (timeStr, mins) => {
+      let [h, m] = timeStr.split(':').map(Number);
+      m += mins;
+      h += Math.floor(m / 60);
+      m = m % 60;
+      if (m < 0) {
+        m += 60;
+        h -= 1;
+      }
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    };
+
+    if (hinhThuc === 'TrucTuyen') {
+      return [
+        { time: addMinutes(gioBatDau, -15), task: 'Điểm danh', desc: 'Sinh viên nhận link và điểm danh.' },
+        { time: addMinutes(gioBatDau, 0), task: 'Đăng nhập', desc: 'Tham gia phòng họp trực tuyến.' },
+        { time: addMinutes(gioBatDau, 15), task: 'Thuyết trình', desc: 'Nghe giới thiệu về nhà máy.' },
+        { time: addMinutes(gioBatDau, 90), task: 'Q&A', desc: 'Giao lưu trực tuyến với doanh nghiệp.' },
+        { time: addMinutes(gioBatDau, 120), task: 'Kết thúc', desc: 'Rời phòng họp.' },
+      ];
+    } else {
+      return [
+        { time: addMinutes(gioBatDau, -30), task: 'Tập trung', desc: 'Sinh viên có mặt đúng giờ, điểm danh.' },
+        { time: addMinutes(gioBatDau, 0), task: 'Di chuyển', desc: 'Xe khởi hành. Vui lòng giữ trật tự.' },
+        { time: addMinutes(gioBatDau, 60), task: 'Đến nơi', desc: 'Nghe phổ biến nội quy an toàn.' },
+        { time: addMinutes(gioBatDau, 90), task: 'Tham quan', desc: 'Quan sát quy trình công nghệ.' },
+        { time: addMinutes(gioBatDau, 180), task: 'Giao lưu', desc: 'Hỏi đáp với doanh nghiệp.' },
+        { time: addMinutes(gioBatDau, 240), task: 'Kết thúc', desc: 'Lên xe về lại trường.' },
+      ];
+    }
+  };
+
+  const itinerary = generateItinerary(selectedTrip);
 
   if (!student) return <div className="p-6">Đang tải dữ liệu...</div>;
 
@@ -160,20 +194,25 @@ export default function LichTrinhDoan_SV() {
             {/* Right Side: Mentor Info */}
             <div className="bg-white/40 rounded-xl p-5 shrink-0 min-w-[280px]">
               <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-4">Giảng viên dẫn đoàn</p>
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-full bg-slate-200 border-2 border-white shadow-sm overflow-hidden flex items-center justify-center shrink-0">
-                  <img src="https://ui-avatars.com/api/?name=GV&background=407F3E&color=fff" alt="Avatar" className="w-full h-full object-cover" />
-                </div>
-                <div>
-                  <h4 className="font-bold text-slate-800 text-lg leading-tight">
-                    {selectedTrip.chuyenThamQuan?.giangVienDanDoan?.ho_ten || 'Chưa phân công'}
-                  </h4>
-                  <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600 mt-1">
-                    <Phone className="w-3.5 h-3.5" />
-                    <span>{selectedTrip.chuyenThamQuan?.giangVienDanDoan?.sdt || '--'}</span>
+              {lecturers.length > 0 ? lecturers.map((gv, idx) => (
+                <div key={idx} className="flex items-center gap-4 mb-3 last:mb-0">
+                  <div className="w-12 h-12 rounded-full bg-slate-200 border-2 border-white shadow-sm overflow-hidden flex items-center justify-center shrink-0">
+                    <img src={`https://ui-avatars.com/api/?name=${gv.ho_ten.split(' ').pop()}&background=${gv.la_truong_doan ? '407F3E' : '89B449'}&color=fff`} alt="Avatar" className="w-full h-full object-cover" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-slate-800 text-[15px] leading-tight flex items-center gap-1.5">
+                      {gv.ho_ten}
+                      {gv.la_truong_doan && <span className="px-1.5 py-0.5 rounded-sm bg-[#407F3E]/10 text-[#407F3E] text-[9px] uppercase font-black">Trưởng đoàn</span>}
+                    </h4>
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600 mt-1">
+                      <Phone className="w-3.5 h-3.5" />
+                      <span>{gv.so_dien_thoai || '--'}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )) : (
+                <div className="text-sm text-slate-500 italic">Chưa phân công giảng viên.</div>
+              )}
             </div>
 
           </div>

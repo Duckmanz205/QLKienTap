@@ -27,6 +27,7 @@ import {
   ImportStudentsDto,
   CreateTripDto,
   ApproveTripDto,
+  CancelTripDto,
   ApproveCancelDto,
   FilterAssignStudentsDto,
   ApproveRefundDto,
@@ -133,6 +134,14 @@ export class ClbController {
   async deleteTrip(@Param('id', ParseIntPipe) id: number) {
     return this.khoaService.deleteTrip(id);
   }
+
+  @Patch('trips/:id/cancel')
+  async cancelTrip(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: CancelTripDto,
+  ) {
+    return this.khoaService.cancelTrip(id, body.lyDoHuy);
+  }
   @Patch('trips/:id/reopen')
   async reopenTripRegistration(@Param('id', ParseIntPipe) id: number) {
     return this.khoaService.reopenTripRegistration(id);
@@ -151,6 +160,7 @@ export class ClbController {
       body.tripId!,
       body.approverId!,
       body.isApproved!,
+      body.giangVienId,
     );
   }
 
@@ -346,8 +356,8 @@ export class ClbController {
   }
 
   @Get('schedules')
-  async getSchedules() {
-    return this.khoaService.getSchedules('QuanLyCLB');
+  async getSchedules(@Query('excludeInactive') excludeInactive: string) {
+    return this.khoaService.getSchedules('QuanLyCLB', excludeInactive === 'true');
   }
 
   @Post('schedules')
@@ -376,13 +386,7 @@ export class ClbController {
     );
   }
 
-  @Post('lock-grades')
-  async lockGrades(@Body() body: LockGradesDto) {
-    return this.khoaService.lockAndFinalizeGrades(
-      body.termStudentId,
-      body.userId,
-    );
-  }
+
 
   @Get('enrollments')
   async getEnrollments(@Query() query: GetEnrollmentsQueryDto) {

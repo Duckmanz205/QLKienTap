@@ -454,7 +454,7 @@ export class ChuyenThamQuan {
   lichKienTap: LichKienTap;
 
   @Column({ nullable: true })
-  lich_kien_tap_id: number;
+  lich_kien_tap_id: number | null;
 
   @Column({ type: 'date' })
   ngay_tham_quan: Date;
@@ -522,12 +522,12 @@ export class PhieuDeXuatChuyenThamQuan {
   @Column()
   sinh_vien_id: number;
 
-  @ManyToOne(() => LichKienTap)
+  @ManyToOne(() => LichKienTap, { nullable: true })
   @JoinColumn({ name: 'lich_kien_tap_id' })
   lichKienTap: LichKienTap;
 
-  @Column()
-  lich_kien_tap_id: number;
+  @Column({ nullable: true })
+  lich_kien_tap_id: number | null;
 
   @ManyToOne(() => NhaMay, { nullable: true })
   @JoinColumn({ name: 'nha_may_id' })
@@ -866,12 +866,12 @@ export class HoiDongChamBaoCao {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => LichKienTap)
-  @JoinColumn({ name: 'lich_kien_tap_id' })
-  lichKienTap: LichKienTap;
+  @ManyToOne(() => DotKienTap)
+  @JoinColumn({ name: 'dot_kien_tap_id' })
+  dotKienTap: DotKienTap;
 
   @Column()
-  lich_kien_tap_id: number;
+  dot_kien_tap_id: number;
 
   @Column()
   ten_hoi_dong: string;

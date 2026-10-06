@@ -299,7 +299,11 @@ export class GiangVienService {
         dd.ngay_diem_danh = new Date();
         await manager.save(DiemDanh, dd);
 
-        if (record.status === 'Vang' || record.status === 'TuChoiThamGia') {
+        if (record.status === 'CoMat') {
+          phieu.trang_thai = 'DaThamGia';
+        } else if (record.status === 'Vang' || record.status === 'TuChoiThamGia') {
+          phieu.trang_thai = 'VangMat';
+
           // Chỉ tự động thêm vào blacklist nếu chưa có blacklist DangKyKhongThamGia còn hiệu lực cho phiếu này
           if (!blacklistSet.has(phieu.id)) {
             const black = new DanhSachDen();
@@ -424,6 +428,8 @@ export class GiangVienService {
       .leftJoinAndSelect('phieu.sinhVien', 'sinhVien')
       .leftJoinAndSelect('phieu.chuyenThamQuan', 'chuyen')
       .leftJoinAndSelect('chuyen.nhaMay', 'nhaMay')
+      .leftJoinAndSelect('chuyen.lichKienTap', 'lich')
+      .leftJoinAndSelect('lich.dotKienTap', 'dot')
       .leftJoinAndSelect('phieuTQ.diemPhieuThamQuan', 'diemPhieu')
       .leftJoinAndMapOne(
         'phieuTQ.diemDanh',
@@ -431,7 +437,8 @@ export class GiangVienService {
         'diemDanh',
         'diemDanh.phieu_tham_quan_id = phieuTQ.id',
       )
-      .where('phieu.sinh_vien_id IN (:...guidedSvIds)', { guidedSvIds });
+      .where('phieu.sinh_vien_id IN (:...guidedSvIds)', { guidedSvIds })
+      .andWhere('CURRENT_TIMESTAMP > phieuTQ.han_nop_bao_cao');
 
     if (search) {
       queryBuilder.andWhere(
@@ -546,9 +553,81 @@ export class GiangVienService {
     diem.diem_thu_hoach = score;
     diem.giang_vien_hd_id = lecturerId;
     diem.ngay_cham_thu_hoach = new Date();
+    diem.nhan_xet_thu_hoach = comment;
     await this.diemPhieuRepo.save(diem);
 
     return { message: 'Chấm điểm bài thu hoạch thành công', diem };
+  }
+
+  // Luu diem de xuat cua AI
+  async saveAIGrade(
+    lecturerId: number,
+    reportId: number,
+    score: number,
+    comment: string,
+  ) {
+    if (
+      typeof score !== 'number' ||
+      !Number.isFinite(score) ||
+      score < 0 ||
+      score > 10
+    ) {
+      throw new BadRequestException(
+        'Điểm đề xuất không hợp lệ (phải từ 0 đến 10)',
+      );
+    }
+
+    const report = await this.baiThuRepo.findOne({
+      where: { id: reportId },
+      relations: { phieuThamQuan: { phieuDangKy: true } },
+    });
+    if (!report) throw new NotFoundException('Không tìm thấy bài thu hoạch');
+
+    const phieuId = report.phieuThamQuan.phieu_dang_ky_id;
+    const studentId = report.phieuThamQuan.phieuDangKy.sinh_vien_id;
+
+    const assignment = await this.phanCongRepo.findOne({
+      where: {
+        giang_vien_id: lecturerId,
+        trang_thai: 'DangHoatDong',
+        dotKienTapSinhVien: {
+          sinh_vien_id: studentId,
+        },
+      },
+      relations: { dotKienTapSinhVien: true },
+    });
+
+    if (!assignment) {
+      throw new ForbiddenException(
+        'Bạn không được phân công hướng dẫn sinh viên sở hữu bài thu hoạch này',
+      );
+    }
+
+    const phieuTQ = await this.phieuTQRepo.findOne({
+      where: { phieu_dang_ky_id: phieuId },
+    });
+    if (!phieuTQ) {
+      throw new NotFoundException('Không tìm thấy phiếu tham quan');
+    }
+
+    let diem = await this.diemPhieuRepo.findOne({
+      where: { phieu_tham_quan_id: phieuTQ.id },
+    });
+    if (diem && diem.da_khoa) {
+      throw new BadRequestException(
+        'Điểm của phiếu tham quan này đã được khóa, không thể chỉnh sửa',
+      );
+    }
+    if (!diem) {
+      diem = new DiemPhieuThamQuan();
+      diem.phieu_tham_quan_id = phieuTQ.id;
+    }
+
+    diem.diem_ai_de_xuat = score;
+    diem.nhan_xet_thu_hoach = comment;
+    await this.diemPhieuRepo.save(diem);
+
+    return { message: 'Lưu điểm AI đề xuất thành công', diem };
   }
 
   // Lay danh sach buoi bao cao hoi dong của giang vien
@@ -557,7 +636,7 @@ export class GiangVienService {
       where: { giang_vien_id: lecturerId },
       relations: {
         hoiDong: {
-          lichKienTap: true,
+          dotKienTap: true,
         },
       },
     });
@@ -574,7 +653,9 @@ export class GiangVienService {
       const phieus = await this.phieuRepo.find({
         where: {
           chuyenThamQuan: {
-            lich_kien_tap_id: map.hoiDong.lich_kien_tap_id,
+            lichKienTap: {
+              dotKienTap: { id: map.hoiDong.dot_kien_tap_id },
+            },
           },
           trang_thai: 'HopLe',
         },
@@ -638,6 +719,8 @@ export class GiangVienService {
         session: map.hoiDong,
         vai_tro: map.vai_tro,
         memberId: map.id,
+        committeeMembers: committeeMembers, // Added this
+        scores: allScores, // Added this for grading panel reset logic
         registrations: registrationsWithScores,
       });
     }
@@ -680,18 +763,18 @@ export class GiangVienService {
 
     const phieu = await this.phieuRepo.findOne({
       where: { id: phieuId },
-      relations: { chuyenThamQuan: true },
+      relations: { chuyenThamQuan: { lichKienTap: true } },
     });
     if (!phieu) {
       throw new NotFoundException('Không tìm thấy phiếu đăng ký');
     }
 
     if (
-      phieu.chuyenThamQuan?.lich_kien_tap_id !==
-      member.hoiDong?.lich_kien_tap_id
+      phieu.chuyenThamQuan?.lichKienTap?.dot_kien_tap_id !==
+      member.hoiDong?.dot_kien_tap_id
     ) {
       throw new ForbiddenException(
-        'Phiếu đăng ký không thuộc kế hoạch kiến tập của hội đồng này',
+        'Phiếu đăng ký không thuộc đợt kiến tập của hội đồng này',
       );
     }
 

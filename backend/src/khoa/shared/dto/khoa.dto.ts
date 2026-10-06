@@ -12,6 +12,7 @@ import {
   Length,
   IsArray,
   ArrayNotEmpty,
+  MinLength,
 } from 'class-validator';
 
 export class CreateYearDto {
@@ -243,6 +244,10 @@ export class CreateScheduleDto {
   @IsOptional()
   @IsBoolean()
   isSubmit?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  tai_khoan_thu_huong_id?: number;
 }
 
 export class ImportStudentsDto {
@@ -326,6 +331,16 @@ export class CreateTripDto {
   trang_thai?: string;
 }
 
+export class CancelTripDto {
+  @IsInt()
+  @Min(1)
+  tripId: number;
+
+  @IsString({ message: 'Lý do hủy không được để trống' })
+  @MinLength(5, { message: 'Lý do hủy phải có ít nhất 5 ký tự' })
+  lyDoHuy: string;
+}
+
 export class ApproveTripDto {
   @IsOptional()
   @IsInt()
@@ -349,6 +364,11 @@ export class ApproveTripDto {
   @IsOptional()
   @IsString()
   hanhDong?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  giangVienId?: number;
 }
 
 export class ApproveCancelDto {
@@ -396,7 +416,7 @@ export class AssignGvddDto {
 export class CreateBoardDto {
   @IsInt()
   @Min(1)
-  scheduleId: number;
+  dotKienTapId: number;
 
   @IsString()
   @IsNotEmpty({ message: 'Tên hội đồng không được để trống' })
@@ -430,11 +450,7 @@ export class AddBoardMemberDto {
 export class LockGradesDto {
   @IsInt()
   @Min(1)
-  termStudentId: number;
-
-  @IsInt()
-  @Min(1)
-  userId: number;
+  lichKienTapId: number;
 }
 
 export class ApproveRefundDto {

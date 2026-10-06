@@ -5,6 +5,7 @@ export const sinhVienApi = {
   getFactories: () => api.get('/sinh-vien/factories'),
   getAvailableTrips: (studentId) => api.get(`/sinh-vien/available-trips/${studentId}`),
   getRegisteredTrips: (studentId) => api.get(`/sinh-vien/registered-trips/${studentId}`),
+  getTripInfo: (tripId) => api.get(`/sinh-vien/trip-info/${tripId}`),
   registerTrip: (tripId) => api.post('/sinh-vien/register', { tripId }),
   proposeTrip: (data) => api.post('/sinh-vien/propose-trip', data),
   getProposals: () => api.get('/sinh-vien/proposals'),

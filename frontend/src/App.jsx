@@ -54,6 +54,7 @@ import BaoCao_SVDatKhongDat_Khoa from './pages/shared/BaoCao_SVDatKhongDat_Khoa'
 
 import ProtectedRoute from './components/ProtectedRoute';
 import { getValidSession, getDashboardPathForRole } from './utils/auth';
+import { ErrorBoundary } from './ErrorBoundary';
 
 function LoginGuard() {
   const session = getValidSession();
@@ -109,8 +110,9 @@ export default function App() {
           );
         }}
       </Toaster>
-      <Routes>
-        {/* Auth Route */}
+      <ErrorBoundary>
+        <Routes>
+          {/* Auth Route */}
         <Route path="/login" element={<LoginGuard />} />
 
         {/* Root path redirect */}
@@ -195,6 +197,7 @@ export default function App() {
         {/* Fallback wildcard route */}
         <Route path="*" element={<NotFoundRedirect />} />
       </Routes>
+      </ErrorBoundary>
     </BrowserRouter>
   );
 }

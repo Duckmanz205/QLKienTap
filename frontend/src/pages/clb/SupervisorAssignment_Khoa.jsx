@@ -447,9 +447,7 @@ export default function SupervisorAssignment_Khoa() {
                                   className="px-3 py-2 text-xs flex items-center justify-between transition-colors cursor-pointer hover:bg-[#E7E0C4]/30"
                                 >
                                   <div className="flex items-center gap-2 truncate">
-                                    <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white bg-[#407F3E]">
-                                      {gv.ho_ten.charAt(0)}
-                                    </div>
+
                                     <span className="font-bold text-slate-800">{gv.ho_ten}</span>
                                   </div>
                                   <span className="font-medium text-slate-500">{gv.ma_gv}</span>

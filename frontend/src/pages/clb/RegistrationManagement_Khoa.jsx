@@ -602,7 +602,7 @@ export default function RegistrationManagement_Khoa() {
                             <td className="p-4 text-right pr-6">
                               <button 
                                 onClick={(e) => { e.stopPropagation(); setSelectedTripForReg(trip); setActiveTab('chot'); }}
-                                className="px-3 py-1.5 bg-slate-100 text-slate-600 group-hover:bg-[#407F3E] group-hover:text-white rounded-lg text-xs font-bold transition-all shadow-sm inline-flex items-center gap-1.5 cursor-pointer"
+                                className="px-3 py-1.5 bg-slate-100 text-slate-600 group-hover:bg-[#407F3E] group-hover:text-white rounded-lg text-xs font-bold transition-all shadow-sm inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
                               >
                                 <Eye className="w-3.5 h-3.5" /> Quản lý
                               </button>
@@ -1420,7 +1420,7 @@ export default function RegistrationManagement_Khoa() {
 
       {/* Toast Popup */}
       {popup.show && createPortal(
-        <div className="fixed bottom-4 right-4 z-[9999] animate-in slide-in-from-right-8 fade-in duration-300">
+        <div className="fixed top-6 right-6 z-[9999] animate-in slide-in-from-right-8 fade-in duration-300">
           <div className={`flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg border text-sm font-bold ${
             popup.type === 'success' 
               ? 'bg-white border-[#407F3E]/20 text-[#407F3E]' 

@@ -45,7 +45,6 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
   });
   const [ngayThamQuan, setNgayThamQuan] = useState('');
   const [gioBatDau, setGioBatDau] = useState('');
-  const [gioKetThuc, setGioKetThuc] = useState('');
   const [hinhThuc, setHinhThuc] = useState('TrucTiep');
 
   // Popup state
@@ -152,7 +151,6 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
       const payload = {
         ngayThamQuan,
         gioBatDau,
-        gioKetThuc,
         hinhThuc
       };
       if (proposalType === 'system') {
@@ -174,7 +172,6 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
       });
       setNgayThamQuan('');
       setGioBatDau('');
-      setGioKetThuc('');
       fetchData(student.id);
     } catch (err) {
       showPopup(err.response?.data?.message || 'Có lỗi xảy ra', 'error');
@@ -213,9 +210,8 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
       
       {/* Custom Popup Toast */}
       {popup.show && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 pointer-events-none">
-          <div className="absolute inset-0 bg-white/5 backdrop-blur-[1px] pointer-events-auto" onClick={() => setPopup({ ...popup, show: false })}></div>
-          <div className={`relative z-10 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-4 animate-in slide-in-from-top-4 fade-in duration-300 pointer-events-auto ${popup.type === 'error' ? 'bg-[#E68A8C] text-white' : 'bg-[#407F3E] text-white'}`}>
+        <div className="fixed top-6 right-6 z-[9999] pointer-events-none">
+          <div className={`relative z-10 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-4 animate-in slide-in-from-right-8 fade-in duration-300 pointer-events-auto ${popup.type === 'error' ? 'bg-[#E68A8C] text-white' : 'bg-[#407F3E] text-white'}`}>
             <span className="font-bold text-sm">{popup.message}</span>
             <button onClick={() => setPopup({ ...popup, show: false })} className="p-1 hover:bg-white/20 rounded-full transition-colors">
               <span className="sr-only">Close</span>
@@ -848,15 +844,22 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                                       <span className="font-bold text-slate-800 text-xs">{reg.hoaDon.so_tien?.toLocaleString('vi-VN')} VNĐ</span>
                                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                                         reg.hoaDon.trang_thai === 'ChuaDong' ? 'bg-orange-100 text-orange-600' :
-                                        reg.hoaDon.trang_thai === 'DaDong' ? 'bg-[#89B449]/20 text-[#407F3E]' :
-                                        'bg-red-100 text-red-600'
+                                        reg.hoaDon.trang_thai === 'DaDongDungHan' ? 'bg-[#89B449]/20 text-[#407F3E]' :
+                                        reg.hoaDon.trang_thai === 'ViPham' ? 'bg-red-100 text-red-600' :
+                                        'bg-slate-100 text-slate-600'
                                       }`}>
                                         {reg.hoaDon.trang_thai === 'ChuaDong' ? 'Chưa đóng' :
-                                         reg.hoaDon.trang_thai === 'DaDong' ? 'Đã đóng' : 'Quá hạn'}
+                                         reg.hoaDon.trang_thai === 'DaDongDungHan' ? 'Đã đóng' : 
+                                         reg.hoaDon.trang_thai === 'ViPham' ? 'Quá hạn' : 
+                                         reg.hoaDon.trang_thai === 'DaHoanPhi' ? 'Đã hoàn phí' : reg.hoaDon.trang_thai}
                                       </span>
                                     </div>
                                   ) : (
-                                    <span className="text-xs text-slate-400 italic">Chưa có</span>
+                                    reg.chuyenThamQuan?.cach_to_chuc === 'TuDo' ? (
+                                      <span className="text-[10px] font-bold text-[#407F3E] bg-[#89B449]/20 px-2 py-0.5 rounded-full">Miễn phí (Tự túc)</span>
+                                    ) : (
+                                      <span className="text-xs text-slate-400 italic">Chưa có</span>
+                                    )
                                   )}
                                 </td>
                                 <td className="p-4 text-right pr-6">
@@ -986,7 +989,10 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                   <div className="md:col-span-2 relative">
                     <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Chọn Nhà máy <span className="text-[#E68A8C]">*</span></label>
                     <div 
-                      onClick={() => setIsFactoryDropdownOpen(!isFactoryDropdownOpen)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsFactoryDropdownOpen(!isFactoryDropdownOpen);
+                      }}
                       className={`w-full px-4 py-3 bg-slate-50 border rounded-xl text-sm flex justify-between items-center cursor-pointer transition-all ${isFactoryDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
                     >
                       <span className={`font-medium truncate pr-2 ${factoryId ? 'text-slate-800' : 'text-slate-500'}`}>
@@ -1103,18 +1109,7 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Giờ kết thúc</label>
-                  <input 
-                    type="time" 
-                    value={gioKetThuc}
-                    onChange={(e) => setGioKetThuc(e.target.value)}
-                    required
-                    className="w-full px-4 py-3 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-800 font-medium" 
-                  />
-                </div>
-
-                <div className="md:col-span-2">
+                <div className="md:col-span-1">
                   <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Hình thức <span className="text-[#E68A8C]">*</span></label>
                   <select 
                     value={hinhThuc}

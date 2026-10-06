@@ -189,44 +189,25 @@ export class UploadController {
     let extractedText: string | null = null;
     if (file.originalname.toLowerCase().endsWith('.pdf')) {
       try {
-        const pdfParse = require('pdf-parse');
-        const pdfBuffer = require('fs').readFileSync(file.path);
-        const data = await pdfParse(pdfBuffer);
-        extractedText = data.text?.trim();
+        const fileBuffer = require('fs').readFileSync(file.path);
+        const blob = new Blob([fileBuffer]);
+        const formData = new FormData();
+        formData.append('file', blob, file.originalname);
 
-        // Fallback: Nếu pdf-parse không đọc được text (ví dụ PDF scan từ ảnh), gọi AI OCR service
-        if (!extractedText || extractedText.length < 50) {
-          try {
-            console.log(
-              'Văn bản PDF quá ngắn hoặc trống, đang gọi AI OCR service để trích xuất...',
-            );
-            const formData = new FormData();
-            const fileBlob = new Blob([pdfBuffer], { type: 'application/pdf' });
-            formData.append('file', fileBlob, file.originalname);
+        console.log('Sending PDF to AI Service for extraction...');
+        const response = await fetch('http://127.0.0.1:8000/process-pdf', {
+          method: 'POST',
+          body: formData,
+        });
 
-            const aiResponse = await fetch(
-              'http://127.0.0.1:8000/process-pdf',
-              {
-                method: 'POST',
-                body: formData,
-              },
-            );
-
-            if (aiResponse.ok) {
-              const aiData = await aiResponse.json();
-              if (aiData.extracted_text) {
-                extractedText = aiData.extracted_text.trim();
-                console.log('AI OCR trích xuất thành công.');
-              }
-            } else {
-              console.error('AI OCR service lỗi:', await aiResponse.text());
-            }
-          } catch (aiErr) {
-            console.error('Không thể kết nối đến AI service:', aiErr.message);
-          }
+        if (response.ok) {
+          const data = await response.json();
+          extractedText = data.extracted_text?.trim();
+        } else {
+          console.error('AI Service extraction failed with status:', response.status);
         }
       } catch (err) {
-        console.error('PDF parsing error:', err);
+        console.error('PDF extraction via AI Service error:', err);
       }
     }
 

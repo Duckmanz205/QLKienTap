@@ -28,6 +28,19 @@ export default function LeaderAssignment_Khoa() {
   const [searchStatusTerm, setSearchStatusTerm] = useState('');
   const statusOptions = ["Tất cả", "Đã phân công", "Chưa phân công"];
 
+  const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
+  const [selectedType, setSelectedType] = useState('');
+  const typeOptions = ["Tất cả", "Trường tổ chức", "Sinh viên đề xuất"];
+
+  const [factories, setFactories] = useState([]);
+  const [isFactoryDropdownOpen, setIsFactoryDropdownOpen] = useState(false);
+  const [selectedFactory, setSelectedFactory] = useState('');
+  const [searchFactoryTerm, setSearchFactoryTerm] = useState('');
+
+  const [isLeaderDropdownOpen, setIsLeaderDropdownOpen] = useState(false);
+  const [selectedLeader, setSelectedLeader] = useState('');
+  const [searchLeaderFilterTerm, setSearchLeaderFilterTerm] = useState('');
+
   const [openDropdownId, setOpenDropdownId] = useState(null); 
   const [selectedLecturerId, setSelectedLecturerId] = useState('');
   const [isTruongDoan, setIsTruongDoan] = useState(true);
@@ -66,12 +79,14 @@ export default function LeaderAssignment_Khoa() {
 
   const fetchInitialData = async () => {
     try {
-      const [schRes, lecRes] = await Promise.all([
+      const [schRes, lecRes, facRes] = await Promise.all([
         khoaApi.getSchedules(),
-        khoaApi.getLecturers()
+        khoaApi.getLecturers(),
+        khoaApi.getFactories()
       ]);
       setSchedules(schRes.data);
       setLecturers(lecRes.data);
+      setFactories(facRes.data);
       // Removed auto-selecting the first schedule so it defaults to "Tất cả"
       fetchTrips();
     } catch (err) {
@@ -154,13 +169,17 @@ export default function LeaderAssignment_Khoa() {
     }
   };
 
-  // Close all dropdowns
   const closeAllDropdowns = () => {
     setIsLichDropdownOpen(false);
     setIsStatusDropdownOpen(false);
+    setIsTypeDropdownOpen(false);
+    setIsFactoryDropdownOpen(false);
+    setIsLeaderDropdownOpen(false);
     setOpenDropdownId(null);
     setSearchLichTerm('');
     setSearchStatusTerm('');
+    setSearchFactoryTerm('');
+    setSearchLeaderFilterTerm('');
   };
 
   const handleDropdownClick = (e, setter) => {
@@ -211,11 +230,21 @@ export default function LeaderAssignment_Khoa() {
   };
 
   const filteredTrips = trips.filter(t => {
-    if (t.cach_to_chuc === 'TuDo') return false; // Hide self-organized trips
     if (selectedLich && t.lich_kien_tap_id !== selectedLich) return false;
+    
+    if (selectedType === 'Trường tổ chức' && t.cach_to_chuc !== 'DoKhoaToChuc') return false;
+    if (selectedType === 'Sinh viên đề xuất' && t.cach_to_chuc !== 'TuDo') return false;
+
+    if (selectedFactory && (t.nha_may_id !== selectedFactory && t.nhaMay?.id !== selectedFactory)) return false;
+
     const gvdd = t.giaoVienDanDoan || [];
     if (selectedStatus === 'Đã phân công' && gvdd.length === 0) return false;
     if (selectedStatus === 'Chưa phân công' && gvdd.length > 0) return false;
+
+    if (selectedLeader) {
+      const isLeaderInTrip = gvdd.some(g => g.giang_vien_id === selectedLeader);
+      if (!isLeaderInTrip) return false;
+    }
 
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
@@ -241,10 +270,13 @@ export default function LeaderAssignment_Khoa() {
     opt.toLowerCase().includes(searchStatusTerm.toLowerCase())
   );
 
-  const doKhoaTrips = trips.filter(t => t.cach_to_chuc === 'DoKhoaToChuc');
-  const totalTrips = doKhoaTrips.length;
-  const assignedTrips = doKhoaTrips.filter(t => t.giaoVienDanDoan && t.giaoVienDanDoan.length > 0).length;
-  const unassignedTrips = totalTrips - assignedTrips;
+  const filteredFactories = factories.filter(f =>
+    f.ten_nha_may?.toLowerCase().includes(searchFactoryTerm.toLowerCase())
+  );
+
+  const filteredLeaders = lecturers.filter(l =>
+    l.ho_ten?.toLowerCase().includes(searchLeaderFilterTerm.toLowerCase())
+  );
 
   return (
     <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300 relative" onClick={closeAllDropdowns}>
@@ -253,41 +285,10 @@ export default function LeaderAssignment_Khoa() {
         <h1 className="text-2xl font-bold text-slate-800">Phân công GV dẫn đoàn</h1>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-[#E7E0C4] flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
-            <MapPin className="w-6 h-6" />
-          </div>
-          <div>
-            <p className="text-xs font-bold text-slate-500 uppercase">Tổng chuyến (Khoa tổ chức)</p>
-            <p className="text-2xl font-black text-slate-800">{totalTrips}</p>
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-[#E7E0C4] flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center text-green-600">
-            <CheckCircle2 className="w-6 h-6" />
-          </div>
-          <div>
-            <p className="text-xs font-bold text-slate-500 uppercase">Đã phân công</p>
-            <p className="text-2xl font-black text-slate-800">{assignedTrips}</p>
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-[#E7E0C4] flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-orange-50 flex items-center justify-center text-orange-600">
-            <AlertCircle className="w-6 h-6" />
-          </div>
-          <div>
-            <p className="text-xs font-bold text-slate-500 uppercase">Cần phân công</p>
-            <p className="text-2xl font-black text-slate-800">{unassignedTrips}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Filter Bar */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-[#E7E0C4] flex flex-wrap items-center gap-4 relative z-20 mb-6">
+      {/* Search and Action Bar */}
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-[#E7E0C4] flex flex-col sm:flex-row items-center justify-between gap-4 mb-4 relative z-30">
         {/* Tìm kiếm */}
-        <div className="relative flex-1 min-w-[240px]">
+        <div className="relative flex-1 w-full sm:max-w-md">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
@@ -301,14 +302,27 @@ export default function LeaderAssignment_Khoa() {
           />
         </div>
 
+        {/* Action Button */}
+        <button 
+          onClick={handleAutoAssign}
+          className="w-full sm:w-auto px-4 py-2 bg-[#407F3E] text-white hover:bg-[#2d5a2c] rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer"
+        >
+          <Zap className="w-4 h-4" />
+          Phân công tự động
+        </button>
+      </div>
+
+      {/* Filter Bar */}
+      <div className="bg-white p-3 rounded-xl shadow-sm border border-[#E7E0C4] flex flex-wrap items-center gap-2 relative z-20 mb-6">
+
         {/* Lịch Dropdown */}
-        <div className="relative min-w-[260px]">
+        <div className="relative flex-1 min-w-[150px]">
           <div 
             onClick={(e) => handleDropdownClick(e, setIsLichDropdownOpen)}
             className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isLichDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
           >
             <span className={`truncate pr-2 font-medium ${selectedLich ? 'text-slate-700' : 'text-slate-400'}`}>
-              {selectedLich ? schedules.find(s => s.id === selectedLich)?.ten_dot : 'Tất cả lịch kiến tập'}
+              {selectedLich ? schedules.find(s => s.id === selectedLich)?.ten_dot : 'Tất cả lịch'}
             </span>
             <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isLichDropdownOpen ? 'rotate-180 text-[#407F3E]' : ''}`} />
           </div>
@@ -331,7 +345,7 @@ export default function LeaderAssignment_Khoa() {
                     selectedLich === '' ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/30 font-medium'
                   }`}
                 >
-                  <span className="truncate pr-2">Tất cả lịch kiến tập (Bao gồm chuyến nháp)</span>
+                  <span className="truncate pr-2">Tất cả lịch</span>
                   {selectedLich === '' && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
                 </div>
                 {filteredSchedules.map(opt => (
@@ -355,12 +369,12 @@ export default function LeaderAssignment_Khoa() {
         </div>
 
         {/* Trạng thái Dropdown */}
-        <div className="relative min-w-[180px]">
+        <div className="relative flex-1 min-w-[130px]">
           <div 
             onClick={(e) => handleDropdownClick(e, setIsStatusDropdownOpen)}
             className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isStatusDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
           >
-            <span className={`truncate pr-2 font-medium ${selectedStatus ? 'text-slate-700' : 'text-slate-400'}`}>{selectedStatus || 'Tất cả trạng thái'}</span>
+            <span className={`truncate pr-2 font-medium ${selectedStatus ? 'text-slate-700' : 'text-slate-400'}`}>{selectedStatus || 'Trạng thái'}</span>
             <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isStatusDropdownOpen ? 'rotate-180 text-[#407F3E]' : ''}`} />
           </div>
           {isStatusDropdownOpen && (
@@ -396,15 +410,141 @@ export default function LeaderAssignment_Khoa() {
           )}
         </div>
 
-        <div className="ml-auto flex items-end">
-          <button 
-            onClick={handleAutoAssign}
-            className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 rounded-lg text-sm font-bold flex items-center gap-2 transition-all shadow-md shadow-blue-500/30 cursor-pointer"
+        {/* Hình thức Dropdown */}
+        <div className="relative flex-1 min-w-[130px]">
+          <div 
+            onClick={(e) => handleDropdownClick(e, setIsTypeDropdownOpen)}
+            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isTypeDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
           >
-            <Zap className="w-4 h-4" />
-            Phân công tự động
-          </button>
+            <span className={`truncate pr-2 font-medium ${selectedType ? 'text-slate-700' : 'text-slate-400'}`}>{selectedType || 'Hình thức'}</span>
+            <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isTypeDropdownOpen ? 'rotate-180 text-[#407F3E]' : ''}`} />
+          </div>
+          {isTypeDropdownOpen && (
+            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[180px]">
+              <div className="max-h-60 overflow-y-auto">
+                {typeOptions.map(opt => (
+                  <div 
+                    key={opt}
+                    onClick={() => { setSelectedType(opt === 'Tất cả' ? '' : opt); setIsTypeDropdownOpen(false); setCurrentPage(1); }}
+                    className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                      selectedType === opt || (selectedType === '' && opt === 'Tất cả') ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/30 font-medium'
+                    }`}
+                  >
+                    <span className="truncate pr-2">{opt}</span>
+                    {(selectedType === opt || (selectedType === '' && opt === 'Tất cả')) && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
+
+        {/* Nhà máy Dropdown */}
+        <div className="relative flex-1 min-w-[140px]">
+          <div 
+            onClick={(e) => handleDropdownClick(e, setIsFactoryDropdownOpen)}
+            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isFactoryDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+          >
+            <span className={`truncate pr-2 font-medium ${selectedFactory ? 'text-slate-700' : 'text-slate-400'}`}>
+              {selectedFactory ? factories.find(f => f.id === selectedFactory)?.ten_nha_may : 'Nhà máy'}
+            </span>
+            <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isFactoryDropdownOpen ? 'rotate-180 text-[#407F3E]' : ''}`} />
+          </div>
+          {isFactoryDropdownOpen && (
+            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[220px]">
+              <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
+                <input 
+                  type="text" 
+                  placeholder="Tìm nhà máy..." 
+                  value={searchFactoryTerm}
+                  onChange={(e) => setSearchFactoryTerm(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
+                />
+              </div>
+              <div className="max-h-60 overflow-y-auto">
+                <div 
+                  onClick={() => { setSelectedFactory(''); setIsFactoryDropdownOpen(false); setCurrentPage(1); }}
+                  className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                    selectedFactory === '' ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/30 font-medium'
+                  }`}
+                >
+                  <span className="truncate pr-2">Tất cả</span>
+                  {selectedFactory === '' && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                </div>
+                {filteredFactories.map(opt => (
+                  <div 
+                    key={opt.id}
+                    onClick={() => { setSelectedFactory(opt.id); setIsFactoryDropdownOpen(false); setCurrentPage(1); }}
+                    className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                      selectedFactory === opt.id ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/30 font-medium'
+                    }`}
+                  >
+                    <span className="truncate pr-2">{opt.ten_nha_may}</span>
+                    {selectedFactory === opt.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                  </div>
+                ))}
+                {filteredFactories.length === 0 && searchFactoryTerm && (
+                  <div className="px-4 py-2 text-xs text-slate-400 text-center">Không tìm thấy nhà máy</div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* GV dẫn đoàn Dropdown */}
+        <div className="relative flex-1 min-w-[150px]">
+          <div 
+            onClick={(e) => handleDropdownClick(e, setIsLeaderDropdownOpen)}
+            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isLeaderDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+          >
+            <span className={`truncate pr-2 font-medium ${selectedLeader ? 'text-slate-700' : 'text-slate-400'}`}>
+              {selectedLeader ? lecturers.find(l => l.id === selectedLeader)?.ho_ten : 'GV dẫn đoàn'}
+            </span>
+            <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isLeaderDropdownOpen ? 'rotate-180 text-[#407F3E]' : ''}`} />
+          </div>
+          {isLeaderDropdownOpen && (
+            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[220px]">
+              <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
+                <input 
+                  type="text" 
+                  placeholder="Tìm giảng viên..." 
+                  value={searchLeaderFilterTerm}
+                  onChange={(e) => setSearchLeaderFilterTerm(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
+                />
+              </div>
+              <div className="max-h-60 overflow-y-auto">
+                <div 
+                  onClick={() => { setSelectedLeader(''); setIsLeaderDropdownOpen(false); setCurrentPage(1); }}
+                  className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                    selectedLeader === '' ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/30 font-medium'
+                  }`}
+                >
+                  <span className="truncate pr-2">Tất cả</span>
+                  {selectedLeader === '' && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                </div>
+                {filteredLeaders.map(opt => (
+                  <div 
+                    key={opt.id}
+                    onClick={() => { setSelectedLeader(opt.id); setIsLeaderDropdownOpen(false); setCurrentPage(1); }}
+                    className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                      selectedLeader === opt.id ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/30 font-medium'
+                    }`}
+                  >
+                    <span className="truncate pr-2">{opt.ho_ten}</span>
+                    {selectedLeader === opt.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                  </div>
+                ))}
+                {filteredLeaders.length === 0 && searchLeaderFilterTerm && (
+                  <div className="px-4 py-2 text-xs text-slate-400 text-center">Không tìm thấy giảng viên</div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
       </div>
 
       {/* Main Table */}
@@ -439,14 +579,14 @@ export default function LeaderAssignment_Khoa() {
                       </div>
                     </td>
                     <td className="p-4 text-center">
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-bold border ${
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-bold border whitespace-nowrap ${
                         hinhThuc === 'Trực tiếp' ? 'bg-[#89B449]/10 text-[#407F3E] border-[#89B449]/20' : 'bg-slate-100 text-slate-600 border-slate-200'
                       }`}>
                         {hinhThuc}
                       </span>
                     </td>
                     <td className="p-4 text-center">
-                      <span className={`inline-flex items-center px-2 py-1 rounded text-[10px] font-bold border ${
+                      <span className={`inline-flex items-center px-2 py-1 rounded text-[10px] font-bold border whitespace-nowrap ${
                         isKhoa ? 'bg-[#407F3E]/10 text-[#407F3E] border-[#407F3E]/20' : 'bg-indigo-50 text-indigo-700 border-indigo-200'
                       }`}>
                         {isKhoa ? 'Do khoa tổ chức' : 'Tự do'}
@@ -533,9 +673,7 @@ export default function LeaderAssignment_Khoa() {
                                   className={`px-4 py-2.5 text-sm flex items-center justify-between transition-colors ${isBusy ? 'opacity-50 cursor-not-allowed bg-slate-50' : 'cursor-pointer hover:bg-[#E7E0C4]/30'} ${selectedLecturerId === gv.id ? 'bg-[#E7E0C4]/50' : ''}`}
                                 >
                                   <div className="flex items-center gap-2 truncate">
-                                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white ${isBusy ? 'bg-slate-400' : 'bg-[#407F3E]'}`}>
-                                      {gv.ho_ten?.charAt(0)}
-                                    </div>
+
                                     <div className="flex flex-col">
                                       <span className="font-bold text-slate-800">{gv.ho_ten}</span>
                                       <span className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
@@ -632,7 +770,7 @@ export default function LeaderAssignment_Khoa() {
 
       {/* Toast Popup */}
       {popup.show && createPortal(
-        <div className="fixed bottom-4 right-4 z-[9999] animate-in slide-in-from-right-8 fade-in duration-300">
+        <div className="fixed top-6 right-6 z-[9999] animate-in slide-in-from-right-8 fade-in duration-300">
           <div className={`flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg border text-sm font-bold ${
             popup.type === 'success' 
               ? 'bg-white border-[#407F3E]/20 text-[#407F3E]' 

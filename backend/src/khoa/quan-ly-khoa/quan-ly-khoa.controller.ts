@@ -33,6 +33,7 @@ import {
   ImportStudentsDto,
   CreateTripDto,
   ApproveTripDto,
+  CancelTripDto,
   ApproveCancelDto,
   FilterAssignStudentsDto,
   AssignGvhdDto,
@@ -319,8 +320,8 @@ export class KhoaController {
 
   @Roles('QuanLyKhoa', 'QuanLyCLB')
   @Get('schedules')
-  async getSchedules() {
-    return this.khoaService.getSchedules('QuanLyKhoa');
+  async getSchedules(@Query('excludeInactive') excludeInactive: string) {
+    return this.khoaService.getSchedules('QuanLyKhoa', excludeInactive === 'true');
   }
 
   @Roles('QuanLyKhoa', 'QuanLyCLB')
@@ -376,6 +377,14 @@ export class KhoaController {
   @Post('trips')
   async createTrip(@Body() body: CreateTripDto) {
     return this.khoaService.createTrip(body);
+  }
+
+  @Patch('trips/:id/cancel')
+  async cancelTrip(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: CancelTripDto,
+  ) {
+    return this.khoaService.cancelTrip(id, body.lyDoHuy);
   }
 
   @Roles('QuanLyCLB')
@@ -477,11 +486,17 @@ export class KhoaController {
     return this.khoaService.autoAssignGvdd();
   }
 
+  @Roles('QuanLyKhoa', 'QuanLyCLB')
+  @Get('boards')
+  async getBoards() {
+    return this.khoaService.getBoards();
+  }
+
   @Roles('QuanLyKhoa')
   @Post('create-board')
   async createBoard(@Body() body: CreateBoardDto) {
     return this.khoaService.createBoard(
-      body.scheduleId,
+      body.dotKienTapId,
       body.name,
       body.date,
       body.room,
@@ -501,10 +516,7 @@ export class KhoaController {
   @Roles('QuanLyKhoa')
   @Post('lock-grades')
   async lockGrades(@Body() body: LockGradesDto) {
-    return this.khoaService.lockAndFinalizeGrades(
-      body.termStudentId,
-      body.userId,
-    );
+    return this.khoaService.lockAndFinalizeGrades(body.lichKienTapId);
   }
 
   @Roles('QuanLyKhoa')
@@ -642,5 +654,10 @@ export class KhoaController {
   @Post('bulk-confirm-payments')
   async bulkConfirmPayments(@Body('records') records: any[]) {
     return this.khoaService.bulkConfirmPayments(records);
+  }
+
+  @Get('config')
+  async getConfig() {
+    return this.khoaService.getTaiKhoanThuHuong();
   }
 }
