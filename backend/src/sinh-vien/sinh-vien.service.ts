@@ -808,7 +808,7 @@ export class SinhVienService {
     try {
       await this.baiThuRepo.save(report);
 
-      // Cập nhật file .txt lên Cloudflare nếu có extractedText
+      // Cập nhật file .txt lên Cloudflare nếu có extractedText (trường hợp fallback)
       if (extractedText && extractedText.length >= 50 && this.r2Storage.isReady()) {
         const txtKey = validBaoCaoRef.replace(/\.\w+$/, '.txt');
         const txtBuffer = Buffer.from('\uFEFF' + extractedText, 'utf-8');
@@ -822,12 +822,8 @@ export class SinhVienService {
         } catch (r2Error) {
           console.error('Lỗi khi ghi đè file text lên R2:', r2Error);
         }
-      } else if (this.r2Storage.isReady()) {
-        // Kích hoạt tiến trình chạy ngầm
-        this.runBackgroundExtraction(validBaoCaoRef).catch(e => 
-          console.error('Lỗi khi khởi chạy tiến trình trích xuất ngầm:', e)
-        );
       }
+      // OCR text extraction is now handled in the background by UploadController
     } catch (error: any) {
       if (error.message && error.message.includes('quá thời hạn')) {
         throw new BadRequestException(error.message);

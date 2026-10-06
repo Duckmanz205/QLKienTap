@@ -185,33 +185,7 @@ export class UploadController {
     const sv = await this.svRepo.findOne({ where: { taikhoan_id: user.sub } });
     const userIdentifier = sv ? sv.mssv : String(user.sub);
 
-    // Bước 1: Trích xuất text từ PDF
-    let extractedText: string | null = null;
-    if (file.originalname.toLowerCase().endsWith('.pdf')) {
-      try {
-        const fileBuffer = require('fs').readFileSync(file.path);
-        const blob = new Blob([fileBuffer]);
-        const formData = new FormData();
-        formData.append('file', blob, file.originalname);
-
-        console.log('Sending PDF to AI Service for extraction...');
-        const response = await fetch('http://127.0.0.1:8000/process-pdf', {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          extractedText = data.extracted_text?.trim();
-        } else {
-          console.error('AI Service extraction failed with status:', response.status);
-        }
-      } catch (err) {
-        console.error('PDF extraction via AI Service error:', err);
-      }
-    }
-
-    // Bước 2: Chuyển file sang thư mục MSSV (từ thư mục user.sub tạo bởi multer)
+    // Bước 1: Chuyển file sang thư mục MSSV (từ thư mục user.sub tạo bởi multer)
     const newDest = `${UPLOAD_DIR}/reports/${userIdentifier}`;
     if (!existsSync(newDest)) {
       mkdirSync(newDest, { recursive: true });
@@ -219,51 +193,41 @@ export class UploadController {
     const newPath = join(newDest, file.filename);
     require('fs').renameSync(file.path, newPath);
 
-    // Bước 3: Tạo file .txt chứa text AI trích xuất
-    // Prepend UTF-8 BOM (\uFEFF) để trình duyệt luôn nhận diện đúng encoding
-    // khi truy cập trực tiếp qua R2 public URL (tránh lỗi mojibake tiếng Việt)
-    const txtFilename = file.filename.replace(/\.\w+$/, '.txt');
-    const txtPath = join(newDest, txtFilename);
-    const txtContent =
-      extractedText || 'Không thể trích xuất văn bản từ file này.';
-    require('fs').writeFileSync(txtPath, '\uFEFF' + txtContent, 'utf-8');
+    // Bước 2: Upload PDF lên Cloudflare R2 trước
+    let keyPdf = '';
+    let keyTxt = '';
+    let signedUrl = '';
 
-    // Bước 4: Xử lý Cloudflare R2
     if (this.r2.isReady()) {
-      const keyPdf = this.r2.generateKey(
+      keyPdf = this.r2.generateKey(
         'reports',
         userIdentifier,
         file.originalname,
       );
-      const keyTxt = keyPdf.replace(/\.\w+$/, '.txt');
+      keyTxt = keyPdf.replace(/\.\w+$/, '.txt');
 
-      await Promise.all([
-        this.r2.uploadFile(
-          this.r2.BUCKET_REPORTS,
-          keyPdf,
-          require('fs').readFileSync(newPath),
-          file.mimetype,
-        ),
-        this.r2.uploadFile(
-          this.r2.BUCKET_REPORTS,
-          keyTxt,
-          require('fs').readFileSync(txtPath),
-          'text/plain; charset=utf-8',
-        ),
-      ]);
+      await this.r2.uploadFile(
+        this.r2.BUCKET_REPORTS,
+        keyPdf,
+        require('fs').readFileSync(newPath),
+        file.mimetype,
+      );
 
       // Bài thu hoạch là dữ liệu nhạy cảm → trả signed URL có thời hạn ngắn (1 giờ) thay vì public URL
-      const signedUrl = await this.r2.getSignedUrl(
+      signedUrl = await this.r2.getSignedUrl(
         this.r2.BUCKET_REPORTS,
         keyPdf,
         3600,
       );
+    }
 
-      try {
-        require('fs').unlinkSync(newPath);
-        require('fs').unlinkSync(txtPath);
-      } catch {}
+    // Bước 3: Kích hoạt tiến trình trích xuất ngầm (fire-and-forget)
+    this.processAiExtractionInBackground(newPath, file.originalname, keyTxt).catch(e => 
+      console.error('Lỗi khởi chạy tiến trình ngầm:', e)
+    );
 
+    // Bước 4: Trả về kết quả ngay lập tức
+    if (this.r2.isReady()) {
       return {
         message: 'Tải lên bài thu hoạch thành công (R2).',
         storage: 'cloudflare-r2',
@@ -281,6 +245,62 @@ export class UploadController {
       fileName: file.filename,
       url: `/api/upload/file/reports/${userIdentifier}/${file.filename}`,
     };
+  }
+
+  private async processAiExtractionInBackground(
+    pdfPath: string,
+    originalName: string,
+    keyTxt: string,
+  ) {
+    try {
+      let extractedText = '';
+      if (originalName.toLowerCase().endsWith('.pdf')) {
+        console.log('Background: Sending PDF to AI Service for extraction...', originalName);
+        const fileBuffer = require('fs').readFileSync(pdfPath);
+        const blob = new Blob([fileBuffer]);
+        const formData = new FormData();
+        formData.append('file', blob, originalName);
+
+        const response = await fetch('http://127.0.0.1:8000/process-pdf', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          extractedText = data.extracted_text?.trim() || '';
+          console.log('Background: AI Extraction completed for', originalName);
+        } else {
+          console.error('Background: AI Service extraction failed with status:', response.status);
+        }
+      }
+
+      const txtContent = extractedText || 'Không thể trích xuất văn bản từ file này.';
+      const txtBuffer = Buffer.from('\uFEFF' + txtContent, 'utf-8');
+
+      if (this.r2.isReady() && keyTxt) {
+        await this.r2.uploadFile(
+          this.r2.BUCKET_REPORTS,
+          keyTxt,
+          txtBuffer,
+          'text/plain; charset=utf-8',
+        );
+        console.log('Background: TXT file uploaded to R2 for', originalName);
+      } else {
+        const txtPath = pdfPath.replace(/\.\w+$/, '.txt');
+        require('fs').writeFileSync(txtPath, txtBuffer);
+      }
+    } catch (err) {
+      console.error('Background: PDF extraction via AI Service error:', err);
+    } finally {
+      try {
+        if (require('fs').existsSync(pdfPath)) {
+          require('fs').unlinkSync(pdfPath);
+        }
+      } catch (e) {
+        console.error('Failed to cleanup local PDF:', e);
+      }
+    }
   }
 
   // ============================================================

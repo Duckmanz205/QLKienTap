@@ -24,6 +24,10 @@ import {
   ThongBao,
 } from '../entities/qlkt.entity';
 
+import { R2StorageService } from '../upload/r2-storage.service';
+import * as fs from 'fs';
+import * as path from 'path';
+
 @Injectable()
 export class GiangVienService {
   constructor(
@@ -51,6 +55,7 @@ export class GiangVienService {
     private blacklistRepo: Repository<DanhSachDen>,
     @InjectRepository(ThongBao) private thongBaoRepo: Repository<ThongBao>,
     private dataSource: DataSource,
+    private r2Storage: R2StorageService,
   ) {}
 
   // Lay thong tin GV bang TaiKhoan ID
@@ -472,6 +477,8 @@ export class GiangVienService {
       ...report,
       diem_thu_hoach:
         report.phieuThamQuan?.diemPhieuThamQuan?.diem_thu_hoach ?? null,
+      diem_ai_de_xuat:
+        report.phieuThamQuan?.diemPhieuThamQuan?.diem_ai_de_xuat ?? null,
       nhan_xet_cua_giang_vien:
         report.phieuThamQuan?.diemPhieuThamQuan?.nhan_xet_thu_hoach ?? null,
     }));
@@ -628,6 +635,65 @@ export class GiangVienService {
     await this.diemPhieuRepo.save(diem);
 
     return { message: 'Lưu điểm AI đề xuất thành công', diem };
+  }
+
+  // Chạy ngầm chấm điểm AI hàng loạt
+  async processBulkAiGradingInBackground(lecturerId: number, reportIds: number[]) {
+    for (const reportId of reportIds) {
+      try {
+        const report = await this.baiThuRepo.findOne({ where: { id: reportId } });
+        if (!report || !report.file_bao_cao) continue;
+
+        let txtKeyOrPath = report.file_bao_cao.replace(/\.\w+$/, '.txt');
+        let textToAnalyze = '';
+
+        if (this.r2Storage.isReady() && report.file_bao_cao.startsWith('reports/')) {
+          try {
+            const { stream } = await this.r2Storage.getFileStream(this.r2Storage.BUCKET_REPORTS, txtKeyOrPath);
+            for await (const chunk of stream) {
+              textToAnalyze += chunk;
+            }
+          } catch (r2Error) {
+            console.error(`Lỗi đọc file TXT từ R2 cho report ${reportId}:`, r2Error);
+          }
+        } else {
+          // Fallback local
+          const localPath = path.join(process.cwd(), 'uploads', txtKeyOrPath);
+          if (fs.existsSync(localPath)) {
+            textToAnalyze = fs.readFileSync(localPath, 'utf8');
+          }
+        }
+
+        if (!textToAnalyze || textToAnalyze.length < 50) continue;
+
+        // Gọi AI Service
+        const aiRes = await fetch('http://127.0.0.1:8000/grade', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer satori_2026_secure_key' // Giả sử key bảo mật nội bộ
+          },
+          body: JSON.stringify({ document_text: textToAnalyze })
+        });
+
+        if (!aiRes.ok) {
+          console.error(`AI Service trả về lỗi cho report ${reportId}`);
+          continue;
+        }
+
+        const aiData = await aiRes.json();
+
+        let aiComment = `1. Hình thức: ${aiData.hinh_thuc_tong_quan?.ly_do_hinh_thuc}\n` +
+                        `2. Tổng quan: ${aiData.hinh_thuc_tong_quan?.ly_do_tong_quan}\n` +
+                        `3. Quy trình: ${aiData.quy_trinh_cong_nghe?.ly_do_quy_trinh}\n` +
+                        `4. VSATTP: ${aiData.vsattp?.ly_do_vsattp}`;
+
+        await this.saveAIGrade(lecturerId, reportId, aiData.diem_bao_cao_cuoi_cung, aiComment);
+        console.log(`Đã chấm ngầm AI xong cho report ${reportId}`);
+      } catch (err) {
+        console.error(`Lỗi quá trình chấm AI ngầm cho report ${reportId}:`, err);
+      }
+    }
   }
 
   // Lay danh sach buoi bao cao hoi dong của giang vien
