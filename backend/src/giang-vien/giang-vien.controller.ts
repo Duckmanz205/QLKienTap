@@ -7,6 +7,7 @@ import {
   ParseIntPipe,
   Query,
   UseGuards,
+  BadRequestException,
 } from '@nestjs/common';
 import { GiangVienService } from './giang-vien.service';
 import { AuthGuard } from '../auth/guards/auth.guard';
@@ -149,6 +150,22 @@ export class GiangVienController {
       body.score,
       body.comment || '',
     );
+  }
+
+  @Post('bulk-grade-ai')
+  async bulkGradeAi(
+    @CurrentUser() user: JwtPayloadUser,
+    @Body('reportIds') reportIds: number[],
+  ) {
+    if (!reportIds || !reportIds.length) {
+      throw new BadRequestException('Danh sách bài thu hoạch không được trống');
+    }
+    const gv = await this.gvService.getLecturerByAccountId(user.sub);
+    // Gọi hàm chạy ngầm (Fire-and-forget), không dùng await để tránh block frontend
+    this.gvService.processBulkAiGradingInBackground(gv.id, reportIds).catch(err => {
+      console.error('Lỗi khi chạy background chấm AI:', err);
+    });
+    return { message: 'Đã đưa danh sách bài vào hàng đợi chấm AI dưới nền' };
   }
 
   @Get('board-sessions')

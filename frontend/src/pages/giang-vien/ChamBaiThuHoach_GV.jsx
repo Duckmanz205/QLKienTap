@@ -28,12 +28,6 @@ export default function ChamBaiThuHoach_GV() {
   
   // Bulk AI Grading states
   const [selectedReportIds, setSelectedReportIds] = useState([]);
-  const [isBulkAiModalOpen, setIsBulkAiModalOpen] = useState(false);
-  const [bulkAiProgress, setBulkAiProgress] = useState(0);
-  const [bulkAiTotal, setBulkAiTotal] = useState(0);
-  const [bulkAiCurrentStudent, setBulkAiCurrentStudent] = useState('');
-  const [bulkAiStatusText, setBulkAiStatusText] = useState('');
-  const isBulkAiCanceled = React.useRef(false);
   
   const [currentPage, setCurrentPage] = useState(1);
   const [limit, setLimit] = useState(15);
@@ -199,93 +193,16 @@ TRANG 38
 
   const handleBulkAiGrading = async () => {
     if (selectedReportIds.length === 0) return;
-    setIsBulkAiModalOpen(true);
-    setBulkAiTotal(selectedReportIds.length);
-    setBulkAiProgress(0);
-    setBulkAiStatusText('Khởi tạo quá trình chấm điểm hàng loạt...');
-    isBulkAiCanceled.current = false;
-
-    for (let i = 0; i < selectedReportIds.length; i++) {
-      if (isBulkAiCanceled.current) {
-        setBulkAiStatusText('Đã hủy quá trình.');
-        break;
-      }
-      const reportId = selectedReportIds[i];
-      const report = reports.find(r => r.id === reportId);
-      if (!report) continue;
-
-      const sv = report.phieuThamQuan?.phieuDangKy?.sinhVien || report.phieuDangKy?.sinhVien;
-      const studentName = sv?.ho_ten || 'Sinh viên';
-      setBulkAiCurrentStudent(studentName);
-      setBulkAiStatusText(`Đang tải dữ liệu bài nộp...`);
-      
-      try {
-        let apiPath = report.file_bao_cao;
-        if (!apiPath) {
-          setBulkAiStatusText(`Thất bại: Không có file đính kèm`);
-          continue;
-        }
-        if (apiPath.startsWith('reports/')) apiPath = `upload/file/${apiPath}`;
-        else if (!apiPath.startsWith('upload/file/')) apiPath = `upload/file/reports/${apiPath}`;
-        if (apiPath.startsWith('/')) apiPath = apiPath.substring(1);
-        
-        const txtApiPath = '/' + apiPath.replace(/\.\w+$/, '.txt');
-        let textToAnalyze = '';
-        try {
-          const respTxt = await api.get(txtApiPath, { responseType: 'text' });
-          if (respTxt.data) textToAnalyze = respTxt.data;
-        } catch (e) {
-          setBulkAiStatusText(`Thất bại: Chưa trích xuất được text cho bài này`);
-          continue;
-        }
-
-        if (!textToAnalyze) {
-           setBulkAiStatusText(`Thất bại: Nội dung văn bản trống`);
-           continue; 
-        }
-
-        setBulkAiStatusText(`Đang phân tích và chấm điểm bằng AI...`);
-        const aiRes = await fetch('http://localhost:8000/grade', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer satori_2026_secure_key'
-          },
-          body: JSON.stringify({ document_text: textToAnalyze })
-        });
-
-        if (!aiRes.ok) {
-           setBulkAiStatusText(`Thất bại: Lỗi từ máy chủ AI`);
-           continue;
-        }
-        
-        const aiData = await aiRes.json();
-        setBulkAiStatusText(`Đang lưu đề xuất điểm ${aiData.diem_bao_cao_cuoi_cung}...`);
-        
-        let aiComment = `1. Hình thức: ${aiData.hinh_thuc_tong_quan?.ly_do_hinh_thuc}\n` +
-                        `2. Tổng quan: ${aiData.hinh_thuc_tong_quan?.ly_do_tong_quan}\n` +
-                        `3. Quy trình: ${aiData.quy_trinh_cong_nghe?.ly_do_quy_trinh}\n` +
-                        `4. VSATTP: ${aiData.vsattp?.ly_do_vsattp}`;
-        
-        await api.post('/giang-vien/save-ai-grade', {
-            reportId: reportId,
-            score: aiData.diem_bao_cao_cuoi_cung,
-            comment: aiComment
-        });
-        
-        setBulkAiProgress(prev => prev + 1);
-        
-      } catch (err) {
-        console.error(err);
-        setBulkAiStatusText(`Thất bại: Có lỗi xảy ra trong quá trình xử lý`);
-      }
-    }
     
-    if (!isBulkAiCanceled.current) {
-      setBulkAiStatusText('Hoàn tất chấm điểm hàng loạt!');
+    try {
+      toast.loading('Đang khởi tạo chấm AI ngầm...', { id: 'bulk-ai' });
+      await api.post('/giang-vien/bulk-grade-ai', { reportIds: selectedReportIds });
+      toast.success('Đã đưa danh sách bài vào hàng đợi chấm AI dưới nền. Hệ thống sẽ tự động chấm, bạn có thể tiếp tục công việc khác.', { id: 'bulk-ai', duration: 5000 });
+      setSelectedReportIds([]);
+    } catch (error) {
+      console.error(error);
+      toast.error('Có lỗi xảy ra khi bắt đầu chấm AI.', { id: 'bulk-ai' });
     }
-    if (lecturer) fetchReports(lecturer.id);
-    setSelectedReportIds([]);
   };
 
   const handleAIGrading = async () => {
@@ -1201,62 +1118,6 @@ TRANG 38
                   <CheckCircle2 className="w-4 h-4" /> Sử dụng đề xuất này
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* Bulk AI Grading Modal */}
-      {isBulkAiModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col">
-            <div className="px-6 py-4 border-b border-[#E7E0C4] bg-[#fdfcf8] flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                  <Sparkles className="w-4 h-4 text-blue-600" />
-                </div>
-                <h2 className="font-bold text-slate-800">Chấm điểm AI hàng loạt</h2>
-              </div>
-            </div>
-            
-            <div className="p-6">
-              <div className="mb-4">
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="font-semibold text-slate-600">Tiến trình</span>
-                  <span className="font-bold text-[#407F3E]">{bulkAiProgress} / {bulkAiTotal}</span>
-                </div>
-                <div className="w-full bg-slate-200 rounded-full h-3">
-                  <div 
-                    className="bg-gradient-to-r from-[#89B449] to-[#407F3E] h-3 rounded-full transition-all duration-300"
-                    style={{ width: `${(bulkAiTotal > 0 ? bulkAiProgress / bulkAiTotal : 0) * 100}%` }}
-                  ></div>
-                </div>
-              </div>
-              
-              <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm">
-                <p className="font-semibold text-slate-700 mb-1 truncate">Đang xử lý: {bulkAiCurrentStudent}</p>
-                <p className="text-slate-500 animate-pulse">{bulkAiStatusText}</p>
-              </div>
-            </div>
-            
-            <div className="px-6 py-4 border-t border-[#E7E0C4] bg-slate-50 flex justify-end">
-              {bulkAiProgress === bulkAiTotal || isBulkAiCanceled.current ? (
-                <button
-                  onClick={() => setIsBulkAiModalOpen(false)}
-                  className="px-5 py-2 rounded-lg bg-[#407F3E] text-white font-bold hover:bg-[#407F3E]/90 transition-colors cursor-pointer"
-                >
-                  Đóng
-                </button>
-              ) : (
-                <button
-                  onClick={() => {
-                    isBulkAiCanceled.current = true;
-                    setBulkAiStatusText('Đang dừng tiến trình...');
-                  }}
-                  className="px-5 py-2 rounded-lg border border-red-200 text-red-600 font-bold hover:bg-red-50 transition-colors cursor-pointer"
-                >
-                  Hủy tiến trình
-                </button>
-              )}
             </div>
           </div>
         </div>
