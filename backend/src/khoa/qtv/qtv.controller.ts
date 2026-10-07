@@ -1,8 +1,20 @@
-import { Controller, Get, Post, Param, ParseIntPipe, Query, BadRequestException, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Param,
+  ParseIntPipe,
+  Query,
+  BadRequestException,
+  UseGuards,
+} from '@nestjs/common';
 import { KhoaService } from '../shared/khoa.service';
 import { GetAccountsQueryDto } from '../shared/dto/khoa.dto';
 import { Roles } from '../../auth/decorators/roles.decorator';
-import { CurrentUser, JwtPayloadUser } from '../../auth/decorators/user.decorator';
+import {
+  CurrentUser,
+  JwtPayloadUser,
+} from '../../auth/decorators/user.decorator';
 import { AuthGuard } from '../../auth/guards/auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 
@@ -15,7 +27,11 @@ export class QtvController {
   @Get('account')
   async getAccounts(@Query() query: GetAccountsQueryDto) {
     return this.khoaService.getAccounts(
-      query.page || 1, query.limit || 15, query.search, query.vaiTro, query.trangThai,
+      query.page || 1,
+      query.limit || 15,
+      query.search,
+      query.vaiTro,
+      query.trangThai,
     );
   }
 
@@ -26,7 +42,9 @@ export class QtvController {
     @CurrentUser() user: JwtPayloadUser,
   ) {
     if (id === user.sub) {
-      throw new BadRequestException('Không thể tự khóa tài khoản của chính mình');
+      throw new BadRequestException(
+        'Không thể tự khóa tài khoản của chính mình',
+      );
     }
     return this.khoaService.toggleAccountLock(id);
   }

@@ -30,16 +30,24 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser, JwtPayloadUser } from '../auth/decorators/user.decorator';
 import { SinhVien, GiangVien, PhanCongGVHD } from '../entities/qlkt.entity';
 
-export class CustomFileTypeValidator extends FileValidator<{ fileType: RegExp | string }> {
+export class CustomFileTypeValidator extends FileValidator<{
+  fileType: RegExp | string;
+}> {
   buildErrorMessage(): string {
     return `Validation failed (expected type is ${this.validationOptions.fileType})`;
   }
   isValid(file: Express.Multer.File): boolean {
     if (!file) return false;
     if (this.validationOptions.fileType instanceof RegExp) {
-      return this.validationOptions.fileType.test(file.mimetype) || this.validationOptions.fileType.test(file.originalname);
+      return (
+        this.validationOptions.fileType.test(file.mimetype) ||
+        this.validationOptions.fileType.test(file.originalname)
+      );
     }
-    return file.mimetype === this.validationOptions.fileType || file.originalname.endsWith(this.validationOptions.fileType);
+    return (
+      file.mimetype === this.validationOptions.fileType ||
+      file.originalname.endsWith(this.validationOptions.fileType)
+    );
   }
 }
 
@@ -83,8 +91,11 @@ export class UploadController {
     if (!gv) return false;
 
     // studentIdentifier could be taikhoan_id (number string) or MSSV (string)
-    const sv = await this.svRepo.createQueryBuilder('sv')
-      .where('sv.taikhoan_id = :identifier OR sv.mssv = :identifier', { identifier: studentIdentifier })
+    const sv = await this.svRepo
+      .createQueryBuilder('sv')
+      .where('sv.taikhoan_id = :identifier OR sv.mssv = :identifier', {
+        identifier: studentIdentifier,
+      })
       .getOne();
 
     if (!sv) return false;
@@ -191,39 +202,25 @@ export class UploadController {
     let extractedText: string | null = null;
     if (file.originalname.toLowerCase().endsWith('.pdf')) {
       try {
-        const pdfParse = require('pdf-parse');
-        const pdfBuffer = require('fs').readFileSync(file.path);
-        const data = await pdfParse(pdfBuffer);
-        extractedText = data.text?.trim();
+        const fileBuffer = require('fs').readFileSync(file.path);
+        const blob = new Blob([fileBuffer]);
+        const formData = new FormData();
+        formData.append('file', blob, file.originalname);
 
-        // Fallback: Nếu pdf-parse không đọc được text (ví dụ PDF scan từ ảnh), gọi AI OCR service
-        if (!extractedText || extractedText.length < 50) {
-          try {
-            console.log('Văn bản PDF quá ngắn hoặc trống, đang gọi AI OCR service để trích xuất...');
-            const formData = new FormData();
-            const fileBlob = new Blob([pdfBuffer], { type: 'application/pdf' });
-            formData.append('file', fileBlob, file.originalname);
+        console.log('Sending PDF to AI Service for extraction...');
+        const response = await fetch('http://127.0.0.1:8000/process-pdf', {
+          method: 'POST',
+          body: formData,
+        });
 
-            const aiResponse = await fetch('http://127.0.0.1:8000/process-pdf', {
-              method: 'POST',
-              body: formData,
-            });
-
-            if (aiResponse.ok) {
-              const aiData = await aiResponse.json();
-              if (aiData.extracted_text) {
-                extractedText = aiData.extracted_text.trim();
-                console.log('AI OCR trích xuất thành công.');
-              }
-            } else {
-              console.error('AI OCR service lỗi:', await aiResponse.text());
-            }
-          } catch (aiErr) {
-            console.error('Không thể kết nối đến AI service:', aiErr.message);
-          }
+        if (response.ok) {
+          const data = await response.json();
+          extractedText = data.extracted_text?.trim();
+        } else {
+          console.error('AI Service extraction failed with status:', response.status);
         }
       } catch (err) {
-        console.error('PDF parsing error:', err);
+        console.error('PDF extraction via AI Service error:', err);
       }
     }
 
@@ -240,7 +237,8 @@ export class UploadController {
     // khi truy cập trực tiếp qua R2 public URL (tránh lỗi mojibake tiếng Việt)
     const txtFilename = file.filename.replace(/\.\w+$/, '.txt');
     const txtPath = join(newDest, txtFilename);
-    const txtContent = extractedText || 'Không thể trích xuất văn bản từ file này.';
+    const txtContent =
+      extractedText || 'Không thể trích xuất văn bản từ file này.';
     require('fs').writeFileSync(txtPath, '\uFEFF' + txtContent, 'utf-8');
 
     // Bước 4: Xử lý Cloudflare R2
@@ -264,7 +262,7 @@ export class UploadController {
           keyTxt,
           require('fs').readFileSync(txtPath),
           'text/plain; charset=utf-8',
-        )
+        ),
       ]);
 
       // Bài thu hoạch là dữ liệu nhạy cảm → trả signed URL có thời hạn ngắn (1 giờ) thay vì public URL
@@ -380,7 +378,9 @@ export class UploadController {
     if (!file) throw new BadRequestException('Tệp tải lên không hợp lệ.');
 
     if (this.r2.isReady()) {
-      let sv = await this.svRepo.findOne({ where: { taikhoan_id: user.sub } });
+      const sv = await this.svRepo.findOne({
+        where: { taikhoan_id: user.sub },
+      });
       const folderName = sv ? sv.mssv : String(user.sub);
 
       const key = this.r2.generateKey(
@@ -463,7 +463,9 @@ export class UploadController {
     if (!file) throw new BadRequestException('Tệp tải lên không hợp lệ.');
 
     if (this.r2.isReady()) {
-      let sv = await this.svRepo.findOne({ where: { taikhoan_id: user.sub } });
+      const sv = await this.svRepo.findOne({
+        where: { taikhoan_id: user.sub },
+      });
       const folderName = sv ? sv.mssv : String(user.sub);
 
       const key = this.r2.generateKey(
@@ -616,7 +618,11 @@ export class UploadController {
       } else {
         throw new ForbiddenException('Bạn không có quyền truy cập file này.');
       }
-    } else if (userRole === 'QuanLyKhoa' || userRole === 'Khoa' || userRole === 'QuanLyCLB') {
+    } else if (
+      userRole === 'QuanLyKhoa' ||
+      userRole === 'Khoa' ||
+      userRole === 'QuanLyCLB'
+    ) {
       // QuanLyKhoa/Khoa/QuanLyCLB có quyền tải file hợp lệ trong các bucket nghiệp vụ (bao gồm cả file legacy 'sv', 'general')
     } else {
       throw new ForbiddenException(
@@ -697,7 +703,9 @@ export class UploadController {
     let userMssv = '';
 
     if (userRole === 'SinhVien') {
-      const sv = await this.svRepo.findOne({ where: { taikhoan_id: user.sub } });
+      const sv = await this.svRepo.findOne({
+        where: { taikhoan_id: user.sub },
+      });
       if (sv) userMssv = sv.mssv;
     }
 
@@ -730,7 +738,11 @@ export class UploadController {
       } else {
         throw new ForbiddenException('Bạn không có quyền truy cập file này.');
       }
-    } else if (userRole === 'QuanLyKhoa' || userRole === 'Khoa' || userRole === 'QuanLyCLB') {
+    } else if (
+      userRole === 'QuanLyKhoa' ||
+      userRole === 'Khoa' ||
+      userRole === 'QuanLyCLB'
+    ) {
     } else {
       throw new ForbiddenException(
         'Bạn không có quyền truy cập tài nguyên này.',
@@ -743,27 +755,43 @@ export class UploadController {
 
     if (!existsSync(filePath)) {
       if (this.r2.isReady()) {
-        const key = ownerId ? `${type}/${ownerId}/${filename}` : `${type}/${filename}`;
+        const key = ownerId
+          ? `${type}/${ownerId}/${filename}`
+          : `${type}/${filename}`;
         let bucketName = this.r2.BUCKET_ATTACHMENTS;
         if (type === 'reports') bucketName = this.r2.BUCKET_REPORTS;
         if (type === 'payments') bucketName = this.r2.BUCKET_PAYMENTS;
-        
+
         try {
-          const { stream, contentType, contentLength } = await this.r2.getFileStream(bucketName, key);
+          const { stream, contentType, contentLength } =
+            await this.r2.getFileStream(bucketName, key);
           let finalContentType = contentType || 'application/octet-stream';
-          if (extname(filename).toLowerCase() === '.txt' && finalContentType === 'text/plain') {
+          if (
+            extname(filename).toLowerCase() === '.txt' &&
+            finalContentType === 'text/plain'
+          ) {
             finalContentType = 'text/plain; charset=utf-8';
           }
           res.setHeader('Content-Type', finalContentType);
           if (contentLength) {
             res.setHeader('Content-Length', contentLength);
           }
-          if (['.xlsx', '.xls', '.docx', '.doc'].includes(extname(filename).toLowerCase())) {
-            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+          if (
+            ['.xlsx', '.xls', '.docx', '.doc'].includes(
+              extname(filename).toLowerCase(),
+            )
+          ) {
+            res.setHeader(
+              'Content-Disposition',
+              `attachment; filename="${filename}"`,
+            );
           } else {
             res.setHeader('Content-Security-Policy', "default-src 'none'");
             res.setHeader('X-Content-Type-Options', 'nosniff');
-            res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+            res.setHeader(
+              'Content-Disposition',
+              `inline; filename="${filename}"`,
+            );
           }
           return stream.pipe(res);
         } catch (err) {

@@ -2,6 +2,7 @@ import {
   Injectable,
   BadRequestException,
   NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, IsNull, DataSource, EntityManager } from 'typeorm';
@@ -40,9 +41,12 @@ export class SinhVienService {
     @InjectRepository(HoaDonLePhi) private hoaDonRepo: Repository<HoaDonLePhi>,
     @InjectRepository(DonHoanPhi) private hoanPhiRepo: Repository<DonHoanPhi>,
     @InjectRepository(DiemDanh) private diemDanhRepo: Repository<DiemDanh>,
-    @InjectRepository(DiemPhieuThamQuan) private diemPhieuRepo: Repository<DiemPhieuThamQuan>,
-    @InjectRepository(PhieuThamQuan) private phieuTQRepo: Repository<PhieuThamQuan>,
-    @InjectRepository(PhieuDeXuatChuyenThamQuan) private deXuatRepo: Repository<PhieuDeXuatChuyenThamQuan>,
+    @InjectRepository(DiemPhieuThamQuan)
+    private diemPhieuRepo: Repository<DiemPhieuThamQuan>,
+    @InjectRepository(PhieuThamQuan)
+    private phieuTQRepo: Repository<PhieuThamQuan>,
+    @InjectRepository(PhieuDeXuatChuyenThamQuan)
+    private deXuatRepo: Repository<PhieuDeXuatChuyenThamQuan>,
     @InjectRepository(BaiThuHoach) private baiThuRepo: Repository<BaiThuHoach>,
     @InjectRepository(DotKienTap_SinhVien)
     private dksvRepo: Repository<DotKienTap_SinhVien>,
@@ -54,7 +58,8 @@ export class SinhVienService {
     @InjectRepository(DanhSachDen)
     private blackListRepo: Repository<DanhSachDen>,
     @InjectRepository(LichKienTap) private lichRepo: Repository<LichKienTap>,
-    @InjectRepository(TaiKhoanThuHuong) private taiKhoanThuHuongRepo: Repository<TaiKhoanThuHuong>,
+    @InjectRepository(TaiKhoanThuHuong)
+    private taiKhoanThuHuongRepo: Repository<TaiKhoanThuHuong>,
     private readonly r2Storage: R2StorageService,
   ) {}
 
@@ -168,9 +173,25 @@ export class SinhVienService {
       relations: { nhaMay: true, lichKienTap: true },
     });
 
-    // Dem so SV da dang ky tung chuyen
+    // Lay danh sach cac chuyen SV da dang ky de loai bo khoi ket qua
+    const studentPhieus = await this.phieuRepo.find({
+      where: { sinh_vien_id: studentId },
+      relations: { chuyenThamQuan: true },
+    });
+    const registeredTripIds = new Set(studentPhieus.map(p => p.chuyen_tham_quan_id));
+    const activeLichIds = new Set(
+      studentPhieus
+        .filter(p => ['ChoDuyet', 'HopLe'].includes(p.trang_thai))
+        .map(p => p.chuyenThamQuan.lich_kien_tap_id)
+    );
+
+    // Dem so SV da dang ky tung chuyen va chi hien thi cac chuyen hop le
     const results: any[] = [];
     for (const trip of trips) {
+      // Bo qua neu da dang ky chuyen nay (bat ky trang thai nao)
+      if (registeredTripIds.has(trip.id)) continue;
+      // Bo qua neu da co 1 dang ky khac (dang cho duyet hoac hop le) trong cung lich
+      if (activeLichIds.has(trip.lich_kien_tap_id)) continue;
       const count = await this.phieuRepo.count({
         where: {
           chuyen_tham_quan_id: trip.id,
@@ -214,7 +235,7 @@ export class SinhVienService {
       }
       for (const phieu of phieus) {
         if (phieu.phieuThamQuan) {
-          (phieu.phieuThamQuan as any).diemDanh = ddMap.get(phieu.phieuThamQuan.id);
+          phieu.phieuThamQuan.diemDanh = ddMap.get(phieu.phieuThamQuan.id);
         }
       }
     }
@@ -248,7 +269,6 @@ export class SinhVienService {
         throw new BadRequestException('Chuyến đi này hiện đang đóng đăng ký');
       }
 
-
       const startYearStr =
         trip.lichKienTap.dotKienTap.hocKy.namHoc.ten_nam_hoc.split('-')[0];
       const startYear = parseInt(startYearStr, 10);
@@ -267,22 +287,21 @@ export class SinhVienService {
         throw new BadRequestException('Bạn đã đăng ký chuyến đi này rồi');
       }
 
-      // Kiem tra khong trung ngay voi bat ky chuyen nao khac da dang ky va chua bi huy/loai
-      const existingSameDay = await manager.find(PhieuDangKy, {
+      // Kiem tra khong duoc dang ky qua 1 chuyen trong cung 1 lich kien tap
+      const existingInLich = await manager.find(PhieuDangKy, {
         where: {
           sinh_vien_id: studentId,
           trang_thai: In(['ChoDuyet', 'HopLe']),
         },
         relations: { chuyenThamQuan: true },
       });
-      const hasSameDay = existingSameDay.some(
+      const hasSameLich = existingInLich.some(
         (p) =>
-          new Date(p.chuyenThamQuan.ngay_tham_quan).toDateString() ===
-          new Date(trip.ngay_tham_quan).toDateString(),
+          p.chuyenThamQuan.lich_kien_tap_id === trip.lich_kien_tap_id,
       );
-      if (hasSameDay) {
+      if (hasSameLich) {
         throw new BadRequestException(
-          'Bạn không được đăng ký hai chuyến đi trùng ngày',
+          'Bạn chỉ được phép đăng ký tối đa 1 chuyến trong cùng một Lịch kiến tập.',
         );
       }
 
@@ -316,20 +335,16 @@ export class SinhVienService {
     nguoiLienHeDeXuat?: string,
     sdtLienHeDeXuat?: string,
   ) {
-    // Tìm đợt kiến tập đang mở đăng ký để gắn đề xuất vào
+    // Tìm đợt kiến tập đang mở đăng ký để gắn đề xuất vào (nếu có)
     const activeLich = await this.lichRepo.findOne({
       where: { trang_thai: 'MoDangKy' },
-      relations: { dotKienTap: true }
+      relations: { dotKienTap: true },
     });
-    
-    if (!activeLich) {
-      throw new BadRequestException(
-        'Hiện tại không có lịch kiến tập nào đang mở đăng ký để nhận đề xuất',
-      );
-    }
 
     if (!nhaMayId && !tenNhaMayDeXuat) {
-      throw new BadRequestException('Vui lòng chọn nhà máy hoặc nhập thông tin nhà máy đề xuất');
+      throw new BadRequestException(
+        'Vui lòng chọn nhà máy hoặc nhập thông tin nhà máy đề xuất',
+      );
     }
 
     if (nhaMayId) {
@@ -357,10 +372,16 @@ export class SinhVienService {
       deXuat.nguoi_lien_he_de_xuat = nguoiLienHeDeXuat || '';
       deXuat.sdt_lien_he_de_xuat = sdtLienHeDeXuat || '';
     }
-    
-    deXuat.lich_kien_tap_id = activeLich.id;
+
+    if (activeLich) {
+      deXuat.lich_kien_tap_id = activeLich.id;
+    } else {
+      deXuat.lich_kien_tap_id = null;
+    }
     deXuat.ngay_tham_quan_de_xuat = ngayThamQuan;
-    const startTimeDate = new Date(`1970-01-01T${gioBatDau.length === 5 ? gioBatDau + ':00' : gioBatDau}`);
+    const startTimeDate = new Date(
+      `1970-01-01T${gioBatDau.length === 5 ? gioBatDau + ':00' : gioBatDau}`,
+    );
     deXuat.gio_bat_dau_de_xuat = startTimeDate as any;
     deXuat.hinh_thuc = hinhThuc;
     deXuat.sinh_vien_id = studentId;
@@ -439,6 +460,14 @@ export class SinhVienService {
       );
     }
 
+    if (phieu.trang_thai === 'ChoDuyet') {
+      phieu.trang_thai = 'DaHuy';
+      await this.phieuRepo.save(phieu);
+      return {
+        message: 'Đã hủy đăng ký thành công (Rút đơn tự do, không bị phạt)',
+      };
+    }
+
     if (!fileMinhChung || fileMinhChung.trim() === '') {
       phieu.trang_thai = 'DaHuy';
       await this.phieuRepo.save(phieu);
@@ -453,7 +482,7 @@ export class SinhVienService {
 
       return {
         message:
-          'Đã hủy đăng ký thành công (Không có minh chứng, bạn bị mất quyền đăng ký trong 3 chuyến tiếp theo)',
+          'Đã hủy đăng ký thành công (Không có minh chứng, bạn bị đưa vào danh sách đen)',
       };
     }
 
@@ -512,8 +541,10 @@ export class SinhVienService {
         hd.trang_thai = 'DaDongDungHan';
         hd.phieuDangKy.trang_thai = 'HopLe';
         await manager.save(PhieuDangKy, hd.phieuDangKy);
-        
-        let ptq = await manager.findOne(PhieuThamQuan, { where: { phieu_dang_ky_id: hd.phieu_dang_ky_id } });
+
+        let ptq = await manager.findOne(PhieuThamQuan, {
+          where: { phieu_dang_ky_id: hd.phieu_dang_ky_id },
+        });
         if (!ptq) {
           ptq = new PhieuThamQuan();
           ptq.phieu_dang_ky_id = hd.phieu_dang_ky_id;
@@ -558,7 +589,9 @@ export class SinhVienService {
       hd.phieuDangKy.trang_thai = 'HopLe';
       await this.phieuRepo.save(hd.phieuDangKy);
 
-      let ptq = await this.phieuTQRepo.findOne({ where: { phieu_dang_ky_id: hd.phieu_dang_ky_id } });
+      let ptq = await this.phieuTQRepo.findOne({
+        where: { phieu_dang_ky_id: hd.phieu_dang_ky_id },
+      });
       if (!ptq) {
         ptq = new PhieuThamQuan();
         ptq.phieu_dang_ky_id = hd.phieu_dang_ky_id;
@@ -578,6 +611,9 @@ export class SinhVienService {
     studentId: number,
     invoiceId: number,
     fileScanUrl: string,
+    nganHangNhan: string,
+    soTaiKhoanNhan: string,
+    tenChuTaiKhoanNhan: string,
   ) {
     const hd = await this.hoaDonRepo.findOne({
       where: { id: invoiceId },
@@ -612,6 +648,9 @@ export class SinhVienService {
     don.ten_chu_tai_khoan_nhan = hd.phieuDangKy?.sinhVien?.ho_ten ?? 'Sinh viên ẩn danh';
     don.ngay_nop = new Date();
     don.trang_thai = 'ChoXuLy';
+    don.ngan_hang_nhan = nganHangNhan;
+    don.so_tai_khoan_nhan = soTaiKhoanNhan;
+    don.ten_chu_tai_khoan_nhan = tenChuTaiKhoanNhan;
     await this.hoanPhiRepo.save(don);
 
     return { message: 'Nộp đơn xin hoàn lệ phí thành công' };
@@ -770,20 +809,22 @@ export class SinhVienService {
         where: { phieu_dang_ky_id: registrationId },
       });
       if (hd && (hd as any).trang_thai === 'ChuaDong') {
-        throw new BadRequestException('Bạn chưa thanh toán lệ phí cho chuyến đi này nên chưa được cấp Phiếu tham quan');
-      }
-      throw new BadRequestException('Chuyến đi này chưa được cấp phiếu tham quan');
-    }
-
-    if (phieu.chuyenThamQuan.cach_to_chuc === 'DoKhoaToChuc') {
-      const dd = await this.dataSource.manager.findOne('DiemDanh', {
-        where: { phieu_tham_quan_id: phieuTQ.id },
-      });
-      if (!dd || (dd as any).trang_thai !== 'CoMat') {
         throw new BadRequestException(
-          'Bạn chưa được điểm danh Có mặt cho chuyến tham quan này nên chưa thể nộp bài thu hoạch',
+          'Bạn chưa thanh toán lệ phí cho chuyến đi này nên chưa được cấp Phiếu tham quan',
         );
       }
+      throw new BadRequestException(
+        'Chuyến đi này chưa được cấp phiếu tham quan',
+      );
+    }
+
+    const dd = await this.dataSource.manager.findOne('DiemDanh', {
+      where: { phieu_tham_quan_id: phieuTQ.id },
+    });
+    if (!dd || (dd as any).trang_thai !== 'CoMat') {
+      throw new BadRequestException(
+        'Bạn chưa được điểm danh Có mặt cho chuyến tham quan này nên chưa thể nộp bài thu hoạch',
+      );
     }
 
     const report = new BaiThuHoach();
@@ -795,40 +836,26 @@ export class SinhVienService {
     try {
       await this.baiThuRepo.save(report);
 
-      // Cập nhật file .txt lên Cloudflare hoặc Local nếu có extractedText
-      if (extractedText) {
-        if (this.r2Storage.isReady() && !validBaoCaoRef.startsWith('/api/')) {
-          const txtKey = validBaoCaoRef.replace(/\.\w+$/, '.txt');
-          const txtBuffer = Buffer.from('\uFEFF' + extractedText, 'utf-8');
-          try {
-            await this.r2Storage.uploadFile(
-              this.r2Storage.BUCKET_REPORTS,
-              txtKey,
-              txtBuffer,
-              'text/plain; charset=utf-8'
-            );
-          } catch (r2Error) {
-            console.error('Lỗi khi ghi đè file text lên R2:', r2Error);
-          }
-        } else {
-          // Ghi đè file local
-          try {
-            const fs = require('fs');
-            const path = require('path');
-            const filename = validBaoCaoRef.split('/').pop();
-            if (filename) {
-               const txtFilename = filename.replace(/\.\w+$/, '.txt');
-               // Folder theo MSSV hoac accountId (upload controller dùng MSSV nếu có)
-               const ownerId = phieu.sinhVien?.mssv || phieu.sinhVien?.taikhoan_id;
-               const txtPath = path.join(process.cwd(), 'uploads', 'reports', String(ownerId), txtFilename);
-               fs.writeFileSync(txtPath, '\uFEFF' + extractedText, 'utf-8');
-            }
-          } catch (localErr) {
-            console.error('Lỗi khi ghi đè file text local:', localErr);
-          }
+      // Cập nhật file .txt lên Cloudflare nếu có extractedText
+      if (extractedText && extractedText.length >= 50 && this.r2Storage.isReady()) {
+        const txtKey = validBaoCaoRef.replace(/\.\w+$/, '.txt');
+        const txtBuffer = Buffer.from('\uFEFF' + extractedText, 'utf-8');
+        try {
+          await this.r2Storage.uploadFile(
+            this.r2Storage.BUCKET_REPORTS,
+            txtKey,
+            txtBuffer,
+            'text/plain; charset=utf-8',
+          );
+        } catch (r2Error) {
+          console.error('Lỗi khi ghi đè file text lên R2:', r2Error);
         }
+      } else if (this.r2Storage.isReady()) {
+        // Kích hoạt tiến trình chạy ngầm
+        this.runBackgroundExtraction(validBaoCaoRef).catch(e => 
+          console.error('Lỗi khi khởi chạy tiến trình trích xuất ngầm:', e)
+        );
       }
-
     } catch (error: any) {
       if (error.message && error.message.includes('quá thời hạn')) {
         throw new BadRequestException(error.message);
@@ -862,24 +889,43 @@ export class SinhVienService {
 
     const report = phieuTQ.baiThuHoach;
 
+    if (phieuTQ.han_nop_bao_cao && new Date() > phieuTQ.han_nop_bao_cao) {
+      throw new BadRequestException(
+        'Đã hết hạn 10 ngày để chỉnh sửa. Bài nộp đã được gửi cho giảng viên và không thể thu hồi.',
+      );
+    }
+
     // Kiểm tra xem đã có điểm chưa
     const diem = await this.diemPhieuRepo.findOne({
       where: { phieu_tham_quan_id: phieuTQ.id },
     });
 
-    if (diem && (diem.diem_chuan_bi != null || diem.diem_thu_hoach != null || diem.diem_hoi_dong_final != null)) {
-      throw new BadRequestException('Bài thu hoạch này đã được chấm điểm, không thể xóa để nộp lại.');
+    if (
+      diem &&
+      (diem.diem_chuan_bi != null ||
+        diem.diem_thu_hoach != null ||
+        diem.diem_hoi_dong_final != null)
+    ) {
+      throw new BadRequestException(
+        'Bài thu hoạch này đã được chấm điểm, không thể xóa để nộp lại.',
+      );
     }
 
     // Xóa file trên R2
     if (this.r2Storage.isReady()) {
       if (report.file_bao_cao) {
         try {
-          await this.r2Storage.deleteFile(this.r2Storage.BUCKET_REPORTS, report.file_bao_cao);
-          
+          await this.r2Storage.deleteFile(
+            this.r2Storage.BUCKET_REPORTS,
+            report.file_bao_cao,
+          );
+
           // Xóa file .txt tương ứng
           const txtKey = report.file_bao_cao.replace(/\.\w+$/, '.txt');
-          await this.r2Storage.deleteFile(this.r2Storage.BUCKET_REPORTS, txtKey);
+          await this.r2Storage.deleteFile(
+            this.r2Storage.BUCKET_REPORTS,
+            txtKey,
+          );
         } catch (e) {
           console.error('Lỗi khi xóa file báo cáo trên R2:', e);
         }
@@ -887,7 +933,10 @@ export class SinhVienService {
 
       if (report.file_xac_nhan_tham_quan) {
         try {
-          await this.r2Storage.deleteFile(this.r2Storage.BUCKET_PAYMENTS, report.file_xac_nhan_tham_quan);
+          await this.r2Storage.deleteFile(
+            this.r2Storage.BUCKET_PAYMENTS,
+            report.file_xac_nhan_tham_quan,
+          );
         } catch (e) {
           console.error('Lỗi khi xóa file xác nhận trên R2:', e);
         }
@@ -959,14 +1008,26 @@ export class SinhVienService {
     }
 
     // Xoa bo cu neu co
-    const lichKienTapId = phieus[0].chuyenThamQuan.lich_kien_tap_id;
-    const countBoard = await this.dataSource.manager.count('HoiDongChamBaoCao', {
-      where: { lich_kien_tap_id: lichKienTapId },
-    });
-    if (countBoard > 0) {
-      throw new BadRequestException(
-        'Không thể thay đổi bộ chuyến báo cáo sau khi Khoa đã lên lịch buổi báo cáo Hội đồng',
-      );
+    const dksv = await this.dksvRepo.findOne({ where: { id: termStudentId } });
+    if (dksv) {
+      const lich = await this.lichRepo.findOne({
+        where: { dot_kien_tap_id: dksv.dot_kien_tap_id },
+        order: { id: 'DESC' }
+      });
+
+      if (lich) {
+        const countBoard = await this.dataSource.manager.count(
+          'HoiDongChamBaoCao',
+          {
+            where: { lich_kien_tap_id: lich.id },
+          },
+        );
+        if (countBoard > 0) {
+          throw new BadRequestException(
+            'Không thể thay đổi bộ chuyến báo cáo sau khi Khoa đã lên lịch buổi báo cáo Hội đồng',
+          );
+        }
+      }
     }
 
     // (v11) Xóa bộ cũ nếu có — bỏ BoChuyenBaoCao_Chuyen, dùng PhieuThamQuan.bo_chuyen_bao_cao_id
@@ -991,7 +1052,9 @@ export class SinhVienService {
 
     // Gán bo_chuyen_bao_cao_id trực tiếp trên PhieuThamQuan
     for (const rId of registrationIds) {
-      const phieuTQ = await this.phieuTQRepo.findOne({ where: { phieu_dang_ky_id: rId } });
+      const phieuTQ = await this.phieuTQRepo.findOne({
+        where: { phieu_dang_ky_id: rId },
+      });
       if (phieuTQ) {
         phieuTQ.bo_chuyen_bao_cao_id = savedBo.id;
         await this.phieuTQRepo.save(phieuTQ);
@@ -1070,8 +1133,10 @@ export class SinhVienService {
 
     const pendingReports = trips.filter(
       (t) =>
-        t.phieuThamQuan && t.trang_thai === 'HopLe' &&
-        (!t.phieuThamQuan?.baiThuHoach || Object.keys(t.phieuThamQuan.baiThuHoach).length === 0),
+        t.phieuThamQuan &&
+        t.trang_thai === 'HopLe' &&
+        (!t.phieuThamQuan?.baiThuHoach ||
+          Object.keys(t.phieuThamQuan.baiThuHoach).length === 0),
     ).length;
 
     let avgScore = 'Chưa có';
@@ -1095,20 +1160,21 @@ export class SinhVienService {
             where: { bo_chuyen_bao_cao_id: boChuyen.id },
           });
 
-            if (phieuTQs.length > 0) {
-              const scores: number[] = [];
-              for (const ptq of phieuTQs) {
+          if (phieuTQs.length > 0) {
+            const scores: number[] = [];
+            for (const ptq of phieuTQs) {
               const diem = await this.diemPhieuRepo.findOne({
                 where: { phieu_tham_quan_id: ptq.id },
               });
               scores.push(
                 Number(diem?.diem_chuan_bi || 0) * 0.3 +
-                Number(diem?.diem_thu_hoach || 0) * 0.3 +
-                Number(diem?.diem_hoi_dong_final || 0) * 0.4 +
-                Number(diem?.diem_cong_final || 0)
+                  Number(diem?.diem_thu_hoach || 0) * 0.3 +
+                  Number(diem?.diem_hoi_dong_final || 0) * 0.4 +
+                  Number(diem?.diem_cong_final || 0),
               );
             }
-            const avg = scores.reduce((sum, val) => sum + val, 0) / scores.length;
+            const avg =
+              scores.reduce((sum, val) => sum + val, 0) / scores.length;
             avgScore = avg.toFixed(1);
           }
         }
@@ -1117,4 +1183,121 @@ export class SinhVienService {
 
     return { registered, completed, pendingReports, avgScore };
   }
+
+  async getTripInfo(studentId: number, tripId: number) {
+    const isRegistered = await this.phieuRepo.findOne({
+      where: {
+        sinh_vien_id: studentId,
+        chuyen_tham_quan_id: tripId,
+        trang_thai: In(['HopLe', 'DaThamGia', 'HoanThanh']),
+      },
+    });
+
+    if (!isRegistered) {
+      throw new ForbiddenException('Bạn không có quyền xem thông tin chuyến tham quan này');
+    }
+
+    const phanCongs = await this.dataSource.manager.find('PhanCongGiangVienDanDoan', {
+      where: { chuyen_tham_quan_id: tripId },
+      relations: ['giangVien'],
+    } as any);
+
+    const lecturers = phanCongs.map((pc: any) => ({
+      id: pc.giangVien.id,
+      ho_ten: pc.giangVien.ho_ten,
+      email: pc.giangVien.email,
+      so_dien_thoai: pc.giangVien.so_dien_thoai,
+      la_truong_doan: pc.la_truong_doan,
+    }));
+
+    const dsSinhVien = await this.phieuRepo.find({
+      where: {
+        chuyen_tham_quan_id: tripId,
+        trang_thai: In(['HopLe', 'DaThamGia', 'HoanThanh']),
+      },
+      relations: { sinhVien: true },
+    });
+
+    const students = dsSinhVien.map(p => ({
+      id: p.sinhVien.id,
+      mssv: p.sinhVien.mssv,
+      ho_ten: p.sinhVien.ho_ten,
+      email: p.sinhVien.email,
+      sdt: p.sinhVien.sdt,
+      truong_nhom: false,
+    }));
+
+    // Sắp xếp theo MSSV
+    students.sort((a, b) => {
+      return a.mssv.localeCompare(b.mssv);
+    });
+
+    return { lecturers, students };
+  }
+
+  private async runBackgroundExtraction(validBaoCaoRef: string) {
+    try {
+      console.log(`[Background AI OCR] Đang tiến hành trích xuất ngầm cho: ${validBaoCaoRef}`);
+      
+      const keyRegex = /^\/api\/upload\/file\/reports\/(.+)$/;
+      const match = validBaoCaoRef.match(keyRegex);
+      if (!match) return;
+
+      const r2Key = match[1];
+
+      // 1. Download file
+      const signedUrl = await this.r2Storage.getSignedUrl(
+        this.r2Storage.BUCKET_REPORTS,
+        r2Key,
+        3600,
+      );
+      
+      const fileRes = await fetch(signedUrl);
+      if (!fileRes.ok) {
+        console.error(`[Background AI OCR] Không thể tải file từ R2: ${fileRes.status}`);
+        return;
+      }
+      
+      const pdfBuffer = await fileRes.arrayBuffer();
+      const fileName = r2Key.split('/').pop() || 'report.pdf';
+
+      // 2. Gọi Python OCR
+      const formData = new FormData();
+      const fileBlob = new Blob([pdfBuffer], { type: 'application/pdf' });
+      formData.append('file', fileBlob, fileName);
+
+      const aiResponse = await fetch('http://127.0.0.1:8000/process-pdf', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (aiResponse.ok) {
+        const aiData = await aiResponse.json();
+        if (aiData.extracted_text) {
+          const extractedText = aiData.extracted_text.trim();
+          console.log(`[Background AI OCR] Trích xuất thành công: ${r2Key}`);
+          
+          // 3. Upload file txt lên R2
+          const txtKey = r2Key.replace(/\.\w+$/, '.txt');
+          const txtBuffer = Buffer.from('\uFEFF' + extractedText, 'utf-8');
+          
+          await this.r2Storage.uploadFile(
+            this.r2Storage.BUCKET_REPORTS,
+            txtKey,
+            txtBuffer,
+            'text/plain; charset=utf-8',
+          );
+        }
+      } else {
+        console.error('[Background AI OCR] Lỗi OCR service:', await aiResponse.text());
+      }
+    } catch (err) {
+      console.error('[Background AI OCR] Lỗi quá trình trích xuất ngầm:', err);
+    }
+  }
 }
+
+
+
+
+

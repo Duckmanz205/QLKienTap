@@ -137,6 +137,20 @@ export class GiangVienController {
     );
   }
 
+  @Post('save-ai-grade')
+  async saveAIGrade(
+    @CurrentUser() user: JwtPayloadUser,
+    @Body() body: GradeReportDto,
+  ) {
+    const gv = await this.gvService.getLecturerByAccountId(user.sub);
+    return this.gvService.saveAIGrade(
+      gv.id,
+      body.reportId,
+      body.score,
+      body.comment || '',
+    );
+  }
+
   @Get('board-sessions')
   async getMyBoardSessions(@CurrentUser() user: JwtPayloadUser) {
     const gv = await this.gvService.getLecturerByAccountId(user.sub);
@@ -169,7 +183,10 @@ export class GiangVienController {
   }
 
   @Post('notifications/:notifId/read')
-  async markNotificationRead(@Param('notifId') notifId: number, @Body('accountId') accountId: number) {
+  async markNotificationRead(
+    @Param('notifId') notifId: number,
+    @Body('accountId') accountId: number,
+  ) {
     return this.gvService.markNotificationRead(accountId, +notifId);
   }
 

@@ -77,6 +77,15 @@ export class SinhVienController {
     return this.svService.getStudentRegisteredTrips(student.id);
   }
 
+  @Get('trip-info/:tripId')
+  async getTripInfo(
+    @CurrentUser() user: JwtPayloadUser,
+    @Param('tripId', ParseIntPipe) tripId: number,
+  ) {
+    const student = await this.svService.getStudentByAccountId(user.sub);
+    return this.svService.getTripInfo(student.id, tripId);
+  }
+
   @Get('proposals')
   async getMyProposals(@CurrentUser() user: JwtPayloadUser) {
     const student = await this.svService.getStudentByAccountId(user.sub);
@@ -156,6 +165,9 @@ export class SinhVienController {
       student.id,
       body.invoiceId,
       body.fileScanUrl,
+      body.nganHangNhan,
+      body.soTaiKhoanNhan,
+      body.tenChuTaiKhoanNhan,
     );
   }
 

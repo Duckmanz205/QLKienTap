@@ -12,6 +12,7 @@ import {
   Length,
   IsArray,
   ArrayNotEmpty,
+  MinLength,
 } from 'class-validator';
 
 export class CreateYearDto {
@@ -243,6 +244,10 @@ export class CreateScheduleDto {
   @IsOptional()
   @IsBoolean()
   isSubmit?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  tai_khoan_thu_huong_id?: number;
 }
 
 export class ImportStudentsDto {
@@ -278,14 +283,17 @@ export class CreateTripDto {
   })
   gio_bat_dau: string;
 
-
   @IsString({ message: 'Hình thức không hợp lệ' })
-  @IsIn(['TrucTiep', 'TrucTuyen'], { message: 'Hình thức phải là TrucTiep hoặc TrucTuyen' })
+  @IsIn(['TrucTiep', 'TrucTuyen'], {
+    message: 'Hình thức phải là TrucTiep hoặc TrucTuyen',
+  })
   hinh_thuc: string;
 
   @IsOptional()
   @IsString({ message: 'Cách tổ chức không hợp lệ' })
-  @IsIn(['DoKhoaToChuc', 'TuDo'], { message: 'Cách tổ chức phải là DoKhoaToChuc hoặc TuDo' })
+  @IsIn(['DoKhoaToChuc', 'TuDo'], {
+    message: 'Cách tổ chức phải là DoKhoaToChuc hoặc TuDo',
+  })
   cach_to_chuc?: string;
 
   @IsInt({ message: 'Sức chứa phải là số' })
@@ -302,9 +310,35 @@ export class CreateTripDto {
   dia_diem_tap_trung?: string;
 
   @IsOptional()
+  @Type(() => Date)
+  @IsDate({ message: 'Hạn đóng lệ phí không hợp lệ' })
+  han_dong_le_phi?: Date;
+
+  @IsOptional()
   @IsString({ message: 'Trạng thái không hợp lệ' })
-  @IsIn(['Nhap', 'ChoDuyet', 'DaDuyet', 'MoDangKy', 'DaChotDanhSach', 'DaDienRa', 'DaHuy'], { message: 'Trạng thái phải thuộc danh sách hợp lệ' })
+  @IsIn(
+    [
+      'Nhap',
+      'ChoDuyet',
+      'DaDuyet',
+      'MoDangKy',
+      'DaChotDanhSach',
+      'DaDienRa',
+      'DaHuy',
+    ],
+    { message: 'Trạng thái phải thuộc danh sách hợp lệ' },
+  )
   trang_thai?: string;
+}
+
+export class CancelTripDto {
+  @IsInt()
+  @Min(1)
+  tripId: number;
+
+  @IsString({ message: 'Lý do hủy không được để trống' })
+  @MinLength(5, { message: 'Lý do hủy phải có ít nhất 5 ký tự' })
+  lyDoHuy: string;
 }
 
 export class ApproveTripDto {
@@ -330,6 +364,11 @@ export class ApproveTripDto {
   @IsOptional()
   @IsString()
   hanhDong?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  giangVienId?: number;
 }
 
 export class ApproveCancelDto {
@@ -377,7 +416,7 @@ export class AssignGvddDto {
 export class CreateBoardDto {
   @IsInt()
   @Min(1)
-  scheduleId: number;
+  dotKienTapId: number;
 
   @IsString()
   @IsNotEmpty({ message: 'Tên hội đồng không được để trống' })
@@ -411,11 +450,7 @@ export class AddBoardMemberDto {
 export class LockGradesDto {
   @IsInt()
   @Min(1)
-  termStudentId: number;
-
-  @IsInt()
-  @Min(1)
-  userId: number;
+  lichKienTapId: number;
 }
 
 export class ApproveRefundDto {

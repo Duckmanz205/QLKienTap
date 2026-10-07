@@ -454,7 +454,7 @@ export class ChuyenThamQuan {
   lichKienTap: LichKienTap;
 
   @Column({ nullable: true })
-  lich_kien_tap_id: number;
+  lich_kien_tap_id: number | null;
 
   @Column({ type: 'date' })
   ngay_tham_quan: Date;
@@ -473,6 +473,9 @@ export class ChuyenThamQuan {
 
   @Column({ type: 'int', default: 0 })
   le_phi: number;
+
+  @Column({ type: 'datetime2', nullable: true })
+  han_dong_le_phi: Date;
 
   @Column({ nullable: true })
   dia_diem_tap_trung: string;
@@ -519,12 +522,12 @@ export class PhieuDeXuatChuyenThamQuan {
   @Column()
   sinh_vien_id: number;
 
-  @ManyToOne(() => LichKienTap)
+  @ManyToOne(() => LichKienTap, { nullable: true })
   @JoinColumn({ name: 'lich_kien_tap_id' })
   lichKienTap: LichKienTap;
 
-  @Column()
-  lich_kien_tap_id: number;
+  @Column({ nullable: true })
+  lich_kien_tap_id: number | null;
 
   @ManyToOne(() => NhaMay, { nullable: true })
   @JoinColumn({ name: 'nha_may_id' })
@@ -704,7 +707,11 @@ export class DanhSachDen {
   @Column()
   so_chuyen_con_lai: number;
 
-  @Column({ type: 'bit', generatedType: 'STORED', asExpression: 'CASE WHEN so_chuyen_con_lai > 0 THEN 1 ELSE 0 END' })
+  @Column({
+    type: 'bit',
+    generatedType: 'STORED',
+    asExpression: 'CASE WHEN so_chuyen_con_lai > 0 THEN 1 ELSE 0 END',
+  })
   con_hieu_luc: boolean;
 }
 
@@ -859,12 +866,12 @@ export class HoiDongChamBaoCao {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => LichKienTap)
-  @JoinColumn({ name: 'lich_kien_tap_id' })
-  lichKienTap: LichKienTap;
+  @ManyToOne(() => DotKienTap)
+  @JoinColumn({ name: 'dot_kien_tap_id' })
+  dotKienTap: DotKienTap;
 
   @Column()
-  lich_kien_tap_id: number;
+  dot_kien_tap_id: number;
 
   @Column()
   ten_hoi_dong: string;

@@ -167,7 +167,9 @@ export class R2StorageService implements OnModuleInit {
     if (!this.isReady()) {
       throw new Error('R2 Storage chưa được cấu hình.');
     }
-    const response = await this.s3!.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+    const response = await this.s3!.send(
+      new GetObjectCommand({ Bucket: bucket, Key: key }),
+    );
     return {
       stream: response.Body,
       contentType: response.ContentType,
