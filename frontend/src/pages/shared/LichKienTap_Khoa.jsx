@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   Plus, ChevronDown, Check, X, Send, MoreVertical, Edit, Trash2, Search
-  Plus, ChevronDown, Check, X, Send, MoreVertical, Edit, Trash2, Search
 } from 'lucide-react';
 import { khoaApi } from '../../services/api';
 import { getValidSession } from '../../utils/auth';
@@ -849,33 +848,16 @@ export default function LichKienTap_Khoa() {
                     </div>
                     <div className="col-span-2 mt-4">
                       <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Tài khoản thụ hưởng <span className="text-red-500">*</span></label>
-                      <select 
+                      <SearchableDropdown
+                        options={taiKhoanConfigs.map(tk => ({
+                          value: tk.id,
+                          label: `${tk.ghi_chu ? `[${tk.ghi_chu}] ` : ''}${tk.ten_ngan_hang} - ${tk.so_tai_khoan} - ${tk.ten_chu_tai_khoan}`
+                        }))}
                         value={createForm.tai_khoan_thu_huong_id}
-                        onChange={e => setCreateForm({...createForm, tai_khoan_thu_huong_id: e.target.value})}
-                        className="w-full px-4 py-2 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] bg-white"
-                      >
-                        <option value="">Chọn tài khoản VietQR...</option>
-                        {taiKhoanConfigs.map(tk => (
-                          <option key={tk.id} value={tk.id}>
-                            {tk.ghi_chu ? `[${tk.ghi_chu}] ` : ''}{tk.ten_ngan_hang} - {tk.so_tai_khoan} - {tk.ten_chu_tai_khoan}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="col-span-2 mt-4">
-                      <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Tài khoản thụ hưởng <span className="text-red-500">*</span></label>
-                      <SearchableDropdown 
-                        value={createForm.tai_khoan_thu_huong_id}
-                        onChange={val => setCreateForm({...createForm, tai_khoan_thu_huong_id: val})}
-                        options={[
-                          { value: '', label: 'Chọn tài khoản VietQR...' },
-                          ...taiKhoanConfigs.map(tk => ({
-                            value: tk.id,
-                            label: `${tk.ghi_chu ? `[${tk.ghi_chu}] ` : ''}${tk.ten_ngan_hang} - ${tk.so_tai_khoan} - ${tk.ten_chu_tai_khoan}`
-                          }))
-                        ]}
+                        onChange={(val) => setCreateForm({...createForm, tai_khoan_thu_huong_id: val})}
+                        placeholder="Chọn tài khoản VietQR..."
+                        searchPlaceholder="Tìm kiếm..."
                         className="w-full"
-                        searchPlaceholder="Tìm tài khoản..."
                       />
                     </div>
                   </div>

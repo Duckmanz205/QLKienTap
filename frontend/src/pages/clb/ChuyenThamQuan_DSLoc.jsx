@@ -1606,18 +1606,17 @@ export default function ChuyenThamQuan_DSLoc() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Giảng viên dẫn đoàn <span className="text-red-500">*</span>
                   </label>
-                  <select
+                  <SearchableDropdown
+                    options={lecturers.map(gv => ({
+                      value: gv.id,
+                      label: `${gv.ten_giang_vien} - ${gv.bo_mon}`
+                    }))}
                     value={selectedLecturerId}
-                    onChange={(e) => setSelectedLecturerId(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#407F3E]/20 focus:border-[#407F3E] transition-all bg-white text-gray-700"
-                  >
-                    <option value="">-- Chọn giảng viên --</option>
-                    {lecturers.map(gv => (
-                      <option key={gv.id} value={gv.id}>
-                        {gv.ten_giang_vien} - {gv.bo_mon}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setSelectedLecturerId(val)}
+                    placeholder="-- Chọn giảng viên --"
+                    searchPlaceholder="Tìm kiếm..."
+                    className="w-full"
+                  />
                 </div>
               </div>
             </div>

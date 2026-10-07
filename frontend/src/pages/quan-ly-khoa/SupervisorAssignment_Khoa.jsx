@@ -816,19 +816,21 @@ export default function SupervisorAssignment_Khoa() {
                     <div className="bg-[#F8F9FA] px-4 py-3 border-t border-[#E7E0C4]/50 flex items-center justify-between text-xs shrink-0">
                       <div className="flex items-center gap-2 text-slate-600 font-medium">
                         Hiển thị 
-                        <select 
-                          className="border border-slate-200 rounded px-1.5 py-1 bg-white focus:outline-none focus:border-[#407F3E]"
+                        <SearchableDropdown
+                          options={[
+                            { value: 10, label: '10' },
+                            { value: 30, label: '30' },
+                            { value: 50, label: '50' },
+                            { value: 100, label: '100' }
+                          ]}
                           value={autoAssignLimit}
-                          onChange={(e) => {
-                            setAutoAssignLimit(Number(e.target.value));
+                          onChange={(val) => {
+                            setAutoAssignLimit(Number(val));
                             setAutoAssignCurrentPage(1);
                           }}
-                        >
-                          <option value={10}>10</option>
-                          <option value={30}>30</option>
-                          <option value={50}>50</option>
-                          <option value={100}>100</option>
-                        </select>
+                          searchPlaceholder="Tìm..."
+                          className="min-w-[80px]"
+                        />
                         / {filteredAutoAssign.length} sinh viên
                       </div>
                       <div className="flex items-center gap-1.5">

@@ -364,10 +364,52 @@ TRANG 38
 
   const handleSelectReport = async (report) => {
     setSelectedReport(report);
-    setScore(report.diem_thu_hoach !== null ? report.diem_thu_hoach : (report.diem_ai_de_xuat !== null ? report.diem_ai_de_xuat : ''));
-    setComments(report.nhan_xet_cua_giang_vien || report.nhan_xet_thu_hoach || '');
-    setScore(report.diem_thu_hoach !== null ? report.diem_thu_hoach : (report.diem_ai_de_xuat !== null ? report.diem_ai_de_xuat : ''));
-    setComments(report.nhan_xet_cua_giang_vien || report.nhan_xet_thu_hoach || '');
+    
+    // 1. Chỉ hiển thị điểm và nhận xét giảng viên nếu giảng viên ĐÃ chấm (diem_thu_hoach khác null)
+    setScore(report.diem_thu_hoach !== null ? report.diem_thu_hoach : '');
+    setComments(report.diem_thu_hoach !== null ? (report.nhan_xet_cua_giang_vien || report.nhan_xet_thu_hoach || '') : '');
+
+    // 2. Tái tạo lại dữ liệu AI để nạp vào mục AI (ẩn nút Chấm tự động và hiện form AI)
+    if (report.diem_ai_de_xuat !== null) {
+      // Vì DB dùng chung cột nhan_xet_thu_hoach, nếu GV chưa chấm thì nhận xét đó chính là của AI
+      let aiCommentStr = report.diem_thu_hoach === null 
+          ? (report.nhan_xet_cua_giang_vien || report.nhan_xet_thu_hoach || '')
+          : "Chi tiết nhận xét AI đã bị ghi đè khi giảng viên lưu điểm.";
+          
+      // Bóc tách text AI thành các phần theo cấu trúc lưu trong handleBulkAiGrading
+      let hinhThuc = "", tongQuan = "", quyTrinh = "", vsattp = "";
+      try {
+        const parts = aiCommentStr.split(/(?=\d\.\s)/);
+        parts.forEach(p => {
+          if (p.startsWith('1. Hình thức:')) hinhThuc = p.replace('1. Hình thức:', '').trim();
+          if (p.startsWith('2. Tổng quan:')) tongQuan = p.replace('2. Tổng quan:', '').trim();
+          if (p.startsWith('3. Quy trình:')) quyTrinh = p.replace('3. Quy trình:', '').trim();
+          if (p.startsWith('4. VSATTP:')) vsattp = p.replace('4. VSATTP:', '').trim();
+        });
+      } catch(e) {}
+
+      // Cập nhật state AI Result để component render lên form chi tiết của AI
+      setAiGradingResult({
+        diem_bao_cao_cuoi_cung: report.diem_ai_de_xuat,
+        hinh_thuc_tong_quan: {
+          diem_hinh_thuc: 'N/A', // AI Hàng loạt không lưu điểm thành phần trong DB
+          ly_do_hinh_thuc: hinhThuc || aiCommentStr,
+          diem_tong_quan: 'N/A',
+          ly_do_tong_quan: tongQuan || 'N/A'
+        },
+        quy_trinh_cong_nghe: {
+          diem_quy_trinh: 'N/A',
+          ly_do_quy_trinh: quyTrinh || 'N/A'
+        },
+        vsattp: {
+          diem_vsattp: 'N/A',
+          ly_do_vsattp: vsattp || 'N/A'
+        }
+      });
+    } else {
+      // Nếu chưa có điểm AI, reset mục AI để hiện nút "Chấm tự động"
+      setAiGradingResult(null);
+    }
 
     if (report.file_bao_cao) {
       setIsLoadingText(true);
@@ -458,35 +500,9 @@ TRANG 38
     return Array.from(tripsMap.entries()).map(([id, name]) => ({ id, name }));
   }, [reports, selectedDotId]);
 
-  const uniqueDots = React.useMemo(() => {
-    const dotsMap = new Map();
-    reports.forEach(r => {
-      const ctq = r.phieuThamQuan?.phieuDangKy?.chuyenThamQuan || r.phieuDangKy?.chuyenThamQuan;
-      const dot = ctq?.lichKienTap?.dotKienTap;
-      if (dot) {
-        dotsMap.set(dot.id, dot.ten_dot);
-      }
-    });
-    return Array.from(dotsMap.entries()).map(([id, name]) => ({ id, name }));
-  }, [reports]);
-
-  const uniqueTrips = React.useMemo(() => {
-    const tripsMap = new Map();
-    reports.forEach(r => {
-      const ctq = r.phieuThamQuan?.phieuDangKy?.chuyenThamQuan || r.phieuDangKy?.chuyenThamQuan;
-      const dot = ctq?.lichKienTap?.dotKienTap;
-      if (ctq && (selectedDotId === 'ALL' || (dot && dot.id === selectedDotId))) {
-        tripsMap.set(ctq.id, ctq.nhaMay?.ten_nha_may || 'Chuyến đi không tên');
-      }
-    });
-    return Array.from(tripsMap.entries()).map(([id, name]) => ({ id, name }));
-  }, [reports, selectedDotId]);
-
   const filteredReports = reports.filter(r => {
     const ctq = r.phieuThamQuan?.phieuDangKy?.chuyenThamQuan || r.phieuDangKy?.chuyenThamQuan;
-    const ctq = r.phieuThamQuan?.phieuDangKy?.chuyenThamQuan || r.phieuDangKy?.chuyenThamQuan;
     const sv = r.phieuThamQuan?.phieuDangKy?.sinhVien || r.phieuDangKy?.sinhVien || {};
-    const nhaMay = ctq?.nhaMay?.ten_nha_may || '';
     const nhaMay = ctq?.nhaMay?.ten_nha_may || '';
     const matchSearch = !searchTerm || 
       (sv.ho_ten && sv.ho_ten.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -502,29 +518,10 @@ TRANG 38
     const matchTrip = selectedTripId === 'ALL' || ctq?.id === selectedTripId;
 
     return matchSearch && matchStatus && matchDot && matchTrip;
-    const matchDot = selectedDotId === 'ALL' || ctq?.lichKienTap?.dotKienTap?.id === selectedDotId;
-    const matchTrip = selectedTripId === 'ALL' || ctq?.id === selectedTripId;
-
-    return matchSearch && matchStatus && matchDot && matchTrip;
   });
 
   const totalPages = Math.ceil(filteredReports.length / limit) || 1;
   const paginatedReports = filteredReports.slice((currentPage - 1) * limit, currentPage * limit);
-
-  const groupedPaginatedReports = React.useMemo(() => {
-    const groups = {};
-    paginatedReports.forEach(report => {
-      const ctq = report.phieuThamQuan?.phieuDangKy?.chuyenThamQuan || report.phieuDangKy?.chuyenThamQuan;
-      const tripId = ctq?.id || 'unknown';
-      const nhaMay = ctq?.nhaMay?.ten_nha_may || 'Chuyến đi khác';
-      
-      if (!groups[tripId]) {
-        groups[tripId] = { nhaMay, reports: [] };
-      }
-      groups[tripId].reports.push(report);
-    });
-    return groups;
-  }, [paginatedReports]);
 
   const groupedPaginatedReports = React.useMemo(() => {
     const groups = {};
@@ -590,37 +587,7 @@ TRANG 38
         ))}
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-6 border-b border-[#E7E0C4] px-2 mb-6 mt-4">
-        {[
-          { id: 'ALL', label: 'Tất cả bài nộp', count: reports.length },
-          { id: 'PENDING', label: 'Chờ chấm', count: reports.filter(r => r.diem_thu_hoach === null).length },
-          { id: 'GRADED', label: 'Đã chấm', count: reports.filter(r => r.diem_thu_hoach !== null).length }
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => {
-              setSelectedStatus(tab.id);
-              setCurrentPage(1);
-            }}
-            className={`pb-3 text-sm font-bold transition-all relative ${
-              selectedStatus === tab.id 
-                ? 'text-[#407F3E]' 
-                : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            {tab.label} <span className={`ml-1.5 px-2 py-0.5 rounded-full text-xs ${selectedStatus === tab.id ? 'bg-[#407F3E]/10 text-[#407F3E]' : 'bg-slate-100 text-slate-500'}`}>{tab.count}</span>
-            {selectedStatus === tab.id && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#407F3E] rounded-t-full" />
-            )}
-          </button>
-        ))}
-      </div>
-
       {/* Filter Bar */}
-      <div className="bg-white p-4 rounded-xl border border-[#E7E0C4] shadow-sm flex flex-col md:flex-row items-center justify-between gap-4 mb-4">
-        <div className="flex-1 w-full flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1 min-w-[200px]">
       <div className="bg-white p-4 rounded-xl border border-[#E7E0C4] shadow-sm flex flex-col md:flex-row items-center justify-between gap-4 mb-4">
         <div className="flex-1 w-full flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1 min-w-[200px]">
@@ -628,13 +595,11 @@ TRANG 38
             <input
               type="text"
               placeholder="Tìm sinh viên, MSSV..."
-              placeholder="Tìm sinh viên, MSSV..."
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full pl-9 pr-4 py-2 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E] bg-slate-50/50 transition-colors hover:bg-white"
               className="w-full pl-9 pr-4 py-2 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E] bg-slate-50/50 transition-colors hover:bg-white"
             />
           </div>
@@ -643,74 +608,7 @@ TRANG 38
             <div 
               onClick={() => { setIsDotDropdownOpen(!isDotDropdownOpen); setIsTripDropdownOpen(false); }}
               className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isDotDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-          {/* Dot Kien Tap Dropdown */}
-          <div className="relative min-w-[160px] w-full sm:w-48" onClick={(e) => e.stopPropagation()}>
-            <div 
-              onClick={() => { setIsDotDropdownOpen(!isDotDropdownOpen); setIsTripDropdownOpen(false); }}
-              className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isDotDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
             >
-              <span className="truncate pr-2 font-medium text-slate-700">
-                {selectedDotId === 'ALL' ? 'Tất cả đợt' : uniqueDots.find(d => d.id === selectedDotId)?.name || 'Đợt kiến tập'}
-              </span>
-              <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-            </div>
-            {isDotDropdownOpen && (
-              <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[220px]">
-                <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
-                  <input 
-                    type="text" 
-                    placeholder="Tìm đợt..." 
-                    value={searchDotDropdown}
-                    onChange={(e) => setSearchDotDropdown(e.target.value)}
-                    onClick={(e) => e.stopPropagation()}
-                    className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
-                  />
-                </div>
-                <div className="max-h-60 overflow-y-auto">
-                  <div 
-                    onClick={() => { setSelectedDotId('ALL'); setSelectedTripId('ALL'); setIsDotDropdownOpen(false); setSearchDotDropdown(''); setCurrentPage(1); }}
-                    className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                      selectedDotId === 'ALL' ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
-                    }`}
-                  >
-                    <span>Tất cả đợt</span>
-                    {selectedDotId === 'ALL' && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                  </div>
-                  {uniqueDots
-                    .filter(d => d.name.toLowerCase().includes(searchDotDropdown.toLowerCase()))
-                    .map(d => (
-                    <div 
-                      key={d.id}
-                      onClick={() => { setSelectedDotId(d.id); setSelectedTripId('ALL'); setIsDotDropdownOpen(false); setSearchDotDropdown(''); setCurrentPage(1); }}
-                      className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                        selectedDotId === d.id ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
-                      }`}
-                    >
-                      <span className="truncate pr-2">{d.name}</span>
-                      {selectedDotId === d.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                    </div>
-                  ))}
-                  {uniqueDots.filter(d => d.name.toLowerCase().includes(searchDotDropdown.toLowerCase())).length === 0 && (
-                    <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy đợt</div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-          
-          {/* Trip Dropdown */}
-          <div className="relative min-w-[200px] w-full sm:w-56" onClick={(e) => e.stopPropagation()}>
-            <div 
-              onClick={() => { setIsTripDropdownOpen(!isTripDropdownOpen); setIsDotDropdownOpen(false); }}
-              className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isTripDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-            >
-              <span className="truncate pr-2 font-medium text-slate-700">
-                {selectedTripId === 'ALL' ? 'Tất cả chuyến đi' : uniqueTrips.find(t => t.id === selectedTripId)?.name || 'Chuyến đi'}
-              </span>
-              <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-            </div>
-            {isTripDropdownOpen && (
-              <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[250px]">
               <span className="truncate pr-2 font-medium text-slate-700">
                 {selectedDotId === 'ALL' ? 'Tất cả đợt' : uniqueDots.find(d => d.id === selectedDotId)?.name || 'Đợt kiến tập'}
               </span>
@@ -779,39 +677,11 @@ TRANG 38
                     placeholder="Tìm chuyến đi..." 
                     value={searchTripDropdown}
                     onChange={(e) => setSearchTripDropdown(e.target.value)}
-                    placeholder="Tìm chuyến đi..." 
-                    value={searchTripDropdown}
-                    onChange={(e) => setSearchTripDropdown(e.target.value)}
                     onClick={(e) => e.stopPropagation()}
                     className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
                   />
                 </div>
                 <div className="max-h-60 overflow-y-auto">
-                  <div 
-                    onClick={() => { setSelectedTripId('ALL'); setIsTripDropdownOpen(false); setSearchTripDropdown(''); setCurrentPage(1); }}
-                    className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                      selectedTripId === 'ALL' ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
-                    }`}
-                  >
-                    <span>Tất cả chuyến đi</span>
-                    {selectedTripId === 'ALL' && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                  </div>
-                  {uniqueTrips
-                    .filter(t => t.name.toLowerCase().includes(searchTripDropdown.toLowerCase()))
-                    .map(t => (
-                    <div 
-                      key={t.id}
-                      onClick={() => { setSelectedTripId(t.id); setIsTripDropdownOpen(false); setSearchTripDropdown(''); setCurrentPage(1); }}
-                      className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                        selectedTripId === t.id ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
-                      }`}
-                    >
-                      <span className="truncate pr-2">{t.name}</span>
-                      {selectedTripId === t.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                    </div>
-                  ))}
-                  {uniqueTrips.filter(t => t.name.toLowerCase().includes(searchTripDropdown.toLowerCase())).length === 0 && (
-                    <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy chuyến đi</div>
                   <div 
                     onClick={() => { setSelectedTripId('ALL'); setIsTripDropdownOpen(false); setSearchTripDropdown(''); setCurrentPage(1); }}
                     className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
@@ -843,19 +713,6 @@ TRANG 38
             )}
           </div>
         </div>
-        <div className="flex items-center gap-4 shrink-0">
-          {selectedReportIds.length > 0 && (
-            <button
-              onClick={handleBulkAiGrading}
-              className="px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white text-sm font-bold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer"
-            >
-              <Sparkles className="w-4 h-4" />
-              Chấm AI ({selectedReportIds.length})
-            </button>
-          )}
-          <div className="text-xs text-slate-500 font-medium">
-            Đang hiển thị: <span className="font-bold text-[#407F3E]">{filteredReports.length}</span> bài
-          </div>
         <div className="flex items-center gap-4 shrink-0">
           {selectedReportIds.length > 0 && (
             <button
@@ -873,16 +730,7 @@ TRANG 38
       </div>
 
       {/* Table of Reports */}
-      {/* Table of Reports */}
       {paginatedReports.length === 0 ? (
-        <div className="p-12 text-center flex flex-col items-center justify-center bg-white rounded-2xl border border-[#E7E0C4] border-dashed">
-          <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-            <FileText className="w-8 h-8 text-slate-300" />
-          </div>
-          <h3 className="text-lg font-bold text-slate-700 mb-1">Chưa có dữ liệu</h3>
-          <p className="text-sm text-slate-500 max-w-sm">
-            {reports.length === 0 ? 'Hiện chưa có bài thu hoạch nào được nộp.' : 'Không tìm thấy bài thu hoạch nào phù hợp với bộ lọc.'}
-          </p>
         <div className="p-12 text-center flex flex-col items-center justify-center bg-white rounded-2xl border border-[#E7E0C4] border-dashed">
           <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
             <FileText className="w-8 h-8 text-slate-300" />
@@ -988,130 +836,7 @@ TRANG 38
                           </div>
                         </div>
                       </td>
-        <div className="bg-white border border-[#E7E0C4] rounded-2xl shadow-sm overflow-hidden mb-6">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[800px]">
-              <thead>
-                <tr className="bg-slate-50 border-b border-[#E7E0C4] text-xs uppercase tracking-wider text-slate-500 font-bold">
-                  <th className="px-6 py-4 w-12 text-center">
-                    <input 
-                      type="checkbox" 
-                      className="w-4 h-4 text-[#407F3E] rounded border-slate-300 focus:ring-[#407F3E] cursor-pointer"
-                      checked={paginatedReports.length > 0 && paginatedReports.filter(r => r.diem_thu_hoach === null).length > 0 && selectedReportIds.length >= paginatedReports.filter(r => r.diem_thu_hoach === null).length}
-                      onChange={(e) => {
-                        const pendingIds = paginatedReports.filter(r => r.diem_thu_hoach === null).map(r => r.id);
-                        if (e.target.checked) {
-                          setSelectedReportIds(Array.from(new Set([...selectedReportIds, ...pendingIds])));
-                        } else {
-                          setSelectedReportIds(selectedReportIds.filter(id => !pendingIds.includes(id)));
-                        }
-                      }}
-                    />
-                  </th>
-                  <th className="px-6 py-4 w-1/3">Sinh viên</th>
-                  <th className="px-6 py-4 w-1/3">Bài nộp</th>
-                  <th className="px-6 py-4 text-right">Trạng thái</th>
-                  <th className="px-6 py-4 text-center w-16"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E7E0C4]">
-                {Object.values(groupedPaginatedReports).map((group, groupIdx) => (
-                  <React.Fragment key={groupIdx}>
-                    <tr className="bg-slate-100/50 border-y border-[#E7E0C4]">
-                      <td colSpan="5" className="px-6 py-2.5">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-700 text-sm">{group.nhaMay}</span>
-                          <span className="px-2 py-0.5 rounded-full bg-[#E7E0C4]/50 text-slate-600 text-[10px] uppercase font-bold tracking-wider">
-                            {group.reports.length} bài
-                          </span>
-                        </div>
-                      </td>
-                    </tr>
-                    {group.reports.map((report) => {
-                      const isGraded = report.diem_thu_hoach !== null;
-                      const sv = report.phieuThamQuan?.phieuDangKy?.sinhVien || report.phieuDangKy?.sinhVien || {};
-                      
-                      // Tạo avatar chữ cái
-                      const initial = sv.ho_ten ? sv.ho_ten.charAt(0).toUpperCase() : 'U';
-                      const avatarColors = [
-                        'bg-blue-100 text-blue-700', 
-                        'bg-green-100 text-green-700', 
-                        'bg-purple-100 text-purple-700', 
-                        'bg-orange-100 text-orange-700', 
-                        'bg-pink-100 text-pink-700'
-                      ];
-                      const avatarColor = avatarColors[(sv.mssv || '0').charCodeAt(0) % avatarColors.length];
 
-                  return (
-                    <tr 
-                      key={report.id}
-                      onClick={() => handleSelectReport(report)}
-                      className="hover:bg-slate-50 transition-colors cursor-pointer group"
-                    >
-                      <td className="px-6 py-4 text-center" onClick={e => e.stopPropagation()}>
-                        <input 
-                          type="checkbox" 
-                          className="w-4 h-4 text-[#407F3E] rounded border-slate-300 focus:ring-[#407F3E] disabled:opacity-50 cursor-pointer"
-                          disabled={isGraded}
-                          checked={selectedReportIds.includes(report.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) setSelectedReportIds([...selectedReportIds, report.id]);
-                            else setSelectedReportIds(selectedReportIds.filter(id => id !== report.id));
-                          }}
-                        />
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-lg shrink-0 ${avatarColor}`}>
-                            {initial}
-                          </div>
-                          <div>
-                            <p className="text-sm font-bold text-slate-800 group-hover:text-[#407F3E] transition-colors">{sv.ho_ten}</p>
-                            <p className="text-[11px] font-medium text-slate-500">{sv.mssv}</p>
-                          </div>
-                        </div>
-                      </td>
-                      
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0 border border-red-100">
-                            <FileText className="w-4 h-4 text-red-500" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-bold text-slate-700 truncate max-w-[150px]">{report.file_url_bao_cao || 'BaoCao.pdf'}</p>
-                            <p className="text-[10px] font-medium text-slate-400 mt-0.5">{new Date(report.ngay_nop).toLocaleDateString('vi-VN')}</p>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td className="px-6 py-4 text-right">
-                        {isGraded ? (
-                          <div className="flex flex-col items-end">
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-[#89B449]/10 text-[#407F3E]">
-                              <CheckCircle2 className="w-3.5 h-3.5" /> Đã chấm
-                            </span>
-                            <span className="text-[13px] font-black text-slate-800 mt-1.5">{report.diem_thu_hoach}/10</span>
-                          </div>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-[#DBD468]/20 text-[#B8A31D] shadow-sm">
-                            <div className="w-1.5 h-1.5 rounded-full bg-[#B8A31D] animate-pulse"></div> Chờ chấm
-                          </span>
-                        )}
-                      </td>
-
-                      <td className="px-6 py-4 text-center">
-                        <button className="w-8 h-8 rounded-full flex items-center justify-center text-slate-300 group-hover:bg-[#407F3E] group-hover:text-white transition-all ml-auto">
-                          <ChevronRight className="w-5 h-5" />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-                  </React.Fragment>
-                ))}
-              </tbody>
-            </table>
-          </div>
                       <td className="px-6 py-4 text-right">
                         {isGraded ? (
                           <div className="flex flex-col items-end">
@@ -1260,7 +985,6 @@ TRANG 38
             {/* Student Info Card */}
             <div className="bg-white rounded-xl p-4 border border-[#E7E0C4] shadow-sm flex items-start gap-3">
 
-
               <div>
                 <h3 className="font-bold text-slate-800 text-sm leading-tight mb-1">{sv.ho_ten}</h3>
                 <p className="text-[11px] font-medium text-slate-500 mb-1">MSSV: {sv.mssv}</p>
@@ -1381,10 +1105,6 @@ TRANG 38
       className={selectedReport ? '' : 'bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300'}
       onClick={() => { setIsTripDropdownOpen(false); setIsDotDropdownOpen(false); }}
     >
-    <div 
-      className={selectedReport ? '' : 'bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300'}
-      onClick={() => { setIsTripDropdownOpen(false); setIsDotDropdownOpen(false); }}
-    >
       {selectedReport ? renderGradingView() : renderReportList()}
 
       {/* AI Grading Details Modal */}
@@ -1474,7 +1194,6 @@ TRANG 38
                     </div>
                     <p className="text-sm text-slate-600">{aiGradingResult.vsattp.ly_do_vsattp}</p>
                   </div>
-
 
                 </div>
               </div>
