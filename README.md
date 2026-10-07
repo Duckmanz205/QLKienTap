@@ -101,7 +101,7 @@ Hệ thống quản lý toàn diện quy trình kiến tập nhà máy dành cho
 | Chức năng | Mô tả |
 | :--- | :--- |
 | Dashboard | Thống kê tổng quan (SV, GV, nhà máy, đợt KT) |
-| Danh mục nền | Quản lý năm học, học kỳ, khóa |
+| Danh mục | Quản lý năm học, học kỳ, khóa |
 | Quản lý sinh viên | Import, xem, quản lý danh sách sinh viên |
 | Quản lý giảng viên | Xem danh sách giảng viên |
 | Quản lý nhà máy | CRUD nhà máy / đơn vị hợp tác |
@@ -229,7 +229,7 @@ Hệ thống sử dụng **33 bảng** trên SQL Server, được định nghĩa
 
 | Nhóm | Bảng | Mô tả |
 | :--- | :--- | :--- |
-| **Danh mục nền** | NamHoc, HocKy, Khoa | Năm học, học kỳ, khóa sinh viên |
+| **Danh mục** | NamHoc, HocKy, Khoa | Năm học, học kỳ, khóa sinh viên |
 | **Người dùng** | TaiKhoan, SinhVien, GiangVien | Tài khoản đăng nhập & thông tin cá nhân |
 | **Kiến tập** | DotKienTap, LichKienTap, LichKienTap_SinhVien | Đợt kiến tập, lịch & đăng ký SV |
 | **Tham quan** | NhaMay, ChuyenThamQuan, ChuyenThamQuan_GiangVienDanDoan | Nhà máy, chuyến tham quan, GV dẫn đoàn |
