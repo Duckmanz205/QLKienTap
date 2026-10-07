@@ -535,19 +535,18 @@ export default function HoiDongChamBaoCao_Khoa() {
                           return (
                             <div key={m.id} className="flex items-center justify-between p-2 bg-slate-50 border border-[#E7E0C4] rounded-lg">
                               <span className="text-sm font-semibold text-slate-800">{lec?.ho_ten}</span>
-                              <SearchableDropdown
-                                options={[
-                                  { value: 'Chủ tịch', label: 'Chủ tịch' },
-                                  { value: 'Thư ký', label: 'Thư ký' },
-                                  { value: 'Thành viên', label: 'Thành viên' }
-                                ]}
+                              <select
                                 value={m.role}
-                                onChange={(newRole) => {
+                                onChange={(e) => {
+                                  const newRole = e.target.value;
                                   setSelectedMembers(selectedMembers.map(item => item.id === m.id ? { ...item, role: newRole } : item));
                                 }}
-                                searchPlaceholder="Tìm vai trò..."
-                                className="min-w-[120px]"
-                              />
+                                className="text-xs px-2 py-1.5 border border-slate-200 rounded font-bold text-slate-700 bg-white focus:outline-none focus:border-[#407F3E]"
+                              >
+                                <option value="Chủ tịch">Chủ tịch</option>
+                                <option value="Thư ký">Thư ký</option>
+                                <option value="Thành viên">Thành viên</option>
+                              </select>
                             </div>
                           );
                         })}

@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import { GiangVienController } from './giang-vien.controller';
 import { GiangVienService } from './giang-vien.service';
+import { UploadModule } from '../upload/upload.module';
 import {
   GiangVien,
   DotKienTap_SinhVien,
@@ -41,6 +42,7 @@ import {
       ThongBao,
     ]),
     AuthModule,
+    UploadModule,
   ],
   controllers: [GiangVienController],
   providers: [GiangVienService],

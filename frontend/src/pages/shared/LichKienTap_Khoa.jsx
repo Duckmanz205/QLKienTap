@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   Plus, ChevronDown, Check, X, Send, MoreVertical, Edit, Trash2, Search
+  Plus, ChevronDown, Check, X, Send, MoreVertical, Edit, Trash2, Search
 } from 'lucide-react';
 import { khoaApi } from '../../services/api';
 import { getValidSession } from '../../utils/auth';
@@ -16,6 +17,7 @@ export default function LichKienTap_Khoa() {
   const [schedules, setSchedules] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   const [factories, setFactories] = useState([]);
+  const [taiKhoanConfigs, setTaiKhoanConfigs] = useState([]);
   const [taiKhoanConfigs, setTaiKhoanConfigs] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -79,11 +81,13 @@ export default function LichKienTap_Khoa() {
     tg_mo_dang_ky_tu: '',
     tg_mo_dang_ky_den: '',
       tai_khoan_thu_huong_id: '',
+      tai_khoan_thu_huong_id: '',
   });  // Trip Table States for Modal
   const [tripPage, setTripPage] = useState(1);
   const [tripPageSize, setTripPageSize] = useState(15);
   const [tripFilterNhaMay, setTripFilterNhaMay] = useState('');
   const [tripFilterHinhThuc, setTripFilterHinhThuc] = useState('');
+  const [tripSearchTerm, setTripSearchTerm] = useState('');
   const [tripSearchTerm, setTripSearchTerm] = useState('');
   const [viewingTripDetail, setViewingTripDetail] = useState(null);
   const [isTripFactoryDropdownOpen, setIsTripFactoryDropdownOpen] = useState(false);
@@ -104,6 +108,7 @@ export default function LichKienTap_Khoa() {
   const [dotSearchTermModal, setDotSearchTermModal] = useState('');
   const [unassignedTrips, setUnassignedTrips] = useState([]);
   const [allTrips, setAllTrips] = useState([]);
+  const [allTrips, setAllTrips] = useState([]);
   const [selectedTripIds, setSelectedTripIds] = useState([]);
 
   useEffect(() => {
@@ -114,14 +119,23 @@ export default function LichKienTap_Khoa() {
     try {
       const [schRes, campRes, tripRes, factoryRes, tkRes] = await Promise.all([
         khoaApi.getSchedules({ excludeInactive: false }),
+      const [schRes, campRes, tripRes, factoryRes, tkRes] = await Promise.all([
+        khoaApi.getSchedules({ excludeInactive: false }),
         khoaApi.getCampaigns(),
         khoaApi.getTrips({ status: 'Nhap' }),
+        khoaApi.getFactories(),
+          khoaApi.getTaiKhoanThuHuong()
         khoaApi.getFactories(),
           khoaApi.getTaiKhoanThuHuong()
       ]);
       setSchedules(schRes.data?.data || schRes.data || []);
       setCampaigns(campRes.data?.data || campRes.data || []);
       setFactories(factoryRes.data?.data || factoryRes.data || []);
+        setTaiKhoanConfigs(tkRes.data?.data || tkRes.data || []);
+      
+      const allTripsData = tripRes.data?.data || tripRes.data || [];
+      setAllTrips(allTripsData);
+      setUnassignedTrips(allTripsData.filter(t => t.trang_thai === 'Nhap' && !t.lich_kien_tap_id));
         setTaiKhoanConfigs(tkRes.data?.data || tkRes.data || []);
       
       const allTripsData = tripRes.data?.data || tripRes.data || [];
@@ -189,7 +203,14 @@ export default function LichKienTap_Khoa() {
       tg_mo_dang_ky_tu: s.tg_mo_dang_ky_tu ? new Date(new Date(s.tg_mo_dang_ky_tu).getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 10) : '',
       tai_khoan_thu_huong_id: s.tai_khoan_thu_huong_id || '',
         tg_mo_dang_ky_den: s.tg_mo_dang_ky_den ? new Date(new Date(s.tg_mo_dang_ky_den).getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 10) : '',
+      tg_mo_dang_ky_tu: s.tg_mo_dang_ky_tu ? new Date(new Date(s.tg_mo_dang_ky_tu).getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 10) : '',
+      tai_khoan_thu_huong_id: s.tai_khoan_thu_huong_id || '',
+        tg_mo_dang_ky_den: s.tg_mo_dang_ky_den ? new Date(new Date(s.tg_mo_dang_ky_den).getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 10) : '',
     });
+    
+    // Set checked state for trips already assigned to this schedule
+    const assignedTripIds = allTrips.filter(t => t.lich_kien_tap_id === s.id).map(t => t.id);
+    setSelectedTripIds(assignedTripIds);
     
     // Set checked state for trips already assigned to this schedule
     const assignedTripIds = allTrips.filter(t => t.lich_kien_tap_id === s.id).map(t => t.id);
@@ -216,6 +237,7 @@ export default function LichKienTap_Khoa() {
 
   const handleFinalSubmit = async () => {
     if (!createForm.ten_lich || !createForm.dot_kien_tap_id || !createForm.tg_mo_dang_ky_tu || !createForm.tg_mo_dang_ky_den || !createForm.so_luong_du_kien || !createForm.tai_khoan_thu_huong_id) {
+    if (!createForm.ten_lich || !createForm.dot_kien_tap_id || !createForm.tg_mo_dang_ky_tu || !createForm.tg_mo_dang_ky_den || !createForm.so_luong_du_kien || !createForm.tai_khoan_thu_huong_id) {
       showToast('Vui lòng điền đầy đủ các thông tin lịch (có dấu *)', 'error');
       return;
     }
@@ -232,6 +254,13 @@ export default function LichKienTap_Khoa() {
     setIsCreating(true);
     try {
       const payload = {
+          ...createForm,
+          dot_kien_tap_id: Number(createForm.dot_kien_tap_id),
+          so_luong_du_kien: Number(createForm.so_luong_du_kien),
+          tai_khoan_thu_huong_id: Number(createForm.tai_khoan_thu_huong_id),
+          tg_mo_dang_ky_tu: tuString,
+          tg_mo_dang_ky_den: denString,
+        };
           ...createForm,
           dot_kien_tap_id: Number(createForm.dot_kien_tap_id),
           so_luong_du_kien: Number(createForm.so_luong_du_kien),
@@ -333,23 +362,30 @@ export default function LichKienTap_Khoa() {
       case 'Nháp':
       case 'Nhap':
         return <span className="inline-flex whitespace-nowrap items-center px-3 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200">Nháp</span>;
+        return <span className="inline-flex whitespace-nowrap items-center px-3 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200">Nháp</span>;
       case 'Chờ duyệt':
       case 'ChoDuyet':
+        return <span className="inline-flex whitespace-nowrap items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#E68A8C]/20 text-[#E68A8C] border border-[#E68A8C]/30 shadow-sm">Chờ duyệt</span>;
         return <span className="inline-flex whitespace-nowrap items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#E68A8C]/20 text-[#E68A8C] border border-[#E68A8C]/30 shadow-sm">Chờ duyệt</span>;
       case 'Đã duyệt':
       case 'DaDuyet':
         return <span className="inline-flex whitespace-nowrap items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#407F3E]/20 text-[#407F3E] border border-[#407F3E]/30 shadow-sm">Đã duyệt</span>;
+        return <span className="inline-flex whitespace-nowrap items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#407F3E]/20 text-[#407F3E] border border-[#407F3E]/30 shadow-sm">Đã duyệt</span>;
       case 'Từ chối':
       case 'TuChoi':
+        return <span className="inline-flex whitespace-nowrap items-center px-3 py-1 rounded-full text-[11px] font-bold bg-red-100 text-red-600 border border-red-200 shadow-sm">Từ chối</span>;
         return <span className="inline-flex whitespace-nowrap items-center px-3 py-1 rounded-full text-[11px] font-bold bg-red-100 text-red-600 border border-red-200 shadow-sm">Từ chối</span>;
       case 'Mở đăng ký':
       case 'MoDangKy':
         return <span className="inline-flex whitespace-nowrap items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#89B449] text-white border border-[#89B449]/20 shadow-sm">Mở đăng ký</span>;
+        return <span className="inline-flex whitespace-nowrap items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#89B449] text-white border border-[#89B449]/20 shadow-sm">Mở đăng ký</span>;
       case 'Đang diễn ra':
       case 'DangDienRa':
         return <span className="inline-flex whitespace-nowrap items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#407F3E] text-white border border-[#407F3E]/20 shadow-sm">Đang diễn ra</span>;
+        return <span className="inline-flex whitespace-nowrap items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#407F3E] text-white border border-[#407F3E]/20 shadow-sm">Đang diễn ra</span>;
       case 'Đã kết thúc':
       case 'DaKetThuc':
+        return <span className="inline-flex whitespace-nowrap items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#DBD468] text-slate-800 border border-[#DBD468]/20 shadow-sm">Đã kết thúc</span>;
         return <span className="inline-flex whitespace-nowrap items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#DBD468] text-slate-800 border border-[#DBD468]/20 shadow-sm">Đã kết thúc</span>;
       case 'Đã khóa':
       case 'DaKhoa':
@@ -357,7 +393,12 @@ export default function LichKienTap_Khoa() {
       case 'Đã hủy':
       case 'DaHuy':
         return <span className="inline-flex whitespace-nowrap items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#E68A8C] text-white shadow-sm border border-[#E68A8C]/20">Đã hủy</span>;
+        return <span className="inline-flex whitespace-nowrap items-center px-3 py-1 rounded-full text-[11px] font-bold bg-slate-800 text-white shadow-sm">Đã khóa</span>;
+      case 'Đã hủy':
+      case 'DaHuy':
+        return <span className="inline-flex whitespace-nowrap items-center px-3 py-1 rounded-full text-[11px] font-bold bg-[#E68A8C] text-white shadow-sm border border-[#E68A8C]/20">Đã hủy</span>;
       default:
+        return <span className="inline-flex whitespace-nowrap items-center px-3 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200">{status}</span>;
         return <span className="inline-flex whitespace-nowrap items-center px-3 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200">{status}</span>;
     }
   };
@@ -369,6 +410,7 @@ export default function LichKienTap_Khoa() {
     return true;
   });
 
+  const displayData = filteredSchedules.map((s) => {
   const displayData = filteredSchedules.map((s) => {
     return {
       id: s.id,
@@ -397,8 +439,20 @@ export default function LichKienTap_Khoa() {
   );
 
   const filteredTrips = availableTripsForModal.filter(t => {
+  const availableTripsForModal = allTrips.filter(t => 
+    t.trang_thai === 'Nhap' && 
+    (!t.lich_kien_tap_id || t.lich_kien_tap_id === editingId)
+  );
+
+  const filteredTrips = availableTripsForModal.filter(t => {
     const matchNhaMay = !tripFilterNhaMay || t.nhaMay?.ten_nha_may?.toLowerCase().includes(tripFilterNhaMay.toLowerCase());
     const matchHinhThuc = !tripFilterHinhThuc || t.hinh_thuc === tripFilterHinhThuc;
+    const searchString = tripSearchTerm.toLowerCase();
+    const matchSearch = !tripSearchTerm || 
+      t.nhaMay?.ten_nha_may?.toLowerCase().includes(searchString) ||
+      t.dia_diem_tap_trung?.toLowerCase().includes(searchString) ||
+      (t.giaoVienDanDoan && t.giaoVienDanDoan.some(gv => gv.giangVien?.ho_ten?.toLowerCase().includes(searchString)));
+    return matchNhaMay && matchHinhThuc && matchSearch;
     const searchString = tripSearchTerm.toLowerCase();
     const matchSearch = !tripSearchTerm || 
       t.nhaMay?.ten_nha_may?.toLowerCase().includes(searchString) ||
@@ -413,8 +467,11 @@ export default function LichKienTap_Khoa() {
   useEffect(() => {
     setTripPage(1);
   }, [tripFilterNhaMay, tripFilterHinhThuc, tripSearchTerm, tripPageSize]);
+  }, [tripFilterNhaMay, tripFilterHinhThuc, tripSearchTerm, tripPageSize]);
 
   const handleToggleTrip = (id) => {
+    const trip = allTrips.find(t => t.id === id);
+    if (!trip) return;
     const trip = allTrips.find(t => t.id === id);
     if (!trip) return;
     if (!selectedTripIds.includes(id)) {
@@ -449,6 +506,7 @@ export default function LichKienTap_Khoa() {
           <button 
             onClick={() => {
               setEditingId(null);
+              setSelectedTripIds([]);
               setSelectedTripIds([]);
               setCreateForm({
                 ten_lich: '', dot_kien_tap_id: '', so_luong_du_kien: '', 
@@ -548,6 +606,7 @@ export default function LichKienTap_Khoa() {
             { label: 'Đang diễn ra', value: 'DangTrienKhai' },
             { label: 'Đã kết thúc', value: 'DaKetThuc' },
             { label: 'Đã khóa', value: 'DaKhoa' },
+            { label: 'Đã hủy', value: 'DaHuy' },
             { label: 'Đã hủy', value: 'DaHuy' },
           ].map(status => (
             <button
@@ -705,6 +764,7 @@ export default function LichKienTap_Khoa() {
           <div 
             className="absolute inset-0 bg-slate-900/40  animate-in fade-in duration-200"
             onClick={() => { setIsModalOpen(false); setEditingId(null); setSelectedTripIds([]); }}
+            onClick={() => { setIsModalOpen(false); setEditingId(null); setSelectedTripIds([]); }}
           ></div>
           
           <div className="bg-white w-full max-w-5xl rounded-2xl shadow-xl relative z-10 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
@@ -712,6 +772,7 @@ export default function LichKienTap_Khoa() {
               <h2 className="text-xl font-bold text-slate-800">
                 {editingId ? 'Cập nhật lịch kiến tập' : 'Tạo lịch kiến tập mới'}
               </h2>
+              <button onClick={() => { setIsModalOpen(false); setEditingId(null); setSelectedTripIds([]); }} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors cursor-pointer">
               <button onClick={() => { setIsModalOpen(false); setEditingId(null); setSelectedTripIds([]); }} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
@@ -788,6 +849,21 @@ export default function LichKienTap_Khoa() {
                     </div>
                     <div className="col-span-2 mt-4">
                       <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Tài khoản thụ hưởng <span className="text-red-500">*</span></label>
+                      <select 
+                        value={createForm.tai_khoan_thu_huong_id}
+                        onChange={e => setCreateForm({...createForm, tai_khoan_thu_huong_id: e.target.value})}
+                        className="w-full px-4 py-2 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] bg-white"
+                      >
+                        <option value="">Chọn tài khoản VietQR...</option>
+                        {taiKhoanConfigs.map(tk => (
+                          <option key={tk.id} value={tk.id}>
+                            {tk.ghi_chu ? `[${tk.ghi_chu}] ` : ''}{tk.ten_ngan_hang} - {tk.so_tai_khoan} - {tk.ten_chu_tai_khoan}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-span-2 mt-4">
+                      <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Tài khoản thụ hưởng <span className="text-red-500">*</span></label>
                       <SearchableDropdown 
                         value={createForm.tai_khoan_thu_huong_id}
                         onChange={val => setCreateForm({...createForm, tai_khoan_thu_huong_id: val})}
@@ -809,6 +885,18 @@ export default function LichKienTap_Khoa() {
                       <div className="bg-[#E7E0C4]/30 px-4 py-3 flex items-center justify-between border-b border-[#E7E0C4]">
                       <h3 className="text-sm font-bold text-slate-800">Danh sách Chuyến tham quan khả dụng</h3>
                       <div className="flex items-center gap-3">
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <Search className="h-3.5 w-3.5 text-slate-400" />
+                          </div>
+                          <input
+                            type="text"
+                            placeholder="Tìm kiếm chuyến..."
+                            value={tripSearchTerm}
+                            onChange={(e) => setTripSearchTerm(e.target.value)}
+                            className="w-48 pl-9 pr-3 py-1.5 border border-[#E7E0C4] rounded-lg text-sm bg-white focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E]"
+                          />
+                        </div>
                         <div className="relative">
                           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                             <Search className="h-3.5 w-3.5 text-slate-400" />
@@ -1005,6 +1093,7 @@ export default function LichKienTap_Khoa() {
             <div className="px-6 py-4 border-t border-[#E7E0C4] bg-slate-50/50 flex items-center justify-between rounded-b-2xl">
               <button 
                 onClick={() => { setIsModalOpen(false); setEditingId(null); setSelectedTripIds([]); }}
+                onClick={() => { setIsModalOpen(false); setEditingId(null); setSelectedTripIds([]); }}
                 disabled={isCreating}
                 className="px-5 py-2.5 border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-bold transition-colors cursor-pointer"
               >
@@ -1089,10 +1178,12 @@ export default function LichKienTap_Khoa() {
                     </thead>
                     <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
                       {allTrips.filter(t => t.lich_kien_tap_id === viewingDetail.id).length === 0 ? (
+                      {allTrips.filter(t => t.lich_kien_tap_id === viewingDetail.id).length === 0 ? (
                         <tr>
                           <td colSpan="4" className="text-center py-6 text-slate-500 font-medium">Chưa có chuyến tham quan nào được gắn</td>
                         </tr>
                       ) : (
+                        allTrips.filter(t => t.lich_kien_tap_id === viewingDetail.id).map(t => (
                         allTrips.filter(t => t.lich_kien_tap_id === viewingDetail.id).map(t => (
                           <tr key={t.id} className="hover:bg-slate-50/50 transition-colors">
                             <td className="p-3 pl-4 font-bold text-slate-800">{t.nhaMay?.ten_nha_may}</td>
@@ -1235,6 +1326,20 @@ export default function LichKienTap_Khoa() {
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Mô tả</label>
                   <p className="text-sm text-slate-800 whitespace-pre-wrap">{viewingTripDetail.mo_ta || 'Không có'}</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Giảng viên dẫn đoàn</label>
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {viewingTripDetail.giaoVienDanDoan && viewingTripDetail.giaoVienDanDoan.length > 0 ? (
+                      viewingTripDetail.giaoVienDanDoan.map((gv, idx) => (
+                        <span key={idx} className="px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-full text-xs font-semibold">
+                          {gv.giangVien?.ho_ten || 'Giảng viên'}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-sm text-slate-500 italic">Chưa phân công giảng viên</span>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Giảng viên dẫn đoàn</label>

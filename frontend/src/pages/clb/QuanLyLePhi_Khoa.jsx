@@ -67,6 +67,64 @@ function convertNumberToWords(amount) {
   return result;
 }
 
+function convertNumberToWords(amount) {
+  if (amount === 0) return "Không đồng";
+
+  const units = ["", " nghìn", " triệu", " tỷ"];
+  const digits = ["không", "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín"];
+
+  function readGroupOfThree(num, isFirstGroup) {
+    let str = "";
+    let hundred = Math.floor(num / 100);
+    let ten = Math.floor((num % 100) / 10);
+    let unit = num % 10;
+
+    if (hundred > 0 || !isFirstGroup) {
+      str += digits[hundred] + " trăm ";
+    }
+
+    if (ten === 0 && unit > 0 && (hundred > 0 || !isFirstGroup)) {
+      str += "lẻ ";
+    } else if (ten === 1) {
+      str += "mười ";
+    } else if (ten > 1) {
+      str += digits[ten] + " mươi ";
+    }
+
+    if (unit === 1 && ten > 1) {
+      str += "mốt ";
+    } else if (unit === 5 && ten > 0) {
+      str += "lăm ";
+    } else if (unit > 0 && (ten !== 1 || unit !== 1)) {
+      str += digits[unit] + " ";
+    }
+
+    return str.trim();
+  }
+
+  let numStr = amount.toString();
+  let groups = [];
+  while (numStr.length > 0) {
+    groups.push(parseInt(numStr.slice(-3)));
+    numStr = numStr.slice(0, -3);
+  }
+
+  let result = "";
+  for (let i = 0; i < groups.length; i++) {
+    if (groups[i] > 0) {
+      const isFirstGroup = (i === groups.length - 1);
+      const groupWords = readGroupOfThree(groups[i], isFirstGroup);
+      if (groupWords) {
+        result = groupWords + units[i] + " " + result;
+      }
+    }
+  }
+
+  result = result.trim();
+  result = result.charAt(0).toUpperCase() + result.slice(1) + " đồng";
+  return result;
+}
+
 export default function QuanLyLePhi_Khoa() {
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   const [schedules, setSchedules] = useState([]);
