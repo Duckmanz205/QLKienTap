@@ -262,9 +262,7 @@ export default function QuanLyLePhi_Khoa() {
     try {
       const res = await khoaApi.getSchedules();
       setSchedules(res.data);
-      if (res.data.length > 0) {
-        setSelectedLich(res.data[0].id);
-      }
+      setSelectedLich('ALL');
     } catch (err) {
       console.error(err);
     }
@@ -272,7 +270,11 @@ export default function QuanLyLePhi_Khoa() {
 
   const fetchFees = async () => {
     try {
-      const res = await khoaApi.getRegistrations({ lichKienTapId: selectedLich });
+      const params = {};
+      if (selectedLich && selectedLich !== 'ALL') {
+        params.lichKienTapId = selectedLich;
+      }
+      const res = await khoaApi.getRegistrations(params);
       setFees(res.data.data || []);
     } catch (err) {
       console.error(err);
@@ -465,7 +467,7 @@ export default function QuanLyLePhi_Khoa() {
             className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isLichDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
           >
             <span className={`truncate pr-2 font-medium ${selectedLich ? 'text-slate-700' : 'text-slate-400'}`}>
-              {schedules.find(s => s.id === selectedLich)?.ten_lich || 'Chọn lịch kiến tập'}
+              {selectedLich === 'ALL' ? 'Tất cả lịch' : (schedules.find(s => s.id === selectedLich)?.ten_lich || 'Chọn lịch kiến tập')}
             </span>
             <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
           </div>
@@ -482,6 +484,18 @@ export default function QuanLyLePhi_Khoa() {
                 />
               </div>
               <div className="max-h-60 overflow-y-auto">
+                <div
+                  onClick={() => {
+                    setSelectedLich('ALL');
+                    setIsLichDropdownOpen(false);
+                    setCurrentPage(1);
+                    setSearchLichTerm('');
+                  }}
+                  className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${selectedLich === 'ALL' ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50 font-medium'}`}
+                >
+                  <span className="truncate pr-2">Tất cả lịch</span>
+                  {selectedLich === 'ALL' && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                </div>
                 {schedules
                   .filter(opt => opt.ten_lich?.toLowerCase().includes(searchLichTerm.toLowerCase()))
                   .map(opt => (

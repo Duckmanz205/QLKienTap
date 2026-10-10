@@ -1,7 +1,7 @@
 import toast from 'react-hot-toast';
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  Info, ChevronDown, Check, Save, Plus, Minus, Search
+  Info, ChevronDown, Check, Save, Plus, Minus, Search, Lock
 } from 'lucide-react';
 import { giangVienApi } from '../../services/api';
 import SearchableDropdown from '../../components/SearchableDropdown';
@@ -66,6 +66,7 @@ export default function DiemChuanBi_DiemCong_GV() {
         name: phieu.sinhVien?.ho_ten,
         diemChuanBi: phieu.diemPhieuThamQuan?.diem_chuan_bi !== undefined && phieu.diemPhieuThamQuan.diem_chuan_bi !== null ? String(phieu.diemPhieuThamQuan.diem_chuan_bi) : '',
         diemCong: phieu.diemPhieuThamQuan?.diem_cong !== undefined && phieu.diemPhieuThamQuan.diem_cong !== null ? Number(phieu.diemPhieuThamQuan.diem_cong) : 0,
+        da_khoa: phieu.diemPhieuThamQuan?.da_khoa ?? false,
         ghiChu: '' // not stored in DB currently based on API, but keep in UI
       }));
 
@@ -243,7 +244,14 @@ export default function DiemChuanBi_DiemCong_GV() {
 
                     <td className="p-4 pl-6 font-mono font-bold text-slate-600">{student.mssv}</td>
 
-                    <td className="p-4 font-bold text-slate-800">{student.name}</td>
+                    <td className="p-4 font-bold text-slate-800 flex items-center gap-2">
+                      {student.name}
+                      {student.da_khoa && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#E68A8C]/10 text-[#E68A8C] border border-[#E68A8C]/20">
+                          <Lock className="w-3 h-3" />
+                        </span>
+                      )}
+                    </td>
 
                     <td className="p-4">
                       <div className="flex justify-center">
@@ -263,7 +271,7 @@ export default function DiemChuanBi_DiemCong_GV() {
                         <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
                           <button
                             onClick={() => handleBonusChange(student.id, -0.5)}
-                            disabled={student.diemCong <= 0}
+                            disabled={student.diemCong <= 0 || student.da_khoa}
                             className="w-6 h-6 flex items-center justify-center rounded bg-white border border-slate-200 text-slate-500 hover:text-slate-800 hover:border-slate-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                           >
                             <Minus className="w-3.5 h-3.5" />
@@ -277,7 +285,7 @@ export default function DiemChuanBi_DiemCong_GV() {
 
                           <button
                             onClick={() => handleBonusChange(student.id, 0.5)}
-                            disabled={student.diemCong >= 1.0}
+                            disabled={student.diemCong >= 1.0 || student.da_khoa}
                             className="w-6 h-6 flex items-center justify-center rounded bg-white border border-slate-200 text-slate-700 hover:text-[#407F3E] hover:border-[#407F3E] hover:bg-[#407F3E]/5 disabled:opacity-30 disabled:cursor-not-allowed transition-colors font-bold text-xs group"
                           >
                             <Plus className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />

@@ -475,13 +475,28 @@ export class ChuyenThamQuan {
   le_phi: number;
 
   @Column({ type: 'datetime2', nullable: true })
-  han_dong_le_phi: Date;
+  han_dong_le_phi: Date | null;
 
   @Column({ nullable: true })
   dia_diem_tap_trung: string;
 
   @Column({ length: 50, default: 'Nhap' })
   trang_thai: string; // 'Nhap' | 'ChoDuyet' | 'DaDuyet' | 'MoDangKy' | 'DaChotDanhSach' | 'DaDienRa' | 'DaHuy'
+
+  @Column({ type: 'date', nullable: true })
+  ngay_tham_quan_moi: Date | null;
+
+  @Column({ type: 'time', name: 'gio_bat_dau_moi', nullable: true })
+  gio_bat_dau_moi: string | null;
+
+  @Column({ type: 'int', nullable: true })
+  suc_chua_moi: number | null;
+
+  @Column({ type: 'datetime2', nullable: true })
+  han_dong_le_phi_moi: Date | null;
+
+  @Column({ type: 'nvarchar', length: 20, nullable: true })
+  trang_thai_sua_doi: string | null;
 }
 
 // (v11) Đổi tên từ ChuyenThamQuan_GiangVienDanDoan → PhanCongGiangVienDanDoan
@@ -971,6 +986,9 @@ export class DiemPhieuThamQuan {
   @Column({ type: 'decimal', precision: 4, scale: 2, nullable: true })
   diem_ai_de_xuat: number;
 
+  @Column({ type: 'nvarchar', length: 'MAX', nullable: true })
+  nhan_xet_ai_de_xuat: string;
+
   @Column({ type: 'decimal', precision: 4, scale: 2, nullable: true })
   diem_thu_hoach: number;
 
@@ -1010,6 +1028,13 @@ export class BoChuyenBaoCao {
 
   @Column()
   dot_kien_tap_sinh_vien_id: number;
+
+  @ManyToOne(() => HoiDongChamBaoCao)
+  @JoinColumn({ name: 'hoi_dong_id' })
+  hoiDong: HoiDongChamBaoCao;
+
+  @Column({ nullable: true })
+  hoi_dong_id: number;
 
   @Column({ type: 'datetime2', default: () => 'SYSDATETIME()' })
   ngay_chon: Date;

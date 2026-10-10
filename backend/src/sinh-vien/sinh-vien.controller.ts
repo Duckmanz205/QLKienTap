@@ -243,17 +243,27 @@ export class SinhVienController {
   @Get('grades')
   async getMyGrades(@CurrentUser() user: JwtPayloadUser) {
     const student = await this.svService.getStudentByAccountId(user.sub);
-    return this.svService.getStudentGrades(student.id);
+    try { return await this.svService.getStudentGrades(student.id); } catch (e) { console.error('API ERROR:', e); throw e; }
   }
 
   @Get('grades/:studentId')
   async getGrades(@CurrentUser() user: JwtPayloadUser) {
     const student = await this.svService.getStudentByAccountId(user.sub);
-    return this.svService.getStudentGrades(student.id);
+    try { return await this.svService.getStudentGrades(student.id); } catch(e) { console.error('API FATAL ERROR:', e); throw e; }
   }
 
   @Get('dashboard-stats/:studentId')
   async getDashboardStats(@Param('studentId') studentId: number) {
     return this.svService.getDashboardStats(+studentId);
   }
+
+  @Get('test-grades')
+  async getTestGrades() {
+    try {
+      return await this.svService.getStudentGrades(808); // or 2, whatever
+    } catch (e) {
+      return { error: e.message, stack: e.stack };
+    }
+  }
+
 }

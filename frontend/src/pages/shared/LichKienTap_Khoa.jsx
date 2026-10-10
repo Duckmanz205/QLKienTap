@@ -121,7 +121,7 @@ export default function LichKienTap_Khoa() {
       const [schRes, campRes, tripRes, factoryRes, tkRes] = await Promise.all([
         khoaApi.getSchedules({ excludeInactive: false }),
         khoaApi.getCampaigns(),
-        khoaApi.getTrips({ status: 'Nhap' }),
+        khoaApi.getTrips(),
         khoaApi.getFactories(),
           khoaApi.getTaiKhoanThuHuong()
         khoaApi.getFactories(),
@@ -985,9 +985,16 @@ export default function LichKienTap_Khoa() {
                                 {trip.nhaMay?.ten_nha_may || 'Nhà máy chưa rõ'}
                               </td>
                               <td className="p-3">
-                                <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${trip.hinh_thuc === 'TrucTiep' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
-                                  {trip.hinh_thuc === 'TrucTiep' ? 'Trực tiếp' : 'Trực tuyến'}
-                                </span>
+                                <div className="flex flex-col gap-1 items-start">
+                                  <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${trip.hinh_thuc === 'TrucTiep' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                                    {trip.hinh_thuc === 'TrucTiep' ? 'Trực tiếp' : 'Trực tuyến'}
+                                  </span>
+                                  {trip.trang_thai_sua_doi === 'ChoDuyet' && (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-600 border border-orange-200 whitespace-nowrap" title="Có sửa đổi đang chờ duyệt">
+                                      ⚠️ Đang chờ duyệt sửa
+                                    </span>
+                                  )}
+                                </div>
                               </td>
                               <td className="p-3 text-sm text-slate-600">
                                 <div className="font-medium text-slate-800">{new Date(trip.ngay_tham_quan).toLocaleDateString('vi-VN')}</div>
@@ -1166,9 +1173,15 @@ export default function LichKienTap_Khoa() {
                         </tr>
                       ) : (
                         allTrips.filter(t => t.lich_kien_tap_id === viewingDetail.id).map(t => (
-                        allTrips.filter(t => t.lich_kien_tap_id === viewingDetail.id).map(t => (
-                          <tr key={t.id} className="hover:bg-slate-50/50 transition-colors">
-                            <td className="p-3 pl-4 font-bold text-slate-800">{t.nhaMay?.ten_nha_may}</td>
+                          <tr key={t.id} className={`transition-colors ${t.trang_thai === 'Nhap' ? 'bg-amber-50 hover:bg-amber-100' : 'hover:bg-slate-50/50'}`}>
+                            <td className="p-3 pl-4 font-bold text-slate-800">
+                              <div className="flex items-center gap-2">
+                                {t.nhaMay?.ten_nha_may}
+                                {t.trang_thai === 'Nhap' && (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200 text-amber-800 shadow-sm border border-amber-300">MỚI / CÓ THAY ĐỔI</span>
+                                )}
+                              </div>
+                            </td>
                             <td className="p-3 text-center">
                               <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${t.hinh_thuc === 'TrucTiep' ? 'bg-[#407F3E]/20 text-[#407F3E]' : 'bg-blue-100 text-blue-700'}`}>
                                 {t.hinh_thuc === 'TrucTiep' ? 'Trực tiếp' : 'Trực tuyến'}
