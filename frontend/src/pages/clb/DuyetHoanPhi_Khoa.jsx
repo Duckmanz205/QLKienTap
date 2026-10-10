@@ -4,6 +4,7 @@ import {
   Paperclip, CheckCircle2, XCircle, AlertTriangle, Search, ChevronDown, Check
 } from 'lucide-react';
 import { khoaApi } from '../../services/api';
+import SearchableDropdown from '../../components/SearchableDropdown';
 
 export default function DuyetHoanPhi_Khoa() {
   const [refunds, setRefunds] = useState([]);
@@ -225,12 +226,12 @@ export default function DuyetHoanPhi_Khoa() {
                           Xem file
                         </button>
                       </td>
-                      <td className="p-4 font-medium text-slate-500">{new Date(r.ngay_yeu_cau).toLocaleDateString('vi-VN')}</td>
+                      <td className="p-4 font-medium text-slate-500">{new Date(r.ngay_nop).toLocaleDateString('vi-VN')}</td>
                       <td className="p-4 text-center">
                         {getStatusBadge(r.trang_thai)}
                       </td>
                       <td className="p-4 text-right pr-6">
-                        {r.trang_thai === 'Pending' ? (
+                        {r.trang_thai === 'ChoXuLy' ? (
                           <div className="flex items-center justify-end gap-2">
                             <button 
                               onClick={() => handleApprove(r.id)}
@@ -263,19 +264,21 @@ export default function DuyetHoanPhi_Khoa() {
         <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
             <span>Hiển thị</span>
-            <select
+            <SearchableDropdown 
+              options={[
+                { value: 15, label: '15' },
+                { value: 30, label: '30' },
+                { value: 50, label: '50' },
+                { value: 100, label: '100' }
+              ]}
               value={limit}
-              onChange={e => {
-                setLimit(Number(e.target.value));
+              onChange={(newLimit) => {
+                setLimit(newLimit);
                 setCurrentPage(1);
               }}
-              className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm text-sm"
-            >
-              <option value={15}>15</option>
-              <option value={30}>30</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
+              searchPlaceholder="Tìm số lượng..."
+              className="min-w-[80px]"
+            />
             <span>/ tổng số <strong className="text-slate-800">{totalItems}</strong> hồ sơ</span>
           </div>
 

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { khoaApi } from '../../services/api';
 import * as XLSX from 'xlsx';
+import SearchableDropdown from '../../components/SearchableDropdown';
 
 export default function RegistrationManagement_Khoa() {
   const [masterTab, setMasterTab] = useState('trips'); // 'trips' | 'huy'
@@ -623,19 +624,21 @@ export default function RegistrationManagement_Khoa() {
               <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
                   <span>Hiển thị</span>
-                  <select
+                  <SearchableDropdown
                     value={limitTrips}
-                    onChange={e => {
-                      setLimitTrips(Number(e.target.value));
+                    onChange={val => {
+                      setLimitTrips(Number(val));
                       setCurrentPageTrips(1);
                     }}
-                    className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
-                  >
-                    <option value={15}>15</option>
-                    <option value={30}>30</option>
-                    <option value={50}>50</option>
-                    <option value={100}>100</option>
-                  </select>
+                    options={[
+                      { value: 15, label: '15' },
+                      { value: 30, label: '30' },
+                      { value: 50, label: '50' },
+                      { value: 100, label: '100' }
+                    ]}
+                    className="min-w-[80px]"
+                    searchPlaceholder="Tìm..."
+                  />
                   <span>/ {totalTrips} chuyến</span>
                 </div>
 
@@ -763,19 +766,21 @@ export default function RegistrationManagement_Khoa() {
               <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
                   <span>Hiển thị</span>
-                  <select
+                  <SearchableDropdown
                     value={limitHuy}
-                    onChange={e => {
-                      setLimitHuy(Number(e.target.value));
+                    onChange={val => {
+                      setLimitHuy(Number(val));
                       setCurrentPageHuy(1);
                     }}
-                    className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
-                  >
-                    <option value={15}>15</option>
-                    <option value={30}>30</option>
-                    <option value={50}>50</option>
-                    <option value={100}>100</option>
-                  </select>
+                    options={[
+                      { value: 15, label: '15' },
+                      { value: 30, label: '30' },
+                      { value: 50, label: '50' },
+                      { value: 100, label: '100' }
+                    ]}
+                    className="min-w-[80px]"
+                    searchPlaceholder="Tìm..."
+                  />
                   <span>/ {totalHuy} yêu cầu</span>
                 </div>
 
@@ -1065,19 +1070,21 @@ export default function RegistrationManagement_Khoa() {
                   <div className="p-4 border-t border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
                       <span>Hiển thị</span>
-                      <select
+                      <SearchableDropdown 
+                        options={[
+                          { value: 15, label: '15' },
+                          { value: 30, label: '30' },
+                          { value: 50, label: '50' },
+                          { value: 100, label: '100' }
+                        ]}
                         value={limitRegs}
-                        onChange={e => {
-                          setLimitRegs(Number(e.target.value));
+                        onChange={(newLimit) => {
+                          setLimitRegs(newLimit);
                           setCurrentPageRegs(1);
                         }}
-                        className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
-                      >
-                        <option value={15}>15</option>
-                        <option value={30}>30</option>
-                        <option value={50}>50</option>
-                        <option value={100}>100</option>
-                      </select>
+                        searchPlaceholder="Tìm số lượng..."
+                        className="min-w-[80px]"
+                      />
                       <span>/ {totalRegs} sinh viên</span>
                     </div>
 
@@ -1309,19 +1316,21 @@ export default function RegistrationManagement_Khoa() {
                     <div className="p-4 border-t border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
                       <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
                         <span>Hiển thị</span>
-                        <select
+                        <SearchableDropdown
                           value={limitFinalized}
-                          onChange={e => {
-                            setLimitFinalized(Number(e.target.value));
+                          onChange={val => {
+                            setLimitFinalized(Number(val));
                             setCurrentPageFinalized(1);
                           }}
-                          className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
-                        >
-                          <option value={15}>15</option>
-                          <option value={30}>30</option>
-                          <option value={50}>50</option>
-                          <option value={100}>100</option>
-                        </select>
+                          options={[
+                            { value: 15, label: '15' },
+                            { value: 30, label: '30' },
+                            { value: 50, label: '50' },
+                            { value: 100, label: '100' }
+                          ]}
+                          className="min-w-[80px]"
+                          searchPlaceholder="Tìm..."
+                        />
                         <span>/ {totalFinalized} sinh viên</span>
                       </div>
 

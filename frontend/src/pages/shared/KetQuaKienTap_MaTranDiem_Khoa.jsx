@@ -1,14 +1,21 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import toast from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import { 
   Lock, ChevronDown, Check, ChevronRight, AlertTriangle, 
+  CheckCircle2, XCircle, Clock, Ban, Award, Search, Download, FileSpreadsheet
   CheckCircle2, XCircle, Clock, Ban, Award, Search, Download, FileSpreadsheet
 } from 'lucide-react';
 import { khoaApi } from '../../services/api';
 import { getValidSession } from '../../utils/auth';
 import { exportDiemQuaTrinh, exportDanhSachPhang, exportTongHopKienTap } from '../../utils/exportExcel';
+import { getValidSession } from '../../utils/auth';
+import { exportDiemQuaTrinh, exportDanhSachPhang, exportTongHopKienTap } from '../../utils/exportExcel';
+import SearchableDropdown from '../../components/SearchableDropdown';
 
 export default function KetQuaKienTap_Khoa() {
+  const session = getValidSession();
+  const isKhoa = session?.user?.vai_tro === 'QuanLyKhoa' || session?.user?.vai_tro === 'Khoa';
   const session = getValidSession();
   const isKhoa = session?.user?.vai_tro === 'QuanLyKhoa' || session?.user?.vai_tro === 'Khoa';
   const [schedules, setSchedules] = useState([]);
@@ -18,6 +25,7 @@ export default function KetQuaKienTap_Khoa() {
   const [results, setResults] = useState([]);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
+  const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
 
   // Search & Filter & Pagination states
@@ -77,6 +85,7 @@ export default function KetQuaKienTap_Khoa() {
     setIsLichDropdownOpen(false);
     setIsClassDropdownOpen(false);
     setIsExportDropdownOpen(false);
+    setIsExportDropdownOpen(false);
   };
 
   const handleDropdownClick = (e, setter, currentVal) => {
@@ -123,6 +132,12 @@ export default function KetQuaKienTap_Khoa() {
     return Math.max(1, ...results.map(r => r.trips?.length || 0));
   }, [results]);
 
+  // Calculate max trips dynamically
+  const maxTrips = useMemo(() => {
+    if (!results || results.length === 0) return 1;
+    return Math.max(1, ...results.map(r => r.trips?.length || 0));
+  }, [results]);
+
   const getStatusBadge = (status) => {
     switch (status) {
       case 'Đạt':
@@ -139,6 +154,67 @@ export default function KetQuaKienTap_Khoa() {
       {/* Header section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <h1 className="text-2xl font-bold text-slate-800">Kết quả kiến tập</h1>
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <button
+              onClick={(e) => { e.stopPropagation(); closeAllDropdowns(); setIsExportDropdownOpen(!isExportDropdownOpen); }}
+              className="px-5 py-2.5 bg-white text-[#407F3E] border border-[#407F3E] hover:bg-[#407F3E]/5 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer"
+            >
+              <Download className="w-4 h-4" />
+              Xuất báo cáo
+              <ChevronDown className="w-4 h-4 opacity-70" />
+            </button>
+            {isExportDropdownOpen && (
+              <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-lg border border-[#E7E0C4] py-1.5 z-50 animate-in fade-in slide-in-from-top-2">
+                <div className="px-3 py-2 border-b border-slate-100 mb-1">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Chọn mẫu xuất</p>
+                </div>
+                <button
+                  onClick={() => {
+                    const tenLich = schedules.find(s => s.id === selectedLich)?.ten_lich || 'TongHop';
+                    exportDiemQuaTrinh(results, tenLich);
+                    setIsExportDropdownOpen(false);
+                  }}
+                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 flex items-center gap-2"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-[#407F3E]" />
+                  <span>Mẫu 1: Điểm quá trình</span>
+                </button>
+                <button
+                  onClick={() => {
+                    const tenLich = schedules.find(s => s.id === selectedLich)?.ten_lich || 'TongHop';
+                    exportDanhSachPhang(results, tenLich);
+                    setIsExportDropdownOpen(false);
+                  }}
+                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 flex items-center gap-2"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-[#407F3E]" />
+                  <span>Mẫu 2: DS sinh viên TQNM</span>
+                </button>
+                <button
+                  onClick={() => {
+                    const tenLich = schedules.find(s => s.id === selectedLich)?.ten_lich || 'TongHop';
+                    exportTongHopKienTap(results, tenLich);
+                    setIsExportDropdownOpen(false);
+                  }}
+                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 flex items-center gap-2"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-[#407F3E]" />
+                  <span>Mẫu 3: Tổng hợp (Nhiều Sheet)</span>
+                </button>
+              </div>
+            )}
+          </div>
+          {isKhoa && (
+            <button 
+              onClick={(e) => { e.stopPropagation(); setIsConfirmModalOpen(true); }}
+              className="px-5 py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer"
+            >
+              <Lock className="w-4 h-4" />
+              Khóa điểm đợt này
+            </button>
+          )}
+        </div>
         <div className="flex items-center gap-3">
           <div className="relative">
             <button
@@ -375,8 +451,13 @@ export default function KetQuaKienTap_Khoa() {
               <tr className="bg-[#E7E0C4] text-slate-800 text-[10px] font-bold uppercase tracking-wider border-b border-white">
                 <th className="p-2 pl-4 border-r border-white text-center" rowSpan={2}>MSSV</th>
                 <th className="p-2 border-r border-white text-center min-w-[150px]" rowSpan={2}>Họ tên</th>
+                <th className="p-2 border-r border-white text-center min-w-[150px]" rowSpan={2}>Họ tên</th>
                 <th className="p-2 border-r border-white text-center" rowSpan={2}>Lớp</th>
                 
+                {/* Dynamically create headers for each factory based on maxTrips */}
+                {Array.from({ length: maxTrips }).map((_, idx) => (
+                  <th key={idx} className="p-2 border-r border-white text-center bg-[#FCE4D6]" colSpan={6}>NHÀ MÁY {idx + 1}</th>
+                ))}
                 {/* Dynamically create headers for each factory based on maxTrips */}
                 {Array.from({ length: maxTrips }).map((_, idx) => (
                   <th key={idx} className="p-2 border-r border-white text-center bg-[#FCE4D6]" colSpan={6}>NHÀ MÁY {idx + 1}</th>
@@ -385,8 +466,19 @@ export default function KetQuaKienTap_Khoa() {
                 <th className="p-2 text-center bg-[#FFF2CC] text-[#407F3E]" rowSpan={2}>Tổng kết</th>
                 <th className="p-2 text-center border-l border-white" rowSpan={2}>Kết quả</th>
                 <th className="p-2 pr-4 text-center border-l border-white min-w-[80px]" rowSpan={2}>Chi tiết</th>
+                <th className="p-2 pr-4 text-center border-l border-white min-w-[80px]" rowSpan={2}>Chi tiết</th>
               </tr>
               <tr className="bg-[#E7E0C4] text-slate-800 text-[9px] font-bold uppercase tracking-tighter border-b border-white">
+                {Array.from({ length: maxTrips }).map((_, idx) => (
+                  <React.Fragment key={`sub-${idx}`}>
+                    <th className="p-1 border-r border-white text-center bg-[#FCE4D6] min-w-[150px]">Tên NM</th>
+                    <th className="p-1 border-r border-white text-center bg-[#FCE4D6]">Chuẩn bị</th>
+                    <th className="p-1 border-r border-white text-center bg-[#FCE4D6]">Thu hoạch</th>
+                    <th className="p-1 border-r border-white text-center bg-[#FCE4D6]">Hội đồng</th>
+                    <th className="p-1 border-r border-white text-center bg-[#FCE4D6]">Cộng</th>
+                    <th className="p-1 border-r border-white text-center bg-[#FCE4D6]">Tổng chuyến</th>
+                  </React.Fragment>
+                ))}
                 {Array.from({ length: maxTrips }).map((_, idx) => (
                   <React.Fragment key={`sub-${idx}`}>
                     <th className="p-1 border-r border-white text-center bg-[#FCE4D6] min-w-[150px]">Tên NM</th>
@@ -403,10 +495,12 @@ export default function KetQuaKienTap_Khoa() {
               {filteredResults.length === 0 ? (
                 <tr>
                   <td colSpan={3 + maxTrips * 6 + 3} className="p-8 text-center text-slate-500 font-medium border-b border-[#E7E0C4]/50">Không có kết quả nào phù hợp.</td>
+                  <td colSpan={3 + maxTrips * 6 + 3} className="p-8 text-center text-slate-500 font-medium border-b border-[#E7E0C4]/50">Không có kết quả nào phù hợp.</td>
                 </tr>
               ) : (
                 paginatedResults.map((r, index) => {
                   const sv = r.sinhVien || {};
+                  const trips = r.trips || [];
                   const trips = r.trips || [];
                   
                   return (
@@ -415,6 +509,34 @@ export default function KetQuaKienTap_Khoa() {
                       <td className="p-2 font-bold text-slate-800 border-r border-[#E7E0C4]/50 whitespace-nowrap">{sv.ho_ten}</td>
                       <td className="p-2 text-center border-r border-[#E7E0C4]/50 text-[10px] text-slate-500">{sv.ten_lop || '--'}</td>
 
+                      {/* Render factory columns dynamically */}
+                      {Array.from({ length: maxTrips }).map((_, idx) => {
+                        const trip = trips[idx];
+                        if (trip) {
+                          return (
+                            <React.Fragment key={`trip-${r.id}-${idx}`}>
+                              <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-medium text-slate-700 truncate max-w-[200px]" title={trip.nhaMay}>{trip.nhaMay || '--'}</td>
+                              <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono">{trip.diem_chuan_bi ?? '--'}</td>
+                              <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono text-blue-600">{trip.diem_bao_cao ?? '--'}</td>
+                              <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono text-red-600">{trip.diem_van_dap ?? '--'}</td>
+                              <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono text-green-600">{trip.diem_cong ?? '--'}</td>
+                              <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-mono font-bold">{trip.diem_tong_nm ?? '--'}</td>
+                            </React.Fragment>
+                          );
+                        } else {
+                          // Render empty slots for missing trips
+                          return (
+                            <React.Fragment key={`trip-empty-${r.id}-${idx}`}>
+                              <td className="p-2 text-center border-r border-[#E7E0C4]/50 text-slate-300">--</td>
+                              <td className="p-2 text-center border-r border-[#E7E0C4]/50 text-slate-300">--</td>
+                              <td className="p-2 text-center border-r border-[#E7E0C4]/50 text-slate-300">--</td>
+                              <td className="p-2 text-center border-r border-[#E7E0C4]/50 text-slate-300">--</td>
+                              <td className="p-2 text-center border-r border-[#E7E0C4]/50 text-slate-300">--</td>
+                              <td className="p-2 text-center border-r border-[#E7E0C4]/50 text-slate-300">--</td>
+                            </React.Fragment>
+                          );
+                        }
+                      })}
                       {/* Render factory columns dynamically */}
                       {Array.from({ length: maxTrips }).map((_, idx) => {
                         const trip = trips[idx];
@@ -476,20 +598,21 @@ export default function KetQuaKienTap_Khoa() {
         <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
             <span>Hiển thị</span>
-            <select 
+            <SearchableDropdown 
+              options={[
+                { value: 15, label: '15' },
+                { value: 30, label: '30' },
+                { value: 50, label: '50' },
+                { value: 100, label: '100' }
+              ]}
               value={limit}
-              onChange={(e) => {
-                const newLimit = Number(e.target.value);
+              onChange={(newLimit) => {
                 setLimit(newLimit);
                 setCurrentPage(1);
               }}
-              className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
-            >
-              <option value={15}>15</option>
-              <option value={30}>30</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
+              searchPlaceholder="Tìm số lượng..."
+              className="min-w-[80px]"
+            />
             <span>/ {filteredResults.length} sinh viên</span>
           </div>
           <div className="flex items-center gap-1.5">
@@ -533,6 +656,9 @@ export default function KetQuaKienTap_Khoa() {
         <div className="fixed inset-0 bg-slate-900/60 z-[100] flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-6xl rounded-2xl shadow-xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 max-h-[90vh]">
             <div className="p-5 border-b border-[#E7E0C4] bg-[#E7E0C4]/30 flex items-center justify-between sticky top-0 z-10">
+        <div className="fixed inset-0 bg-slate-900/60 z-[100] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-6xl rounded-2xl shadow-xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 max-h-[90vh]">
+            <div className="p-5 border-b border-[#E7E0C4] bg-[#E7E0C4]/30 flex items-center justify-between sticky top-0 z-10">
               <h2 className="font-extrabold text-slate-800 text-lg flex items-center gap-2">
                 <Award className="w-5 h-5 text-[#407F3E]" />
                 <span>Chi tiết điểm sinh viên</span>
@@ -554,12 +680,67 @@ export default function KetQuaKienTap_Khoa() {
                     <p className="text-slate-800 font-bold text-base leading-tight">{selectedStudent.sinhVien?.ho_ten}</p>
                     <p className="text-xs text-slate-500 font-mono mt-0.5">MSSV: {selectedStudent.sinhVien?.mssv} &bull; Lớp: {selectedStudent.sinhVien?.ten_lop}</p>
                   </div>
+            
+            <div className="p-5 overflow-y-auto flex-1 space-y-5 text-sm font-medium text-slate-600">
+              {/* Header Info */}
+              <div className="flex items-center justify-between gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <div className="flex items-center gap-3">
+
+                  <div>
+                    <p className="text-slate-800 font-bold text-base leading-tight">{selectedStudent.sinhVien?.ho_ten}</p>
+                    <p className="text-xs text-slate-500 font-mono mt-0.5">MSSV: {selectedStudent.sinhVien?.mssv} &bull; Lớp: {selectedStudent.sinhVien?.ten_lop}</p>
+                  </div>
                 </div>
+                <div className="text-right">
+                  {getStatusBadge(selectedStudent.trang_thai)}
                 <div className="text-right">
                   {getStatusBadge(selectedStudent.trang_thai)}
                 </div>
               </div>
 
+              {/* Trips List */}
+              <div className="space-y-3">
+                <h3 className="font-bold text-slate-700 text-sm uppercase tracking-wider">Điểm từng nhà máy</h3>
+                
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {selectedStudent.trips?.length > 0 ? (
+                  selectedStudent.trips.map((trip, idx) => (
+                    <div key={idx} className="bg-white border border-[#E7E0C4] rounded-xl overflow-hidden shadow-sm">
+                      <div className="bg-[#E7E0C4]/15 px-4 py-2.5 border-b border-[#E7E0C4]/50 flex justify-between items-center">
+                        <span className="font-bold text-slate-800">#{idx + 1} - {trip.nhaMay}</span>
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-white border border-[#E7E0C4] text-slate-600">
+                          {trip.hinh_thuc === 'TrucTiep' ? 'Offline' : (trip.hinh_thuc === 'TrucTuyen' ? 'Online' : trip.hinh_thuc || 'N/A')}
+                        </span>
+                      </div>
+                      <div className="p-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                        <div className="flex justify-between border-b border-slate-100 pb-1.5">
+                          <span className="text-slate-500">Chuẩn bị & Tương tác:</span>
+                          <span className="text-slate-800 font-bold font-mono">{trip.diem_chuan_bi ?? '--'}</span>
+                        </div>
+                        <div className="flex justify-between border-b border-slate-100 pb-1.5">
+                          <span className="text-slate-500">Điểm báo cáo:</span>
+                          <span className="text-slate-800 font-bold font-mono">{trip.diem_bao_cao ?? '--'}</span>
+                        </div>
+                        <div className="flex justify-between border-b border-slate-100 pb-1.5">
+                          <span className="text-slate-500">Hội đồng (Vấn đáp):</span>
+                          <span className="text-slate-800 font-bold font-mono">{trip.diem_van_dap ?? '--'}</span>
+                        </div>
+                        <div className="flex justify-between border-b border-slate-100 pb-1.5">
+                          <span className="text-slate-500">Điểm cộng:</span>
+                          <span className="text-green-600 font-bold font-mono">+{trip.diem_cong ?? '0'}</span>
+                        </div>
+                        <div className="flex justify-between pt-1.5 col-span-2 bg-slate-50 -mx-4 -mb-4 px-4 pb-4 mt-3 border-t border-slate-100 items-center">
+                          <span className="text-slate-700 font-bold">Tổng điểm chuyến đi:</span>
+                          <span className="text-lg text-[#407F3E] font-black font-mono">{trip.diem_tong_nm ?? '--'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-6 bg-slate-50 rounded-xl border border-slate-100 border-dashed text-slate-400 col-span-full">
+                    Không có dữ liệu chuyến tham quan
+                  </div>
+                )}
               {/* Trips List */}
               <div className="space-y-3">
                 <h3 className="font-bold text-slate-700 text-sm uppercase tracking-wider">Điểm từng nhà máy</h3>
@@ -611,11 +792,20 @@ export default function KetQuaKienTap_Khoa() {
                 <span className="text-[#407F3E] font-bold text-base uppercase">Điểm tổng kết học phần</span>
                 <span className="text-2xl text-[#407F3E] font-black font-mono">{selectedStudent.diem_tong_ket ?? '--'}</span>
               </div>
+
+              {/* Final Grade */}
+              <div className="flex items-center justify-between p-4 bg-[#407F3E]/5 rounded-xl border border-[#407F3E]/20 mt-6">
+                <span className="text-[#407F3E] font-bold text-base uppercase">Điểm tổng kết học phần</span>
+                <span className="text-2xl text-[#407F3E] font-black font-mono">{selectedStudent.diem_tong_ket ?? '--'}</span>
+              </div>
             </div>
+
+            <div className="p-4 border-t border-[#E7E0C4] bg-slate-50 flex justify-end sticky bottom-0 z-10">
 
             <div className="p-4 border-t border-[#E7E0C4] bg-slate-50 flex justify-end sticky bottom-0 z-10">
               <button 
                 onClick={() => setSelectedStudent(null)} 
+                className="px-6 py-2.5 bg-slate-700 hover:bg-slate-800 text-white font-bold rounded-xl text-sm cursor-pointer shadow-sm transition-colors"
                 className="px-6 py-2.5 bg-slate-700 hover:bg-slate-800 text-white font-bold rounded-xl text-sm cursor-pointer shadow-sm transition-colors"
               >
                 Đóng

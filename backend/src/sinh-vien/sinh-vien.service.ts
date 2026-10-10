@@ -427,6 +427,15 @@ export class SinhVienService {
     if (!trip) throw new NotFoundException('Không tìm thấy chuyến tham quan');
     const now = new Date();
 
+    // Leader's logic: if registration is still open, cancel immediately without approval or blacklist
+    if (trip.trang_thai === 'MoDangKy') {
+      phieu.trang_thai = 'DaHuy';
+      await this.phieuRepo.save(phieu);
+      return {
+        message: 'Đã hủy đăng ký thành công (Chuyến đi đang mở đăng ký)',
+      };
+    }
+
     if (trip.trang_thai === 'DaDienRa' || new Date(trip.ngay_tham_quan) < now) {
       throw new BadRequestException(
         'Không thể hủy chuyến tham quan đã diễn ra',
@@ -546,12 +555,28 @@ export class SinhVienService {
   async payInvoice(invoiceId: number) {
     const hd = await this.hoaDonRepo.findOne({
       where: { id: invoiceId },
-      relations: { phieuDangKy: true },
+      relations: { phieuDangKy: { chuyenThamQuan: true } },
     });
     if (!hd) throw new NotFoundException('Không tìm thấy hóa đơn');
 
     hd.ngay_dong_thuc_te = new Date();
-    if (hd.ngay_dong_thuc_te <= hd.han_dong) {
+    
+    let isDungHan = false;
+    if (hd.phieuDangKy?.chuyenThamQuan) {
+      const ctq = hd.phieuDangKy.chuyenThamQuan;
+      if (ctq.ngay_tham_quan && ctq.gio_bat_dau) {
+        const dateStr = typeof ctq.ngay_tham_quan === 'string' ? ctq.ngay_tham_quan : ctq.ngay_tham_quan.toISOString().split('T')[0];
+        const departureTime = new Date(`${dateStr}T${ctq.gio_bat_dau}`);
+        const deadline = new Date(departureTime.getTime() - 24 * 60 * 60 * 1000);
+        isDungHan = hd.ngay_dong_thuc_te <= deadline;
+      } else {
+        isDungHan = hd.han_dong ? (hd.ngay_dong_thuc_te <= hd.han_dong) : true;
+      }
+    } else {
+      isDungHan = hd.han_dong ? (hd.ngay_dong_thuc_te <= hd.han_dong) : true;
+    }
+
+    if (isDungHan) {
       hd.trang_thai = 'DaDongDungHan';
       hd.phieuDangKy.trang_thai = 'HopLe';
       await this.phieuRepo.save(hd.phieuDangKy);
@@ -584,7 +609,7 @@ export class SinhVienService {
   ) {
     const hd = await this.hoaDonRepo.findOne({
       where: { id: invoiceId },
-      relations: { phieuDangKy: true },
+      relations: { phieuDangKy: { sinhVien: true } },
     });
     if (!hd) throw new NotFoundException('Không tìm thấy hóa đơn');
     if (hd.phieuDangKy.sinh_vien_id !== studentId) {
@@ -610,6 +635,9 @@ export class SinhVienService {
     const don = new DonHoanPhi();
     don.hoa_don_id = invoiceId;
     don.file_don_da_duyet = fileScanUrl;
+    don.ngan_hang_nhan = 'Ngân hàng mặc định (Thiếu trên UI)';
+    don.so_tai_khoan_nhan = '000000000';
+    don.ten_chu_tai_khoan_nhan = hd.phieuDangKy?.sinhVien?.ho_ten ?? 'Sinh viên ẩn danh';
     don.ngay_nop = new Date();
     don.trang_thai = 'ChoXuLy';
     don.ngan_hang_nhan = nganHangNhan;
@@ -814,6 +842,11 @@ export class SinhVienService {
         } catch (r2Error) {
           console.error('Lỗi khi ghi đè file text lên R2:', r2Error);
         }
+      } else if (this.r2Storage.isReady()) {
+        // Kích hoạt tiến trình chạy ngầm
+        this.runBackgroundExtraction(validBaoCaoRef).catch(e => 
+          console.error('Lỗi khi khởi chạy tiến trình trích xuất ngầm:', e)
+        );
       }
       // OCR text extraction is now handled in the background by UploadController
     } catch (error: any) {

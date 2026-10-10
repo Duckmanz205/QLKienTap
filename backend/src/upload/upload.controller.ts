@@ -100,6 +100,7 @@ export class UploadController {
 
     if (!sv) return false;
 
+    // 1. Kiểm tra xem có phải giảng viên hướng dẫn chấm điểm không
     const assignment = await this.phanCongRepo.findOne({
       where: {
         giang_vien_id: gv.id,
@@ -111,7 +112,19 @@ export class UploadController {
       relations: { dotKienTapSinhVien: true },
     });
 
-    return !!assignment;
+    if (assignment) return true;
+
+    // 2. Kiểm tra xem có phải giảng viên dẫn đoàn (Lead Lecturer) không
+    const isLead = await this.svRepo.manager.query(
+      `SELECT TOP 1 1 
+       FROM PhanCongGiangVienDanDoan pc 
+       JOIN PhieuDangKy pdk ON pc.chuyen_tham_quan_id = pdk.chuyen_tham_quan_id 
+       WHERE pc.giang_vien_id = ${gv.id} AND pdk.sinh_vien_id = ${sv.id}`
+    );
+
+    if (isLead && isLead.length > 0) return true;
+
+    return false;
   }
 
   private sendLocalFile(res: any, filePath: string, filename: string) {

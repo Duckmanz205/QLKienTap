@@ -184,6 +184,30 @@ class ApiService {
     }
   }
 
+  static Future<dynamic> delete(String path) async {
+    try {
+      final response = await http
+          .delete(
+            Uri.parse('$baseUrl/$path'),
+            headers: _headers,
+          )
+          .timeout(const Duration(seconds: 4));
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        if (response.body.isEmpty) return null;
+        return jsonDecode(response.body);
+      } else if (response.statusCode == 401) {
+        await _handleUnauthorized();
+        throw Exception(
+            'Phiên làm việc hết hạn. Vui lòng đăng nhập lại (401).');
+      } else {
+        throw _handleErrorResponse(response);
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   // Auth
   static Future<Map<String, dynamic>> login(
       String username, String password) async {
@@ -264,7 +288,7 @@ class ApiService {
   }
 
   static Future<dynamic> submitReport(int registrationId,
-      String fileBaoCaoUrl, String? fileXacNhanUrl) async {
+      String fileBaoCaoUrl, String? fileXacNhanUrl, {String? extractedText}) async {
     final data = <String, dynamic>{
       'registrationId': registrationId,
       'fileBaoCaoUrl': fileBaoCaoUrl,
@@ -272,7 +296,14 @@ class ApiService {
     if (fileXacNhanUrl != null) {
       data['fileXacNhanUrl'] = fileXacNhanUrl;
     }
+    if (extractedText != null) {
+      data['extractedText'] = extractedText;
+    }
     return await post('sinh-vien/submit-report', data);
+  }
+
+  static Future<dynamic> deleteReport(int registrationId) async {
+    return await delete('sinh-vien/report/$registrationId');
   }
 
   static Future<dynamic> selectRepresentativeTrips(
@@ -297,10 +328,14 @@ class ApiService {
   }
 
   static Future<dynamic> requestRefund(
-      int invoiceId, String fileScanUrl) async {
+      int invoiceId, String fileScanUrl, {String? bankName, String? accountNumber, String? accountName, String? reason}) async {
     return await post('sinh-vien/request-refund', {
       'invoiceId': invoiceId,
       'fileScanUrl': fileScanUrl,
+      if (bankName != null) 'ngan_hang': bankName,
+      if (accountNumber != null) 'so_tai_khoan': accountNumber,
+      if (accountName != null) 'ten_nguoi_nhan': accountName,
+      if (reason != null) 'ly_do': reason,
     });
   }
 
@@ -380,10 +415,12 @@ class ApiService {
 
   // Lecturer guided reports
   static Future<dynamic> getGuidedReports(int lecturerId,
-      {String? search, String? status}) async {
+      {String? search, String? status, int? page, int? limit}) async {
     final queryParams = <String, String>{};
     if (search != null) queryParams['search'] = search;
     if (status != null) queryParams['status'] = status;
+    if (page != null) queryParams['page'] = page.toString();
+    if (limit != null) queryParams['limit'] = limit.toString();
     final uri = Uri.parse('$baseUrl/giang-vien/guided-reports/$lecturerId')
         .replace(queryParameters: queryParams);
     try {
@@ -473,6 +510,149 @@ class ApiService {
       }
     } catch (e) {
       rethrow;
+    }
+  }
+
+  static Future<String> fetchReportText(String pdfUrl) async {
+    try {
+      String finalUrl = pdfUrl;
+      if (finalUrl.startsWith('reports/')) {
+        finalUrl = '$baseUrl/upload/file/$finalUrl';
+      } else if (finalUrl.startsWith('/api/')) {
+        finalUrl = baseUrl.replaceAll('/api', '') + finalUrl;
+      } else if (!finalUrl.startsWith('http')) {
+        finalUrl = '$baseUrl/upload/file/reports/$finalUrl';
+      }
+      
+      String txtUrl = finalUrl.replaceAll(RegExp(r'\.pdf$'), '.txt');
+      
+      if (txtUrl.contains('localhost') || txtUrl.contains('127.0.0.1')) {
+        try {
+          final uri = Uri.parse(baseUrl);
+          txtUrl = txtUrl.replaceAll('localhost', uri.host).replaceAll('127.0.0.1', uri.host);
+        } catch (e) {
+          txtUrl = txtUrl.replaceAll('localhost', '10.0.2.2').replaceAll('127.0.0.1', '10.0.2.2');
+        }
+      }
+
+      final uri = Uri.parse(txtUrl);
+      final response = await http.get(uri, headers: {
+        if (token != null) 'Authorization': 'Bearer $token',
+      }).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        return utf8.decode(response.bodyBytes);
+      } else {
+        // Fallback: Download PDF and extract text
+        return await _downloadAndExtractPdfText(finalUrl);
+      }
+    } catch (e) {
+      throw Exception('Không thể lấy nội dung báo cáo: $e');
+    }
+  }
+
+  static Future<String> _downloadAndExtractPdfText(String pdfUrl) async {
+    try {
+      if (pdfUrl.contains('localhost') || pdfUrl.contains('127.0.0.1')) {
+        try {
+          final uri = Uri.parse(baseUrl);
+          pdfUrl = pdfUrl.replaceAll('localhost', uri.host).replaceAll('127.0.0.1', uri.host);
+        } catch (e) {
+          pdfUrl = pdfUrl.replaceAll('localhost', '10.0.2.2').replaceAll('127.0.0.1', '10.0.2.2');
+        }
+      }
+
+      final response = await http.get(Uri.parse(pdfUrl), headers: {
+        if (token != null) 'Authorization': 'Bearer $token',
+      }).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode != 200) {
+        throw Exception('Không thể tải PDF để trích xuất: ${response.statusCode}');
+      }
+
+      String aiBase = 'http://10.0.2.2:8000';
+      try {
+        final uri = Uri.parse(baseUrl);
+        aiBase = '${uri.scheme}://${uri.host}:8000';
+      } catch (e) {}
+
+      final request = http.MultipartRequest('POST', Uri.parse('$aiBase/process-pdf'));
+      request.files.add(http.MultipartFile.fromBytes('file', response.bodyBytes, filename: 'report.pdf'));
+      
+      final streamedResponse = await request.send().timeout(const Duration(seconds: 120));
+      final aiResponse = await http.Response.fromStream(streamedResponse);
+
+      if (aiResponse.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(aiResponse.bodyBytes));
+        return data['extracted_text'] ?? '';
+      } else {
+        throw Exception('Lỗi trích xuất PDF: ${aiResponse.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Lỗi trích xuất PDF qua AI: $e');
+    }
+  }
+
+  static Future<Map<String, dynamic>> gradeWithAI(String documentText) async {
+    try {
+      String aiBase = 'http://10.0.2.2:8000';
+      try {
+        final uri = Uri.parse(baseUrl);
+        aiBase = '${uri.scheme}://${uri.host}:8000';
+      } catch (e) {
+        // Fallback
+      }
+
+      final uri = Uri.parse('$aiBase/grade');
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer satori_2026_secure_key'
+        },
+        body: jsonEncode({'document_text': documentText}),
+      ).timeout(const Duration(seconds: 120));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(utf8.decode(response.bodyBytes));
+      } else {
+        throw Exception('Lỗi AI: ${response.statusCode} - ${response.body}');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+  static Future<String?> extractTextFromPdf(String filePath) async {
+    try {
+      String aiBase = 'http://10.0.2.2:8000';
+      try {
+        final uri = Uri.parse(baseUrl);
+        aiBase = '${uri.scheme}://${uri.host}:8000';
+      } catch (e) {
+        // Fallback
+      }
+
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$aiBase/process-pdf'),
+      );
+      request.files.add(await http.MultipartFile.fromPath('file', filePath));
+      
+      final streamedResponse = await request.send().timeout(const Duration(seconds: 120));
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200) {
+        // The API returns UTF-8 but http.Response might decode it wrong without specifying
+        final decodedBody = utf8.decode(response.bodyBytes);
+        final data = jsonDecode(decodedBody);
+        return data['extracted_text'];
+      } else {
+        print('Error extracting PDF: ${response.statusCode} - ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      print('Exception extracting PDF: $e');
+      return null;
     }
   }
 }

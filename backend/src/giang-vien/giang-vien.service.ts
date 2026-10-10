@@ -416,7 +416,6 @@ export class GiangVienService {
     search?: string,
     status?: string,
   ) {
-    // Tim tat ca sinh vien duoc huong dan
     const guidedSvIds = (
       await this.phanCongRepo.find({
         where: { giang_vien_id: lecturerId, trang_thai: 'DangHoatDong' },
@@ -424,7 +423,13 @@ export class GiangVienService {
       })
     ).map((a) => a.dotKienTapSinhVien.sinh_vien_id);
 
-    if (guidedSvIds.length === 0)
+    const ledTripIds = (
+      await this.danDoanRepo.find({
+        where: { giang_vien_id: lecturerId },
+      })
+    ).map(a => a.chuyen_tham_quan_id);
+
+    if (guidedSvIds.length === 0 && ledTripIds.length === 0)
       return { data: [], total: 0, page, limit, totalPages: 0 };
 
     const queryBuilder = this.baiThuRepo

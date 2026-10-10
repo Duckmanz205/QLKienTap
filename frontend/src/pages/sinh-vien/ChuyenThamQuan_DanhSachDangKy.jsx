@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { sinhVienApi } from '../../services/api';
+import SearchableDropdown from '../../components/SearchableDropdown';
 
 export default function ChuyenThamQuan_DanhSachDangKy() {
   const navigate = useNavigate();
@@ -618,19 +619,21 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                   <div className="p-4 bg-white rounded-xl border border-[#E7E0C4] flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
                     <div className="text-xs text-slate-600 flex items-center gap-2">
                       <span>Hiển thị</span>
-                      <select
+                      <SearchableDropdown
                         value={limitAvailable}
-                        onChange={e => {
-                          setLimitAvailable(Number(e.target.value));
+                        onChange={val => {
+                          setLimitAvailable(Number(val));
                           setPageAvailable(1);
                         }}
-                        className="px-2 py-1 bg-white border border-[#E7E0C4] rounded-lg text-xs font-semibold focus:outline-none focus:border-[#407F3E] cursor-pointer"
-                      >
-                        <option value={6}>6 chuyến</option>
-                        <option value={12}>12 chuyến</option>
-                        <option value={24}>24 chuyến</option>
-                        <option value={48}>48 chuyến</option>
-                      </select>
+                        options={[
+                          { value: 6, label: '6 chuyến' },
+                          { value: 12, label: '12 chuyến' },
+                          { value: 24, label: '24 chuyến' },
+                          { value: 48, label: '48 chuyến' }
+                        ]}
+                        className="min-w-[120px]"
+                        searchPlaceholder="Tìm..."
+                      />
                       <span>/ tổng số <strong className="text-slate-800">{totalAvailable}</strong> chuyến mở</span>
                     </div>
 
@@ -896,19 +899,21 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                   <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div className="text-xs text-slate-600 flex items-center gap-2">
                       <span>Hiển thị</span>
-                      <select
+                      <SearchableDropdown
                         value={limitRegistered}
-                        onChange={e => {
-                          setLimitRegistered(Number(e.target.value));
+                        onChange={val => {
+                          setLimitRegistered(Number(val));
                           setPageRegistered(1);
                         }}
-                        className="px-2 py-1 bg-white border border-[#E7E0C4] rounded-lg text-xs font-semibold focus:outline-none focus:border-[#407F3E] cursor-pointer"
-                      >
-                        <option value={15}>15 mục</option>
-                        <option value={30}>30 mục</option>
-                        <option value={50}>50 mục</option>
-                        <option value={100}>100 mục</option>
-                      </select>
+                        options={[
+                          { value: 15, label: '15 mục' },
+                          { value: 30, label: '30 mục' },
+                          { value: 50, label: '50 mục' },
+                          { value: 100, label: '100 mục' }
+                        ]}
+                        className="min-w-[120px]"
+                        searchPlaceholder="Tìm..."
+                      />
                       <span>/ tổng số <strong className="text-slate-800">{totalReg}</strong> đơn đăng ký</span>
                     </div>
 
@@ -1111,15 +1116,16 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
 
                 <div className="md:col-span-1">
                   <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Hình thức <span className="text-[#E68A8C]">*</span></label>
-                  <select 
+                  <SearchableDropdown
                     value={hinhThuc}
-                    onChange={(e) => setHinhThuc(e.target.value)}
-                    required
-                    className="w-full px-4 py-3 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-800 font-medium"
-                  >
-                    <option value="TrucTiep">Trực tiếp</option>
-                    <option value="TrucTuyen">Trực tuyến</option>
-                  </select>
+                    onChange={(val) => setHinhThuc(val)}
+                    options={[
+                      { value: 'TrucTiep', label: 'Trực tiếp' },
+                      { value: 'TrucTuyen', label: 'Trực tuyến' }
+                    ]}
+                    className="w-full"
+                    searchPlaceholder="Tìm..."
+                  />
                 </div>
               </div>
 

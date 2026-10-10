@@ -15,6 +15,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { giangVienApi } from '../../services/api';
+import SearchableDropdown from '../../components/SearchableDropdown';
 
 export default function HoiDongChamBaoCao_DSBuoi_GV() {
   const [lecturer, setLecturer] = useState(null);
@@ -223,61 +224,20 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
               />
             </div>
 
-            {/* Role Filter Popover */}
-            <div className="relative min-w-[200px]" onClick={(e) => e.stopPropagation()}>
-              <div 
-                onClick={() => setIsRoleDropdownOpen(!isRoleDropdownOpen)}
-                className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isRoleDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-              >
-                <span className="truncate pr-2 font-medium text-slate-700">
-                  {selectedRole === 'ALL' ? 'Tất cả vai trò' : selectedRole}
-                </span>
-                <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-              </div>
-              {isRoleDropdownOpen && (
-                <div className="absolute top-full right-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-50 py-1 overflow-hidden animate-in slide-in-from-top-1">
-                  <div className="p-2 border-b border-[#E7E0C4]">
-                    <input
-                      type="text"
-                      placeholder="Tìm vai trò..."
-                      value={searchRoleDropdown}
-                      onChange={(e) => setSearchRoleDropdown(e.target.value)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-[#E7E0C4] rounded-lg focus:outline-none focus:border-[#407F3E]"
-                    />
-                  </div>
-                  <div className="max-h-60 overflow-y-auto">
-                    {['ALL', ...availableRoles]
-                      .filter(role => {
-                        const label = role === 'ALL' ? 'Tất cả vai trò' : role;
-                        return !searchRoleDropdown || label.toLowerCase().includes(searchRoleDropdown.toLowerCase());
-                      })
-                      .map(role => (
-                        <div 
-                          key={role}
-                          onClick={() => {
-                            setSelectedRole(role);
-                            setIsRoleDropdownOpen(false);
-                            setSearchRoleDropdown('');
-                            setCurrentPage(1);
-                          }}
-                          className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                            selectedRole === role ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50 font-medium'
-                          }`}
-                        >
-                          <span>{role === 'ALL' ? 'Tất cả vai trò' : role}</span>
-                          {selectedRole === role && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                        </div>
-                      ))}
-                    {['ALL', ...availableRoles].filter(role => {
-                      const label = role === 'ALL' ? 'Tất cả vai trò' : role;
-                      return !searchRoleDropdown || label.toLowerCase().includes(searchRoleDropdown.toLowerCase());
-                    }).length === 0 && (
-                      <div className="px-4 py-3 text-xs text-slate-500 text-center">Không tìm thấy vai trò</div>
-                    )}
-                  </div>
-                </div>
-              )}
+            <div className="min-w-[200px]">
+              <SearchableDropdown
+                value={selectedRole}
+                onChange={val => {
+                  setSelectedRole(val);
+                  setCurrentPage(1);
+                }}
+                options={[
+                  { value: 'ALL', label: 'Tất cả vai trò' },
+                  ...availableRoles.map(role => ({ value: role, label: role }))
+                ]}
+                className="w-full"
+                searchPlaceholder="Tìm vai trò..."
+              />
             </div>
           </div>
 
@@ -366,20 +326,21 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
             <div className="mt-6 pt-4 border-t border-[#E7E0C4] flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
                 <span>Hiển thị</span>
-                <select 
+                <SearchableDropdown 
+                  options={[
+                    { value: 6, label: '6' },
+                    { value: 12, label: '12' },
+                    { value: 24, label: '24' },
+                    { value: 48, label: '48' }
+                  ]}
                   value={limit}
-                  onChange={(e) => {
-                    const newLimit = Number(e.target.value);
+                  onChange={(newLimit) => {
                     setLimit(newLimit);
                     setCurrentPage(1);
                   }}
-                  className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
-                >
-                  <option value={6}>6</option>
-                  <option value={12}>12</option>
-                  <option value={24}>24</option>
-                  <option value={48}>48</option>
-                </select>
+                  searchPlaceholder="Tìm số lượng..."
+                  className="min-w-[80px]"
+                />
                 <span>/ {filteredBoards.length} hội đồng</span>
               </div>
               <div className="flex items-center gap-1.5">

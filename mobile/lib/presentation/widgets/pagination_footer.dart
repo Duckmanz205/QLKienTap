@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
+import 'searchable_dropdown.dart';
 
 class PaginationFooter extends StatelessWidget {
   final int currentPage;
@@ -42,27 +43,13 @@ class PaginationFooter extends StatelessWidget {
                 style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
               ),
               const SizedBox(width: 8),
-              Container(
-                height: 32,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade300),
-                  borderRadius: BorderRadius.circular(8),
-                  color: Colors.white,
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<int>(
-                    value: limit,
-                    icon: const Icon(Icons.arrow_drop_down, size: 20),
-                    style: const TextStyle(color: AppColors.darkSlate, fontSize: 13, fontWeight: FontWeight.bold),
-                    onChanged: (val) {
-                      if (val != null) onLimitChanged(val);
-                    },
-                    items: [15, 30, 50, 100].map((e) {
-                      return DropdownMenuItem(value: e, child: Text('$e'));
-                    }).toList(),
-                  ),
-                ),
+              SearchableDropdown(
+                title: 'Hiển thị',
+                value: limit.toString(),
+                options: const ['15', '30', '50', '100'],
+                onChanged: (val) {
+                  onLimitChanged(int.parse(val));
+                },
               ),
               const SizedBox(width: 8),
               Expanded(

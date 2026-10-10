@@ -4,6 +4,7 @@ import {
   Plus, ChevronDown, Check, X, Search, ChevronRight, Calendar, MapPin, Users
 } from 'lucide-react';
 import { khoaApi } from '../../services/api';
+import SearchableDropdown from '../../components/SearchableDropdown';
 
 export default function HoiDongChamBaoCao_Khoa() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -359,20 +360,21 @@ export default function HoiDongChamBaoCao_Khoa() {
         <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
             <span>Hiển thị</span>
-            <select 
+            <SearchableDropdown 
+              options={[
+                { value: 15, label: '15' },
+                { value: 30, label: '30' },
+                { value: 50, label: '50' },
+                { value: 100, label: '100' }
+              ]}
               value={limit}
-              onChange={(e) => {
-                const newLimit = Number(e.target.value);
+              onChange={(newLimit) => {
                 setLimit(newLimit);
                 setCurrentPage(1);
               }}
-              className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
-            >
-              <option value={15}>15</option>
-              <option value={30}>30</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
+              searchPlaceholder="Tìm số lượng..."
+              className="min-w-[80px]"
+            />
             <span>/ {filteredCommittees.length} hội đồng</span>
           </div>
           <div className="flex items-center gap-1.5">
@@ -578,18 +580,19 @@ export default function HoiDongChamBaoCao_Khoa() {
                           return (
                             <div key={m.id} className="flex items-center justify-between p-2 bg-slate-50 border border-[#E7E0C4] rounded-lg">
                               <span className="text-sm font-semibold text-slate-800">{lec?.ho_ten}</span>
-                              <select
+                              <SearchableDropdown
+                                options={[
+                                  { value: 'Chủ tịch', label: 'Chủ tịch' },
+                                  { value: 'Thư ký', label: 'Thư ký' },
+                                  { value: 'Thành viên', label: 'Thành viên' }
+                                ]}
                                 value={m.role}
-                                onChange={(e) => {
-                                  const newRole = e.target.value;
-                                  setSelectedMembers(selectedMembers.map(item => item.id === m.id ? { ...item, role: newRole } : item));
+                                onChange={(val) => {
+                                  setSelectedMembers(selectedMembers.map(item => item.id === m.id ? { ...item, role: val } : item));
                                 }}
-                                className="text-xs px-2 py-1.5 border border-slate-200 rounded font-bold text-slate-700 bg-white focus:outline-none focus:border-[#407F3E]"
-                              >
-                                <option value="Chủ tịch">Chủ tịch</option>
-                                <option value="Thư ký">Thư ký</option>
-                                <option value="Thành viên">Thành viên</option>
-                              </select>
+                                searchPlaceholder="Tìm..."
+                                className="min-w-[140px]"
+                              />
                             </div>
                           );
                         })}
