@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { sinhVienApi } from '../../services/api';
 import Toast from '../../components/Toast';
+import SearchableDropdown from '../../components/SearchableDropdown';
 
 export default function NopBaiThuHoach_SV() {
   const [student, setStudent] = useState(null);
@@ -316,13 +317,15 @@ export default function NopBaiThuHoach_SV() {
                   
                   <div className="space-y-2">
                     <label className="block text-xs font-bold text-white/70 uppercase tracking-wider">Chọn đợt bảo vệ</label>
-                    <div className="relative">
-                      <select className="w-full px-4 py-3 bg-white text-slate-800 rounded-xl text-sm font-bold appearance-none cursor-pointer border-none focus:ring-4 focus:ring-[#DBD468]/50 outline-none">
-                        <option>Đợt 1 (15/10/2026 - Phòng B.301)</option>
-                        <option>Đợt 2 (20/10/2026 - Phòng C.105)</option>
-                      </select>
-                      <ChevronRight className="w-4 h-4 text-slate-400 absolute right-4 top-1/2 -translate-y-1/2 rotate-90 pointer-events-none" />
-                    </div>
+                    <SearchableDropdown 
+                      options={[
+                        { value: 'dot1', label: 'Đợt 1 (15/10/2026 - Phòng B.301)' },
+                        { value: 'dot2', label: 'Đợt 2 (20/10/2026 - Phòng C.105)' }
+                      ]}
+                      value={'dot1'}
+                      onChange={() => {}}
+                      searchPlaceholder="Tìm đợt bảo vệ..."
+                    />
                   </div>
                 </div>
               )}

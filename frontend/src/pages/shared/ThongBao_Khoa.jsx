@@ -6,18 +6,16 @@ import {
   MessageSquare, Search
 } from 'lucide-react';
 import api, { khoaApi } from '../../services/api';
+import SearchableDropdown from '../../components/SearchableDropdown';
 
 export default function ThongBao_Khoa() {
   const [notifications, setNotifications] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isDoiTuongDropdownOpen, setIsDoiTuongDropdownOpen] = useState(false);
   const [viewingDetail, setViewingDetail] = useState(null);
 
   // Filter & Pagination states
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilterDoiTuong, setSelectedFilterDoiTuong] = useState('ALL');
-  const [searchDoiTuongDropdown, setSearchDoiTuongDropdown] = useState('');
-  const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [limit, setLimit] = useState(15);
   
@@ -138,63 +136,21 @@ export default function ThongBao_Khoa() {
           </div>
 
           {/* Đối tượng Filter Dropdown */}
-          <div className="relative w-56" onClick={(e) => e.stopPropagation()}>
-            <div 
-              onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
-              className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isFilterDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-            >
-              <span className="truncate pr-2 font-medium text-slate-700">
-                {selectedFilterDoiTuong === 'ALL' ? 'Tất cả đối tượng' : (selectedFilterDoiTuong === 'STUDENT' ? 'Sinh viên' : 'Giảng viên')}
-              </span>
-              <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-            </div>
-            {isFilterDropdownOpen && (
-              <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1">
-                <div className="p-2 border-b border-[#E7E0C4]">
-                  <input
-                    type="text"
-                    placeholder="Tìm đối tượng..."
-                    value={searchDoiTuongDropdown}
-                    onChange={(e) => setSearchDoiTuongDropdown(e.target.value)}
-                    onClick={(e) => e.stopPropagation()}
-                    className="w-full px-2.5 py-1 text-xs bg-slate-50 border border-[#E7E0C4] rounded-md focus:outline-none focus:border-[#407F3E]"
-                  />
-                </div>
-                <div className="max-h-60 overflow-y-auto">
-                {[
-                  { id: 'ALL', name: 'Tất cả đối tượng' },
-                  { id: 'STUDENT', name: 'Sinh viên' },
-                  { id: 'LECTURER', name: 'Giảng viên' }
-                ]
-                  .filter(opt => !searchDoiTuongDropdown || opt.name.toLowerCase().includes(searchDoiTuongDropdown.toLowerCase()))
-                  .map(opt => (
-                  <div 
-                    key={opt.id}
-                    onClick={() => { 
-                      setSelectedFilterDoiTuong(opt.id); 
-                      setIsFilterDropdownOpen(false); 
-                      setSearchDoiTuongDropdown('');
-                      setCurrentPage(1); 
-                    }}
-                    className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                      selectedFilterDoiTuong === opt.id ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
-                    }`}
-                  >
-                    <span>{opt.name}</span>
-                    {selectedFilterDoiTuong === opt.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                  </div>
-                ))}
-                {[
-                  { id: 'ALL', name: 'Tất cả đối tượng' },
-                  { id: 'STUDENT', name: 'Sinh viên' },
-                  { id: 'LECTURER', name: 'Giảng viên' }
-                ].filter(opt => !searchDoiTuongDropdown || opt.name.toLowerCase().includes(searchDoiTuongDropdown.toLowerCase())).length === 0 && (
-                  <div className="px-4 py-3 text-xs text-slate-500 text-center">Không tìm thấy</div>
-                )}
-                </div>
-              </div>
-            )}
-          </div>
+          <SearchableDropdown
+            options={[
+              { value: 'ALL', label: 'Tất cả đối tượng' },
+              { value: 'STUDENT', label: 'Sinh viên' },
+              { value: 'LECTURER', label: 'Giảng viên' }
+            ]}
+            value={selectedFilterDoiTuong}
+            onChange={(val) => {
+              setSelectedFilterDoiTuong(val);
+              setCurrentPage(1);
+            }}
+            placeholder="Tất cả đối tượng"
+            searchPlaceholder="Tìm đối tượng..."
+            className="w-56 z-30"
+          />
         </div>
       </div>
 
@@ -263,20 +219,21 @@ export default function ThongBao_Khoa() {
         <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
             <span>Hiển thị</span>
-            <select 
+            <SearchableDropdown 
+              options={[
+                { value: 15, label: '15' },
+                { value: 30, label: '30' },
+                { value: 50, label: '50' },
+                { value: 100, label: '100' }
+              ]}
               value={limit}
-              onChange={(e) => {
-                const newLimit = Number(e.target.value);
+              onChange={(newLimit) => {
                 setLimit(newLimit);
                 setCurrentPage(1);
               }}
-              className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
-            >
-              <option value={15}>15</option>
-              <option value={30}>30</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
+              searchPlaceholder="Tìm số lượng..."
+              className="min-w-[80px]"
+            />
             <span>/ {filteredNotifications.length} thông báo</span>
           </div>
           <div className="flex items-center gap-1.5">

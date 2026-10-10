@@ -1,8 +1,149 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/app_models.dart';
 import '../../../data/state/app_state.dart';
+import '../../../core/network/api_service.dart';
 import '../../widgets/paginated_list.dart';
+
+Future<void> _showCancelDialog(
+  BuildContext context,
+  Trip trip,
+  AppStateProviderState appStateProvider, {
+  VoidCallback? onBack,
+}) async {
+  final reasonCtrl = TextEditingController();
+  String? localPath;
+  String? fileName;
+  bool isSubmitting = false;
+
+  await showDialog(
+    context: context,
+    builder: (ctx) {
+      return StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: const Text('Hủy đăng ký', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text('Bạn có chắc muốn hủy đăng ký chuyến ${trip.name} không?'),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: reasonCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Lý do hủy (bắt buộc)',
+                      border: OutlineInputBorder(),
+                    ),
+                    maxLines: 2,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('File minh chứng (tùy chọn):', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: () async {
+                      try {
+                        final pickerResult = await FilePicker.pickFiles(
+                          type: FileType.custom,
+                          allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'],
+                        );
+                        if (pickerResult != null && pickerResult.files.single.path != null) {
+                          setState(() {
+                            localPath = pickerResult.files.single.path;
+                            fileName = pickerResult.files.single.name;
+                          });
+                        }
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Lỗi chọn file: $e')),
+                        );
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.attach_file, size: 16, color: AppColors.primary),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              fileName ?? 'Chưa chọn file',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: fileName != null ? AppColors.darkSlate : Colors.grey.shade600,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSubmitting ? null : () => Navigator.pop(ctx),
+                child: const Text('Đóng'),
+              ),
+              ElevatedButton(
+                onPressed: isSubmitting
+                    ? null
+                    : () async {
+                        if (reasonCtrl.text.trim().isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Vui lòng nhập lý do hủy.')),
+                          );
+                          return;
+                        }
+
+                        setState(() => isSubmitting = true);
+                        try {
+                          await appStateProvider.cancelTripRegistration(
+                            trip.id,
+                            trip.registrationId,
+                            lyDo: reasonCtrl.text.trim(),
+                            fileMinhChung: localPath,
+                          );
+                          if (context.mounted) {
+                            Navigator.pop(ctx);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Đã gửi yêu cầu hủy đăng ký chuyến ${trip.name}')),
+                            );
+                            if (onBack != null) onBack();
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Lỗi: $e'), backgroundColor: AppColors.danger),
+                            );
+                          }
+                        } finally {
+                          if (context.mounted) {
+                            setState(() => isSubmitting = false);
+                          }
+                        }
+                      },
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger, foregroundColor: Colors.white),
+                child: isSubmitting
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Text('XÁC NHẬN HỦY'),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+}
 
 class ChuyenThamQuanSVScreen extends StatefulWidget {
   final Function(String) onTripTap;
@@ -95,13 +236,23 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
   }
 
   Widget _buildCurrentTabContent(List<Trip> available, List<Trip> registered, AppStateProviderState appStateProvider) {
+    Widget content;
     if (widget.activeTab == 'propose') {
-      return _buildProposeTab(appStateProvider);
+      content = _buildProposeTab(appStateProvider);
     } else if (widget.activeTab == 'registered') {
-      return _buildRegisteredTripsTab(registered, appStateProvider);
+      content = _buildRegisteredTripsTab(registered, appStateProvider);
     } else {
-      return _buildAvailableTripsTab(available, appStateProvider);
+      content = _buildAvailableTripsTab(available, appStateProvider);
     }
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        if (ApiService.userId != null) {
+          await appStateProvider.fetchStudentDataFromApi(ApiService.userId!);
+        }
+      },
+      child: content,
+    );
   }
 
   Widget _buildAvailableTripsTab(List<Trip> trips, AppStateProviderState appStateProvider) {
@@ -177,11 +328,21 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                 child: ElevatedButton(
-                  onPressed: () {
-                    appStateProvider.registerTrip(trip.id);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Đăng ký thành công chuyến ${trip.name}')),
-                    );
+                  onPressed: () async {
+                    try {
+                      await appStateProvider.registerTrip(trip.id);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Đăng ký thành công chuyến ${trip.name}')),
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Đăng ký thất bại: $e')),
+                        );
+                      }
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
@@ -264,10 +425,7 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
                     children: [
                       TextButton(
                         onPressed: () {
-                          appStateProvider.cancelTripRegistration(trip.id);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Đã hủy đăng ký chuyến ${trip.name}')),
-                          );
+                          _showCancelDialog(context, trip, appStateProvider);
                         },
                         style: TextButton.styleFrom(
                           foregroundColor: AppColors.danger,
@@ -458,12 +616,22 @@ class ChuyenThamQuanDetailSVScreen extends StatelessWidget {
                 const SizedBox(height: 32),
                 if (!trip.isRegistered)
                   ElevatedButton(
-                    onPressed: () {
-                      appStateProvider.registerTrip(trip.id);
-                      onBack();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Đăng ký thành công chuyến ${trip.name}')),
-                      );
+                    onPressed: () async {
+                      try {
+                        await appStateProvider.registerTrip(trip.id);
+                        if (context.mounted) {
+                          onBack();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Đăng ký thành công chuyến ${trip.name}')),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Đăng ký thất bại: $e')),
+                          );
+                        }
+                      }
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
@@ -478,11 +646,7 @@ class ChuyenThamQuanDetailSVScreen extends StatelessWidget {
                     onPressed: trip.isCompleted
                         ? null
                         : () {
-                            appStateProvider.cancelTripRegistration(trip.id);
-                            onBack();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Đã hủy đăng ký chuyến ${trip.name}')),
-                            );
+                            _showCancelDialog(context, trip, appStateProvider, onBack: onBack);
                           },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: trip.isCompleted ? Colors.grey.shade300 : AppColors.danger,

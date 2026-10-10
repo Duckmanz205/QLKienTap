@@ -5,6 +5,7 @@ import {
 import { khoaApi } from '../../services/api';
 import Toast from '../../components/Toast';
 import EdgeToEdgeContainer from '../../components/EdgeToEdgeContainer';
+import SearchableDropdown from '../../components/SearchableDropdown';
 
 export default function SupervisorAssignment_Khoa() {
   const [campaigns, setCampaigns] = useState([]);
@@ -40,6 +41,13 @@ export default function SupervisorAssignment_Khoa() {
   const [isAutoAssignModalOpen, setIsAutoAssignModalOpen] = useState(false);
   const [autoAssignPreview, setAutoAssignPreview] = useState(null);
   const [loadingAutoAssign, setLoadingAutoAssign] = useState(false);
+
+  // Auto assign modal pagination & search state
+  const [autoAssignSearchTerm, setAutoAssignSearchTerm] = useState('');
+  const [autoAssignCurrentPage, setAutoAssignCurrentPage] = useState(1);
+  const [autoAssignLimit, setAutoAssignLimit] = useState(30);
+  const [openLecturerDropdownId, setOpenLecturerDropdownId] = useState(null);
+  const [lecturerDropdownSearchTerm, setLecturerDropdownSearchTerm] = useState('');
 
   // Auto assign modal pagination & search state
   const [autoAssignSearchTerm, setAutoAssignSearchTerm] = useState('');
@@ -181,6 +189,7 @@ export default function SupervisorAssignment_Khoa() {
     setIsClassDropdownOpen(false);
     setIsStatusDropdownOpen(false);
     setOpenLecturerDropdownId(null);
+    setOpenLecturerDropdownId(null);
   };
 
   const handleDropdownClick = (e, setter) => {
@@ -234,6 +243,23 @@ export default function SupervisorAssignment_Khoa() {
   const rawAssignedStudents = enrollments.filter(e => e.sinhVien?.details?.giangVienHuongDan).length;
   const rawUnassignedStudents = rawTotalStudents - rawAssignedStudents;
   const progressPercent = rawTotalStudents === 0 ? 0 : Math.round((rawAssignedStudents / rawTotalStudents) * 100);
+
+  // Auto Assign Pagination & Search Logic
+  const filteredAutoAssign = (autoAssignPreview?.assignments || []).filter(a => {
+    if (!autoAssignSearchTerm) return true;
+    const term = autoAssignSearchTerm.toLowerCase();
+    return (
+      (a.sinhVien?.mssv || '').toLowerCase().includes(term) ||
+      (a.sinhVien?.ho_ten || '').toLowerCase().includes(term) ||
+      (a.sinhVien?.ten_lop || '').toLowerCase().includes(term)
+    );
+  });
+
+  const totalAutoAssignPages = Math.ceil(filteredAutoAssign.length / autoAssignLimit) || 1;
+  const paginatedAutoAssign = filteredAutoAssign.slice(
+    (autoAssignCurrentPage - 1) * autoAssignLimit,
+    autoAssignCurrentPage * autoAssignLimit
+  );
 
   // Auto Assign Pagination & Search Logic
   const filteredAutoAssign = (autoAssignPreview?.assignments || []).filter(a => {
@@ -504,16 +530,21 @@ export default function SupervisorAssignment_Khoa() {
             <div className="p-3 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0">
               <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
                 <span>Hiển thị</span>
-                <select 
+                <SearchableDropdown 
+                  options={[
+                    { value: 15, label: '15' },
+                    { value: 30, label: '30' },
+                    { value: 50, label: '50' },
+                    { value: 100, label: '100' }
+                  ]}
                   value={limit}
-                  onChange={e => { setLimit(Number(e.target.value)); setCurrentPage(1); }}
-                  className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
-                >
-                  <option value={15}>15</option>
-                  <option value={30}>30</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                </select>
+                  onChange={(newLimit) => {
+                    setLimit(newLimit);
+                    setCurrentPage(1);
+                  }}
+                  searchPlaceholder="Tìm số lượng..."
+                  className="min-w-[80px]"
+                />
                 <span>/ {totalItems} sinh viên</span>
               </div>
               
@@ -661,6 +692,7 @@ export default function SupervisorAssignment_Khoa() {
       {isAutoAssignModalOpen && autoAssignPreview && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden animate-in zoom-in-95">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden animate-in zoom-in-95">
             <div className="bg-slate-50 border-b border-slate-200 p-4 flex justify-between items-center">
               <div>
                 <h3 className="text-lg font-bold text-slate-800">Xác nhận phân công tự động</h3>
@@ -784,19 +816,159 @@ export default function SupervisorAssignment_Khoa() {
                     <div className="bg-[#F8F9FA] px-4 py-3 border-t border-[#E7E0C4]/50 flex items-center justify-between text-xs shrink-0">
                       <div className="flex items-center gap-2 text-slate-600 font-medium">
                         Hiển thị 
-                        <select 
-                          className="border border-slate-200 rounded px-1.5 py-1 bg-white focus:outline-none focus:border-[#407F3E]"
+                        <SearchableDropdown
+                          options={[
+                            { value: 10, label: '10' },
+                            { value: 30, label: '30' },
+                            { value: 50, label: '50' },
+                            { value: 100, label: '100' }
+                          ]}
                           value={autoAssignLimit}
-                          onChange={(e) => {
-                            setAutoAssignLimit(Number(e.target.value));
+                          onChange={(val) => {
+                            setAutoAssignLimit(Number(val));
                             setAutoAssignCurrentPage(1);
                           }}
-                        >
-                          <option value={10}>10</option>
-                          <option value={30}>30</option>
-                          <option value={50}>50</option>
-                          <option value={100}>100</option>
-                        </select>
+                          searchPlaceholder="Tìm..."
+                          className="min-w-[80px]"
+                        />
+                        / {filteredAutoAssign.length} sinh viên
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button 
+                          onClick={() => setAutoAssignCurrentPage(1)} 
+                          disabled={autoAssignCurrentPage === 1}
+                          className="px-2 py-1 rounded border border-slate-200 bg-white text-slate-600 disabled:opacity-50 hover:bg-slate-50 transition-colors"
+                        >Trang đầu</button>
+                        <button 
+                          onClick={() => setAutoAssignCurrentPage(p => Math.max(1, p - 1))} 
+                          disabled={autoAssignCurrentPage === 1}
+                          className="px-2 py-1 rounded border border-slate-200 bg-white text-slate-600 disabled:opacity-50 hover:bg-slate-50 transition-colors"
+                        >Trước</button>
+                        <span className="px-3 py-1 rounded bg-[#407F3E] text-white font-bold shadow-sm">Trang {autoAssignCurrentPage} / {totalAutoAssignPages}</span>
+                        <button 
+                          onClick={() => setAutoAssignCurrentPage(p => Math.min(totalAutoAssignPages, p + 1))} 
+                          disabled={autoAssignCurrentPage === totalAutoAssignPages}
+                          className="px-2 py-1 rounded border border-slate-200 bg-white text-slate-600 disabled:opacity-50 hover:bg-slate-50 transition-colors"
+                        >Sau</button>
+                        <button 
+                          onClick={() => setAutoAssignCurrentPage(totalAutoAssignPages)} 
+                          disabled={autoAssignCurrentPage === totalAutoAssignPages}
+                          className="px-2 py-1 rounded border border-slate-200 bg-white text-slate-600 disabled:opacity-50 hover:bg-slate-50 transition-colors"
+                        >Trang cuối</button>
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                      <Check className="w-4 h-4 text-green-600" />
+                      Danh sách phân công dự kiến
+                    </h4>
+                    <div className="relative w-72">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                      <input 
+                        type="text" 
+                        placeholder="Tìm MSSV, Tên, Lớp..." 
+                        value={autoAssignSearchTerm}
+                        onChange={e => {setAutoAssignSearchTerm(e.target.value); setAutoAssignCurrentPage(1);}}
+                        className="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-[#407F3E]"
+                        onClick={e => e.stopPropagation()}
+                      />
+                    </div>
+                  </div>
+                  <div className="border border-[#E7E0C4]/50 rounded-xl overflow-hidden shadow-sm flex flex-col">
+                    <div className="overflow-y-auto max-h-[50vh]">
+                      <table className="w-full text-left border-collapse">
+                        <thead className="sticky top-0 bg-[#E7E0C4]/40 backdrop-blur-md text-slate-800 text-[10px] font-bold uppercase tracking-wider z-20 shadow-sm">
+                          <tr>
+                            <th className="p-3 pl-4">MSSV</th>
+                            <th className="p-3">Họ tên sinh viên</th>
+                            <th className="p-3">Lớp</th>
+                            <th className="p-3">Giảng viên nhận</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 text-sm">
+                          {paginatedAutoAssign.map((a, i) => {
+                            const originalIndex = autoAssignPreview.assignments.findIndex(item => item.sinhVien.id === a.sinhVien.id);
+                            return (
+                            <tr key={i} className="hover:bg-slate-50 transition-colors">
+                              <td className="p-3 pl-4 font-mono font-bold text-xs text-slate-500">{a.sinhVien.mssv}</td>
+                              <td className="p-3 font-bold text-slate-800 text-xs">{a.sinhVien.ho_ten}</td>
+                              <td className="p-3 font-medium text-slate-600 text-xs">{a.sinhVien.ten_lop || 'N/A'}</td>
+                              <td className="p-2 font-bold text-[#407F3E] relative" onClick={e => e.stopPropagation()}>
+                                <div 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenLecturerDropdownId(openLecturerDropdownId === a.sinhVien.id ? null : a.sinhVien.id);
+                                    setLecturerDropdownSearchTerm('');
+                                  }}
+                                  className="flex justify-between items-center w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs cursor-pointer hover:border-[#407F3E]"
+                                >
+                                  <span className="truncate pr-2">{a.lecturer?.ho_ten || 'Chọn giảng viên'}</span>
+                                  <ChevronDown className={`w-3.5 h-3.5 text-slate-400 shrink-0 ${openLecturerDropdownId === a.sinhVien.id ? 'rotate-180' : ''}`} />
+                                </div>
+                                {openLecturerDropdownId === a.sinhVien.id && (
+                                  <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-50 py-1" onClick={e => e.stopPropagation()}>
+                                    <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
+                                      <input 
+                                        type="text" 
+                                        placeholder="Tìm giảng viên..." 
+                                        value={lecturerDropdownSearchTerm}
+                                        onChange={(e) => setLecturerDropdownSearchTerm(e.target.value)}
+                                        className="w-full px-2 py-1 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E]"
+                                        onClick={(e) => e.stopPropagation()}
+                                        autoFocus
+                                      />
+                                    </div>
+                                    <div className="max-h-48 overflow-y-auto">
+                                      {lecturers.filter(l => l.ho_ten.toLowerCase().includes(lecturerDropdownSearchTerm.toLowerCase())).map(gv => (
+                                        <div 
+                                          key={gv.id}
+                                          onClick={() => {
+                                            if (originalIndex !== -1) {
+                                              const newAssignments = [...autoAssignPreview.assignments];
+                                              newAssignments[originalIndex].lecturer = gv;
+                                              newAssignments[originalIndex].lecturerId = gv.id;
+                                              setAutoAssignPreview({
+                                                ...autoAssignPreview,
+                                                assignments: newAssignments
+                                              });
+                                            }
+                                            setOpenLecturerDropdownId(null);
+                                          }}
+                                          className={`px-3 py-1.5 text-xs cursor-pointer flex justify-between items-center hover:bg-slate-50 ${a.lecturerId === gv.id ? 'font-bold text-[#407F3E] bg-[#407F3E]/5' : 'text-slate-700'}`}
+                                        >
+                                          <span>{gv.ho_ten}</span>
+                                          {a.lecturerId === gv.id && <Check className="w-3.5 h-3.5 text-[#407F3E]" />}
+                                        </div>
+                                      ))}
+                                      {lecturers.filter(l => l.ho_ten.toLowerCase().includes(lecturerDropdownSearchTerm.toLowerCase())).length === 0 && (
+                                        <div className="px-3 py-2 text-xs text-slate-400 text-center">Không tìm thấy giảng viên</div>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          )})}
+                        </tbody>
+                      </table>
+                    </div>
+                    {/* Pagination Footer */}
+                    <div className="bg-[#F8F9FA] px-4 py-3 border-t border-[#E7E0C4]/50 flex items-center justify-between text-xs shrink-0">
+                      <div className="flex items-center gap-2 text-slate-600 font-medium">
+                        Hiển thị 
+                        <SearchableDropdown 
+                          options={[
+                            { value: 10, label: '10' },
+                            { value: 30, label: '30' },
+                            { value: 50, label: '50' },
+                            { value: 100, label: '100' }
+                          ]}
+                          value={autoAssignLimit}
+                          onChange={(newLimit) => {
+                            setAutoAssignLimit(newLimit);
+                            setAutoAssignCurrentPage(1);
+                          }}
+                          searchPlaceholder="Tìm số lượng..."
+                          className="min-w-[80px]"
+                        />
                         / {filteredAutoAssign.length} sinh viên
                       </div>
                       <div className="flex items-center gap-1.5">
@@ -822,6 +994,7 @@ export default function SupervisorAssignment_Khoa() {
                           className="px-2 py-1 rounded border border-slate-200 bg-white text-slate-600 disabled:opacity-50 hover:bg-slate-50 transition-colors"
                         >Trang cuối</button>
                       </div>
+                    </div>
                     </div>
                   </div>
                 </div>

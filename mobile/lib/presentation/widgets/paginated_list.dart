@@ -70,6 +70,7 @@ class _PaginatedListState<T> extends State<PaginatedList<T>> {
         : <T>[];
 
     return CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
         if (widget.headerWidgetBuilder != null)
           SliverToBoxAdapter(child: widget.headerWidgetBuilder!(filtered)),

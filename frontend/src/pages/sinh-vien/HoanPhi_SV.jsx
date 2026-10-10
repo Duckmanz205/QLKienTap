@@ -5,6 +5,7 @@ import {
   RotateCcw, Plus, UploadCloud, X, Check, AlertCircle, Search, ChevronDown
 } from 'lucide-react';
 import api, { sinhVienApi } from '../../services/api';
+import SearchableDropdown from '../../components/SearchableDropdown';
 
 export default function HoanPhi_SV() {
   const navigate = useNavigate();
@@ -17,8 +18,6 @@ export default function HoanPhi_SV() {
   // Filter & Pagination state
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
-  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
-  const [searchStatusDropdown, setSearchStatusDropdown] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [limit, setLimit] = useState(15);
 
@@ -211,68 +210,22 @@ export default function HoanPhi_SV() {
         </div>
 
         {/* Status Popover Dropdown */}
-        <div className="relative min-w-[180px]" onClick={(e) => e.stopPropagation()}>
-          <div 
-            onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
-            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isStatusDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-          >
-            <span className="truncate pr-2 font-medium text-slate-700">
-              {statusFilter === 'ALL' && 'Tất cả trạng thái'}
-              {statusFilter === 'ChoXuLy' && 'Chờ xử lý'}
-              {statusFilter === 'DaHoanTien' && 'Đã hoàn tiền'}
-              {statusFilter === 'TuChoi' && 'Từ chối'}
-            </span>
-            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-          </div>
-          {isStatusDropdownOpen && (
-            <div className="absolute top-full right-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-50 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[200px]">
-              <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
-                <input 
-                  type="text" 
-                  placeholder="Tìm trạng thái..." 
-                  value={searchStatusDropdown}
-                  onChange={(e) => setSearchStatusDropdown(e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
-                />
-              </div>
-              <div className="max-h-60 overflow-y-auto">
-                {[
-                  { id: 'ALL', label: 'Tất cả trạng thái' },
-                  { id: 'ChoXuLy', label: 'Chờ xử lý' },
-                  { id: 'DaHoanTien', label: 'Đã hoàn tiền' },
-                  { id: 'TuChoi', label: 'Từ chối' },
-                ]
-                  .filter(opt => opt.label.toLowerCase().includes(searchStatusDropdown.toLowerCase()))
-                  .map(opt => (
-                    <div 
-                      key={opt.id}
-                      onClick={() => {
-                        setStatusFilter(opt.id);
-                        setIsStatusDropdownOpen(false);
-                        setSearchStatusDropdown('');
-                        setCurrentPage(1);
-                      }}
-                      className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                        statusFilter === opt.id ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50 font-medium'
-                      }`}
-                    >
-                      <span>{opt.label}</span>
-                      {statusFilter === opt.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                    </div>
-                  ))}
-                {[
-                  { id: 'ALL', label: 'Tất cả trạng thái' },
-                  { id: 'ChoXuLy', label: 'Chờ xử lý' },
-                  { id: 'DaHoanTien', label: 'Đã hoàn tiền' },
-                  { id: 'TuChoi', label: 'Từ chối' },
-                ].filter(opt => opt.label.toLowerCase().includes(searchStatusDropdown.toLowerCase())).length === 0 && (
-                  <div className="px-3 py-2 text-xs text-slate-500 text-center">Không tìm thấy</div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+        <SearchableDropdown
+          options={[
+            { value: 'ALL', label: 'Tất cả trạng thái' },
+            { value: 'ChoXuLy', label: 'Chờ xử lý' },
+            { value: 'DaHoanTien', label: 'Đã hoàn tiền' },
+            { value: 'TuChoi', label: 'Từ chối' }
+          ]}
+          value={statusFilter}
+          onChange={(val) => {
+            setStatusFilter(val);
+            setCurrentPage(1);
+          }}
+          placeholder="Tất cả trạng thái"
+          searchPlaceholder="Tìm trạng thái..."
+          className="min-w-[180px]"
+        />
 
       </div>
 
@@ -335,20 +288,21 @@ export default function HoanPhi_SV() {
         <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
             <span>Hiển thị</span>
-            <select 
+            <SearchableDropdown 
+              options={[
+                { value: 15, label: '15' },
+                { value: 30, label: '30' },
+                { value: 50, label: '50' },
+                { value: 100, label: '100' }
+              ]}
               value={limit}
-              onChange={(e) => {
-                const newLimit = Number(e.target.value);
+              onChange={(newLimit) => {
                 setLimit(newLimit);
                 setCurrentPage(1);
               }}
-              className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
-            >
-              <option value={15}>15</option>
-              <option value={30}>30</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
+              searchPlaceholder="Tìm số lượng..."
+              className="min-w-[80px]"
+            />
             <span>/ {filteredRefunds.length} yêu cầu</span>
           </div>
           <div className="flex items-center gap-1.5">
@@ -409,19 +363,16 @@ export default function HoanPhi_SV() {
                 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Chọn hóa đơn vi phạm <span className="text-[#E68A8C]">*</span></label>
-                  <select 
+                  <SearchableDropdown
+                    options={eligibleInvoices.map(i => ({
+                      value: i.id,
+                      label: `${i.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Hóa đơn #' + i.id} (${Number(i.so_tien).toLocaleString()}đ)`
+                    }))}
                     value={selectedInvoiceId}
-                    onChange={(e) => setSelectedInvoiceId(e.target.value)}
-                    required
-                    className="w-full px-4 py-3 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-800 font-medium appearance-none cursor-pointer"
-                  >
-                    <option value="">-- Chọn hóa đơn --</option>
-                    {eligibleInvoices.map((i) => (
-                      <option key={i.id} value={i.id}>
-                        {i.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || `Hóa đơn #${i.id}`} ({Number(i.so_tien).toLocaleString()}đ)
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setSelectedInvoiceId(val)}
+                    placeholder="-- Chọn hóa đơn --"
+                    searchPlaceholder="Tìm kiếm hóa đơn..."
+                  />
                 </div>
 
                 <div>

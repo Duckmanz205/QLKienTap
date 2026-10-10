@@ -5,6 +5,7 @@ import '../../../core/network/api_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/state/app_state.dart';
 import '../../widgets/paginated_list.dart';
+import '../../widgets/searchable_dropdown.dart';
 
 class TaiChinhSVScreen extends StatefulWidget {
   const TaiChinhSVScreen({super.key});
@@ -97,7 +98,13 @@ class _TaiChinhSVScreenState extends State<TaiChinhSVScreen> {
   }
 
   Widget _buildPaymentsTab(AppState appState, AppStateProviderState appStateProvider) {
-    return PaginatedList<dynamic>(
+    return RefreshIndicator(
+      onRefresh: () async {
+        if (ApiService.userId != null) {
+          await appStateProvider.fetchStudentDataFromApi(ApiService.userId!);
+        }
+      },
+      child: PaginatedList<dynamic>(
       items: appState.payments,
       searchHint: 'Tìm kiếm hóa đơn...',
       dropdownTitle: 'Trạng thái',
@@ -251,14 +258,21 @@ class _TaiChinhSVScreenState extends State<TaiChinhSVScreen> {
           ),
         );
       },
-    );
+    ));
   }
 
   Widget _buildRefundsTab(AppState appState, AppStateProviderState appStateProvider) {
-    final violatedPayments = appState.payments.where((p) => p.status == 'Vi phạm' || p.status == 'Đã đóng đúng hạn').toList();
+    final violatedPayments = appState.payments.where((p) => p.status == 'Vi phạm').toList();
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+    return RefreshIndicator(
+      onRefresh: () async {
+        if (ApiService.userId != null) {
+          await appStateProvider.fetchStudentDataFromApi(ApiService.userId!);
+        }
+      },
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -275,22 +289,14 @@ class _TaiChinhSVScreenState extends State<TaiChinhSVScreen> {
               const Text('Tạo đơn hoàn phí', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.primary)),
               const SizedBox(height: 12),
               
-              DropdownButtonFormField<String>(
-                value: _refundSelectedInvoice,
-                decoration: InputDecoration(
-                  labelText: 'Chọn hóa đơn liên quan',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  isDense: true,
-                ),
-                items: violatedPayments.map((p) {
-                  return DropdownMenuItem<String>(
-                    value: p.id,
-                    child: Text(p.name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
-                  );
-                }).toList(),
+              SearchableDropdown(
+                title: 'Hóa đơn liên quan',
+                value: _refundSelectedInvoice != null ? violatedPayments.firstWhere((p) => p.id == _refundSelectedInvoice).name : 'Chọn hóa đơn liên quan',
+                options: violatedPayments.map((p) => p.name).toList(),
                 onChanged: (val) {
+                  final p = violatedPayments.firstWhere((p) => p.name == val);
                   setState(() {
-                    _refundSelectedInvoice = val;
+                    _refundSelectedInvoice = p.id;
                   });
                 },
               ),
@@ -312,6 +318,7 @@ class _TaiChinhSVScreenState extends State<TaiChinhSVScreen> {
                       });
                     }
                   } catch (e) {
+                    if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text('Lỗi chọn file: $e'), backgroundColor: AppColors.danger),
                     );
@@ -369,30 +376,136 @@ class _TaiChinhSVScreenState extends State<TaiChinhSVScreen> {
               ElevatedButton(
                 onPressed: _refundSelectedInvoice != null && _refundUploadedFile != null && !_isUploadingRefund
                     ? () async {
+                        final pay = appState.payments.firstWhere((p) => p.id == _refundSelectedInvoice);
+                        
+                        final accountNumberController = TextEditingController();
+                        final accountNameController = TextEditingController();
+                        final reasonController = TextEditingController();
+                        final formKey = GlobalKey<FormState>();
+                        String? selectedBank;
+                        final List<String> banks = ['Vietcombank', 'Techcombank', 'MB Bank', 'Agribank', 'VietinBank', 'BIDV', 'ACB', 'TPBank', 'VPBank', 'Khác'];
+
+                        final result = await showDialog<bool>(
+                          context: context,
+                          builder: (context) {
+                            return StatefulBuilder(
+                              builder: (context, setStateDialog) {
+                                return AlertDialog(
+                                  title: const Text('Nhập thông tin hoàn phí', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                                  content: SingleChildScrollView(
+                                    child: Form(
+                                      key: formKey,
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          SearchableDropdown(
+                                            title: 'Ngân hàng',
+                                            value: selectedBank ?? 'Chọn ngân hàng',
+                                            options: banks,
+                                            onChanged: (val) {
+                                              setStateDialog(() {
+                                                selectedBank = val;
+                                              });
+                                            },
+                                          ),
+                                          const SizedBox(height: 12),
+                                          TextFormField(
+                                            controller: accountNumberController,
+                                            decoration: const InputDecoration(labelText: 'Số tài khoản', border: OutlineInputBorder(), isDense: true),
+                                            validator: (v) => v == null || v.isEmpty ? 'Vui lòng nhập' : null,
+                                            keyboardType: TextInputType.number,
+                                          ),
+                                          const SizedBox(height: 12),
+                                          TextFormField(
+                                            controller: accountNameController,
+                                            decoration: const InputDecoration(labelText: 'Tên người thụ hưởng', border: OutlineInputBorder(), isDense: true),
+                                            validator: (v) => v == null || v.isEmpty ? 'Vui lòng nhập' : null,
+                                          ),
+                                          const SizedBox(height: 12),
+                                          TextFormField(
+                                            controller: reasonController,
+                                            decoration: const InputDecoration(labelText: 'Lý do / Lời nhắn', border: OutlineInputBorder(), isDense: true),
+                                            maxLines: 2,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context, false),
+                                      child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
+                                    ),
+                                    ElevatedButton(
+                                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+                                      onPressed: () {
+                                        if (selectedBank == null) {
+                                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Vui lòng chọn ngân hàng')));
+                                          return;
+                                        }
+                                        if (formKey.currentState?.validate() ?? false) {
+                                          Navigator.pop(context, true);
+                                        }
+                                      },
+                                      child: const Text('Xác nhận gửi'),
+                                    ),
+                                  ],
+                                );
+                              }
+                            );
+                          }
+                        );
+
+                        if (result != true) return;
+                        
                         setState(() {
                           _isUploadingRefund = true;
                         });
-                        final pay = appState.payments.firstWhere((p) => p.id == _refundSelectedInvoice);
-                        final success = await appStateProvider.addRefund(
-                          'HĐ: ${pay.name.replaceAll('Chuyến: ', '')}',
-                          '50.000đ',
-                          localPath: _refundLocalFilePath,
-                          fileName: _refundUploadedFile,
-                        );
-                        setState(() {
-                          _isUploadingRefund = false;
-                          if (success) {
-                            _refundSelectedInvoice = null;
-                            _refundUploadedFile = null;
-                            _refundLocalFilePath = null;
+                        try {
+                          final success = await appStateProvider.addRefund(
+                            pay.id,
+                            'HĐ: ${pay.name.replaceAll('Chuyến: ', '')}',
+                            '50.000đ',
+                            localPath: _refundLocalFilePath,
+                            fileName: _refundUploadedFile,
+                            bankName: selectedBank,
+                            accountNumber: accountNumberController.text,
+                            accountName: accountNameController.text,
+                            reason: reasonController.text,
+                          );
+                          if (mounted) {
+                            setState(() {
+                              _isUploadingRefund = false;
+                              if (success) {
+                                _refundSelectedInvoice = null;
+                                _refundUploadedFile = null;
+                                _refundLocalFilePath = null;
+                              }
+                            });
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(success ? 'Nộp đơn hoàn phí thành công!' : 'Nộp đơn hoàn phí thất bại.'),
+                                backgroundColor: success ? AppColors.secondary : AppColors.danger,
+                              ),
+                            );
                           }
-                        });
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(success ? 'Nộp đơn hoàn phí thành công!' : 'Nộp đơn hoàn phí thất bại.'),
-                            backgroundColor: success ? AppColors.secondary : AppColors.danger,
-                          ),
-                        );
+                        } catch (e) {
+                          if (mounted) {
+                            setState(() {
+                              _isUploadingRefund = false;
+                            });
+                            String errorMsg = e.toString();
+                            if (errorMsg.startsWith('Exception: ')) {
+                              errorMsg = errorMsg.substring(11);
+                            }
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(errorMsg),
+                                backgroundColor: AppColors.danger,
+                              ),
+                            );
+                          }
+                        }
                       }
                     : null,
                 style: ElevatedButton.styleFrom(
@@ -442,6 +555,6 @@ class _TaiChinhSVScreenState extends State<TaiChinhSVScreen> {
           },
         ),
       ],
-    ));
+    )));
   }
 }

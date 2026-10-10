@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import api, { giangVienApi } from '../../services/api';
+import SearchableDropdown from '../../components/SearchableDropdown';
 
 export default function ChamBaiThuHoach_GV() {
   const navigate = useNavigate();
@@ -28,6 +29,12 @@ export default function ChamBaiThuHoach_GV() {
   
   // Bulk AI Grading states
   const [selectedReportIds, setSelectedReportIds] = useState([]);
+  const [isBulkAiModalOpen, setIsBulkAiModalOpen] = useState(false);
+  const [bulkAiProgress, setBulkAiProgress] = useState(0);
+  const [bulkAiTotal, setBulkAiTotal] = useState(0);
+  const [bulkAiCurrentStudent, setBulkAiCurrentStudent] = useState('');
+  const [bulkAiStatusText, setBulkAiStatusText] = useState('');
+  const isBulkAiCanceled = React.useRef(false);
   
   const [currentPage, setCurrentPage] = useState(1);
   const [limit, setLimit] = useState(15);
@@ -193,16 +200,93 @@ TRANG 38
 
   const handleBulkAiGrading = async () => {
     if (selectedReportIds.length === 0) return;
-    
-    try {
-      toast.loading('Đang khởi tạo chấm AI ngầm...', { id: 'bulk-ai' });
-      await api.post('/giang-vien/bulk-grade-ai', { reportIds: selectedReportIds });
-      toast.success('Đã đưa danh sách bài vào hàng đợi chấm AI dưới nền. Hệ thống sẽ tự động chấm, bạn có thể tiếp tục công việc khác.', { id: 'bulk-ai', duration: 5000 });
-      setSelectedReportIds([]);
-    } catch (error) {
-      console.error(error);
-      toast.error('Có lỗi xảy ra khi bắt đầu chấm AI.', { id: 'bulk-ai' });
+    setIsBulkAiModalOpen(true);
+    setBulkAiTotal(selectedReportIds.length);
+    setBulkAiProgress(0);
+    setBulkAiStatusText('Khởi tạo quá trình chấm điểm hàng loạt...');
+    isBulkAiCanceled.current = false;
+
+    for (let i = 0; i < selectedReportIds.length; i++) {
+      if (isBulkAiCanceled.current) {
+        setBulkAiStatusText('Đã hủy quá trình.');
+        break;
+      }
+      const reportId = selectedReportIds[i];
+      const report = reports.find(r => r.id === reportId);
+      if (!report) continue;
+
+      const sv = report.phieuThamQuan?.phieuDangKy?.sinhVien || report.phieuDangKy?.sinhVien;
+      const studentName = sv?.ho_ten || 'Sinh viên';
+      setBulkAiCurrentStudent(studentName);
+      setBulkAiStatusText(`Đang tải dữ liệu bài nộp...`);
+      
+      try {
+        let apiPath = report.file_bao_cao;
+        if (!apiPath) {
+          setBulkAiStatusText(`Thất bại: Không có file đính kèm`);
+          continue;
+        }
+        if (apiPath.startsWith('reports/')) apiPath = `upload/file/${apiPath}`;
+        else if (!apiPath.startsWith('upload/file/')) apiPath = `upload/file/reports/${apiPath}`;
+        if (apiPath.startsWith('/')) apiPath = apiPath.substring(1);
+        
+        const txtApiPath = '/' + apiPath.replace(/\.\w+$/, '.txt');
+        let textToAnalyze = '';
+        try {
+          const respTxt = await api.get(txtApiPath, { responseType: 'text' });
+          if (respTxt.data) textToAnalyze = respTxt.data;
+        } catch (e) {
+          setBulkAiStatusText(`Thất bại: Chưa trích xuất được text cho bài này`);
+          continue;
+        }
+
+        if (!textToAnalyze) {
+           setBulkAiStatusText(`Thất bại: Nội dung văn bản trống`);
+           continue; 
+        }
+
+        setBulkAiStatusText(`Đang phân tích và chấm điểm bằng AI...`);
+        const aiRes = await fetch('http://localhost:8000/grade', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer satori_2026_secure_key'
+          },
+          body: JSON.stringify({ document_text: textToAnalyze })
+        });
+
+        if (!aiRes.ok) {
+           setBulkAiStatusText(`Thất bại: Lỗi từ máy chủ AI`);
+           continue;
+        }
+        
+        const aiData = await aiRes.json();
+        setBulkAiStatusText(`Đang lưu đề xuất điểm ${aiData.diem_bao_cao_cuoi_cung}...`);
+        
+        let aiComment = `1. Hình thức: ${aiData.hinh_thuc_tong_quan?.ly_do_hinh_thuc}\n` +
+                        `2. Tổng quan: ${aiData.hinh_thuc_tong_quan?.ly_do_tong_quan}\n` +
+                        `3. Quy trình: ${aiData.quy_trinh_cong_nghe?.ly_do_quy_trinh}\n` +
+                        `4. VSATTP: ${aiData.vsattp?.ly_do_vsattp}`;
+        
+        await api.post('/giang-vien/save-ai-grade', {
+            reportId: reportId,
+            score: aiData.diem_bao_cao_cuoi_cung,
+            comment: aiComment
+        });
+        
+        setBulkAiProgress(prev => prev + 1);
+        
+      } catch (err) {
+        console.error(err);
+        setBulkAiStatusText(`Thất bại: Có lỗi xảy ra trong quá trình xử lý`);
+      }
     }
+    
+    if (!isBulkAiCanceled.current) {
+      setBulkAiStatusText('Hoàn tất chấm điểm hàng loạt!');
+    }
+    if (lecturer) fetchReports(lecturer.id);
+    setSelectedReportIds([]);
   };
 
   const handleAIGrading = async () => {
@@ -280,8 +364,52 @@ TRANG 38
 
   const handleSelectReport = async (report) => {
     setSelectedReport(report);
-    setScore(report.diem_thu_hoach !== null ? report.diem_thu_hoach : (report.diem_ai_de_xuat !== null ? report.diem_ai_de_xuat : ''));
-    setComments(report.nhan_xet_cua_giang_vien || report.nhan_xet_thu_hoach || '');
+    
+    // 1. Chỉ hiển thị điểm và nhận xét giảng viên nếu giảng viên ĐÃ chấm (diem_thu_hoach khác null)
+    setScore(report.diem_thu_hoach !== null ? report.diem_thu_hoach : '');
+    setComments(report.diem_thu_hoach !== null ? (report.nhan_xet_cua_giang_vien || report.nhan_xet_thu_hoach || '') : '');
+
+    // 2. Tái tạo lại dữ liệu AI để nạp vào mục AI (ẩn nút Chấm tự động và hiện form AI)
+    if (report.diem_ai_de_xuat !== null) {
+      // Vì DB dùng chung cột nhan_xet_thu_hoach, nếu GV chưa chấm thì nhận xét đó chính là của AI
+      let aiCommentStr = report.diem_thu_hoach === null 
+          ? (report.nhan_xet_cua_giang_vien || report.nhan_xet_thu_hoach || '')
+          : "Chi tiết nhận xét AI đã bị ghi đè khi giảng viên lưu điểm.";
+          
+      // Bóc tách text AI thành các phần theo cấu trúc lưu trong handleBulkAiGrading
+      let hinhThuc = "", tongQuan = "", quyTrinh = "", vsattp = "";
+      try {
+        const parts = aiCommentStr.split(/(?=\d\.\s)/);
+        parts.forEach(p => {
+          if (p.startsWith('1. Hình thức:')) hinhThuc = p.replace('1. Hình thức:', '').trim();
+          if (p.startsWith('2. Tổng quan:')) tongQuan = p.replace('2. Tổng quan:', '').trim();
+          if (p.startsWith('3. Quy trình:')) quyTrinh = p.replace('3. Quy trình:', '').trim();
+          if (p.startsWith('4. VSATTP:')) vsattp = p.replace('4. VSATTP:', '').trim();
+        });
+      } catch(e) {}
+
+      // Cập nhật state AI Result để component render lên form chi tiết của AI
+      setAiGradingResult({
+        diem_bao_cao_cuoi_cung: report.diem_ai_de_xuat,
+        hinh_thuc_tong_quan: {
+          diem_hinh_thuc: 'N/A', // AI Hàng loạt không lưu điểm thành phần trong DB
+          ly_do_hinh_thuc: hinhThuc || aiCommentStr,
+          diem_tong_quan: 'N/A',
+          ly_do_tong_quan: tongQuan || 'N/A'
+        },
+        quy_trinh_cong_nghe: {
+          diem_quy_trinh: 'N/A',
+          ly_do_quy_trinh: quyTrinh || 'N/A'
+        },
+        vsattp: {
+          diem_vsattp: 'N/A',
+          ly_do_vsattp: vsattp || 'N/A'
+        }
+      });
+    } else {
+      // Nếu chưa có điểm AI, reset mục AI để hiện nút "Chấm tự động"
+      setAiGradingResult(null);
+    }
 
     if (report.file_bao_cao) {
       setIsLoadingText(true);
@@ -289,6 +417,9 @@ TRANG 38
       setPdfBlobUrl(null);
       try {
         let apiPath = report.file_bao_cao;
+        if (apiPath.startsWith('/api/')) {
+          apiPath = apiPath.substring(5); // remove /api/
+        }
         if (apiPath.startsWith('reports/')) {
           apiPath = `upload/file/${apiPath}`;
         } else if (!apiPath.startsWith('upload/file/')) {
@@ -741,20 +872,21 @@ TRANG 38
       <div className="p-4 border border-[#E7E0C4] bg-white rounded-xl shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
           <span>Hiển thị</span>
-          <select 
+          <SearchableDropdown 
+            options={[
+              { value: 15, label: '15' },
+              { value: 30, label: '30' },
+              { value: 50, label: '50' },
+              { value: 100, label: '100' }
+            ]}
             value={limit}
-            onChange={(e) => {
-              const newLimit = Number(e.target.value);
+            onChange={(newLimit) => {
               setLimit(newLimit);
               setCurrentPage(1);
             }}
-            className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
-          >
-            <option value={15}>15</option>
-            <option value={30}>30</option>
-            <option value={50}>50</option>
-            <option value={100}>100</option>
-          </select>
+            searchPlaceholder="Tìm số lượng..."
+            className="min-w-[80px]"
+          />
           <span>/ {filteredReports.length} bài thu hoạch</span>
         </div>
         <div className="flex items-center gap-1.5">
@@ -1063,7 +1195,6 @@ TRANG 38
                     <p className="text-sm text-slate-600">{aiGradingResult.vsattp.ly_do_vsattp}</p>
                   </div>
 
-
                 </div>
               </div>
 
@@ -1118,6 +1249,62 @@ TRANG 38
                   <CheckCircle2 className="w-4 h-4" /> Sử dụng đề xuất này
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Bulk AI Grading Modal */}
+      {isBulkAiModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-[#E7E0C4] bg-[#fdfcf8] flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                  <Sparkles className="w-4 h-4 text-blue-600" />
+                </div>
+                <h2 className="font-bold text-slate-800">Chấm điểm AI hàng loạt</h2>
+              </div>
+            </div>
+            
+            <div className="p-6">
+              <div className="mb-4">
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="font-semibold text-slate-600">Tiến trình</span>
+                  <span className="font-bold text-[#407F3E]">{bulkAiProgress} / {bulkAiTotal}</span>
+                </div>
+                <div className="w-full bg-slate-200 rounded-full h-3">
+                  <div 
+                    className="bg-gradient-to-r from-[#89B449] to-[#407F3E] h-3 rounded-full transition-all duration-300"
+                    style={{ width: `${(bulkAiTotal > 0 ? bulkAiProgress / bulkAiTotal : 0) * 100}%` }}
+                  ></div>
+                </div>
+              </div>
+              
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm">
+                <p className="font-semibold text-slate-700 mb-1 truncate">Đang xử lý: {bulkAiCurrentStudent}</p>
+                <p className="text-slate-500 animate-pulse">{bulkAiStatusText}</p>
+              </div>
+            </div>
+            
+            <div className="px-6 py-4 border-t border-[#E7E0C4] bg-slate-50 flex justify-end">
+              {bulkAiProgress === bulkAiTotal || isBulkAiCanceled.current ? (
+                <button
+                  onClick={() => setIsBulkAiModalOpen(false)}
+                  className="px-5 py-2 rounded-lg bg-[#407F3E] text-white font-bold hover:bg-[#407F3E]/90 transition-colors cursor-pointer"
+                >
+                  Đóng
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    isBulkAiCanceled.current = true;
+                    setBulkAiStatusText('Đang dừng tiến trình...');
+                  }}
+                  className="px-5 py-2 rounded-lg border border-red-200 text-red-600 font-bold hover:bg-red-50 transition-colors cursor-pointer"
+                >
+                  Hủy tiến trình
+                </button>
+              )}
             </div>
           </div>
         </div>

@@ -5,6 +5,7 @@ import {
   Edit2, Wifi, Users, X
 } from 'lucide-react';
 import { khoaApi } from '../../services/api';
+import SearchableDropdown from '../../components/SearchableDropdown';
 
 export default function DanhMuc_NhaMay_Khoa() {
   const [factories, setFactories] = useState([]);
@@ -380,19 +381,21 @@ export default function DanhMuc_NhaMay_Khoa() {
         <div className="p-4 border border-[#E7E0C4] bg-white rounded-xl shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
             <span>Hiển thị</span>
-            <select 
+            <SearchableDropdown 
+              options={[
+                { value: 15, label: '15' },
+                { value: 30, label: '30' },
+                { value: 50, label: '50' },
+                { value: 100, label: '100' }
+              ]}
               value={limit}
-              onChange={(e) => {
-                setLimit(Number(e.target.value));
+              onChange={(newLimit) => {
+                setLimit(newLimit);
                 setPage(1);
               }}
-              className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
-            >
-              <option value={15}>15</option>
-              <option value={30}>30</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
+              searchPlaceholder="Tìm số lượng..."
+              className="min-w-[80px]"
+            />
             <span>/ {totalFactories} nhà máy</span>
           </div>
           <div className="flex items-center gap-1.5">
@@ -513,14 +516,16 @@ export default function DanhMuc_NhaMay_Khoa() {
               {editData && (
                 <div className="pt-2">
                   <label className="block text-sm font-bold text-slate-700 mb-2">Trạng thái</label>
-                  <select 
+                  <SearchableDropdown
                     value={trangThai}
-                    onChange={(e) => setTrangThai(e.target.value)}
-                    className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] text-sm transition-all cursor-pointer"
-                  >
-                    <option value="HoatDong">Hoạt động (Đang hợp tác)</option>
-                    <option value="NgungHopTac">Ngừng hợp tác</option>
-                  </select>
+                    onChange={(val) => setTrangThai(val)}
+                    options={[
+                      { value: 'HoatDong', label: 'Hoạt động (Đang hợp tác)' },
+                      { value: 'NgungHopTac', label: 'Ngừng hợp tác' }
+                    ]}
+                    className="w-full"
+                    searchPlaceholder="Tìm trạng thái..."
+                  />
                 </div>
               )}
 

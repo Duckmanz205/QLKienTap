@@ -7,6 +7,65 @@ import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { khoaApi } from '../../services/api';
 import Toast from '../../components/Toast';
+import SearchableDropdown from '../../components/SearchableDropdown';
+
+function convertNumberToWords(amount) {
+  if (amount === 0) return "Không đồng";
+
+  const units = ["", " nghìn", " triệu", " tỷ"];
+  const digits = ["không", "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín"];
+
+  function readGroupOfThree(num, isFirstGroup) {
+    let str = "";
+    let hundred = Math.floor(num / 100);
+    let ten = Math.floor((num % 100) / 10);
+    let unit = num % 10;
+
+    if (hundred > 0 || !isFirstGroup) {
+      str += digits[hundred] + " trăm ";
+    }
+
+    if (ten === 0 && unit > 0 && (hundred > 0 || !isFirstGroup)) {
+      str += "lẻ ";
+    } else if (ten === 1) {
+      str += "mười ";
+    } else if (ten > 1) {
+      str += digits[ten] + " mươi ";
+    }
+
+    if (unit === 1 && ten > 1) {
+      str += "mốt ";
+    } else if (unit === 5 && ten > 0) {
+      str += "lăm ";
+    } else if (unit > 0 && (ten !== 1 || unit !== 1)) {
+      str += digits[unit] + " ";
+    }
+
+    return str.trim();
+  }
+
+  let numStr = amount.toString();
+  let groups = [];
+  while (numStr.length > 0) {
+    groups.push(parseInt(numStr.slice(-3)));
+    numStr = numStr.slice(0, -3);
+  }
+
+  let result = "";
+  for (let i = 0; i < groups.length; i++) {
+    if (groups[i] > 0) {
+      const isFirstGroup = (i === groups.length - 1);
+      const groupWords = readGroupOfThree(groups[i], isFirstGroup);
+      if (groupWords) {
+        result = groupWords + units[i] + " " + result;
+      }
+    }
+  }
+
+  result = result.trim();
+  result = result.charAt(0).toUpperCase() + result.slice(1) + " đồng";
+  return result;
+}
 
 function convertNumberToWords(amount) {
   if (amount === 0) return "Không đồng";
@@ -584,19 +643,21 @@ export default function QuanLyLePhi_Khoa() {
         <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
             <span>Hiển thị</span>
-            <select
+            <SearchableDropdown 
+              options={[
+                { value: 15, label: '15' },
+                { value: 30, label: '30' },
+                { value: 50, label: '50' },
+                { value: 100, label: '100' }
+              ]}
               value={limit}
-              onChange={e => {
-                setLimit(Number(e.target.value));
+              onChange={(newLimit) => {
+                setLimit(newLimit);
                 setCurrentPage(1);
               }}
-              className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
-            >
-              <option value={15}>15</option>
-              <option value={30}>30</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
+              searchPlaceholder="Tìm số lượng..."
+              className="min-w-[80px]"
+            />
             <span>/ {totalItems} sinh viên</span>
           </div>
 

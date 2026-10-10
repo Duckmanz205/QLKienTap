@@ -8,6 +8,7 @@ import {
 import * as XLSX from 'xlsx';
 import { khoaApi } from '../../services/api';
 import { getValidSession } from '../../utils/auth';
+import SearchableDropdown from '../../components/SearchableDropdown';
 
 export default function ChuyenThamQuan_DSLoc() {
   const [activeTab, setActiveTab] = useState('khoa'); // 'khoa' | 'tudo'
@@ -730,19 +731,21 @@ export default function ChuyenThamQuan_DSLoc() {
                 <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
                   <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
                     <span>Hiển thị</span>
-                    <select
+                    <SearchableDropdown
                       value={limitKhoa}
-                      onChange={e => {
-                        setLimitKhoa(Number(e.target.value));
+                      onChange={val => {
+                        setLimitKhoa(Number(val));
                         setCurrentPageKhoa(1);
                       }}
-                      className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
-                    >
-                      <option value={15}>15</option>
-                      <option value={30}>30</option>
-                      <option value={50}>50</option>
-                      <option value={100}>100</option>
-                    </select>
+                      options={[
+                        { value: 15, label: '15' },
+                        { value: 30, label: '30' },
+                        { value: 50, label: '50' },
+                        { value: 100, label: '100' }
+                      ]}
+                      className="min-w-[80px]"
+                      searchPlaceholder="Tìm..."
+                    />
                     <span>/ {totalKhoa} chuyến</span>
                   </div>
 
@@ -952,19 +955,21 @@ export default function ChuyenThamQuan_DSLoc() {
                 <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
                   <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
                     <span>Hiển thị</span>
-                    <select
+                    <SearchableDropdown
                       value={limitTuDo}
-                      onChange={e => {
-                        setLimitTuDo(Number(e.target.value));
+                      onChange={val => {
+                        setLimitTuDo(Number(val));
                         setCurrentPageTuDo(1);
                       }}
-                      className="border border-[#E7E0C4] rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-[#407F3E] text-slate-700 cursor-pointer shadow-sm"
-                    >
-                      <option value={15}>15</option>
-                      <option value={30}>30</option>
-                      <option value={50}>50</option>
-                      <option value={100}>100</option>
-                    </select>
+                      options={[
+                        { value: 15, label: '15' },
+                        { value: 30, label: '30' },
+                        { value: 50, label: '50' },
+                        { value: 100, label: '100' }
+                      ]}
+                      className="min-w-[80px]"
+                      searchPlaceholder="Tìm..."
+                    />
                     <span>/ {totalTuDo} đề xuất</span>
                   </div>
 
@@ -1601,18 +1606,17 @@ export default function ChuyenThamQuan_DSLoc() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Giảng viên dẫn đoàn <span className="text-red-500">*</span>
                   </label>
-                  <select
+                  <SearchableDropdown
+                    options={lecturers.map(gv => ({
+                      value: gv.id,
+                      label: `${gv.ten_giang_vien} - ${gv.bo_mon}`
+                    }))}
                     value={selectedLecturerId}
-                    onChange={(e) => setSelectedLecturerId(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#407F3E]/20 focus:border-[#407F3E] transition-all bg-white text-gray-700"
-                  >
-                    <option value="">-- Chọn giảng viên --</option>
-                    {lecturers.map(gv => (
-                      <option key={gv.id} value={gv.id}>
-                        {gv.ten_giang_vien} - {gv.bo_mon}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setSelectedLecturerId(val)}
+                    placeholder="-- Chọn giảng viên --"
+                    searchPlaceholder="Tìm kiếm..."
+                    className="w-full"
+                  />
                 </div>
               </div>
             </div>

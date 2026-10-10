@@ -3335,7 +3335,7 @@ export class KhoaService {
   async confirmManualPayment(hoaDonId: number) {
     const hd = await this.hoaDonRepo.findOne({
       where: { id: hoaDonId },
-      relations: { phieuDangKy: true },
+      relations: { phieuDangKy: { chuyenThamQuan: true } },
     });
     if (!hd) throw new NotFoundException('Không tìm thấy hóa đơn');
     if (hd.trang_thai !== 'ChuaDong') {

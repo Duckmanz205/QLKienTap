@@ -91,6 +91,7 @@ class Trip {
   final bool isRegistered;
   final bool isCompleted;
   final GradeDetail? gradeDetails;
+  final String? registrationId;
 
   Trip({
     required this.id,
@@ -105,12 +106,14 @@ class Trip {
     required this.isRegistered,
     required this.isCompleted,
     this.gradeDetails,
+    this.registrationId,
   });
 
   Trip copyWith({
     bool? isRegistered,
     bool? isCompleted,
     GradeDetail? gradeDetails,
+    String? registrationId,
   }) {
     return Trip(
       id: id,
@@ -125,6 +128,7 @@ class Trip {
       isRegistered: isRegistered ?? this.isRegistered,
       isCompleted: isCompleted ?? this.isCompleted,
       gradeDetails: gradeDetails ?? this.gradeDetails,
+      registrationId: registrationId ?? this.registrationId,
     );
   }
 }
@@ -172,6 +176,8 @@ class Submission {
   final String? submittedAt;
   final bool hasConfirmationFile;
   final String? confirmationFileName;
+  final String? fileBaoCaoUrl;
+  final String? fileXacNhanUrl;
 
   Submission({
     required this.id,
@@ -185,6 +191,8 @@ class Submission {
     this.submittedAt,
     this.hasConfirmationFile = false,
     this.confirmationFileName,
+    this.fileBaoCaoUrl,
+    this.fileXacNhanUrl,
   });
 
   Submission copyWith({
@@ -195,6 +203,8 @@ class Submission {
     String? submittedAt,
     bool? hasConfirmationFile,
     String? confirmationFileName,
+    String? fileBaoCaoUrl,
+    String? fileXacNhanUrl,
   }) {
     return Submission(
       id: id,
@@ -208,6 +218,8 @@ class Submission {
       submittedAt: submittedAt ?? this.submittedAt,
       hasConfirmationFile: hasConfirmationFile ?? this.hasConfirmationFile,
       confirmationFileName: confirmationFileName ?? this.confirmationFileName,
+      fileBaoCaoUrl: fileBaoCaoUrl ?? this.fileBaoCaoUrl,
+      fileXacNhanUrl: fileXacNhanUrl ?? this.fileXacNhanUrl,
     );
   }
 }
@@ -280,10 +292,12 @@ class LecturerStudent {
   final double prelimGrade; // Điểm chuẩn bị
   final double extraGrade;  // Điểm cộng (max 1.0)
   final double gvhdGrade;   // Điểm GVHD chấm
-  final double aiSuggestedGrade;
+  final double? aiSuggestedGrade;
   final String? comment;
   final bool isGraded;
   final String tourId;
+  final String? reportFileUrl;
+  final String? confirmationFileUrl;
 
   LecturerStudent({
     required this.id,
@@ -301,10 +315,12 @@ class LecturerStudent {
     required this.prelimGrade,
     required this.extraGrade,
     required this.gvhdGrade,
-    required this.aiSuggestedGrade,
+    this.aiSuggestedGrade,
     this.comment,
     required this.isGraded,
     required this.tourId,
+    this.reportFileUrl,
+    this.confirmationFileUrl,
   });
 
   LecturerStudent copyWith({
@@ -317,6 +333,8 @@ class LecturerStudent {
     double? gvhdGrade,
     String? comment,
     bool? isGraded,
+    String? reportFileUrl,
+    String? confirmationFileUrl,
   }) {
     return LecturerStudent(
       id: id,
@@ -338,6 +356,8 @@ class LecturerStudent {
       comment: comment ?? this.comment,
       isGraded: isGraded ?? this.isGraded,
       tourId: tourId,
+      reportFileUrl: reportFileUrl ?? this.reportFileUrl,
+      confirmationFileUrl: confirmationFileUrl ?? this.confirmationFileUrl,
     );
   }
 }
@@ -370,6 +390,7 @@ class CouncilSession {
   final String room;
   final int studentCount;
   final String status; // 'upcoming', 'ongoing', 'completed'
+  final String role;
 
   CouncilSession({
     required this.id,
@@ -379,6 +400,7 @@ class CouncilSession {
     required this.room,
     required this.studentCount,
     required this.status,
+    required this.role,
   });
 }
 
@@ -698,6 +720,7 @@ final List<CouncilSession> initialCouncils = [
     room: 'Phòng học A1.204',
     studentCount: 8,
     status: 'upcoming',
+    role: 'Chủ tịch',
   ),
 ];
 
