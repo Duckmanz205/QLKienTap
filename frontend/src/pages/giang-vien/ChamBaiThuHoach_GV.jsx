@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   ArrowLeft, FileText, CheckCircle2, Save, Search, ChevronRight,
   ZoomIn, ZoomOut, Download, Sparkles, MessageSquareWarning, User,
-  Filter, Check, ChevronDown, X
+  Filter, Check, ChevronDown, X, Lock
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import api, { giangVienApi } from '../../services/api';
@@ -35,6 +35,7 @@ export default function ChamBaiThuHoach_GV() {
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [isGradingAI, setIsGradingAI] = useState(false);
   const [aiGradingResult, setAiGradingResult] = useState(null);
+  const [isExpandedComments, setIsExpandedComments] = useState(false);
   const [isMockModalOpen, setIsMockModalOpen] = useState(false);
   const [mockText, setMockText] = useState(`TRANG 20
 * BÁO CÁO KIẾN TẬP – HỌC KỲ 2 NĂM HỌC 2024 - 2025
@@ -248,12 +249,16 @@ TRANG 38
   const [pdfBlobUrl, setPdfBlobUrl] = useState(null);
   const [isLoadingText, setIsLoadingText] = useState(false);
 
-  const TEMPLATE_COMMENT = `1. Giới thiệu tổng quan nhà máy: ...
-2. Thuyết minh quy trình công nghệ sản xuất: ...
-3. Đánh giá thực trạng điều kiện đảm bảo VSATTP: ...`;
-
   const handleInsertTemplate = () => {
-    setComments(prev => prev ? prev + '\n\n' + TEMPLATE_COMMENT : TEMPLATE_COMMENT);
+    if (aiGradingResult) {
+      const aiComment = `1. Hình thức: ${aiGradingResult.hinh_thuc_tong_quan.ly_do_hinh_thuc}\n2. Tổng quan: ${aiGradingResult.hinh_thuc_tong_quan.ly_do_tong_quan}\n3. Quy trình: ${aiGradingResult.quy_trinh_cong_nghe.ly_do_quy_trinh}\n4. VSATTP: ${aiGradingResult.vsattp.ly_do_vsattp}`;
+      setComments(prev => prev ? prev + '\n\n' + aiComment : aiComment);
+      toast.success('Đã chèn mẫu nhận xét từ AI');
+    } else {
+      const basicTemplate = `1. Hình thức trình bày: \n2. Tổng quan nhà máy: \n3. Quy trình công nghệ: \n4. Đánh giá VSATTP: `;
+      setComments(prev => prev ? prev + '\n\n' + basicTemplate : basicTemplate);
+      toast.success('Đã chèn sườn nhận xét cơ bản');
+    }
   };
 
   useEffect(() => {
@@ -282,6 +287,17 @@ TRANG 38
     setSelectedReport(report);
     setScore(report.diem_thu_hoach !== null ? report.diem_thu_hoach : (report.diem_ai_de_xuat !== null ? report.diem_ai_de_xuat : ''));
     setComments(report.nhan_xet_cua_giang_vien || report.nhan_xet_thu_hoach || '');
+
+    if (report.nhan_xet_ai_de_xuat) {
+      try {
+        setAiGradingResult(JSON.parse(report.nhan_xet_ai_de_xuat));
+      } catch (e) {
+        console.error('Lỗi parse JSON AI:', e);
+        setAiGradingResult(null);
+      }
+    } else {
+      setAiGradingResult(null);
+    }
 
     if (report.file_bao_cao) {
       setIsLoadingText(true);
@@ -854,7 +870,14 @@ TRANG 38
             <div className="bg-white rounded-xl p-4 border border-[#E7E0C4] shadow-sm flex items-start gap-3">
 
               <div>
-                <h3 className="font-bold text-slate-800 text-sm leading-tight mb-1">{sv.ho_ten}</h3>
+                <h3 className="font-bold text-slate-800 text-sm leading-tight mb-1 flex items-center gap-2">
+                  {sv.ho_ten}
+                  {selectedReport.da_khoa && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#E68A8C]/10 text-[#E68A8C] border border-[#E68A8C]/20">
+                      <Lock className="w-3 h-3" /> Đã khóa
+                    </span>
+                  )}
+                </h3>
                 <p className="text-[11px] font-medium text-slate-500 mb-1">MSSV: {sv.mssv}</p>
                 <p className="text-[11px] font-medium text-[#407F3E] flex items-center gap-1">
                   <CheckCircle2 className="w-3 h-3" /> {nhaMay}
@@ -873,7 +896,7 @@ TRANG 38
                 <div className="flex flex-col gap-3">
                   <button 
                     onClick={handleAIGrading}
-                    disabled={isGradingAI}
+                    disabled={isGradingAI || selectedReport.da_khoa}
                     className="w-full flex justify-center items-center gap-2 text-sm font-bold text-white bg-[#407F3E] px-4 py-2.5 rounded-lg shadow-sm hover:bg-[#407F3E]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isGradingAI ? (
@@ -933,13 +956,23 @@ TRANG 38
                     <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider">
                       Nhận xét chi tiết
                     </label>
-                    <button 
-                      type="button" 
-                      onClick={handleInsertTemplate}
-                      className="text-[10px] font-bold text-[#407F3E] bg-[#89B449]/10 px-2 py-0.5 rounded flex items-center gap-1 cursor-pointer hover:bg-[#89B449]/20 transition-colors"
-                    >
-                      <Sparkles className="w-3 h-3" /> Chèn mẫu
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button 
+                        type="button" 
+                        onClick={() => setIsExpandedComments(true)}
+                        className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded flex items-center gap-1 cursor-pointer hover:bg-slate-200 transition-colors"
+                      >
+                        <ZoomIn className="w-3 h-3" /> Phóng to
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={handleInsertTemplate}
+                        disabled={selectedReport?.da_khoa}
+                        className="text-[10px] font-bold text-[#407F3E] bg-[#89B449]/10 px-2 py-0.5 rounded flex items-center gap-1 cursor-pointer hover:bg-[#89B449]/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <Sparkles className="w-3 h-3" /> Chèn mẫu
+                      </button>
+                    </div>
                   </div>
                   <textarea 
                     rows={6}
@@ -1118,6 +1151,45 @@ TRANG 38
                   <CheckCircle2 className="w-4 h-4" /> Sử dụng đề xuất này
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Expanded Comments Modal */}
+      {isExpandedComments && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-4xl h-[80vh] rounded-2xl shadow-xl flex flex-col">
+            <div className="px-6 py-4 border-b border-[#E7E0C4] bg-[#fdfcf8] flex items-center justify-between shrink-0">
+              <h2 className="font-bold text-slate-800 text-lg">Nhận xét chi tiết</h2>
+              <button 
+                onClick={() => setIsExpandedComments(false)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 flex-1 flex flex-col">
+              <textarea 
+                value={comments}
+                onChange={(e) => setComments(e.target.value)}
+                placeholder="Nhận xét về nội dung, hình thức và tính thực tiễn của bài thu hoạch..."
+                className="w-full h-full p-4 bg-slate-50 border border-slate-300 rounded-xl text-base focus:outline-none focus:border-[#407F3E] focus:ring-2 focus:ring-[#407F3E]/20 transition-all text-slate-700 shadow-inner resize-none custom-scrollbar"
+              />
+            </div>
+            <div className="px-6 py-4 border-t border-[#E7E0C4] bg-slate-50 flex items-center justify-end shrink-0 gap-3">
+              <button 
+                onClick={handleInsertTemplate}
+                className="px-5 py-2.5 rounded-lg border border-slate-300 text-slate-600 font-bold text-sm hover:bg-slate-100 transition-colors cursor-pointer flex items-center gap-2"
+              >
+                <Sparkles className="w-4 h-4 text-[#407F3E]" /> Chèn mẫu
+              </button>
+              <button 
+                onClick={() => setIsExpandedComments(false)}
+                className="px-6 py-2.5 rounded-lg bg-[#407F3E] text-white font-bold text-sm shadow-md hover:bg-[#407F3E]/90 hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer"
+              >
+                <CheckCircle2 className="w-4 h-4" /> Hoàn tất
+              </button>
             </div>
           </div>
         </div>

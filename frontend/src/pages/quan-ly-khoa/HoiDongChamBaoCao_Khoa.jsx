@@ -1,7 +1,7 @@
 import toast from 'react-hot-toast';
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Plus, ChevronDown, Check, X, Search, ChevronRight, Calendar, MapPin
+  Plus, ChevronDown, Check, X, Search, ChevronRight, Calendar, MapPin, Users
 } from 'lucide-react';
 import { khoaApi } from '../../services/api';
 
@@ -12,7 +12,13 @@ export default function HoiDongChamBaoCao_Khoa() {
   // Modal Dropdown States
   const [isLichDropdownOpen, setIsLichDropdownOpen] = useState(false);
   const [isMembersOpen, setIsMembersOpen] = useState(false);
-  const [isStudentsOpen, setIsStudentsOpen] = useState(false); // To show the open state
+
+  // Assign Students Modal States
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [assigningBoard, setAssigningBoard] = useState(null);
+  const [availableStudents, setAvailableStudents] = useState([]);
+  const [selectedAvailableStudents, setSelectedAvailableStudents] = useState([]);
+  const [isFetchingStudents, setIsFetchingStudents] = useState(false);
 
   // Filter & Pagination States
   const [searchTerm, setSearchTerm] = useState('');
@@ -110,7 +116,37 @@ export default function HoiDongChamBaoCao_Khoa() {
   const closeAllModalDropdowns = () => {
     setIsLichDropdownOpen(false);
     setIsMembersOpen(false);
-    setIsStudentsOpen(false);
+  };
+
+  const handleOpenAssignModal = async (board) => {
+    setAssigningBoard(board);
+    setIsAssignModalOpen(true);
+    setSelectedAvailableStudents([]);
+    setIsFetchingStudents(true);
+    try {
+      const res = await khoaApi.getAvailableStudentsForBoard(board.dot_kien_tap_id);
+      setAvailableStudents(res.data || []);
+    } catch (err) {
+      toast.error('Lỗi tải danh sách sinh viên');
+    } finally {
+      setIsFetchingStudents(false);
+    }
+  };
+
+  const handleAssignStudents = async (e) => {
+    e.preventDefault();
+    if (selectedAvailableStudents.length === 0) {
+      toast.error('Vui lòng chọn ít nhất 1 sinh viên');
+      return;
+    }
+    try {
+      await khoaApi.assignStudentsToBoard(assigningBoard.id, selectedAvailableStudents);
+      toast.success('Phân công sinh viên thành công!');
+      setIsAssignModalOpen(false);
+      fetchData();
+    } catch (err) {
+      toast.error('Lỗi phân công sinh viên');
+    }
   };
 
   const handleModalDropdownClick = (e, setter) => {
@@ -294,13 +330,22 @@ export default function HoiDongChamBaoCao_Khoa() {
                         {getStatusBadge(c.trangThai)}
                       </td>
                       <td className="p-4 text-right pr-6">
-                        <button 
-                          className="p-1.5 text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer" 
-                          title="Chi tiết"
-                          onClick={() => setViewingDetail(c)}
-                        >
-                          <ChevronRight className="w-5 h-5" />
-                        </button>
+                        <div className="flex items-center justify-end gap-2">
+                          <button 
+                            className="p-1.5 text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer" 
+                            title="Phân công sinh viên"
+                            onClick={() => handleOpenAssignModal(c)}
+                          >
+                            <Users className="w-5 h-5" />
+                          </button>
+                          <button 
+                            className="p-1.5 text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer" 
+                            title="Chi tiết"
+                            onClick={() => setViewingDetail(c)}
+                          >
+                            <ChevronRight className="w-5 h-5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -666,6 +711,118 @@ export default function HoiDongChamBaoCao_Khoa() {
           </div>
         </div>
       )}
+      
+      {/* Modal - Phân công sinh viên */}
+      {isAssignModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div 
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={(e) => { e.stopPropagation(); setIsAssignModalOpen(false); }}
+          ></div>
+          
+          <div 
+            className="bg-white w-full max-w-2xl rounded-2xl shadow-xl relative z-10 animate-in zoom-in-95 duration-200 flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 py-4 border-b border-[#E7E0C4] flex items-center justify-between bg-slate-50 rounded-t-2xl">
+              <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                <Users className="w-5 h-5 text-[#407F3E]" />
+                Phân công Sinh viên
+              </h2>
+              <button 
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setIsAssignModalOpen(false); }}
+                className="p-1.5 text-slate-400 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              {isFetchingStudents ? (
+                <div className="text-center py-8 text-slate-500 font-medium">Đang tải danh sách sinh viên...</div>
+              ) : availableStudents.length === 0 ? (
+                <div className="text-center py-8 text-slate-500 font-medium border-2 border-dashed border-slate-200 rounded-xl">
+                  Không còn sinh viên nào chưa được phân công trong đợt này.
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-bold text-slate-700">Chọn sinh viên tham gia báo cáo:</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (selectedAvailableStudents.length === availableStudents.length) {
+                          setSelectedAvailableStudents([]);
+                        } else {
+                          setSelectedAvailableStudents(availableStudents.map(s => s.id));
+                        }
+                      }}
+                      className="text-xs font-bold text-[#407F3E] hover:underline"
+                    >
+                      {selectedAvailableStudents.length === availableStudents.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+                    </button>
+                  </div>
+                  {availableStudents.map(student => {
+                    const sv = student.dotKienTapSinhVien?.sinhVien;
+                    if (!sv) return null;
+                    const isChecked = selectedAvailableStudents.includes(student.id);
+                    return (
+                      <div 
+                        key={student.id} 
+                        onClick={() => {
+                          if (isChecked) {
+                            setSelectedAvailableStudents(prev => prev.filter(id => id !== student.id));
+                          } else {
+                            setSelectedAvailableStudents(prev => [...prev, student.id]);
+                          }
+                        }}
+                        className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-colors ${isChecked ? 'border-[#407F3E] bg-[#407F3E]/5' : 'border-slate-200 hover:border-[#407F3E]'}`}
+                      >
+                        <input 
+                          type="checkbox" 
+                          checked={isChecked}
+                          readOnly
+                          className="w-4 h-4 text-[#407F3E] rounded border-slate-300 focus:ring-[#407F3E]"
+                        />
+                        <img src={sv.anh_dai_dien || `https://i.pravatar.cc/150?u=${sv.ma_sv}`} alt="avatar" className="w-10 h-10 rounded-full border border-slate-200 object-cover bg-white" />
+                        <div>
+                          <p className="text-sm font-bold text-slate-800">{sv.ho_ten}</p>
+                          <p className="text-xs font-medium text-slate-500">{sv.ma_sv}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            
+            <div className="px-6 py-4 border-t border-[#E7E0C4] bg-slate-50/50 flex items-center justify-between rounded-b-2xl">
+              <div className="text-sm font-semibold text-slate-600">
+                Đã chọn: <span className="font-bold text-[#407F3E]">{selectedAvailableStudents.length}</span> SV
+              </div>
+              <div className="flex gap-3">
+                <button 
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setIsAssignModalOpen(false); }}
+                  className="px-5 py-2.5 border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-bold transition-colors cursor-pointer"
+                >
+                  Đóng
+                </button>
+                <button 
+                  type="button"
+                  disabled={selectedAvailableStudents.length === 0 || isFetchingStudents}
+                  onClick={handleAssignStudents}
+                  className="px-6 py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl text-sm font-bold transition-colors shadow-sm cursor-pointer"
+                >
+                  Xác nhận
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

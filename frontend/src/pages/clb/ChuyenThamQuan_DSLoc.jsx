@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import {
   Plus, ChevronDown, Check, X, Calendar, Clock, MapPin,
   ChevronRight, Users, CheckCircle2, XCircle, RefreshCw, Search,
-  MoreVertical, Edit, PlayCircle, Trash2, CheckCircle, RotateCcw, Download
+  MoreVertical, Edit, PlayCircle, Trash2, CheckCircle, RotateCcw, Download, ArrowRight
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { khoaApi } from '../../services/api';
@@ -45,6 +45,7 @@ export default function ChuyenThamQuan_DSLoc() {
 
   const session = getValidSession();
   const currentUser = session?.user;
+  const isAdmin = currentUser?.vai_tro?.ten_vai_tro === 'QuanLyKhoa' || currentUser?.vai_tro === 'QuanLyKhoa';
 
   // Modal Data
   const [nhaMayOptions, setNhaMayOptions] = useState([]);
@@ -132,7 +133,11 @@ export default function ChuyenThamQuan_DSLoc() {
         khoaApi.getTrips(),
         khoaApi.getProposals()
       ]);
-      const allTrips = tripsRes.data || [];
+      let allTrips = tripsRes.data || [];
+      if (isAdmin) {
+        const approvedLich = ['DaDuyet', 'MoDangKy', 'DangDienRa', 'DaKetThuc', 'DaKhoa'];
+        allTrips = allTrips.filter(t => t.lichKienTap && approvedLich.includes(t.lichKienTap.trang_thai));
+      }
       setTripsKhoa(allTrips);
       setTripsTuDo(proposalsRes.data || []);
     } catch (err) {
@@ -301,6 +306,21 @@ export default function ChuyenThamQuan_DSLoc() {
     });
   };
 
+  const handleApproveEmergencyEdit = (tripId, isApproved) => {
+    const actionText = isApproved ? "duyệt" : "từ chối";
+    const action = async () => {
+      try {
+        await khoaApi.approveEmergencyEdit(tripId, isApproved);
+        showPopup(`${isApproved ? 'Duyệt' : 'Từ chối'} yêu cầu sửa đổi thành công`, 'success');
+        fetchTrips();
+      } catch (err) {
+        console.error(err);
+        showPopup(err.response?.data?.message || `Có lỗi xảy ra khi xử lý yêu cầu`, 'error');
+      }
+    };
+    showConfirm(`Xác nhận ${actionText}`, `Bạn có chắc chắn muốn ${actionText} yêu cầu sửa đổi thông tin cho chuyến tham quan này?`, action);
+  };
+
   const handleApproveTrip = (tripId, isApproved) => {
     if (!currentUser) {
       showPopup('Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.', 'error');
@@ -441,24 +461,26 @@ export default function ChuyenThamQuan_DSLoc() {
           className={`pb-3 text-sm font-bold transition-all relative ${activeTab === 'khoa' ? 'text-[#89B449]' : 'text-slate-500 hover:text-slate-700'
             }`}
         >
-          Chuyến do khoa tổ chức
+          {isAdmin ? 'Danh sách chuyến tham quan' : 'Chuyến do khoa tổ chức'}
           {activeTab === 'khoa' && (
             <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[#89B449] rounded-t-full"></div>
           )}
         </button>
-        <button
-          onClick={() => setActiveTab('tudo')}
-          className={`pb-3 text-sm font-bold transition-all relative flex items-center gap-2 ${activeTab === 'tudo' ? 'text-[#89B449]' : 'text-slate-500 hover:text-slate-700'
-            }`}
-        >
-          Đề xuất chuyến tự do
-          <span className="bg-[#DBD468] text-slate-800 text-[10px] px-1.5 py-0.5 rounded-full font-bold shadow-sm">
-            {tripsTuDo.filter(t => t.trang_thai_duyet === 'ChoDuyet').length}
-          </span>
-          {activeTab === 'tudo' && (
-            <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[#89B449] rounded-t-full"></div>
-          )}
-        </button>
+        {!isAdmin && (
+          <button
+            onClick={() => setActiveTab('tudo')}
+            className={`pb-3 text-sm font-bold transition-all relative flex items-center gap-2 ${activeTab === 'tudo' ? 'text-[#89B449]' : 'text-slate-500 hover:text-slate-700'
+              }`}
+          >
+            Đề xuất chuyến tự do
+            <span className="bg-[#DBD468] text-slate-800 text-[10px] px-1.5 py-0.5 rounded-full font-bold shadow-sm">
+              {tripsTuDo.filter(t => t.trang_thai_duyet === 'ChoDuyet').length}
+            </span>
+            {activeTab === 'tudo' && (
+              <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[#89B449] rounded-t-full"></div>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Tab 1: Khoa tổ chức */}
@@ -550,13 +572,15 @@ export default function ChuyenThamQuan_DSLoc() {
               </div>
             </div>
 
-            <button
-              onClick={(e) => { e.stopPropagation(); handleAddClick(); }}
-              className="px-4 py-2 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer whitespace-nowrap"
-            >
-              <Plus className="w-4 h-4" />
-              Tạo chuyến tham quan
-            </button>
+            {!isAdmin && (
+              <button
+                onClick={(e) => { e.stopPropagation(); handleAddClick(); }}
+                className="px-4 py-2 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer whitespace-nowrap"
+              >
+                <Plus className="w-4 h-4" />
+                Tạo chuyến tham quan
+              </button>
+            )}
           </div>
 
           {(() => {
@@ -628,16 +652,23 @@ export default function ChuyenThamQuan_DSLoc() {
                                 </div>
                               </td>
                               <td className="p-4 text-center">
-                                <span className={`inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold shadow-sm border whitespace-nowrap ${t.trang_thai === 'MoDangKy' ? 'bg-[#89B449] text-white border-[#89B449]/20' :
-                                  t.trang_thai === 'Nhap' ? 'bg-slate-400 text-white border-slate-400/20' :
-                                    t.trang_thai === 'DaHuy' ? 'bg-[#E68A8C] text-white border-[#E68A8C]/20' :
-                                      'bg-[#407F3E] text-white border-[#407F3E]/20'
-                                  }`}>
-                                  {t.trang_thai === 'MoDangKy' ? 'Mở đăng ký' :
-                                    t.trang_thai === 'DaChotDanhSach' ? 'Đã chốt danh sách' :
-                                      t.trang_thai === 'DaDienRa' ? 'Đã diễn ra' :
-                                        t.trang_thai === 'DaHuy' ? 'Đã huỷ' : 'Nháp'}
-                                </span>
+                                <div className="flex flex-col items-center gap-1">
+                                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold shadow-sm border whitespace-nowrap ${t.trang_thai === 'MoDangKy' ? 'bg-[#89B449] text-white border-[#89B449]/20' :
+                                    t.trang_thai === 'Nhap' ? 'bg-slate-400 text-white border-slate-400/20' :
+                                      t.trang_thai === 'DaHuy' ? 'bg-[#E68A8C] text-white border-[#E68A8C]/20' :
+                                        'bg-[#407F3E] text-white border-[#407F3E]/20'
+                                    }`}>
+                                    {t.trang_thai === 'MoDangKy' ? 'Mở đăng ký' :
+                                      t.trang_thai === 'DaChotDanhSach' ? 'Đã chốt danh sách' :
+                                        t.trang_thai === 'DaDienRa' ? 'Đã diễn ra' :
+                                          t.trang_thai === 'DaHuy' ? 'Đã huỷ' : 'Nháp'}
+                                  </span>
+                                  {t.trang_thai_sua_doi === 'ChoDuyet' && (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-600 border border-orange-200 whitespace-nowrap" title="Có sửa đổi đang chờ duyệt">
+                                      ⚠️ Đang chờ duyệt sửa
+                                    </span>
+                                  )}
+                                </div>
                               </td>
                               <td className="p-4 text-right pr-6 relative">
                                 <button
@@ -654,60 +685,84 @@ export default function ChuyenThamQuan_DSLoc() {
                                     style={{ top: dropdownPosition.top, right: dropdownPosition.right }}
                                     onClick={(e) => e.stopPropagation()}
                                   >
-                                    {t.trang_thai === 'Nhap' && (
+                                    {isAdmin ? (
                                       <>
-                                        <button onClick={(e) => { e.stopPropagation(); handleEditClick(t); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors">
-                                          <Edit className="w-4 h-4 text-[#89B449]" /> Cập nhật
-                                        </button>
-                                        <button onClick={(e) => { e.stopPropagation(); handleDeleteTrip(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#E68A8C] hover:bg-red-50 flex items-center gap-2 transition-colors border-t border-slate-100">
-                                          <Trash2 className="w-4 h-4" /> Xóa
-                                        </button>
+                                        {t.trang_thai_sua_doi === 'ChoDuyet' ? (
+                                          <>
+                                            <button onClick={(e) => { e.stopPropagation(); handleApproveEmergencyEdit(t.id, true); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#407F3E] hover:bg-green-50 flex items-center gap-2 transition-colors border-b border-slate-100">
+                                              <CheckCircle className="w-4 h-4" /> Duyệt sửa đổi
+                                            </button>
+                                            <button onClick={(e) => { e.stopPropagation(); handleApproveEmergencyEdit(t.id, false); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#E68A8C] hover:bg-red-50 flex items-center gap-2 transition-colors border-b border-slate-100">
+                                              <XCircle className="w-4 h-4" /> Từ chối sửa đổi
+                                            </button>
+                                          </>
+                                        ) : (
+                                          <div className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-400">
+                                            Không có thao tác
+                                          </div>
+                                        )}
                                       </>
-                                    )}
-
-                                    {t.trang_thai === 'MoDangKy' && (
+                                    ) : (
                                       <>
-                                        <button onClick={(e) => { e.stopPropagation(); handleEditClick(t); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors border-b border-slate-100">
-                                          <Edit className="w-4 h-4 text-orange-500" /> Sửa đổi khẩn cấp
-                                        </button>
-                                        <button onClick={(e) => { e.stopPropagation(); handlePreviewAssignStudents(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#407F3E] hover:bg-green-50 flex items-center gap-2 transition-colors">
-                                          <CheckCircle className="w-4 h-4" /> Xét duyệt danh sách
-                                        </button>
-                                        <button onClick={(e) => { e.stopPropagation(); handleCancelTrip(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#E68A8C] hover:bg-red-50 flex items-center gap-2 transition-colors border-t border-slate-100">
-                                          <Trash2 className="w-4 h-4" /> Hủy chuyến
-                                        </button>
-                                      </>
-                                    )}
+                                        {t.trang_thai === 'Nhap' && (
+                                          <>
+                                            <button onClick={(e) => { e.stopPropagation(); handleEditClick(t); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors">
+                                              <Edit className="w-4 h-4 text-[#89B449]" /> Cập nhật
+                                            </button>
+                                            <button onClick={(e) => { e.stopPropagation(); handleDeleteTrip(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#E68A8C] hover:bg-red-50 flex items-center gap-2 transition-colors border-t border-slate-100">
+                                              <Trash2 className="w-4 h-4" /> Xóa
+                                            </button>
+                                          </>
+                                        )}
 
-                                    {t.trang_thai === 'DaChotDanhSach' && (
-                                      <>
-                                        <button onClick={(e) => { e.stopPropagation(); handleEditClick(t); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors border-b border-slate-100">
-                                          <Edit className="w-4 h-4 text-orange-500" /> Sửa đổi khẩn cấp
-                                        </button>
-                                        <button onClick={(e) => { e.stopPropagation(); handleReopenRegistration(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-orange-600 hover:bg-orange-50 flex items-center gap-2 transition-colors">
-                                          <RotateCcw className="w-4 h-4" /> Mở đăng ký bổ sung
-                                        </button>
-                                        <button onClick={(e) => { e.stopPropagation(); handleCancelTrip(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#E68A8C] hover:bg-red-50 flex items-center gap-2 transition-colors border-t border-slate-100">
-                                          <Trash2 className="w-4 h-4" /> Hủy chuyến
-                                        </button>
-                                      </>
-                                    )}
+                                        {t.trang_thai === 'MoDangKy' && (
+                                          <>
+                                            {t.trang_thai_sua_doi !== 'ChoDuyet' && (
+                                              <button onClick={(e) => { e.stopPropagation(); handleEditClick(t); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors border-b border-slate-100">
+                                                <Edit className="w-4 h-4 text-orange-500" /> Sửa đổi khẩn cấp
+                                              </button>
+                                            )}
+                                            <button onClick={(e) => { e.stopPropagation(); handleCancelTrip(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#E68A8C] hover:bg-red-50 flex items-center gap-2 transition-colors border-t border-slate-100">
+                                              <Trash2 className="w-4 h-4" /> Hủy chuyến
+                                            </button>
+                                          </>
+                                        )}
 
-                                    {t.trang_thai === 'DaDuyet' && (
-                                      <>
-                                        <button onClick={(e) => { e.stopPropagation(); handleEditClick(t); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors border-b border-slate-100">
-                                          <Edit className="w-4 h-4 text-orange-500" /> Sửa đổi khẩn cấp
-                                        </button>
-                                        <button onClick={(e) => { e.stopPropagation(); handleCancelTrip(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#E68A8C] hover:bg-red-50 flex items-center gap-2 transition-colors border-t border-slate-100">
-                                          <Trash2 className="w-4 h-4" /> Hủy chuyến
-                                        </button>
-                                      </>
-                                    )}
+                                        {t.trang_thai === 'DaChotDanhSach' && (
+                                          <>
+                                            {t.trang_thai_sua_doi !== 'ChoDuyet' && (
+                                              <button onClick={(e) => { e.stopPropagation(); handleEditClick(t); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors border-b border-slate-100">
+                                                <Edit className="w-4 h-4 text-orange-500" /> Sửa đổi khẩn cấp
+                                              </button>
+                                            )}
+                                            <button onClick={(e) => { e.stopPropagation(); handleReopenRegistration(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-orange-600 hover:bg-orange-50 flex items-center gap-2 transition-colors">
+                                              <RotateCcw className="w-4 h-4" /> Mở đăng ký bổ sung
+                                            </button>
+                                            <button onClick={(e) => { e.stopPropagation(); handleCancelTrip(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#E68A8C] hover:bg-red-50 flex items-center gap-2 transition-colors border-t border-slate-100">
+                                              <Trash2 className="w-4 h-4" /> Hủy chuyến
+                                            </button>
+                                          </>
+                                        )}
 
-                                    {t.trang_thai !== 'Nhap' && t.trang_thai !== 'MoDangKy' && t.trang_thai !== 'DaDuyet' && t.trang_thai !== 'DaChotDanhSach' && (
-                                      <div className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-400">
-                                        Không có thao tác
-                                      </div>
+                                        {t.trang_thai === 'DaDuyet' && (
+                                          <>
+                                            {t.trang_thai_sua_doi !== 'ChoDuyet' && (
+                                              <button onClick={(e) => { e.stopPropagation(); handleEditClick(t); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors border-b border-slate-100">
+                                                <Edit className="w-4 h-4 text-orange-500" /> Sửa đổi khẩn cấp
+                                              </button>
+                                            )}
+                                            <button onClick={(e) => { e.stopPropagation(); handleCancelTrip(t.id); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#E68A8C] hover:bg-red-50 flex items-center gap-2 transition-colors border-t border-slate-100">
+                                              <Trash2 className="w-4 h-4" /> Hủy chuyến
+                                            </button>
+                                          </>
+                                        )}
+
+                                        {t.trang_thai !== 'Nhap' && t.trang_thai !== 'MoDangKy' && t.trang_thai !== 'DaDuyet' && t.trang_thai !== 'DaChotDanhSach' && (
+                                          <div className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-400">
+                                            Không có thao tác
+                                          </div>
+                                        )}
+                                      </>
                                     )}
                                   </div>,
                                   document.body
@@ -1250,24 +1305,60 @@ export default function ChuyenThamQuan_DSLoc() {
                   <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center shrink-0">
                     <Calendar className="w-4 h-4" />
                   </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Ngày tham quan</label>
-                    <p className="text-sm font-medium text-slate-700 mt-0.5">
-                      {viewingDetail.ngay_tham_quan ? new Date(viewingDetail.ngay_tham_quan).toLocaleDateString('vi-VN') : (viewingDetail.ngay_tham_quan_de_xuat ? new Date(viewingDetail.ngay_tham_quan_de_xuat).toLocaleDateString('vi-VN') : '--')}
-                    </p>
-                  </div>
+                  {(() => {
+                    const oldNgay = viewingDetail.ngay_tham_quan ? new Date(viewingDetail.ngay_tham_quan).toLocaleDateString('vi-VN') : (viewingDetail.ngay_tham_quan_de_xuat ? new Date(viewingDetail.ngay_tham_quan_de_xuat).toLocaleDateString('vi-VN') : '--');
+                    const newNgay = viewingDetail.ngay_tham_quan_moi ? new Date(viewingDetail.ngay_tham_quan_moi).toLocaleDateString('vi-VN') : null;
+                    const isChanged = viewingDetail.trang_thai_sua_doi === 'ChoDuyet' && newNgay && oldNgay !== newNgay;
+                    return (
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2 block">
+                          Ngày tham quan
+                          {isChanged && <span className="text-orange-500 font-bold lowercase">yêu cầu đổi</span>}
+                        </label>
+                        <div className="text-sm font-medium text-slate-700 mt-0.5 flex items-center gap-2">
+                          <span className={isChanged ? 'line-through text-slate-400' : ''}>
+                            {oldNgay}
+                          </span>
+                          {isChanged && (
+                            <>
+                              <ArrowRight className="w-4 h-4 text-slate-400" />
+                              <span className="text-[#407F3E] font-bold">{newNgay}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div className="flex gap-3">
                   <div className="w-8 h-8 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center shrink-0">
                     <Clock className="w-4 h-4" />
                   </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Thời gian</label>
-                    <p className="text-sm font-medium text-slate-700 mt-0.5">
-                      {(viewingDetail.gio_bat_dau || viewingDetail.gio_bat_dau_de_xuat || '--').substring(0, 5)}
-                    </p>
-                  </div>
+                  {(() => {
+                    const oldGio = (viewingDetail.gio_bat_dau || viewingDetail.gio_bat_dau_de_xuat || '--').substring(0, 5);
+                    const newGio = viewingDetail.gio_bat_dau_moi ? viewingDetail.gio_bat_dau_moi.substring(0, 5) : null;
+                    const isChanged = viewingDetail.trang_thai_sua_doi === 'ChoDuyet' && newGio && oldGio !== newGio;
+                    return (
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2 block">
+                          Thời gian
+                          {isChanged && <span className="text-orange-500 font-bold lowercase">yêu cầu đổi</span>}
+                        </label>
+                        <div className="text-sm font-medium text-slate-700 mt-0.5 flex items-center gap-2">
+                          <span className={isChanged ? 'line-through text-slate-400' : ''}>
+                            {oldGio}
+                          </span>
+                          {isChanged && (
+                            <>
+                              <ArrowRight className="w-4 h-4 text-slate-400" />
+                              <span className="text-[#407F3E] font-bold">{newGio}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div className="flex gap-3">
@@ -1299,12 +1390,62 @@ export default function ChuyenThamQuan_DSLoc() {
                     <div className="w-8 h-8 rounded-full bg-cyan-50 text-cyan-500 flex items-center justify-center shrink-0">
                       <Users className="w-4 h-4" />
                     </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Sức chứa (Đã ĐK / Tổng)</label>
-                      <p className="text-sm font-medium text-slate-700 mt-0.5">
-                        <span className="text-[#407F3E] font-bold">{viewingDetail.dang_ky_count || 0}</span> / {viewingDetail.suc_chua || 0}
-                      </p>
+                    {(() => {
+                      const oldSucChua = viewingDetail.suc_chua || 0;
+                      const newSucChua = viewingDetail.suc_chua_moi;
+                      const isChanged = viewingDetail.trang_thai_sua_doi === 'ChoDuyet' && newSucChua && Number(oldSucChua) !== Number(newSucChua);
+                      return (
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2 block">
+                            Sức chứa (Đã ĐK / Tổng)
+                            {isChanged && <span className="text-orange-500 font-bold lowercase">yêu cầu đổi</span>}
+                          </label>
+                          <div className="text-sm font-medium text-slate-700 mt-0.5 flex items-center gap-2">
+                            <span className={isChanged ? 'line-through text-slate-400' : ''}>
+                              <span className="text-[#407F3E] font-bold">{viewingDetail.dang_ky_count || 0}</span> / {oldSucChua}
+                            </span>
+                            {isChanged && (
+                              <>
+                                <ArrowRight className="w-4 h-4 text-slate-400" />
+                                <span className="text-[#407F3E] font-bold">{viewingDetail.dang_ky_count || 0} / {newSucChua}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+
+                {viewingDetail.cach_to_chuc === 'DoKhoaToChuc' && (
+                  <div className="flex gap-3">
+                    <div className="w-8 h-8 rounded-full bg-red-50 text-red-500 flex items-center justify-center shrink-0">
+                      <Clock className="w-4 h-4" />
                     </div>
+                    {(() => {
+                      const oldHan = viewingDetail.han_dong_le_phi ? new Date(viewingDetail.han_dong_le_phi).toLocaleDateString('vi-VN') + ' ' + new Date(viewingDetail.han_dong_le_phi).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'}) : '--';
+                      const newHan = viewingDetail.han_dong_le_phi_moi ? new Date(viewingDetail.han_dong_le_phi_moi).toLocaleDateString('vi-VN') + ' ' + new Date(viewingDetail.han_dong_le_phi_moi).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'}) : null;
+                      const isChanged = viewingDetail.trang_thai_sua_doi === 'ChoDuyet' && newHan && oldHan !== newHan;
+                      return (
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2 block">
+                            Hạn đóng lệ phí
+                            {isChanged && <span className="text-orange-500 font-bold lowercase">yêu cầu đổi</span>}
+                          </label>
+                          <div className="text-sm font-medium text-slate-700 mt-0.5 flex items-center gap-2">
+                            <span className={isChanged ? 'line-through text-slate-400' : ''}>
+                              {oldHan}
+                            </span>
+                            {isChanged && (
+                              <>
+                                <ArrowRight className="w-4 h-4 text-slate-400" />
+                                <span className="text-[#407F3E] font-bold">{newHan}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
 

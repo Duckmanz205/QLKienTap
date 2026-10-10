@@ -472,6 +472,7 @@ export default function Layout() {
       // TỔ CHỨC KIẾN TẬP
       { to: '/khoa/plans', label: 'Đợt kiến tập', icon: Calendar, category: 'TỔ CHỨC KIẾN TẬP' },
       { to: '/khoa/lich-kien-tap', label: 'Lịch kiến tập', icon: Layers, category: 'TỔ CHỨC KIẾN TẬP' },
+      { to: '/khoa/trips', label: 'Duyệt chuyến khẩn cấp', icon: Compass, category: 'TỔ CHỨC KIẾN TẬP' },
       { to: '/khoa/supervisors', label: 'Phân công GVHD', icon: GraduationCap, category: 'TỔ CHỨC KIẾN TẬP' },
       // ĐÁNH GIÁ & KẾT QUẢ
       { to: '/khoa/boards', label: 'Hội đồng chấm báo cáo', icon: Presentation, category: 'ĐÁNH GIÁ & KẾT QUẢ' },

@@ -387,6 +387,15 @@ export class KhoaController {
     return this.khoaService.cancelTrip(id, body.lyDoHuy);
   }
 
+  @Roles('QuanLyKhoa')
+  @Put('trips/:id/approve-edit')
+  async approveTripEdit(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { isApproved: boolean },
+  ) {
+    return this.khoaService.approveEmergencyEdit(id, body.isApproved);
+  }
+
   @Roles('QuanLyCLB')
   @Post('approve-trip')
   async approveTrip(@Body() body: ApproveTripDto) {
@@ -490,6 +499,22 @@ export class KhoaController {
   @Get('boards')
   async getBoards() {
     return this.khoaService.getBoards();
+  }
+
+  @Roles('QuanLyKhoa')
+  @Get('boards/available-students')
+  async getAvailableStudentsForBoard(@Query('dotKienTapId') dotKienTapId: string) {
+    if (!dotKienTapId) return [];
+    return this.khoaService.getAvailableStudentsForBoard(+dotKienTapId);
+  }
+
+  @Roles('QuanLyKhoa')
+  @Post('boards/:id/assign-students')
+  async assignStudentsToBoard(
+    @Param('id') id: string,
+    @Body('boChuyenIds') boChuyenIds: number[]
+  ) {
+    return this.khoaService.assignStudentsToBoard(+id, boChuyenIds);
   }
 
   @Roles('QuanLyKhoa')

@@ -335,11 +335,7 @@ export class SinhVienService {
     nguoiLienHeDeXuat?: string,
     sdtLienHeDeXuat?: string,
   ) {
-    // Tìm đợt kiến tập đang mở đăng ký để gắn đề xuất vào (nếu có)
-    const activeLich = await this.lichRepo.findOne({
-      where: { trang_thai: 'MoDangKy' },
-      relations: { dotKienTap: true },
-    });
+    // Lịch kiến tập sẽ được Stored Procedure tự động gán khi Khoa duyệt
 
     if (!nhaMayId && !tenNhaMayDeXuat) {
       throw new BadRequestException(
@@ -373,11 +369,7 @@ export class SinhVienService {
       deXuat.sdt_lien_he_de_xuat = sdtLienHeDeXuat || '';
     }
 
-    if (activeLich) {
-      deXuat.lich_kien_tap_id = activeLich.id;
-    } else {
-      deXuat.lich_kien_tap_id = null;
-    }
+    deXuat.lich_kien_tap_id = null;
     deXuat.ngay_tham_quan_de_xuat = ngayThamQuan;
     const startTimeDate = new Date(
       `1970-01-01T${gioBatDau.length === 5 ? gioBatDau + ':00' : gioBatDau}`,
@@ -1041,32 +1033,41 @@ export class SinhVienService {
 
     const results: any[] = [];
     for (const dksv of dksvs) {
-      const boChuyen = await this.boChuyenRepo.findOne({
-        where: { dot_kien_tap_sinh_vien_id: dksv.id },
+      const selectedTrips: any[] = [];
+                  const pdks = await this.phieuRepo.find({
+        where: {
+          sinh_vien_id: studentId,
+          trang_thai: 'HopLe',
+          chuyenThamQuan: {
+            lichKienTap: {
+              dot_kien_tap_id: dksv.dot_kien_tap_id
+            }
+          }
+        },
+        relations: { chuyenThamQuan: { nhaMay: true, lichKienTap: true }, phieuThamQuan: true },
       });
 
-      const selectedTrips: any[] = [];
-      if (boChuyen) {
-        // (v11) Truy vấn trực tiếp qua PhieuThamQuan.bo_chuyen_bao_cao_id
-        const phieuTQs = await this.phieuTQRepo.find({
-          where: { bo_chuyen_bao_cao_id: boChuyen.id },
-          relations: { phieuDangKy: { chuyenThamQuan: { nhaMay: true } } },
-        });
-
-        for (const phieuTQ of phieuTQs) {
-          const score = await this.diemPhieuRepo.findOne({
-            where: { phieu_tham_quan_id: phieuTQ.id },
-          });
-          selectedTrips.push({
-            phieu_dang_ky_id: phieuTQ.phieu_dang_ky_id,
-            ten_nha_may: phieuTQ.phieuDangKy.chuyenThamQuan.nhaMay.ten_nha_may,
-            hinh_thuc: phieuTQ.phieuDangKy.chuyenThamQuan.hinh_thuc,
-            diem_chuan_bi: score?.diem_chuan_bi || 0,
-            diem_bai_thu_hoach: score?.diem_thu_hoach || 0,
-            diem_bao_cao_tqnm: score?.diem_hoi_dong_final || 0,
-            diem_cong: score?.diem_cong_final || 0,
-          });
+      for (const pdk of pdks) {
+        if (!pdk.phieuThamQuan || pdk.phieuThamQuan.trang_thai !== 'HopLe') {
+          continue;
         }
+        const phieuTQ = pdk.phieuThamQuan;
+        const score = await this.diemPhieuRepo.findOne({
+          where: { phieu_tham_quan_id: phieuTQ.id },
+        });
+        
+        const isLocked = score?.da_khoa === true;
+
+        selectedTrips.push({
+          id: phieuTQ.id,
+          phieu_dang_ky_id: pdk.id,
+          ten_nha_may: pdk.chuyenThamQuan?.nhaMay?.ten_nha_may || 'N/A',
+          hinh_thuc: pdk.chuyenThamQuan?.hinh_thuc || 'N/A',
+          diem_chuan_bi: isLocked ? (score?.diem_chuan_bi ?? null) : null,
+          diem_bai_thu_hoach: isLocked ? (score?.diem_thu_hoach ?? null) : null,
+          diem_bao_cao_tqnm: isLocked ? (score?.diem_hoi_dong_final ?? null) : null,
+          diem_cong: isLocked ? (score?.diem_cong_final ?? null) : null,
+        });
       }
 
       results.push({

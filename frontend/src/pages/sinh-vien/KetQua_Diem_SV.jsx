@@ -33,21 +33,27 @@ export default function KetQua_Diem_SV() {
     }
   };
 
-  const calculateTripScore = (trip) => {
-    if (!trip) return 0;
-    const score = (Number(trip.diem_chuan_bi || 0) * 0.1) + 
-                  (Number(trip.diem_thu_hoach || 0) * 0.4) + 
-                  (Number(trip.diem_hoi_dong_final || 0) * 0.5) + 
-                  Number(trip.diem_cong_final_final || 0);
+    const calculateTripScore = (trip) => {
+    if (!trip) return '-';
+    if (trip.diem_chuan_bi === null || trip.diem_bai_thu_hoach === null || trip.diem_bao_cao_tqnm === null) {
+      return '-';
+    }
+    const score = (Number(trip.diem_chuan_bi || 0) * 0.3) + 
+                  (Number(trip.diem_bai_thu_hoach || 0) * 0.3) + 
+                  (Number(trip.diem_bao_cao_tqnm || 0) * 0.4) + 
+                  Number(trip.diem_cong || 0);
     return Math.min(10, score).toFixed(1);
   };
 
-  let finalScore = 0;
+  let finalScore = '-';
   if (termGrade?.diem_tong_ket !== null && termGrade?.diem_tong_ket !== undefined) {
-    finalScore = Number(termGrade.diem_tong_ket);
+    finalScore = Number(termGrade.diem_tong_ket).toFixed(1);
   } else if (grades.length > 0) {
-    const sum = grades.reduce((acc, t) => acc + Number(calculateTripScore(t)), 0);
-    finalScore = sum / grades.length;
+    const validGrades = grades.filter(t => calculateTripScore(t) !== '-');
+    if (validGrades.length > 0) {
+      const sum = validGrades.reduce((acc, t) => acc + Number(calculateTripScore(t)), 0);
+      finalScore = (sum / validGrades.length).toFixed(1);
+    }
   }
   
   const isScoreLocked = termGrade?.diem_tong_ket !== null && termGrade?.diem_tong_ket !== undefined;
@@ -86,7 +92,7 @@ export default function KetQua_Diem_SV() {
             {isScoreLocked ? (
               <>
                 <span className="text-6xl md:text-7xl font-black text-white leading-none tracking-tighter">
-                  {finalScore.toFixed(1)}
+                  {finalScore}
                 </span>
                 <span className="text-white/50 text-3xl font-black mt-4">/10</span>
                 
@@ -99,7 +105,7 @@ export default function KetQua_Diem_SV() {
             ) : (
               <div className="flex items-center flex-wrap gap-4 mt-2">
                 <span className="text-6xl md:text-7xl font-black text-white leading-none tracking-tighter">
-                  {finalScore.toFixed(1)}
+                  {finalScore}
                 </span>
                 <span className="text-white/50 text-3xl font-black mt-4">/10</span>
                 
@@ -148,19 +154,19 @@ export default function KetQua_Diem_SV() {
                 return (
                   <tr key={trip.id} className="hover:bg-slate-50 transition-colors group">
                     <td className="p-4 pl-6 font-bold text-slate-800">
-                      {trip.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Chưa xác định'}
+                      {trip.ten_nha_may || 'Chưa xác định'}
                     </td>
                     <td className="p-4 text-center font-medium">
                       {trip.diem_chuan_bi !== null && trip.diem_chuan_bi !== undefined ? Number(trip.diem_chuan_bi).toFixed(1) : '-'}
                     </td>
                     <td className="p-4 text-center font-medium">
-                      {trip.diem_thu_hoach !== null && trip.diem_thu_hoach !== undefined ? Number(trip.diem_thu_hoach).toFixed(1) : '-'}
+                      {trip.diem_bai_thu_hoach !== null && trip.diem_bai_thu_hoach !== undefined ? Number(trip.diem_bai_thu_hoach).toFixed(1) : '-'}
                     </td>
                     <td className="p-4 text-center font-medium">
-                      {trip.diem_hoi_dong_final !== null && trip.diem_hoi_dong_final !== undefined ? Number(trip.diem_hoi_dong_final).toFixed(1) : '-'}
+                      {trip.diem_bao_cao_tqnm !== null && trip.diem_bao_cao_tqnm !== undefined ? Number(trip.diem_bao_cao_tqnm).toFixed(1) : '-'}
                     </td>
                     <td className="p-4 text-center font-medium text-[#89B449]">
-                      {trip.diem_cong_final > 0 ? `+${Number(trip.diem_cong_final).toFixed(1)}` : (trip.diem_cong_final === 0 ? '0' : '-')}
+                      {trip.diem_cong > 0 ? `+${Number(trip.diem_cong).toFixed(1)}` : (trip.diem_cong === 0 ? '0' : '-')}
                     </td>
                     <td className="p-4 text-center pr-6 bg-slate-50 group-hover:bg-slate-100 transition-colors">
                       <span className="text-xl font-black text-[#407F3E]">
