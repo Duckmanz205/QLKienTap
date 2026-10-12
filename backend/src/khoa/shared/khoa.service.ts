@@ -3363,28 +3363,39 @@ export class KhoaService {
 
   // Get all notifications
   async getNotifications() {
-    return this.thongBaoRepo.find({
+    const list = await this.thongBaoRepo.find({
       relations: {
         nguoiGui: true,
         khoaHoc: true,
+        files: true,
       },
       order: { ngay_gui: 'DESC' },
     });
+
+    return list.map((n) => ({
+      ...n,
+      file_dinh_kem: n.files && n.files.length > 0 ? n.files[0].ten_file : null,
+      file_url: n.files && n.files.length > 0 ? n.files[0].duong_dan : null,
+    }));
   }
 
   // Create a new notification
   async createNotification(data: {
     tieu_de: string;
     noi_dung: string;
-    nguoi_gui_id: number;
+    nguoi_gui_id?: number;
     khoa_hoc_id?: number;
+    doi_tuong_nhan?: string;
+    loai_thong_bao?: string;
     file_url?: string;
     file_name?: string;
   }) {
     const notif = new ThongBao();
     notif.tieu_de = data.tieu_de;
     notif.noi_dung = data.noi_dung;
-    notif.nguoi_gui_id = data.nguoi_gui_id;
+    notif.nguoi_gui_id = data.nguoi_gui_id || 1;
+    notif.doi_tuong_nhan = data.doi_tuong_nhan || 'ALL';
+    notif.loai_thong_bao = data.loai_thong_bao || 'ThongBao';
     if (data.khoa_hoc_id) {
       notif.khoa_hoc_id = data.khoa_hoc_id;
     }
@@ -3400,6 +3411,7 @@ export class KhoaService {
       file.duong_dan = data.file_url;
       file.dung_luong_kb = 0;
       await this.tbFileRepo.save(file);
+      savedNotif.files = [file];
     }
 
     // Queue background jobs for email and reminder notification

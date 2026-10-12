@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Bell, FileText, CheckCircle2, AlertTriangle, 
-  Paperclip, Clock, Trash2, Check, Search, ChevronDown
+  Paperclip, Clock, Trash2, Check, Search, ChevronDown,
+  Download, X, User
 } from 'lucide-react';
 import { giangVienApi } from '../../services/api';
 import SearchableDropdown from '../../components/SearchableDropdown';
@@ -9,8 +10,6 @@ import SearchableDropdown from '../../components/SearchableDropdown';
 export default function ThongBao_GV() {
   const [activeFilter, setActiveFilter] = useState('all'); // 'all' or 'unread'
   const [selectedType, setSelectedType] = useState('ALL');
-  const [searchTypeDropdown, setSearchTypeDropdown] = useState('');
-  const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [limit, setLimit] = useState(15);
@@ -18,6 +17,7 @@ export default function ThongBao_GV() {
   const [notifications, setNotifications] = useState([]);
   const [lecturer, setLecturer] = useState(null);
   const [dismissedIds, setDismissedIds] = useState([]);
+  const [viewingDetail, setViewingDetail] = useState(null);
 
   useEffect(() => {
     const userJson = localStorage.getItem('user');
@@ -39,31 +39,19 @@ export default function ThongBao_GV() {
     }
   };
 
-  const handleMarkAsRead = async (notif) => {
-    if (notif.da_doc || !lecturer) return;
-    try {
-      await giangVienApi.markNotificationRead(notif.id, lecturer.taikhoan_id);
-      setNotifications(prev => prev.map(n => 
-        n.id === notif.id ? { ...n, da_doc: true } : n
-      ));
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleMarkAllRead = async () => {
-    if (!lecturer) return;
-    try {
-      await giangVienApi.markAllNotificationsRead(lecturer.id);
-      setNotifications(prev => prev.map(n => ({ ...n, da_doc: true })));
-    } catch (err) {
-      console.error(err);
-    }
+  const handleCardClick = (notif) => {
+    setViewingDetail(notif);
   };
 
   const handleDismiss = (e, notifId) => {
     e.stopPropagation();
     setDismissedIds(prev => [...prev, notifId]);
+  };
+
+  const resolveFileUrl = (url) => {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    return `http://localhost:3000${url.startsWith('/') ? '' : '/'}${url}`;
   };
 
   const visibleNotifications = notifications.filter(n => !dismissedIds.includes(n.id));
@@ -74,155 +62,94 @@ export default function ThongBao_GV() {
       const matchSearch = !searchQuery || 
         (n.tieu_de && n.tieu_de.toLowerCase().includes(q)) ||
         (n.noi_dung && n.noi_dung.toLowerCase().includes(q));
-      const matchFilter = activeFilter === 'all' || (activeFilter === 'unread' && !n.da_doc);
-      const matchType = selectedType === 'ALL' || n.loai_thong_bao === selectedType;
-      return matchSearch && matchFilter && matchType;
+      const nType = n.loai_thong_bao || n.type || 'ThongBao';
+      const matchType = selectedType === 'ALL' || nType === selectedType;
+      return matchSearch && matchType;
     });
-  }, [visibleNotifications, searchQuery, activeFilter, selectedType]);
+  }, [visibleNotifications, searchQuery, selectedType]);
 
   const totalPages = Math.ceil(filteredNotifications.length / limit) || 1;
   const paginatedNotifications = filteredNotifications.slice((currentPage - 1) * limit, currentPage * limit);
 
-  const unreadCount = visibleNotifications.filter(n => !n.da_doc).length;
-
   const getIcon = (type) => {
     switch(type) {
-      case 'CanhBao': return <div className="w-10 h-10 rounded-full bg-[#DBD468]/20 text-[#8b8433] flex items-center justify-center shrink-0"><AlertTriangle className="w-5 h-5" /></div>;
-      case 'PhanCong': return <div className="w-10 h-10 rounded-full bg-[#407F3E]/10 text-[#407F3E] flex items-center justify-center shrink-0"><FileText className="w-5 h-5" /></div>;
-      case 'ThanhCong': return <div className="w-10 h-10 rounded-full bg-[#89B449]/20 text-[#476d01] flex items-center justify-center shrink-0"><CheckCircle2 className="w-5 h-5" /></div>;
-      default: return <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center shrink-0"><Bell className="w-5 h-5" /></div>;
+      case 'CanhBao': 
+        return <div className="w-10 h-10 rounded-full bg-[#DBD468]/20 text-[#8b8433] flex items-center justify-center shrink-0 border border-[#DBD468]/30"><AlertTriangle className="w-5 h-5" /></div>;
+      case 'PhanCong': 
+        return <div className="w-10 h-10 rounded-full bg-[#407F3E]/15 text-[#407F3E] flex items-center justify-center shrink-0 border border-[#407F3E]/20"><FileText className="w-5 h-5" /></div>;
+      case 'NhacNho': 
+        return <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-200"><Bell className="w-5 h-5" /></div>;
+      case 'ThanhCong': 
+        return <div className="w-10 h-10 rounded-full bg-[#89B449]/20 text-[#476d01] flex items-center justify-center shrink-0 border border-[#89B449]/30"><CheckCircle2 className="w-5 h-5" /></div>;
+      default: 
+        return <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center shrink-0 border border-slate-200"><Bell className="w-5 h-5" /></div>;
+    }
+  };
+
+  const getTypeLabel = (type) => {
+    switch (type) {
+      case 'PhanCong': return 'Phân công';
+      case 'CanhBao': return 'Cảnh báo';
+      case 'NhacNho': return 'Nhắc nhở';
+      case 'ChuyenDi': return 'Chuyến đi';
+      case 'TaiChinh': return 'Tài chính';
+      default: return 'Thông báo chung';
     }
   };
 
   return (
-    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300 relative" onClick={() => setIsTypeDropdownOpen(false)}>
-      
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300 relative">
       <div className="max-w-4xl mx-auto">
-        {/* Header & Quick Actions */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Bell className="w-6 h-6 text-[#407F3E]" /> Thông báo
-          </h1>
-
-          <button 
-            onClick={handleMarkAllRead}
-            className="text-xs font-bold text-slate-500 hover:text-[#407F3E] transition-colors flex items-center gap-1 cursor-pointer"
-          >
-            <Check className="w-4 h-4" /> Đánh dấu tất cả đã đọc
-          </button>
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+              <Bell className="w-6 h-6 text-[#407F3E]" /> Thông báo giảng viên
+            </h1>
+            <p className="text-xs text-slate-500 mt-1">Hộp thư tin tức, quyết định phân công và lịch trình từ Khoa</p>
+          </div>
         </div>
 
         {/* Filter Bar */}
         <div className="bg-white p-4 rounded-xl shadow-sm border border-[#E7E0C4] mb-6 flex flex-wrap gap-4 items-center justify-between relative z-20">
-          
           {/* Search Input */}
-          <div className="relative flex-1 min-w-[240px]">
+          <div className="relative flex-1 min-w-[220px]">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input 
               type="text" 
-              placeholder="Tìm theo tiêu đề, nội dung..." 
+              placeholder="Tìm kiếm thông báo..." 
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E] transition-all text-slate-800 font-medium"
+              className="w-full pl-9 pr-4 py-2 border border-[#E7E0C4] rounded-lg text-sm bg-slate-50 focus:outline-none focus:border-[#407F3E] text-slate-700 font-medium"
             />
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Filter Pills */}
-            <div className="flex bg-[#E7E0C4]/50 p-1 rounded-lg border border-[#E7E0C4]">
-              <button 
-                onClick={() => {
-                  setActiveFilter('all');
-                  setCurrentPage(1);
-                }}
-                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
-                  activeFilter === 'all' ? 'bg-[#407F3E] text-white shadow-sm' : 'text-slate-600 hover:text-slate-800'
-                }`}
-              >
-                Tất cả
-              </button>
-              <button 
-                onClick={() => {
-                  setActiveFilter('unread');
-                  setCurrentPage(1);
-                }}
-                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  activeFilter === 'unread' ? 'bg-[#407F3E] text-white shadow-sm' : 'text-slate-600 hover:text-slate-800'
-                }`}
-              >
-                Chưa đọc
-                {unreadCount > 0 && <span className="w-4 h-4 rounded-full bg-[#DBD468] text-slate-800 text-[9px] flex items-center justify-center">{unreadCount}</span>}
-              </button>
-            </div>
-
+          {/* Right Controls */}
+          <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
             {/* Type Popover Dropdown */}
-            <div className="relative min-w-[170px]" onClick={(e) => e.stopPropagation()}>
-              <div 
-                onClick={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)}
-                className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs font-medium flex justify-between items-center cursor-pointer transition-all ${isTypeDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-              >
-                <span className="truncate pr-2 text-slate-700">
-                  {selectedType === 'ALL' && 'Tất cả loại'}
-                  {selectedType === 'PhanCong' && 'Phân công'}
-                  {selectedType === 'CanhBao' && 'Cảnh báo'}
-                  {selectedType === 'ThanhCong' && 'Thành công'}
-                </span>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-              </div>
-              {isTypeDropdownOpen && (
-                <div className="absolute top-full right-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-50 py-1 overflow-hidden animate-in slide-in-from-top-1">
-                  <div className="p-2 border-b border-[#E7E0C4]">
-                    <input
-                      type="text"
-                      placeholder="Tìm loại..."
-                      value={searchTypeDropdown}
-                      onChange={(e) => setSearchTypeDropdown(e.target.value)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="w-full px-2.5 py-1 text-xs bg-slate-50 border border-[#E7E0C4] rounded-md focus:outline-none focus:border-[#407F3E]"
-                    />
-                  </div>
-                  <div className="max-h-60 overflow-y-auto">
-                    {[
-                      { id: 'ALL', label: 'Tất cả loại' },
-                      { id: 'PhanCong', label: 'Phân công' },
-                      { id: 'CanhBao', label: 'Cảnh báo' },
-                      { id: 'ThanhCong', label: 'Thành công' },
-                    ]
-                      .filter(opt => !searchTypeDropdown || opt.label.toLowerCase().includes(searchTypeDropdown.toLowerCase()))
-                      .map(opt => (
-                        <div 
-                          key={opt.id}
-                          onClick={() => {
-                            setSelectedType(opt.id);
-                            setIsTypeDropdownOpen(false);
-                            setSearchTypeDropdown('');
-                            setCurrentPage(1);
-                          }}
-                          className={`px-3 py-2 text-xs cursor-pointer flex justify-between items-center transition-colors ${
-                            selectedType === opt.id ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50 font-medium'
-                          }`}
-                        >
-                          <span>{opt.label}</span>
-                          {selectedType === opt.id && <Check className="w-3.5 h-3.5 text-[#407F3E] shrink-0" />}
-                        </div>
-                      ))}
-                    {[
-                      { id: 'ALL', label: 'Tất cả loại' },
-                      { id: 'PhanCong', label: 'Phân công' },
-                      { id: 'CanhBao', label: 'Cảnh báo' },
-                      { id: 'ThanhCong', label: 'Thành công' },
-                    ].filter(opt => !searchTypeDropdown || opt.label.toLowerCase().includes(searchTypeDropdown.toLowerCase())).length === 0 && (
-                      <div className="px-3 py-2 text-xs text-slate-500 text-center">Không tìm thấy loại</div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
+            <SearchableDropdown
+              options={[
+                { value: 'ALL', label: 'Tất cả loại' },
+                { value: 'ThongBao', label: 'Thông báo chung' },
+                { value: 'PhanCong', label: 'Phân công' },
+                { value: 'NhacNho', label: 'Nhắc nhở' },
+                { value: 'CanhBao', label: 'Cảnh báo' },
+                { value: 'ChuyenDi', label: 'Chuyến đi' },
+                { value: 'TaiChinh', label: 'Tài chính' },
+              ]}
+              value={selectedType}
+              onChange={(val) => {
+                setSelectedType(val);
+                setCurrentPage(1);
+              }}
+              placeholder="Tất cả loại"
+              searchPlaceholder="Tìm loại..."
+              className="min-w-[170px]"
+            />
           </div>
-
         </div>
 
         {/* Notifications Feed */}
@@ -236,61 +163,77 @@ export default function ThongBao_GV() {
               <p className="text-sm text-slate-500 mt-1">Không tìm thấy thông báo phù hợp bộ lọc.</p>
             </div>
           ) : (
-            <div className="flex flex-col">
-              {paginatedNotifications.map((notif, index) => (
-                <div 
-                  key={notif.id} 
-                  onClick={() => handleMarkAsRead(notif)}
-                  className={`p-5 flex gap-4 transition-colors hover:bg-slate-50 group cursor-pointer ${
-                    index !== paginatedNotifications.length - 1 ? 'border-b border-[#E7E0C4]/60' : ''
-                  } ${!notif.da_doc ? 'bg-[#fdfcf8]' : 'opacity-70 hover:opacity-100'}`}
-                >
-                  
-                  {/* Unread Indicator & Icon */}
-                  <div className="relative shrink-0">
-                    {!notif.da_doc && (
-                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#DBD468] rounded-full border-2 border-white shadow-sm z-10"></div>
-                    )}
-                    {getIcon(notif.loai_thong_bao)}
-                  </div>
+            <div className="flex flex-col divide-y divide-[#E7E0C4]/60">
+              {paginatedNotifications.map((notif) => {
+                const notifType = notif.loai_thong_bao || notif.type || 'ThongBao';
+                const hasFile = notif.file_url || notif.file_dinh_kem || (notif.files && notif.files.length > 0);
+                const fileName = notif.file_dinh_kem || notif.files?.[0]?.ten_file || 'Tệp đính kèm';
+                const fileUrl = notif.file_url || notif.files?.[0]?.duong_dan;
 
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-col sm:flex-row justify-between items-start gap-1 mb-1">
-                      <h3 className={`text-sm truncate pr-4 ${!notif.da_doc ? 'font-black text-slate-800' : 'font-bold text-slate-700'}`}>
-                        {notif.tieu_de}
-                      </h3>
-                      <span className="text-[11px] font-bold text-slate-400 whitespace-nowrap flex items-center gap-1 shrink-0">
-                        <Clock className="w-3 h-3" /> {new Date(notif.ngay_gui || Date.now()).toLocaleDateString('vi-VN')}
-                      </span>
+                return (
+                  <div 
+                    key={notif.id} 
+                    onClick={() => handleCardClick(notif)}
+                    className="p-5 flex gap-4 transition-colors hover:bg-slate-50 group cursor-pointer bg-white"
+                  >
+                    {/* Icon */}
+                    <div className="relative shrink-0">
+                      {getIcon(notifType)}
                     </div>
-                    
-                    <p className={`text-xs line-clamp-2 leading-relaxed mb-3 ${!notif.da_doc ? 'text-slate-600 font-medium' : 'text-slate-500'}`}>
-                      {notif.noi_dung}
-                    </p>
 
-                    {/* Attachment Chip */}
-                    {notif.file_dinh_kem && (
-                      <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#E7E0C4]/30 hover:bg-[#E7E0C4] border border-[#E7E0C4] rounded-lg cursor-pointer transition-colors w-fit">
-                        <Paperclip className="w-3.5 h-3.5 text-[#407F3E]" />
-                        <span className="text-[11px] font-bold text-slate-700">Tệp đính kèm</span>
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-col sm:flex-row justify-between items-start gap-1 mb-1">
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5 inline-block">
+                            {getTypeLabel(notifType)}
+                          </span>
+                          <h3 className="text-base pr-4 font-bold text-slate-800">
+                            {notif.tieu_de}
+                          </h3>
+                        </div>
+                        <span className="text-[11px] font-bold text-slate-400 whitespace-nowrap flex items-center gap-1 shrink-0">
+                          <Clock className="w-3 h-3" /> {new Date(notif.ngay_gui || notif.created_at || new Date()).toLocaleString('vi-VN', {
+                            day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                          })}
+                        </span>
                       </div>
-                    )}
-                  </div>
+                      
+                      <p className="text-xs line-clamp-2 leading-relaxed mb-2.5 text-slate-600 font-normal">
+                        {notif.noi_dung}
+                      </p>
 
-                  {/* Actions (Hover) */}
-                  <div className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity pl-2">
-                    <button 
-                      onClick={(e) => handleDismiss(e, notif.id)}
-                      className="p-2 text-slate-300 hover:text-[#E68A8C] hover:bg-red-50 rounded-lg transition-colors cursor-pointer" 
-                      title="Ẩn thông báo"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+                      {/* Attachment Chip */}
+                      {hasFile && (
+                        <div 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.open(resolveFileUrl(fileUrl), '_blank');
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#E7E0C4]/30 hover:bg-[#E7E0C4] border border-[#E7E0C4] rounded-lg cursor-pointer transition-colors w-fit"
+                          title="Bấm để tải về hoặc xem tệp"
+                        >
+                          <Paperclip className="w-3.5 h-3.5 text-[#407F3E]" />
+                          <span className="text-[11px] font-bold text-slate-700 max-w-[220px] truncate">{fileName}</span>
+                          <Download className="w-3 h-3 shrink-0 ml-1 text-slate-500" />
+                        </div>
+                      )}
+                    </div>
 
-                </div>
-              ))}
+                    {/* Actions (Hover) */}
+                    <div className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity pl-2">
+                      <button 
+                        onClick={(e) => handleDismiss(e, notif.id)}
+                        className="p-2 text-slate-300 hover:text-[#E68A8C] hover:bg-red-50 rounded-lg transition-colors cursor-pointer" 
+                        title="Ẩn thông báo"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                  </div>
+                );
+              })}
             </div>
           )}
 
@@ -310,7 +253,7 @@ export default function ThongBao_GV() {
                   setLimit(newLimit);
                   setCurrentPage(1);
                 }}
-                searchPlaceholder="Tìm số lượng..."
+                searchPlaceholder="Số hàng..."
                 className="min-w-[80px]"
               />
               <span>/ {filteredNotifications.length} thông báo</span>
@@ -352,6 +295,92 @@ export default function ThongBao_GV() {
         </div>
       </div>
 
+      {/* Modal - Xem chi tiết thông báo */}
+      {viewingDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-slate-900/20 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={() => setViewingDetail(null)}
+          ></div>
+          
+          <div 
+            className="bg-white w-full max-w-2xl rounded-2xl shadow-xl relative z-10 animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh] overflow-hidden"
+          >
+            <div className="px-6 py-4 border-b border-[#E7E0C4] flex items-center justify-between bg-slate-50/50">
+              <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <Bell className="w-5 h-5 text-[#407F3E]" />
+                Chi tiết thông báo
+              </h2>
+              <button 
+                type="button"
+                onClick={() => setViewingDetail(null)}
+                className="p-1.5 text-slate-400 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4 overflow-y-auto">
+              <div className="flex flex-wrap gap-2 items-center">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded text-[11px] font-bold bg-[#407F3E]/10 text-[#407F3E] border border-[#407F3E]/20">
+                  {getTypeLabel(viewingDetail.loai_thong_bao || viewingDetail.type)}
+                </span>
+                <span className="text-xs text-slate-400 ml-auto font-medium flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5" />
+                  {new Date(viewingDetail.ngay_gui || viewingDetail.created_at || new Date()).toLocaleString('vi-VN')}
+                </span>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-bold text-slate-800 leading-snug">{viewingDetail.tieu_de}</h3>
+                {viewingDetail.nguoi_gui && (
+                  <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
+                    <User className="w-3.5 h-3.5" /> Người gửi: {viewingDetail.nguoi_gui}
+                  </p>
+                )}
+              </div>
+
+              <div className="p-4 bg-slate-50 border border-slate-200/70 rounded-xl text-sm font-medium text-slate-700 whitespace-pre-wrap leading-relaxed">
+                {viewingDetail.noi_dung}
+              </div>
+
+              {/* Tệp đính kèm */}
+              {(viewingDetail.file_url || viewingDetail.file_dinh_kem || (viewingDetail.files && viewingDetail.files.length > 0)) && (
+                <div className="border border-[#E7E0C4] bg-[#E7E0C4]/15 rounded-xl p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <FileText className="w-6 h-6 text-[#407F3E] shrink-0" />
+                    <div>
+                      <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">Tệp đính kèm</p>
+                      <p className="text-sm font-semibold text-slate-800">
+                        {viewingDetail.file_dinh_kem || viewingDetail.files?.[0]?.ten_file || 'Tài liệu đính kèm'}
+                      </p>
+                    </div>
+                  </div>
+                  <a
+                    href={resolveFileUrl(viewingDetail.file_url || viewingDetail.files?.[0]?.duong_dan)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2 bg-[#407F3E] hover:bg-[#407F3E]/90 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Tải về / Xem
+                  </a>
+                </div>
+              )}
+            </div>
+            
+            <div className="px-6 py-4 border-t border-[#E7E0C4] bg-slate-50/50 flex items-center justify-end rounded-b-2xl">
+              <button 
+                type="button"
+                onClick={() => setViewingDetail(null)}
+                className="px-6 py-2 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl text-sm font-bold transition-colors shadow-sm cursor-pointer"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

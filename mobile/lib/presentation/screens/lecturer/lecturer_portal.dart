@@ -147,26 +147,9 @@ class _LecturerPortalState extends State<LecturerPortal> {
           ),
         ),
         actions: [
-          Stack(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.notifications_none, color: AppColors.darkSlate),
-                onPressed: () => setState(() => _notificationSubScreen = true),
-              ),
-              if (appState.lecturerNotifications.any((n) => n.isUnread))
-                Positioned(
-                  top: 10,
-                  right: 10,
-                  child: Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: AppColors.danger,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ),
-            ],
+          IconButton(
+            icon: const Icon(Icons.notifications_none, color: AppColors.darkSlate),
+            onPressed: () => setState(() => _notificationSubScreen = true),
           ),
           GestureDetector(
             onTap: () => setState(() => _profileSubScreen = true),

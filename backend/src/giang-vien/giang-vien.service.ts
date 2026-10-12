@@ -906,19 +906,24 @@ export class GiangVienService {
   // (v13) Newsfeed — không còn ThongBaoDaDoc
   async getNotifications(_lecturerId: number) {
     const list = await this.thongBaoRepo.find({
-      where: { khoa_hoc_id: IsNull() },
+      where: {
+        khoa_hoc_id: IsNull(),
+        doi_tuong_nhan: In(['ALL', 'LECTURER']),
+      },
+      relations: {
+        nguoiGui: true,
+        files: true,
+      },
       order: { ngay_gui: 'DESC' },
     });
 
-    return list;
-  }
-
-  async markNotificationRead(_accountId: number, _notifId: number) {
-    return { success: true };
-  }
-
-  async markAllNotificationsRead(_lecturerId: number) {
-    return { success: true, count: 0 };
+    return list.map((n) => ({
+      ...n,
+      type: n.loai_thong_bao,
+      file_dinh_kem: n.files && n.files.length > 0 ? n.files[0].ten_file : null,
+      file_url: n.files && n.files.length > 0 ? n.files[0].duong_dan : null,
+      nguoi_gui: n.nguoiGui?.ten_dang_nhap || 'Khoa / CLB',
+    }));
   }
 
   // Dashboard Stats

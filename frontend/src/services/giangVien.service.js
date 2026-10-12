@@ -12,7 +12,5 @@ export const giangVienApi = {
   getBoardSessions: (lecturerId) => api.get(`/giang-vien/board-sessions/${lecturerId}`),
   submitBoardScore: (data) => api.post('/giang-vien/submit-board-score', data),
   getNotifications: (lecturerId) => api.get(`/giang-vien/notifications/${lecturerId}`),
-  markNotificationRead: (notifId, accountId) => api.post(`/giang-vien/notifications/${notifId}/read`, { accountId }),
-  markAllNotificationsRead: (lecturerId) => api.post(`/giang-vien/notifications/mark-all-read/${lecturerId}`),
   getDashboardStats: (lecturerId) => api.get(`/giang-vien/dashboard-stats/${lecturerId}`),
 };

@@ -169,41 +169,20 @@ class DashboardSVScreen extends StatelessWidget {
               final notif = recentNotifications[index];
               return Card(
                 child: ListTile(
-                  onTap: () {
-                    appStateProvider.markStudentNotificationRead(notif.id);
-                    onNotifTap();
-                  },
-                  leading: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: const BoxDecoration(
-                          color: AppColors.appBackground,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.campaign, size: 20, color: AppColors.primary),
-                      ),
-                      if (!notif.isRead)
-                        Positioned(
-                          top: 0,
-                          right: 0,
-                          child: Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: AppColors.warning,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ),
-                    ],
+                  onTap: onNotifTap,
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: const BoxDecoration(
+                      color: AppColors.appBackground,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.campaign, size: 20, color: AppColors.primary),
                   ),
                   title: Text(
                     notif.title,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 13,
-                      fontWeight: notif.isRead ? FontWeight.w500 : FontWeight.bold,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                   subtitle: Text(

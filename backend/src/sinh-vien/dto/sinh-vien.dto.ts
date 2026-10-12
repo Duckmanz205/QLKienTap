@@ -95,12 +95,6 @@ export class RequestRefundDto {
   tenChuTaiKhoanNhan: string;
 }
 
-export class MarkNotificationReadDto {
-  @IsInt()
-  @Min(1)
-  notifId: number;
-}
-
 export class SubmitReportDto {
   @IsInt()
   @Min(1)

@@ -476,14 +476,23 @@ export class CreateKhoaNotificationDto {
   @IsNotEmpty({ message: 'Nội dung thông báo không được để trống' })
   noi_dung: string;
 
+  @IsOptional()
   @IsInt()
   @Min(1)
-  nguoi_gui_id: number;
+  nguoi_gui_id?: number;
 
   @IsOptional()
   @IsInt()
   @Min(1)
   khoa_hoc_id?: number;
+
+  @IsOptional()
+  @IsString()
+  doi_tuong_nhan?: string;
+
+  @IsOptional()
+  @IsString()
+  loai_thong_bao?: string;
 
   @IsOptional()
   @IsString()

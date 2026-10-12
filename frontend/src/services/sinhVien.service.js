@@ -15,7 +15,6 @@ export const sinhVienApi = {
   requestRefund: (data) => api.post('/sinh-vien/request-refund', data),
   getRefundRequests: (studentId) => api.get(`/sinh-vien/refund-requests/${studentId}`),
   getNotifications: (studentId) => api.get(`/sinh-vien/notifications/${studentId}`),
-  markNotificationRead: (notifId) => api.post('/sinh-vien/mark-notification-read', { notifId }),
   submitReport: (data) => api.post('/sinh-vien/submit-report', data),
   uploadReport: (file) => {
     const formData = new FormData();

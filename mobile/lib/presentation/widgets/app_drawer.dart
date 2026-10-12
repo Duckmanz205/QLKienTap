@@ -28,9 +28,6 @@ class AppDrawer extends StatelessWidget {
     final String avatarUrl = role == 'SinhVien'
         ? appState.studentProfile.avatar
         : appState.lecturerProfile.avatar;
-    final int notifCount = role == 'SinhVien'
-        ? appState.studentNotifications.where((n) => !n.isRead).length
-        : appState.lecturerNotifications.where((n) => n.isUnread).length;
 
     // Define menu items for each role
     final List<Map<String, dynamic>> menuItems = role == 'SinhVien'
@@ -42,7 +39,7 @@ class AppDrawer extends StatelessWidget {
             {'icon': Icons.school, 'label': 'Kết quả & điểm', 'category': 'KIẾN TẬP CỦA TÔI', 'index': 3},
             {'icon': Icons.payment, 'label': 'Thanh toán', 'category': 'TÀI CHÍNH', 'subScreen': 'finance_payment', 'index': 4},
             {'icon': Icons.money_off, 'label': 'Hoàn phí', 'category': 'TÀI CHÍNH', 'subScreen': 'finance_refund', 'index': 4},
-            {'icon': Icons.notifications, 'label': 'Thông báo', 'category': 'THÔNG BÁO', 'subScreen': 'notifications', 'badge': notifCount, 'index': 4},
+            {'icon': Icons.notifications, 'label': 'Thông báo', 'category': 'THÔNG BÁO', 'subScreen': 'notifications', 'index': 4},
           ]
         : [
             {'icon': Icons.home_outlined, 'label': 'Trang chủ', 'category': 'TRANG CHỦ', 'index': 0},
@@ -51,7 +48,7 @@ class AppDrawer extends StatelessWidget {
             {'icon': Icons.star_border, 'label': 'Điểm chuẩn bị & Cộng', 'category': 'DẪN ĐOÀN', 'subScreen': 'grading_prep', 'index': 2},
             {'icon': Icons.person_outline, 'label': 'Sinh viên hướng dẫn', 'category': 'HƯỚNG DẪN', 'index': 2},
             {'icon': Icons.tv_outlined, 'label': 'Buổi báo cáo TQNM', 'category': 'HỘI ĐỒNG', 'index': 3},
-            {'icon': Icons.notifications_none, 'label': 'Thông báo', 'category': 'THÔNG BÁO', 'subScreen': 'notifications', 'badge': notifCount, 'index': 4},
+            {'icon': Icons.notifications_none, 'label': 'Thông báo', 'category': 'THÔNG BÁO', 'subScreen': 'notifications', 'index': 4},
           ];
 
     // Group items by category

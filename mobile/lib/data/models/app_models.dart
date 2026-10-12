@@ -140,6 +140,8 @@ class StudentNotification {
   final String timeText;
   final bool isRead;
   final String? attachment;
+  final String? fileUrl;
+  final String? type;
 
   StudentNotification({
     required this.id,
@@ -148,10 +150,14 @@ class StudentNotification {
     required this.timeText,
     required this.isRead,
     this.attachment,
+    this.fileUrl,
+    this.type,
   });
 
   StudentNotification copyWith({
     bool? isRead,
+    String? fileUrl,
+    String? type,
   }) {
     return StudentNotification(
       id: id,
@@ -160,6 +166,8 @@ class StudentNotification {
       timeText: timeText,
       isRead: isRead ?? this.isRead,
       attachment: attachment,
+      fileUrl: fileUrl ?? this.fileUrl,
+      type: type ?? this.type,
     );
   }
 }
@@ -411,6 +419,8 @@ class LecturerNotification {
   final String time;
   final bool isUnread;
   final String? attachment;
+  final String? fileUrl;
+  final String? type;
 
   LecturerNotification({
     required this.id,
@@ -419,10 +429,14 @@ class LecturerNotification {
     required this.time,
     required this.isUnread,
     this.attachment,
+    this.fileUrl,
+    this.type,
   });
 
   LecturerNotification copyWith({
     bool? isUnread,
+    String? fileUrl,
+    String? type,
   }) {
     return LecturerNotification(
       id: id,
@@ -431,6 +445,8 @@ class LecturerNotification {
       time: time,
       isUnread: isUnread ?? this.isUnread,
       attachment: attachment,
+      fileUrl: fileUrl ?? this.fileUrl,
+      type: type ?? this.type,
     );
   }
 }
