@@ -348,13 +348,6 @@ class ApiService {
     return await get('sinh-vien/notifications/$studentId');
   }
 
-  static Future<dynamic> markStudentNotificationRead(
-      int notifId) async {
-    return await post('sinh-vien/mark-notification-read', {
-      'notifId': notifId,
-    });
-  }
-
   // Student grades
   static Future<dynamic> getStudentGrades(int studentId) async {
     return await get('sinh-vien/grades/$studentId');
@@ -468,17 +461,6 @@ class ApiService {
   // Lecturer notifications
   static Future<dynamic> getLecturerNotifications(int lecturerId) async {
     return await get('giang-vien/notifications/$lecturerId');
-  }
-
-  static Future<dynamic> markLecturerNotificationRead(
-      int notifId, int accountId) async {
-    return await post('giang-vien/notifications/$notifId/read', {
-      'accountId': accountId,
-    });
-  }
-
-  static Future<dynamic> markAllLecturerNotificationsRead(int lecturerId) async {
-    return await post('giang-vien/notifications/mark-all-read/$lecturerId', {});
   }
 
   // Lecturer dashboard

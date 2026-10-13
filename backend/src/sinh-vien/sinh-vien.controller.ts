@@ -18,7 +18,6 @@ import {
   ProposeTripDto,
   RequestCancelDto,
   RequestRefundDto,
-  MarkNotificationReadDto,
   SubmitReportDto,
   SelectRepresentativeTripsDto,
 } from './dto/sinh-vien.dto';
@@ -193,14 +192,6 @@ export class SinhVienController {
   async getNotifications(@CurrentUser() user: JwtPayloadUser) {
     const student = await this.svService.getStudentByAccountId(user.sub);
     return this.svService.getNotifications(student.id);
-  }
-
-  @Post('mark-notification-read')
-  async markNotificationRead(
-    @CurrentUser() user: JwtPayloadUser,
-    @Body() body: MarkNotificationReadDto,
-  ) {
-    return this.svService.markNotificationRead(user.sub, body.notifId);
   }
 
   @Post('submit-report')

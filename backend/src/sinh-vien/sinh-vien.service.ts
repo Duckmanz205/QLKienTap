@@ -675,18 +675,27 @@ export class SinhVienService {
   async getNotifications(studentId: number) {
     const sv = await this.svRepo.findOne({ where: { id: studentId } });
     if (!sv) throw new NotFoundException('Không tìm thấy sinh viên');
-    // Thong bao chung (khoa_hoc_id IS NULL) hoac thong bao cho rieng khoa của SV này
+    
+    const targetAudience = In(['ALL', 'STUDENT']);
     const list = await this.thongBaoRepo.find({
-      where: [{ khoa_hoc_id: IsNull() }, { khoa_hoc_id: sv.khoa_hoc_id }],
+      where: [
+        { khoa_hoc_id: IsNull(), doi_tuong_nhan: targetAudience },
+        { khoa_hoc_id: sv.khoa_hoc_id, doi_tuong_nhan: targetAudience },
+      ],
+      relations: {
+        nguoiGui: true,
+        files: true,
+      },
       order: { ngay_gui: 'DESC' },
     });
 
-    return list;
-  }
-
-  // (v13) ThongBaoDaDoc đã bị xóa — newsfeed không cần đánh dấu đã đọc
-  async markNotificationRead(_accountId: number, _notifId: number) {
-    return { success: true };
+    return list.map((n) => ({
+      ...n,
+      type: n.loai_thong_bao,
+      file_dinh_kem: n.files && n.files.length > 0 ? n.files[0].ten_file : null,
+      file_url: n.files && n.files.length > 0 ? n.files[0].duong_dan : null,
+      nguoi_gui: n.nguoiGui?.ten_dang_nhap || 'Khoa / CLB',
+    }));
   }
 
   private sanitizeAndValidateFileRef(

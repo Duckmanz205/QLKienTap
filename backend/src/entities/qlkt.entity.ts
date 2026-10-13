@@ -300,6 +300,12 @@ export class ThongBao {
   @Column({ nullable: true })
   khoa_hoc_id: number;
 
+  @Column({ length: 20, default: 'ALL' })
+  doi_tuong_nhan: string; // 'ALL' | 'STUDENT' | 'LECTURER'
+
+  @Column({ length: 50, default: 'ThongBao' })
+  loai_thong_bao: string; // 'ThongBao' | 'NhacNho' | 'PhanCong' | 'ChuyenDi' | 'TaiChinh' | 'CanhBao' | 'ThanhCong'
+
   @Column({ type: 'datetime2', default: () => 'SYSDATETIME()' })
   ngay_gui: Date;
 
@@ -309,6 +315,9 @@ export class ThongBao {
   // (v6) Thêm ngay_chinh_sua
   @Column({ type: 'datetime2', nullable: true })
   ngay_chinh_sua: Date;
+
+  @OneToMany(() => ThongBaoFile, (f) => f.thongBao)
+  files: ThongBaoFile[];
 }
 
 @Entity('ThongBaoFile')

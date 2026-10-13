@@ -16,6 +16,10 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import {
+  CurrentUser,
+  JwtPayloadUser,
+} from '../../auth/decorators/user.decorator';
 import { KhoaService } from '../shared/khoa.service';
 import { AuthGuard } from '../../auth/guards/auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
@@ -307,8 +311,15 @@ export class ClbController {
   }
 
   @Post('notifications')
-  async createNotification(@Body() body: CreateKhoaNotificationDto) {
-    return this.khoaService.createNotification(body);
+  async createNotification(
+    @Body() body: CreateKhoaNotificationDto,
+    @CurrentUser() user: JwtPayloadUser,
+  ) {
+    const nguoi_gui_id = body.nguoi_gui_id || user?.sub || 1;
+    return this.khoaService.createNotification({
+      ...body,
+      nguoi_gui_id,
+    });
   }
 
   @Post('export-student-list')

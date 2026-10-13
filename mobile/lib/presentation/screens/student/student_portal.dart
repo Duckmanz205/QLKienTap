@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
-import '../../../core/network/api_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/state/app_state.dart';
 import 'dashboard_sv.dart';
@@ -130,26 +128,9 @@ class _StudentPortalState extends State<StudentPortal> {
           ),
         ),
         actions: [
-          Stack(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.notifications_none, color: AppColors.darkSlate),
-                onPressed: () => _openMoreScreen('notifications'),
-              ),
-              if (appState.studentNotifications.any((n) => !n.isRead))
-                Positioned(
-                  top: 10,
-                  right: 10,
-                  child: Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: AppColors.danger,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ),
-            ],
+          IconButton(
+            icon: const Icon(Icons.notifications_none, color: AppColors.darkSlate),
+            onPressed: () => _openMoreScreen('notifications'),
           ),
           GestureDetector(
             onTap: () => _openMoreScreen('profile'),

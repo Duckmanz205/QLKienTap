@@ -299,12 +299,24 @@ class AppStateProviderState extends State<AppStateContainer> {
       setState(() {
         if (notifsJson.isNotEmpty) {
           _state.studentNotifications = notifsJson.map((n) {
+            final rawDate = n['ngay_gui'] ?? n['created_at'];
+            String formattedTime = 'Vừa xong';
+            if (rawDate != null) {
+              final dt = DateTime.tryParse(rawDate.toString())?.toLocal();
+              if (dt != null) {
+                formattedTime = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+              }
+            }
+
             return StudentNotification(
               id: n['id'].toString(),
               title: n['tieu_de'] ?? 'Thông báo',
               content: n['noi_dung'] ?? '',
-              timeText: n['ngay_tao'] != null ? n['ngay_tao'].substring(0, 10) : 'Vừa xong',
+              timeText: formattedTime,
               isRead: n['da_doc'] ?? false,
+              attachment: n['file_dinh_kem'] ?? (n['files'] != null && (n['files'] as List).isNotEmpty ? n['files'][0]['ten_file'] : null),
+              fileUrl: n['file_url'] ?? (n['files'] != null && (n['files'] as List).isNotEmpty ? n['files'][0]['duong_dan'] : null),
+              type: n['loai_thong_bao'] ?? n['type'] ?? 'ThongBao',
             );
           }).toList();
         } else {
@@ -412,6 +424,37 @@ class AppStateProviderState extends State<AppStateContainer> {
           tongSvHuongDan: statsJson['tongSvHuongDan'] ?? 0,
         );
       });
+
+      try {
+        final notifsJson = await ApiService.getLecturerNotifications(lecturerId);
+        if (notifsJson is List && notifsJson.isNotEmpty) {
+          setState(() {
+            _state.lecturerNotifications = notifsJson.map((n) {
+              final rawDate = n['ngay_gui'] ?? n['created_at'];
+              String formattedTime = 'Vừa xong';
+              if (rawDate != null) {
+                final dt = DateTime.tryParse(rawDate.toString())?.toLocal();
+                if (dt != null) {
+                  formattedTime = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+                }
+              }
+
+              return LecturerNotification(
+                id: n['id'].toString(),
+                title: n['tieu_de'] ?? 'Thông báo',
+                body: n['noi_dung'] ?? '',
+                time: formattedTime,
+                isUnread: !(n['da_doc'] == true),
+                attachment: n['file_dinh_kem'] ?? (n['files'] != null && (n['files'] as List).isNotEmpty ? n['files'][0]['ten_file'] : null),
+                fileUrl: n['file_url'] ?? (n['files'] != null && (n['files'] as List).isNotEmpty ? n['files'][0]['duong_dan'] : null),
+                type: n['loai_thong_bao'] ?? n['type'] ?? 'ThongBao',
+              );
+            }).toList();
+          });
+        }
+      } catch (e) {
+        print('Error fetching lecturer notifications: $e');
+      }
 
     } catch (e) {
       print('Failed to load lecturer data from backend, staying with in-memory mock data: $e');
@@ -724,32 +767,6 @@ class AppStateProviderState extends State<AppStateContainer> {
     return true;
   }
 
-  void markStudentNotificationRead(String id) {
-    final notifId = int.tryParse(id);
-    if (notifId != null) {
-      ApiService.markStudentNotificationRead(notifId).catchError((e) {
-        print('markStudentNotificationRead API call failed: $e');
-      });
-    }
-
-    setState(() {
-      _state.studentNotifications = _state.studentNotifications.map((n) {
-        if (n.id == id) {
-          return n.copyWith(isRead: true);
-        }
-        return n;
-      }).toList();
-    });
-  }
-
-  void markAllStudentNotificationsRead() {
-    setState(() {
-      _state.studentNotifications = _state.studentNotifications.map((n) {
-        return n.copyWith(isRead: true);
-      }).toList();
-    });
-  }
-
   // Lecturer Operations
   Future<void> updateAttendance(String studentId, String status, {String? reason}) async {
     final student = _state.lecturerStudents.firstWhere(
@@ -836,25 +853,6 @@ class AppStateProviderState extends State<AppStateContainer> {
           );
         }
         return s;
-      }).toList();
-    });
-  }
-
-  void markLecturerNotificationRead(String id) {
-    setState(() {
-      _state.lecturerNotifications = _state.lecturerNotifications.map((n) {
-        if (n.id == id) {
-          return n.copyWith(isUnread: false);
-        }
-        return n;
-      }).toList();
-    });
-  }
-
-  void markAllLecturerNotificationsRead() {
-    setState(() {
-      _state.lecturerNotifications = _state.lecturerNotifications.map((n) {
-        return n.copyWith(isUnread: false);
       }).toList();
     });
   }
