@@ -16,6 +16,7 @@ export const sinhVienApi = {
   getRefundRequests: (studentId) => api.get(`/sinh-vien/refund-requests/${studentId}`),
   getNotifications: (studentId) => api.get(`/sinh-vien/notifications/${studentId}`),
   submitReport: (data) => api.post('/sinh-vien/submit-report', data),
+  submitConfirmationPaper: (data) => api.post('/sinh-vien/submit-confirmation-paper', data),
   uploadReport: (file) => {
     const formData = new FormData();
     formData.append('file', file);
@@ -23,8 +24,16 @@ export const sinhVienApi = {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
   },
+  uploadAttachment: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/upload/attachment', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
   deleteReport: (registrationId) => api.delete(`/sinh-vien/report/${registrationId}`),
   selectRepresentativeTrips: (data) => api.post('/sinh-vien/select-representative-trips', data),
+  getRepresentativeTripsStatus: () => api.get('/sinh-vien/representative-trips-status'),
   getGrades: (studentId) => api.get(`/sinh-vien/grades/${studentId}`),
   getDashboardStats: (studentId) => api.get(`/sinh-vien/dashboard-stats/${studentId}`),
   getPaymentConfig: () => api.get('/sinh-vien/payment-config'),

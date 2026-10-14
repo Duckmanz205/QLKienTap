@@ -86,6 +86,22 @@ export class SubmitBoardScoreDto {
   score: number;
 }
 
+export class SubmitBoardScoresBatchDto {
+  @IsInt()
+  @Min(1)
+  memberId: number;
+
+  @IsArray()
+  @ArrayNotEmpty({ message: 'Danh sách phiếu tham quan không được để trống' })
+  @IsInt({ each: true })
+  phieuIds: number[];
+
+  @IsNumber()
+  @Min(0, { message: 'Điểm hội đồng không được bé hơn 0' })
+  @Max(10, { message: 'Điểm hội đồng không được lớn hơn 10' })
+  score: number;
+}
+
 export class GuidedReportsQueryDto {
   @IsOptional()
   @Type(() => Number)
@@ -107,3 +123,18 @@ export class GuidedReportsQueryDto {
   @IsString()
   status?: string;
 }
+
+export class LockTripPrepGradesDto {
+  @IsInt()
+  @Min(1)
+  tripId: number;
+}
+
+export class LockGuidedReportsGradesDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  dotKienTapId?: number;
+}
+

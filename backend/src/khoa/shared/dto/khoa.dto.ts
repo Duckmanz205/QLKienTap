@@ -447,10 +447,55 @@ export class AddBoardMemberDto {
   role: string;
 }
 
+export class UpdateBoardDto {
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  date?: Date;
+
+  @IsOptional()
+  @IsString()
+  room?: string;
+}
+
+export class UnassignStudentsDto {
+  @IsArray()
+  @ArrayNotEmpty({ message: 'Danh sách bộ chuyến không được rỗng' })
+  boChuyenIds: number[];
+}
+
 export class LockGradesDto {
   @IsInt()
   @Min(1)
   lichKienTapId: number;
+}
+
+export class UnlockTripPrepGradesDto {
+  @IsInt()
+  @Min(1)
+  tripId: number;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Lý do mở khóa không được để trống' })
+  lyDo: string;
+}
+
+export class UnlockLecturerReportGradesDto {
+  @IsInt()
+  @Min(1)
+  dotKienTapId: number;
+
+  @IsInt()
+  @Min(1)
+  giangVienId: number;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Lý do mở khóa không được để trống' })
+  lyDo: string;
 }
 
 export class ApproveRefundDto {

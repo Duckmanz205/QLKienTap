@@ -5,11 +5,25 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* HUIT Brand Design Tokens */
+  --huit-primary: #407F3E;
+  --huit-primary-hover: #326631;
+  --huit-accent-yellow: #DBD468;
+  --huit-accent-orange: #D97706;
+  --huit-cream: #E7E0C4;
+  --huit-cream-light: #FAF8F0;
+  --huit-page-bg: #FAF9F5;
+  --huit-border: #E7E0C4;
+  --huit-text-main: #1E293B;
+  --huit-text-muted: #64748B;
+}
+
 body {
   font-family: 'Inter', sans-serif;
   margin: 0;
   padding: 0;
-  background-color: #F2F6F0;
+  background-color: var(--huit-page-bg);
 }
 
 #root {

@@ -1,9 +1,9 @@
 import toast from 'react-hot-toast';
 import React, { useState, useEffect, useRef } from 'react';
-import { 
+import {
   ArrowLeft, FileText, CheckCircle2, Save, Search, ChevronRight,
   ZoomIn, ZoomOut, Download, Sparkles, MessageSquareWarning, User,
-  Filter, Check, ChevronDown, X, Lock
+  Filter, Check, ChevronDown, X, Lock, Minus, Maximize2, Building2, Award, ExternalLink
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import api, { giangVienApi } from '../../services/api';
@@ -12,10 +12,12 @@ import SearchableDropdown from '../../components/SearchableDropdown';
 export default function ChamBaiThuHoach_GV() {
   const navigate = useNavigate();
   const location = useLocation();
-  
+
   const [lecturer, setLecturer] = useState(null);
   const [reports, setReports] = useState([]);
   const [selectedReport, setSelectedReport] = useState(null);
+  const [activeViewerTab, setActiveViewerTab] = useState('report'); // 'report' | 'confirmation'
+  const [confirmationFile, setConfirmationFile] = useState(null);
 
   // Filter & Pagination states
   const [searchTerm, setSearchTerm] = useState(location.state?.filterMssv || '');
@@ -26,16 +28,18 @@ export default function ChamBaiThuHoach_GV() {
   const [selectedTripId, setSelectedTripId] = useState('ALL');
   const [isTripDropdownOpen, setIsTripDropdownOpen] = useState(false);
   const [searchTripDropdown, setSearchTripDropdown] = useState('');
-  
-  // Bulk AI Grading states
+
+  // Bulk AI Grading states (Background Progress)
   const [selectedReportIds, setSelectedReportIds] = useState([]);
-  const [isBulkAiModalOpen, setIsBulkAiModalOpen] = useState(false);
+  const [isBulkAiRunning, setIsBulkAiRunning] = useState(false);
+  const [isBulkAiMinimized, setIsBulkAiMinimized] = useState(false);
   const [bulkAiProgress, setBulkAiProgress] = useState(0);
   const [bulkAiTotal, setBulkAiTotal] = useState(0);
   const [bulkAiCurrentStudent, setBulkAiCurrentStudent] = useState('');
   const [bulkAiStatusText, setBulkAiStatusText] = useState('');
+  const [bulkAiIsCompleted, setBulkAiIsCompleted] = useState(false);
   const isBulkAiCanceled = React.useRef(false);
-  
+
   const [currentPage, setCurrentPage] = useState(1);
   const [limit, setLimit] = useState(15);
 
@@ -201,18 +205,23 @@ TRANG 38
 
   const handleBulkAiGrading = async () => {
     if (selectedReportIds.length === 0) return;
-    setIsBulkAiModalOpen(true);
-    setBulkAiTotal(selectedReportIds.length);
+    const reportIdsToProcess = [...selectedReportIds];
+    setSelectedReportIds([]); // Bỏ chọn để giảng viên tự do thao tác trên danh sách
+    setIsBulkAiRunning(true);
+    setIsBulkAiMinimized(false);
+    setBulkAiIsCompleted(false);
+    setBulkAiTotal(reportIdsToProcess.length);
     setBulkAiProgress(0);
     setBulkAiStatusText('Khởi tạo quá trình chấm điểm hàng loạt...');
     isBulkAiCanceled.current = false;
 
-    for (let i = 0; i < selectedReportIds.length; i++) {
+    let successCount = 0;
+    for (let i = 0; i < reportIdsToProcess.length; i++) {
       if (isBulkAiCanceled.current) {
-        setBulkAiStatusText('Đã hủy quá trình.');
+        setBulkAiStatusText('Đã dừng tiến trình.');
         break;
       }
-      const reportId = selectedReportIds[i];
+      const reportId = reportIdsToProcess[i];
       const report = reports.find(r => r.id === reportId);
       if (!report) continue;
 
@@ -220,30 +229,30 @@ TRANG 38
       const studentName = sv?.ho_ten || 'Sinh viên';
       setBulkAiCurrentStudent(studentName);
       setBulkAiStatusText(`Đang tải dữ liệu bài nộp...`);
-      
+
       try {
         let apiPath = report.file_bao_cao;
         if (!apiPath) {
-          setBulkAiStatusText(`Thất bại: Không có file đính kèm`);
+          setBulkAiStatusText(`Bỏ qua: Không có file đính kèm`);
           continue;
         }
         if (apiPath.startsWith('reports/')) apiPath = `upload/file/${apiPath}`;
         else if (!apiPath.startsWith('upload/file/')) apiPath = `upload/file/reports/${apiPath}`;
         if (apiPath.startsWith('/')) apiPath = apiPath.substring(1);
-        
+
         const txtApiPath = '/' + apiPath.replace(/\.\w+$/, '.txt');
         let textToAnalyze = '';
         try {
           const respTxt = await api.get(txtApiPath, { responseType: 'text' });
           if (respTxt.data) textToAnalyze = respTxt.data;
         } catch (e) {
-          setBulkAiStatusText(`Thất bại: Chưa trích xuất được text cho bài này`);
+          setBulkAiStatusText(`Bỏ qua: Chưa trích xuất được text cho bài này`);
           continue;
         }
 
         if (!textToAnalyze) {
-           setBulkAiStatusText(`Thất bại: Nội dung văn bản trống`);
-           continue; 
+          setBulkAiStatusText(`Bỏ qua: Nội dung văn bản trống`);
+          continue;
         }
 
         setBulkAiStatusText(`Đang phân tích và chấm điểm bằng AI...`);
@@ -257,37 +266,66 @@ TRANG 38
         });
 
         if (!aiRes.ok) {
-           setBulkAiStatusText(`Thất bại: Lỗi từ máy chủ AI`);
-           continue;
+          setBulkAiStatusText(`Thất bại: Lỗi từ máy chủ AI`);
+          continue;
         }
-        
+
         const aiData = await aiRes.json();
         setBulkAiStatusText(`Đang lưu đề xuất điểm ${aiData.diem_bao_cao_cuoi_cung}...`);
-        
-        let aiComment = `1. Hình thức: ${aiData.hinh_thuc_tong_quan?.ly_do_hinh_thuc}\n` +
-                        `2. Tổng quan: ${aiData.hinh_thuc_tong_quan?.ly_do_tong_quan}\n` +
-                        `3. Quy trình: ${aiData.quy_trinh_cong_nghe?.ly_do_quy_trinh}\n` +
-                        `4. VSATTP: ${aiData.vsattp?.ly_do_vsattp}`;
-        
+
+        const diemHT = aiData.hinh_thuc_tong_quan?.diem_hinh_thuc ?? '';
+        const diemTQ = aiData.hinh_thuc_tong_quan?.diem_tong_quan ?? '';
+        const diemQT = aiData.quy_trinh_cong_nghe?.diem_quy_trinh ?? '';
+        const diemVS = aiData.vsattp?.diem_vsattp ?? '';
+
+        let aiComment = 
+          `1. Hình thức${diemHT !== '' ? ` [Điểm: ${diemHT}]` : ''}: ${aiData.hinh_thuc_tong_quan?.ly_do_hinh_thuc || 'Đạt'}\n` +
+          `2. Tổng quan${diemTQ !== '' ? ` [Điểm: ${diemTQ}]` : ''}: ${aiData.hinh_thuc_tong_quan?.ly_do_tong_quan || 'Đạt'}\n` +
+          `3. Quy trình${diemQT !== '' ? ` [Điểm: ${diemQT}]` : ''}: ${aiData.quy_trinh_cong_nghe?.ly_do_quy_trinh || 'Đạt'}\n` +
+          `4. VSATTP${diemVS !== '' ? ` [Điểm: ${diemVS}]` : ''}: ${aiData.vsattp?.ly_do_vsattp || 'Đạt'}`;
+
         await api.post('/giang-vien/save-ai-grade', {
-            reportId: reportId,
-            score: aiData.diem_bao_cao_cuoi_cung,
-            comment: aiComment
+          reportId: reportId,
+          score: aiData.diem_bao_cao_cuoi_cung,
+          comment: aiComment
         });
-        
+
+        // Cập nhật real-time vào danh sách reports trong bộ nhớ
+        setReports(prev => prev.map(r => {
+          if (r.id === reportId) {
+            return {
+              ...r,
+              diem_ai_de_xuat: aiData.diem_bao_cao_cuoi_cung,
+              nhan_xet_cua_giang_vien: aiComment,
+              nhan_xet_thu_hoach: aiComment,
+              nhan_xet_ai_de_xuat: aiComment
+            };
+          }
+          return r;
+        }));
+
+        // Nếu giảng viên đang mở đúng bài này, cập nhật luôn kết quả đề xuất AI lên sidebar
+        if (selectedReport?.id === reportId) {
+          setAiGradingResult(aiData);
+        }
+
+        successCount++;
         setBulkAiProgress(prev => prev + 1);
-        
+
       } catch (err) {
         console.error(err);
         setBulkAiStatusText(`Thất bại: Có lỗi xảy ra trong quá trình xử lý`);
       }
     }
-    
-    if (!isBulkAiCanceled.current) {
-      setBulkAiStatusText('Hoàn tất chấm điểm hàng loạt!');
+
+    setBulkAiIsCompleted(true);
+    if (isBulkAiCanceled.current) {
+      setBulkAiStatusText(`Đã dừng tiến trình. Đã hoàn thành ${successCount}/${reportIdsToProcess.length} bài.`);
+    } else {
+      setBulkAiStatusText(`Hoàn tất chấm điểm AI cho ${successCount}/${reportIdsToProcess.length} bài!`);
+      toast.success(`Đã hoàn tất chấm điểm AI hàng loạt (${successCount}/${reportIdsToProcess.length} bài)!`);
     }
     if (lecturer) fetchReports(lecturer.id);
-    setSelectedReportIds([]);
   };
 
   const handleAIGrading = async () => {
@@ -306,6 +344,40 @@ TRANG 38
       }
       const data = await response.json();
       setAiGradingResult(data);
+
+      const diemHT = data.hinh_thuc_tong_quan?.diem_hinh_thuc ?? '';
+      const diemTQ = data.hinh_thuc_tong_quan?.diem_tong_quan ?? '';
+      const diemQT = data.quy_trinh_cong_nghe?.diem_quy_trinh ?? '';
+      const diemVS = data.vsattp?.diem_vsattp ?? '';
+
+      const aiComment = 
+        `1. Hình thức${diemHT !== '' ? ` [Điểm: ${diemHT}]` : ''}: ${data.hinh_thuc_tong_quan?.ly_do_hinh_thuc || 'Đạt'}\n` +
+        `2. Tổng quan${diemTQ !== '' ? ` [Điểm: ${diemTQ}]` : ''}: ${data.hinh_thuc_tong_quan?.ly_do_tong_quan || 'Đạt'}\n` +
+        `3. Quy trình${diemQT !== '' ? ` [Điểm: ${diemQT}]` : ''}: ${data.quy_trinh_cong_nghe?.ly_do_quy_trinh || 'Đạt'}\n` +
+        `4. VSATTP${diemVS !== '' ? ` [Điểm: ${diemVS}]` : ''}: ${data.vsattp?.ly_do_vsattp || 'Đạt'}`;
+
+      if (selectedReport) {
+        try {
+          await api.post('/giang-vien/save-ai-grade', {
+            reportId: selectedReport.id,
+            score: data.diem_bao_cao_cuoi_cung,
+            comment: aiComment
+          });
+          setReports(prev => prev.map(r => r.id === selectedReport.id ? {
+            ...r,
+            diem_ai_de_xuat: data.diem_bao_cao_cuoi_cung,
+            nhan_xet_ai_de_xuat: aiComment
+          } : r));
+          setSelectedReport(prev => prev ? {
+            ...prev,
+            diem_ai_de_xuat: data.diem_bao_cao_cuoi_cung,
+            nhan_xet_ai_de_xuat: aiComment
+          } : prev);
+        } catch (e) {
+          console.error("Không thể lưu điểm AI tự động:", e);
+        }
+      }
+
       toast.success('Đã chấm điểm xong bằng AI!');
     } catch (err) {
       console.error(err);
@@ -324,7 +396,7 @@ TRANG 38
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-  
+
   // Grading states
   const [score, setScore] = useState('');
   const [comments, setComments] = useState('');
@@ -369,46 +441,66 @@ TRANG 38
 
   const handleSelectReport = async (report) => {
     setSelectedReport(report);
-    
+
     // 1. Chỉ hiển thị điểm và nhận xét giảng viên nếu giảng viên ĐÃ chấm (diem_thu_hoach khác null)
     setScore(report.diem_thu_hoach !== null ? report.diem_thu_hoach : '');
     setComments(report.diem_thu_hoach !== null ? (report.nhan_xet_cua_giang_vien || report.nhan_xet_thu_hoach || '') : '');
 
     // 2. Tái tạo lại dữ liệu AI để nạp vào mục AI (ẩn nút Chấm tự động và hiện form AI)
-    if (report.diem_ai_de_xuat !== null) {
-      // Vì DB dùng chung cột nhan_xet_thu_hoach, nếu GV chưa chấm thì nhận xét đó chính là của AI
-      let aiCommentStr = report.diem_thu_hoach === null 
-          ? (report.nhan_xet_cua_giang_vien || report.nhan_xet_thu_hoach || '')
-          : "Chi tiết nhận xét AI đã bị ghi đè khi giảng viên lưu điểm.";
-          
-      // Bóc tách text AI thành các phần theo cấu trúc lưu trong handleBulkAiGrading
-      let hinhThuc = "", tongQuan = "", quyTrinh = "", vsattp = "";
-      try {
-        const parts = aiCommentStr.split(/(?=\d\.\s)/);
-        parts.forEach(p => {
-          if (p.startsWith('1. Hình thức:')) hinhThuc = p.replace('1. Hình thức:', '').trim();
-          if (p.startsWith('2. Tổng quan:')) tongQuan = p.replace('2. Tổng quan:', '').trim();
-          if (p.startsWith('3. Quy trình:')) quyTrinh = p.replace('3. Quy trình:', '').trim();
-          if (p.startsWith('4. VSATTP:')) vsattp = p.replace('4. VSATTP:', '').trim();
-        });
-      } catch(e) {}
+    if (report.diem_ai_de_xuat !== null && report.diem_ai_de_xuat !== undefined) {
+      // Ưu tiên đọc từ nhan_xet_ai_de_xuat, nếu chưa có thì lấy từ nhan_xet_cua_giang_vien / nhan_xet_thu_hoach
+      let aiCommentStr = report.nhan_xet_ai_de_xuat || report.nhan_xet_cua_giang_vien || report.nhan_xet_thu_hoach || '';
 
-      // Cập nhật state AI Result để component render lên form chi tiết của AI
+      let hinhThuc = "", tongQuan = "", quyTrinh = "", vsattp = "";
+      let diemHT = "Đạt", diemTQ = "Đạt", diemQT = "Đạt", diemVS = "Đạt";
+
+      if (aiCommentStr) {
+        try {
+          const parts = aiCommentStr.split(/(?=\d\.\s)/);
+          parts.forEach(p => {
+            const trimmed = p.trim();
+            if (trimmed.startsWith('1. Hình thức')) {
+              let text = trimmed.replace(/^1\.\s*Hình thức\s*(\[.*?\])?\s*:\s*/i, '').trim();
+              const mScore = trimmed.match(/\[Điểm:\s*([\d\.]+)\]/i);
+              if (mScore) diemHT = mScore[1];
+              hinhThuc = text;
+            } else if (trimmed.startsWith('2. Tổng quan')) {
+              let text = trimmed.replace(/^2\.\s*Tổng quan\s*(\[.*?\])?\s*:\s*/i, '').trim();
+              const mScore = trimmed.match(/\[Điểm:\s*([\d\.]+)\]/i);
+              if (mScore) diemTQ = mScore[1];
+              tongQuan = text;
+            } else if (trimmed.startsWith('3. Quy trình')) {
+              let text = trimmed.replace(/^3\.\s*Quy trình\s*(\[.*?\])?\s*:\s*/i, '').trim();
+              const mScore = trimmed.match(/\[Điểm:\s*([\d\.]+)\]/i);
+              if (mScore) diemQT = mScore[1];
+              quyTrinh = text;
+            } else if (trimmed.startsWith('4. VSATTP')) {
+              let text = trimmed.replace(/^4\.\s*VSATTP\s*(\[.*?\])?\s*:\s*/i, '').trim();
+              const mScore = trimmed.match(/\[Điểm:\s*([\d\.]+)\]/i);
+              if (mScore) diemVS = mScore[1];
+              vsattp = text;
+            }
+          });
+        } catch (e) {
+          console.error("Lỗi parse text AI:", e);
+        }
+      }
+
       setAiGradingResult({
         diem_bao_cao_cuoi_cung: report.diem_ai_de_xuat,
         hinh_thuc_tong_quan: {
-          diem_hinh_thuc: 'N/A', // AI Hàng loạt không lưu điểm thành phần trong DB
-          ly_do_hinh_thuc: hinhThuc || aiCommentStr,
-          diem_tong_quan: 'N/A',
-          ly_do_tong_quan: tongQuan || 'N/A'
+          diem_hinh_thuc: diemHT,
+          ly_do_hinh_thuc: hinhThuc || (aiCommentStr ? aiCommentStr : 'Đạt yêu cầu về hình thức trình bày báo cáo.'),
+          diem_tong_quan: diemTQ,
+          ly_do_tong_quan: tongQuan || 'Đạt yêu cầu về tổng quan nhà máy/công ty.'
         },
         quy_trinh_cong_nghe: {
-          diem_quy_trinh: 'N/A',
-          ly_do_quy_trinh: quyTrinh || 'N/A'
+          diem_quy_trinh: diemQT,
+          ly_do_quy_trinh: quyTrinh || 'Đạt yêu cầu về thuyết minh quy trình công nghệ.'
         },
         vsattp: {
-          diem_vsattp: 'N/A',
-          ly_do_vsattp: vsattp || 'N/A'
+          diem_vsattp: diemVS,
+          ly_do_vsattp: vsattp || 'Đạt yêu cầu về đánh giá thực trạng VSATTP.'
         }
       });
     } else {
@@ -416,15 +508,31 @@ TRANG 38
       setAiGradingResult(null);
     }
 
-    if (report.nhan_xet_ai_de_xuat) {
-      try {
-        setAiGradingResult(JSON.parse(report.nhan_xet_ai_de_xuat));
-      } catch (e) {
-        console.error('Lỗi parse JSON AI:', e);
-        setAiGradingResult(null);
+    setActiveViewerTab('report');
+    if (report.file_xac_nhan_tham_quan) {
+      let xnPath = report.file_xac_nhan_tham_quan;
+      if (xnPath.startsWith('/api/')) xnPath = xnPath.substring(5);
+      if (xnPath.startsWith('attachments/') || xnPath.startsWith('payments/')) {
+        xnPath = `upload/file/${xnPath}`;
+      } else if (!xnPath.startsWith('upload/file/')) {
+        xnPath = `upload/file/attachments/${xnPath}`;
       }
+      if (xnPath.startsWith('/')) xnPath = xnPath.substring(1);
+
+      api.get('/' + xnPath, { responseType: 'blob' })
+        .then(res => {
+          if (res.data) {
+            const blobUrl = URL.createObjectURL(res.data);
+            const isImg = res.headers['content-type']?.startsWith('image/') || /\.(png|jpe?g)$/i.test(xnPath);
+            setConfirmationFile({ url: blobUrl, isImage: isImg, name: xnPath.split('/').pop() });
+          }
+        })
+        .catch(err => {
+          console.warn('Không tải được giấy xác nhận:', err);
+          setConfirmationFile(null);
+        });
     } else {
-      setAiGradingResult(null);
+      setConfirmationFile(null);
     }
 
     if (report.file_bao_cao) {
@@ -442,7 +550,7 @@ TRANG 38
           apiPath = `upload/file/reports/${apiPath}`;
         }
         if (apiPath.startsWith('/')) apiPath = apiPath.substring(1);
-        
+
         // Fetch PDF Blob
         try {
           const respPdf = await api.get('/' + apiPath, { responseType: 'blob' });
@@ -492,6 +600,48 @@ TRANG 38
     }
   };
 
+  const isReportsLocked = React.useMemo(() => {
+    if (reports.length === 0) return false;
+    const currentList = selectedDotId === 'ALL' 
+      ? reports 
+      : reports.filter(r => {
+          const ctq = r.phieuThamQuan?.phieuDangKy?.chuyenThamQuan || r.phieuDangKy?.chuyenThamQuan;
+          return ctq?.lichKienTap?.dotKienTap?.id === selectedDotId;
+        });
+    return currentList.length > 0 && currentList.every(r => r.da_khoa || r.da_khoa_thu_hoach);
+  }, [reports, selectedDotId]);
+
+  const lockDate = React.useMemo(() => {
+    const r = reports.find(r => r.ngay_khoa_thu_hoach);
+    return r?.ngay_khoa_thu_hoach ? new Date(r.ngay_khoa_thu_hoach).toLocaleDateString('vi-VN') : null;
+  }, [reports]);
+
+  const handleLockReports = async () => {
+    if (reports.length === 0) return;
+    const currentList = selectedDotId === 'ALL' 
+      ? reports 
+      : reports.filter(r => {
+          const ctq = r.phieuThamQuan?.phieuDangKy?.chuyenThamQuan || r.phieuDangKy?.chuyenThamQuan;
+          return ctq?.lichKienTap?.dotKienTap?.id === selectedDotId;
+        });
+
+    const unGraded = currentList.filter(r => r.diem_thu_hoach === null || r.diem_thu_hoach === undefined);
+    if (unGraded.length > 0) {
+      toast.error(`Còn ${unGraded.length} bài thu hoạch chưa được chấm điểm. Vui lòng chấm hết trước khi nộp lên Khoa.`);
+      return;
+    }
+
+    try {
+      const dotIdParam = selectedDotId !== 'ALL' ? selectedDotId : undefined;
+      const res = await giangVienApi.lockGuidedReportsGrades({ dotKienTapId: dotIdParam });
+      toast.success(res.data?.message || 'Đã khóa và nộp bảng điểm thu hoạch lên Khoa thành công!');
+      if (lecturer) fetchReports(lecturer.id);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Lỗi khi nộp bảng điểm lên Khoa');
+      console.error(err);
+    }
+  };
+
   const uniqueDots = React.useMemo(() => {
     const dotsMap = new Map();
     reports.forEach(r => {
@@ -520,14 +670,14 @@ TRANG 38
     const ctq = r.phieuThamQuan?.phieuDangKy?.chuyenThamQuan || r.phieuDangKy?.chuyenThamQuan;
     const sv = r.phieuThamQuan?.phieuDangKy?.sinhVien || r.phieuDangKy?.sinhVien || {};
     const nhaMay = ctq?.nhaMay?.ten_nha_may || '';
-    const matchSearch = !searchTerm || 
+    const matchSearch = !searchTerm ||
       (sv.ho_ten && sv.ho_ten.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (sv.mssv && sv.mssv.toLowerCase().includes(searchTerm.toLowerCase())) ||
       nhaMay.toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     const isGraded = r.diem_thu_hoach !== null;
-    const matchStatus = selectedStatus === 'ALL' || 
-      (selectedStatus === 'PENDING' && !isGraded) || 
+    const matchStatus = selectedStatus === 'ALL' ||
+      (selectedStatus === 'PENDING' && !isGraded) ||
       (selectedStatus === 'GRADED' && isGraded);
 
     const matchDot = selectedDotId === 'ALL' || ctq?.lichKienTap?.dotKienTap?.id === selectedDotId;
@@ -545,7 +695,7 @@ TRANG 38
       const ctq = report.phieuThamQuan?.phieuDangKy?.chuyenThamQuan || report.phieuDangKy?.chuyenThamQuan;
       const tripId = ctq?.id || 'unknown';
       const nhaMay = ctq?.nhaMay?.ten_nha_may || 'Chuyến đi khác';
-      
+
       if (!groups[tripId]) {
         groups[tripId] = { nhaMay, reports: [] };
       }
@@ -563,7 +713,7 @@ TRANG 38
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
         <div>
           {location.state?.filterMssv && (
-            <button 
+            <button
               onClick={() => navigate('/giang-vien/guided-students')}
               className="flex items-center gap-1.5 text-slate-500 hover:text-[#407F3E] font-bold text-sm mb-2 transition-colors cursor-pointer w-fit"
             >
@@ -573,6 +723,25 @@ TRANG 38
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-3">
             Danh sách Bài thu hoạch
           </h1>
+        </div>
+
+        {/* Lock / Submit Status & Action */}
+        <div className="flex items-center gap-3">
+          {isReportsLocked ? (
+            <div className="px-4 py-2 bg-emerald-50 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm">
+              <Lock className="w-4 h-4 text-emerald-600" />
+              <span>Đã nộp bảng điểm lên Khoa {lockDate ? `ngày ${lockDate}` : ''}</span>
+            </div>
+          ) : (
+            <button
+              onClick={handleLockReports}
+              disabled={reports.length === 0}
+              className="px-5 py-2.5 bg-[#407F3E] hover:bg-[#407F3E]/90 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition-all cursor-pointer hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Lock className="w-4 h-4" />
+              Khóa & Nộp bảng điểm thu hoạch
+            </button>
+          )}
         </div>
       </div>
 
@@ -589,11 +758,10 @@ TRANG 38
               setSelectedStatus(tab.id);
               setCurrentPage(1);
             }}
-            className={`pb-3 text-sm font-bold transition-all relative ${
-              selectedStatus === tab.id 
-                ? 'text-[#407F3E]' 
+            className={`pb-3 text-sm font-bold transition-all relative ${selectedStatus === tab.id
+                ? 'text-[#407F3E]'
                 : 'text-slate-500 hover:text-slate-700'
-            }`}
+              }`}
           >
             {tab.label} <span className={`ml-1.5 px-2 py-0.5 rounded-full text-xs ${selectedStatus === tab.id ? 'bg-[#407F3E]/10 text-[#407F3E]' : 'bg-slate-100 text-slate-500'}`}>{tab.count}</span>
             {selectedStatus === tab.id && (
@@ -621,7 +789,7 @@ TRANG 38
           </div>
           {/* Dot Kien Tap Dropdown */}
           <div className="relative min-w-[160px] w-full sm:w-48" onClick={(e) => e.stopPropagation()}>
-            <div 
+            <div
               onClick={() => { setIsDotDropdownOpen(!isDotDropdownOpen); setIsTripDropdownOpen(false); }}
               className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isDotDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
             >
@@ -633,9 +801,9 @@ TRANG 38
             {isDotDropdownOpen && (
               <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[220px]">
                 <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
-                  <input 
-                    type="text" 
-                    placeholder="Tìm đợt..." 
+                  <input
+                    type="text"
+                    placeholder="Tìm đợt..."
                     value={searchDotDropdown}
                     onChange={(e) => setSearchDotDropdown(e.target.value)}
                     onClick={(e) => e.stopPropagation()}
@@ -643,11 +811,10 @@ TRANG 38
                   />
                 </div>
                 <div className="max-h-60 overflow-y-auto">
-                  <div 
+                  <div
                     onClick={() => { setSelectedDotId('ALL'); setSelectedTripId('ALL'); setIsDotDropdownOpen(false); setSearchDotDropdown(''); setCurrentPage(1); }}
-                    className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                      selectedDotId === 'ALL' ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
-                    }`}
+                    className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${selectedDotId === 'ALL' ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                      }`}
                   >
                     <span>Tất cả đợt</span>
                     {selectedDotId === 'ALL' && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
@@ -655,17 +822,16 @@ TRANG 38
                   {uniqueDots
                     .filter(d => d.name.toLowerCase().includes(searchDotDropdown.toLowerCase()))
                     .map(d => (
-                    <div 
-                      key={d.id}
-                      onClick={() => { setSelectedDotId(d.id); setSelectedTripId('ALL'); setIsDotDropdownOpen(false); setSearchDotDropdown(''); setCurrentPage(1); }}
-                      className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                        selectedDotId === d.id ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
-                      }`}
-                    >
-                      <span className="truncate pr-2">{d.name}</span>
-                      {selectedDotId === d.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                    </div>
-                  ))}
+                      <div
+                        key={d.id}
+                        onClick={() => { setSelectedDotId(d.id); setSelectedTripId('ALL'); setIsDotDropdownOpen(false); setSearchDotDropdown(''); setCurrentPage(1); }}
+                        className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${selectedDotId === d.id ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                          }`}
+                      >
+                        <span className="truncate pr-2">{d.name}</span>
+                        {selectedDotId === d.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                      </div>
+                    ))}
                   {uniqueDots.filter(d => d.name.toLowerCase().includes(searchDotDropdown.toLowerCase())).length === 0 && (
                     <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy đợt</div>
                   )}
@@ -673,10 +839,10 @@ TRANG 38
               </div>
             )}
           </div>
-          
+
           {/* Trip Dropdown */}
           <div className="relative min-w-[200px] w-full sm:w-56" onClick={(e) => e.stopPropagation()}>
-            <div 
+            <div
               onClick={() => { setIsTripDropdownOpen(!isTripDropdownOpen); setIsDotDropdownOpen(false); }}
               className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isTripDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
             >
@@ -688,9 +854,9 @@ TRANG 38
             {isTripDropdownOpen && (
               <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[250px]">
                 <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
-                  <input 
-                    type="text" 
-                    placeholder="Tìm chuyến đi..." 
+                  <input
+                    type="text"
+                    placeholder="Tìm chuyến đi..."
                     value={searchTripDropdown}
                     onChange={(e) => setSearchTripDropdown(e.target.value)}
                     onClick={(e) => e.stopPropagation()}
@@ -698,11 +864,10 @@ TRANG 38
                   />
                 </div>
                 <div className="max-h-60 overflow-y-auto">
-                  <div 
+                  <div
                     onClick={() => { setSelectedTripId('ALL'); setIsTripDropdownOpen(false); setSearchTripDropdown(''); setCurrentPage(1); }}
-                    className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                      selectedTripId === 'ALL' ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
-                    }`}
+                    className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${selectedTripId === 'ALL' ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                      }`}
                   >
                     <span>Tất cả chuyến đi</span>
                     {selectedTripId === 'ALL' && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
@@ -710,17 +875,16 @@ TRANG 38
                   {uniqueTrips
                     .filter(t => t.name.toLowerCase().includes(searchTripDropdown.toLowerCase()))
                     .map(t => (
-                    <div 
-                      key={t.id}
-                      onClick={() => { setSelectedTripId(t.id); setIsTripDropdownOpen(false); setSearchTripDropdown(''); setCurrentPage(1); }}
-                      className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                        selectedTripId === t.id ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
-                      }`}
-                    >
-                      <span className="truncate pr-2">{t.name}</span>
-                      {selectedTripId === t.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                    </div>
-                  ))}
+                      <div
+                        key={t.id}
+                        onClick={() => { setSelectedTripId(t.id); setIsTripDropdownOpen(false); setSearchTripDropdown(''); setCurrentPage(1); }}
+                        className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${selectedTripId === t.id ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                          }`}
+                      >
+                        <span className="truncate pr-2">{t.name}</span>
+                        {selectedTripId === t.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                      </div>
+                    ))}
                   {uniqueTrips.filter(t => t.name.toLowerCase().includes(searchTripDropdown.toLowerCase())).length === 0 && (
                     <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy chuyến đi</div>
                   )}
@@ -759,10 +923,10 @@ TRANG 38
       ) : (
         <div className="bg-white border border-[#E7E0C4] rounded-2xl shadow-sm overflow-hidden mb-6">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[800px]">
+            <table className="w-full text-left border-collapse min-w-[950px]">
               <thead>
                 <tr className="bg-slate-50 border-b border-[#E7E0C4] text-xs uppercase tracking-wider text-slate-500 font-bold">
-                  <th className="px-6 py-4 w-12 text-center">
+                  <th className="px-4 py-4 w-12 text-center">
                     <input 
                       type="checkbox" 
                       className="w-4 h-4 text-[#407F3E] rounded border-slate-300 focus:ring-[#407F3E] cursor-pointer"
@@ -777,17 +941,23 @@ TRANG 38
                       }}
                     />
                   </th>
-                  <th className="px-6 py-4 w-1/3">Sinh viên</th>
-                  <th className="px-6 py-4 w-1/3">Bài nộp</th>
-                  <th className="px-6 py-4 text-right">Trạng thái</th>
-                  <th className="px-6 py-4 text-center w-16"></th>
+                  <th className="px-6 py-4 min-w-[200px]">Sinh viên</th>
+                  <th className="px-6 py-4 min-w-[180px]">Bài nộp</th>
+                  <th className="px-4 py-4 text-center w-36">
+                    <div className="inline-flex items-center gap-1.5 text-blue-600 font-bold">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Điểm AI</span>
+                    </div>
+                  </th>
+                  <th className="px-4 py-4 text-center w-40">Điểm GV</th>
+                  <th className="px-4 py-4 text-center w-14"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E7E0C4]">
                 {Object.values(groupedPaginatedReports).map((group, groupIdx) => (
                   <React.Fragment key={groupIdx}>
                     <tr className="bg-slate-100/50 border-y border-[#E7E0C4]">
-                      <td colSpan="5" className="px-6 py-2.5">
+                      <td colSpan="6" className="px-6 py-2.5">
                         <div className="flex items-center gap-2">
                           <span className="font-bold text-slate-700 text-sm">{group.nhaMay}</span>
                           <span className="px-2 py-0.5 rounded-full bg-[#E7E0C4]/50 text-slate-600 text-[10px] uppercase font-bold tracking-wider">
@@ -798,18 +968,8 @@ TRANG 38
                     </tr>
                     {group.reports.map((report) => {
                       const isGraded = report.diem_thu_hoach !== null;
+                      const hasAiGrade = report.diem_ai_de_xuat !== null && report.diem_ai_de_xuat !== undefined;
                       const sv = report.phieuThamQuan?.phieuDangKy?.sinhVien || report.phieuDangKy?.sinhVien || {};
-                      
-                      // Tạo avatar chữ cái
-                      const initial = sv.ho_ten ? sv.ho_ten.charAt(0).toUpperCase() : 'U';
-                      const avatarColors = [
-                        'bg-blue-100 text-blue-700', 
-                        'bg-green-100 text-green-700', 
-                        'bg-purple-100 text-purple-700', 
-                        'bg-orange-100 text-orange-700', 
-                        'bg-pink-100 text-pink-700'
-                      ];
-                      const avatarColor = avatarColors[(sv.mssv || '0').charCodeAt(0) % avatarColors.length];
 
                   return (
                     <tr 
@@ -817,7 +977,7 @@ TRANG 38
                       onClick={() => handleSelectReport(report)}
                       className="hover:bg-slate-50 transition-colors cursor-pointer group"
                     >
-                      <td className="px-6 py-4 text-center" onClick={e => e.stopPropagation()}>
+                      <td className="px-4 py-4 text-center" onClick={e => e.stopPropagation()}>
                         <input 
                           type="checkbox" 
                           className="w-4 h-4 text-[#407F3E] rounded border-slate-300 focus:ring-[#407F3E] disabled:opacity-50 cursor-pointer"
@@ -830,14 +990,9 @@ TRANG 38
                         />
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-lg shrink-0 ${avatarColor}`}>
-                            {initial}
-                          </div>
-                          <div>
-                            <p className="text-sm font-bold text-slate-800 group-hover:text-[#407F3E] transition-colors">{sv.ho_ten}</p>
-                            <p className="text-[11px] font-medium text-slate-500">{sv.mssv}</p>
-                          </div>
+                        <div>
+                          <p className="text-sm font-bold text-slate-800 group-hover:text-[#407F3E] transition-colors">{sv.ho_ten}</p>
+                          <p className="text-[11px] font-medium text-slate-500 mt-0.5">{sv.mssv}</p>
                         </div>
                       </td>
                       
@@ -853,22 +1008,43 @@ TRANG 38
                         </div>
                       </td>
 
-                      <td className="px-6 py-4 text-right">
-                        {isGraded ? (
-                          <div className="flex flex-col items-end">
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-[#89B449]/10 text-[#407F3E]">
-                              <CheckCircle2 className="w-3.5 h-3.5" /> Đã chấm
-                            </span>
-                            <span className="text-[13px] font-black text-slate-800 mt-1.5">{report.diem_thu_hoach}/10</span>
+                      {/* Cột Điểm AI đề xuất */}
+                      <td className="px-4 py-4 text-center" onClick={e => e.stopPropagation()}>
+                        {hasAiGrade ? (
+                          <div 
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 font-bold text-xs shadow-2xs hover:bg-blue-100 transition-colors cursor-default"
+                            title={`AI đề xuất: ${report.diem_ai_de_xuat} điểm`}
+                          >
+                            <Sparkles className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                            <span className="text-sm font-black">{report.diem_ai_de_xuat}</span>
+                            <span className="text-[10px] font-semibold text-blue-500">/10</span>
                           </div>
                         ) : (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-[#DBD468]/20 text-[#B8A31D] shadow-sm">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-medium text-slate-400 bg-slate-50 border border-slate-200/60">
+                            Chưa chấm
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Cột Điểm GV chính thức */}
+                      <td className="px-4 py-4 text-center">
+                        {isGraded ? (
+                          <div className="flex flex-col items-center">
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-[#407F3E] font-bold text-xs shadow-2xs">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-[#407F3E] shrink-0" />
+                              <span className="text-sm font-black text-[#407F3E]">{report.diem_thu_hoach}</span>
+                              <span className="text-[10px] font-semibold text-[#407F3E]/70">/10</span>
+                            </div>
+                            <span className="text-[10px] font-medium text-emerald-600 mt-0.5">Đã chấm</span>
+                          </div>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-[#DBD468]/20 text-[#B8A31D] border border-[#DBD468]/40 shadow-2xs">
                             <div className="w-1.5 h-1.5 rounded-full bg-[#B8A31D] animate-pulse"></div> Chờ chấm
                           </span>
                         )}
                       </td>
 
-                      <td className="px-6 py-4 text-center">
+                      <td className="px-4 py-4 text-center">
                         <button className="w-8 h-8 rounded-full flex items-center justify-center text-slate-300 group-hover:bg-[#407F3E] group-hover:text-white transition-all ml-auto">
                           <ChevronRight className="w-5 h-5" />
                         </button>
@@ -888,7 +1064,7 @@ TRANG 38
       <div className="p-4 border border-[#E7E0C4] bg-white rounded-xl shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
           <span>Hiển thị</span>
-          <SearchableDropdown 
+          <SearchableDropdown
             options={[
               { value: 15, label: '15' },
               { value: 30, label: '30' },
@@ -906,14 +1082,14 @@ TRANG 38
           <span>/ {filteredReports.length} bài thu hoạch</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <button 
+          <button
             disabled={currentPage <= 1}
             onClick={() => setCurrentPage(1)}
             className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
           >
             Trang đầu
           </button>
-          <button 
+          <button
             disabled={currentPage <= 1}
             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
             className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
@@ -923,14 +1099,14 @@ TRANG 38
           <span className="px-4 py-1.5 rounded-lg bg-[#407F3E] text-white text-sm font-bold shadow-sm cursor-default mx-1">
             Trang {currentPage} / {totalPages}
           </span>
-          <button 
+          <button
             disabled={currentPage >= totalPages}
             onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
             className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
           >
             Sau
           </button>
-          <button 
+          <button
             disabled={currentPage >= totalPages}
             onClick={() => setCurrentPage(totalPages)}
             className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
@@ -951,53 +1127,118 @@ TRANG 38
 
     return (
       <div className="h-[calc(100vh-64px)] flex flex-col animate-in fade-in zoom-in-95 duration-300">
-        
+
         {/* Top Breadcrumb Bar */}
-        <div className="h-14 bg-white border-b border-[#E7E0C4] flex items-center justify-between px-6 shrink-0 z-10">
-          <div className="flex items-center gap-2 text-sm font-bold text-slate-600">
-            <button 
+        <div className="h-14 bg-white border-b border-[#E7E0C4] flex items-center justify-between px-6 shrink-0 z-10 gap-3">
+          <div className="flex items-center gap-2 text-sm font-bold text-slate-600 min-w-0">
+            <button
               onClick={() => setSelectedReport(null)}
-              className="flex items-center gap-1.5 text-slate-500 hover:text-[#407F3E] transition-colors cursor-pointer mr-2 pr-4 border-r border-slate-200"
+              className="flex items-center gap-1.5 text-slate-500 hover:text-[#407F3E] transition-colors cursor-pointer mr-2 pr-4 border-r border-slate-200 shrink-0"
             >
               <ArrowLeft className="w-4 h-4" /> Quay lại
             </button>
-            <button onClick={() => setSelectedReport(null)} className="hover:text-[#407F3E] transition-colors">
+            <button onClick={() => setSelectedReport(null)} className="hover:text-[#407F3E] transition-colors shrink-0">
               Bài thu hoạch
             </button>
-            <ChevronRight className="w-4 h-4 text-slate-400" />
-            <span className="text-[#407F3E]">{nhaMay}</span>
+            <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+            <span className="text-[#407F3E] truncate">{nhaMay}</span>
           </div>
+
+          {/* Tab Selector between Report and Confirmation Paper */}
+          {confirmationFile && (
+            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 shrink-0">
+              <button
+                type="button"
+                onClick={() => setActiveViewerTab('report')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  activeViewerTab === 'report'
+                    ? 'bg-white text-[#407F3E] shadow-xs'
+                    : 'text-slate-600 hover:text-slate-800'
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>Bài thu hoạch</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveViewerTab('confirmation')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  activeViewerTab === 'confirmation'
+                    ? 'bg-white text-indigo-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-800'
+                }`}
+              >
+                <Award className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Giấy xác nhận DN (Mộc đỏ)</span>
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="flex-1 flex overflow-hidden bg-[#E7E0C4]/20">
-          
+
           {/* Left Side: Document Viewer */}
           <div className="flex-1 flex flex-col overflow-hidden relative">
-            
-            {/* PDF Canvas (Actual File) */}
+
+            {/* Document Canvas (Actual File or Confirmation) */}
             <div className="flex-1 w-full h-full flex justify-center bg-slate-200">
-              {isLoadingText ? (
-                <div className="flex flex-col items-center justify-center py-20 text-slate-500 w-full h-full">
-                  <div className="w-8 h-8 border-4 border-[#E7E0C4] border-t-[#407F3E] rounded-full animate-spin mb-4"></div>
-                  <p>Đang tải file báo cáo...</p>
-                </div>
-              ) : pdfBlobUrl ? (
-                <iframe 
-                  src={pdfBlobUrl} 
-                  className="w-full h-full border-0" 
-                  title="Báo cáo PDF" 
-                />
+              {activeViewerTab === 'report' ? (
+                isLoadingText ? (
+                  <div className="flex flex-col items-center justify-center py-20 text-slate-500 w-full h-full">
+                    <div className="w-8 h-8 border-4 border-[#E7E0C4] border-t-[#407F3E] rounded-full animate-spin mb-4"></div>
+                    <p>Đang tải file báo cáo...</p>
+                  </div>
+                ) : pdfBlobUrl ? (
+                  <iframe
+                    src={pdfBlobUrl}
+                    className="w-full h-full border-0"
+                    title="Báo cáo PDF"
+                  />
+                ) : (
+                  <div className="flex items-center justify-center w-full h-full text-slate-500">
+                    {reportText || 'Không tìm thấy file PDF.'}
+                  </div>
+                )
               ) : (
-                <div className="flex items-center justify-center w-full h-full text-slate-500">
-                  {reportText || 'Không tìm thấy file PDF.'}
-                </div>
+                confirmationFile?.url ? (
+                  confirmationFile.isImage ? (
+                    <div className="w-full h-full flex flex-col items-center justify-center p-6 bg-slate-900/10 overflow-auto">
+                      <div className="relative group max-w-2xl max-h-full">
+                        <img 
+                          src={confirmationFile.url} 
+                          alt="Giấy xác nhận tham quan doanh nghiệp" 
+                          className="max-h-[80vh] w-auto object-contain rounded-xl shadow-lg border border-slate-300 bg-white"
+                        />
+                        <a
+                          href={confirmationFile.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="absolute top-3 right-3 px-3 py-1.5 bg-black/75 hover:bg-black text-white text-xs font-bold rounded-lg backdrop-blur-sm transition-all flex items-center gap-1.5"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" /> Mở ảnh gốc
+                        </a>
+                      </div>
+                    </div>
+                  ) : (
+                    <iframe
+                      src={confirmationFile.url}
+                      className="w-full h-full border-0"
+                      title="Giấy xác nhận doanh nghiệp"
+                    />
+                  )
+                ) : (
+                  <div className="flex flex-col items-center justify-center w-full h-full text-slate-400 gap-2">
+                    <Building2 className="w-10 h-10 text-slate-300" />
+                    <span>Không tìm thấy file giấy xác nhận doanh nghiệp.</span>
+                  </div>
+                )
               )}
             </div>
           </div>
 
           {/* Right Side: Grading Sidebar */}
           <div className="w-full md:w-[350px] lg:w-[400px] bg-[#fdfcf8] border-l border-[#E7E0C4] flex flex-col shrink-0 shadow-[-4px_0_15px_-3px_rgba(0,0,0,0.05)] z-20 overflow-y-auto custom-scrollbar p-5 space-y-5">
-            
+
             {/* Student Info Card */}
             <div className="bg-white rounded-xl p-4 border border-[#E7E0C4] shadow-sm flex items-start gap-3">
 
@@ -1023,10 +1264,10 @@ TRANG 38
                 <Sparkles className="w-4 h-4 text-[#407F3E]" />
                 <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">AI đề xuất điểm</h4>
               </div>
-              
+
               {!aiGradingResult ? (
                 <div className="flex flex-col gap-3">
-                  <button 
+                  <button
                     onClick={handleAIGrading}
                     disabled={isGradingAI || selectedReport.da_khoa}
                     className="w-full flex justify-center items-center gap-2 text-sm font-bold text-white bg-[#407F3E] px-4 py-2.5 rounded-lg shadow-sm hover:bg-[#407F3E]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1048,7 +1289,7 @@ TRANG 38
                       <span className="text-4xl font-black text-[#407F3E] leading-none">{aiGradingResult.diem_bao_cao_cuoi_cung}</span>
                       <span className="text-sm font-bold text-slate-500">/ 10</span>
                     </div>
-                    <button 
+                    <button
                       onClick={() => setIsAiModalOpen(true)}
                       className="text-[11px] font-bold text-[#407F3E] bg-white border border-[#E7E0C4] px-2.5 py-1.5 rounded-md hover:bg-[#fdfcf8] transition-colors shadow-sm cursor-pointer whitespace-nowrap"
                     >
@@ -1064,20 +1305,25 @@ TRANG 38
               <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-5 flex items-center gap-2">
                 <Edit3Icon className="w-4 h-4 text-[#407F3E]" /> Đánh giá & Chấm điểm
               </h4>
-              
+
               <div className="space-y-5">
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-wider">
                     Điểm GVHD <span className="text-[#E68A8C]">*</span>
                   </label>
                   <div className="relative w-28">
-                    <input 
-                      type="number" min="0" max="10" step="0.1" 
+                    <input
+                      type="number" min="0" max="10" step="0.1"
+                      disabled={selectedReport?.da_khoa || selectedReport?.da_khoa_thu_hoach}
                       value={score}
                       onChange={(e) => setScore(e.target.value)}
                       placeholder="--"
                       required
-                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-lg focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] font-black text-[#407F3E] transition-all text-center shadow-sm"
+                      className={`w-full px-3 py-2 border rounded-lg text-lg font-black transition-all text-center shadow-sm ${
+                        selectedReport?.da_khoa || selectedReport?.da_khoa_thu_hoach
+                          ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                          : 'bg-white border-slate-300 text-[#407F3E] focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E]'
+                      }`}
                     />
                     <span className="absolute -right-8 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-sm">/ 10</span>
                   </div>
@@ -1089,40 +1335,52 @@ TRANG 38
                       Nhận xét chi tiết
                     </label>
                     <div className="flex items-center gap-2">
-                      <button 
-                        type="button" 
+                      <button
+                        type="button"
                         onClick={() => setIsExpandedComments(true)}
                         className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded flex items-center gap-1 cursor-pointer hover:bg-slate-200 transition-colors"
                       >
                         <ZoomIn className="w-3 h-3" /> Phóng to
                       </button>
-                      <button 
-                        type="button" 
+                      <button
+                        type="button"
                         onClick={handleInsertTemplate}
-                        disabled={selectedReport?.da_khoa}
+                        disabled={selectedReport?.da_khoa || selectedReport?.da_khoa_thu_hoach}
                         className="text-[10px] font-bold text-[#407F3E] bg-[#89B449]/10 px-2 py-0.5 rounded flex items-center gap-1 cursor-pointer hover:bg-[#89B449]/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Sparkles className="w-3 h-3" /> Chèn mẫu
                       </button>
                     </div>
                   </div>
-                  <textarea 
+                  <textarea
                     rows={6}
+                    disabled={selectedReport?.da_khoa || selectedReport?.da_khoa_thu_hoach}
                     value={comments}
                     onChange={(e) => setComments(e.target.value)}
                     placeholder="Nhận xét về nội dung, hình thức và tính thực tiễn của bài thu hoạch..."
-                    className="w-full px-4 py-3 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-700 shadow-sm resize-none custom-scrollbar"
+                    className={`w-full px-4 py-3 border rounded-lg text-sm transition-all shadow-sm resize-none custom-scrollbar ${
+                      selectedReport?.da_khoa || selectedReport?.da_khoa_thu_hoach
+                        ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                        : 'bg-white border-slate-300 text-slate-700 focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E]'
+                    }`}
                   />
                 </div>
               </div>
 
               <div className="mt-8 space-y-3">
-                <button 
-                  type="submit"
-                  className="w-full flex items-center justify-center gap-2 py-3 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-lg text-sm font-bold shadow-md hover:shadow-lg transition-all cursor-pointer"
-                >
-                  <Save className="w-4 h-4" /> Lưu điểm
-                </button>
+                {selectedReport?.da_khoa || selectedReport?.da_khoa_thu_hoach ? (
+                  <div className="w-full py-3 bg-emerald-50 text-emerald-800 border border-emerald-300 rounded-lg text-sm font-bold flex items-center justify-center gap-2">
+                    <Lock className="w-4 h-4 text-emerald-600" />
+                    Đã nộp điểm lên Khoa
+                  </div>
+                ) : (
+                  <button
+                    type="submit"
+                    className="w-full flex items-center justify-center gap-2 py-3 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-lg text-sm font-bold shadow-md hover:shadow-lg transition-all cursor-pointer"
+                  >
+                    <Save className="w-4 h-4" /> Lưu điểm
+                  </button>
+                )}
               </div>
 
             </form>
@@ -1134,7 +1392,7 @@ TRANG 38
   };
 
   return (
-    <div 
+    <div
       className={selectedReport ? '' : 'bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300'}
       onClick={() => { setIsTripDropdownOpen(false); setIsDotDropdownOpen(false); }}
     >
@@ -1152,17 +1410,17 @@ TRANG 38
                 </div>
                 <h2 className="font-bold text-slate-800">Phân tích & Đề xuất từ AI</h2>
               </div>
-              <button 
+              <button
                 onClick={() => setIsAiModalOpen(false)}
                 className="text-slate-400 hover:text-slate-600 p-1.5 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
+
             {/* Body */}
             <div className="p-6 overflow-y-auto max-h-[75vh] custom-scrollbar space-y-6">
-              
+
               {/* Overview */}
               <div className="flex gap-6 items-center">
                 <div className="shrink-0 flex flex-col items-center justify-center w-28 h-28 rounded-full border-4 border-[#89B449]/30 bg-[#fdfcf8]">
@@ -1183,16 +1441,18 @@ TRANG 38
               <div>
                 <h4 className="text-xs font-bold text-slate-800 uppercase mb-4">Chi tiết theo tiêu chí</h4>
                 <div className="space-y-3">
-                  
+
                   {/* Hình thức */}
                   <div className="p-4 border border-[#E7E0C4] rounded-xl bg-white shadow-sm hover:shadow transition-shadow">
                     <div className="flex items-center justify-between mb-2">
                       <h5 className="font-bold text-slate-800 text-sm">Hình thức trình bày</h5>
                       <span className="text-xs font-bold px-2.5 py-1 rounded-md bg-[#89B449]/10 text-[#407F3E]">
-                        {aiGradingResult.hinh_thuc_tong_quan.diem_hinh_thuc} / 10 đ
+                        {isNaN(Number(aiGradingResult?.hinh_thuc_tong_quan?.diem_hinh_thuc))
+                          ? (aiGradingResult?.hinh_thuc_tong_quan?.diem_hinh_thuc || 'Đạt')
+                          : `${aiGradingResult.hinh_thuc_tong_quan.diem_hinh_thuc} / 10 đ`}
                       </span>
                     </div>
-                    <p className="text-sm text-slate-600">{aiGradingResult.hinh_thuc_tong_quan.ly_do_hinh_thuc}</p>
+                    <p className="text-sm text-slate-600">{aiGradingResult?.hinh_thuc_tong_quan?.ly_do_hinh_thuc}</p>
                   </div>
 
                   {/* Tổng quan */}
@@ -1200,10 +1460,12 @@ TRANG 38
                     <div className="flex items-center justify-between mb-2">
                       <h5 className="font-bold text-slate-800 text-sm">Tổng quan về nhà máy/công ty</h5>
                       <span className="text-xs font-bold px-2.5 py-1 rounded-md bg-[#89B449]/10 text-[#407F3E]">
-                        {aiGradingResult.hinh_thuc_tong_quan.diem_tong_quan} / 10 đ
+                        {isNaN(Number(aiGradingResult?.hinh_thuc_tong_quan?.diem_tong_quan))
+                          ? (aiGradingResult?.hinh_thuc_tong_quan?.diem_tong_quan || 'Đạt')
+                          : `${aiGradingResult.hinh_thuc_tong_quan.diem_tong_quan} / 10 đ`}
                       </span>
                     </div>
-                    <p className="text-sm text-slate-600">{aiGradingResult.hinh_thuc_tong_quan.ly_do_tong_quan}</p>
+                    <p className="text-sm text-slate-600">{aiGradingResult?.hinh_thuc_tong_quan?.ly_do_tong_quan}</p>
                   </div>
 
                   {/* Quy trình công nghệ */}
@@ -1211,10 +1473,12 @@ TRANG 38
                     <div className="flex items-center justify-between mb-2">
                       <h5 className="font-bold text-slate-800 text-sm">Thuyết minh quy trình công nghệ</h5>
                       <span className="text-xs font-bold px-2.5 py-1 rounded-md bg-[#89B449]/10 text-[#407F3E]">
-                        {aiGradingResult.quy_trinh_cong_nghe.diem_quy_trinh} / 10 đ
+                        {isNaN(Number(aiGradingResult?.quy_trinh_cong_nghe?.diem_quy_trinh))
+                          ? (aiGradingResult?.quy_trinh_cong_nghe?.diem_quy_trinh || 'Đạt')
+                          : `${aiGradingResult.quy_trinh_cong_nghe.diem_quy_trinh} / 10 đ`}
                       </span>
                     </div>
-                    <p className="text-sm text-slate-600">{aiGradingResult.quy_trinh_cong_nghe.ly_do_quy_trinh}</p>
+                    <p className="text-sm text-slate-600">{aiGradingResult?.quy_trinh_cong_nghe?.ly_do_quy_trinh}</p>
                   </div>
 
                   {/* VSATTP */}
@@ -1222,10 +1486,12 @@ TRANG 38
                     <div className="flex items-center justify-between mb-2">
                       <h5 className="font-bold text-slate-800 text-sm">Đánh giá thực trạng VSATTP</h5>
                       <span className="text-xs font-bold px-2.5 py-1 rounded-md bg-[#89B449]/10 text-[#407F3E]">
-                        {aiGradingResult.vsattp.diem_vsattp} / 10 đ
+                        {isNaN(Number(aiGradingResult?.vsattp?.diem_vsattp))
+                          ? (aiGradingResult?.vsattp?.diem_vsattp || 'Đạt')
+                          : `${aiGradingResult.vsattp.diem_vsattp} / 10 đ`}
                       </span>
                     </div>
-                    <p className="text-sm text-slate-600">{aiGradingResult.vsattp.ly_do_vsattp}</p>
+                    <p className="text-sm text-slate-600">{aiGradingResult?.vsattp?.ly_do_vsattp}</p>
                   </div>
 
                 </div>
@@ -1245,7 +1511,7 @@ TRANG 38
 
             {/* Footer */}
             <div className="px-6 py-4 border-t border-[#E7E0C4] bg-slate-50 flex items-center justify-between shrink-0">
-              <button 
+              <button
                 onClick={() => {
                   setAiGradingResult(null);
                   setIsAiModalOpen(false);
@@ -1254,15 +1520,15 @@ TRANG 38
               >
                 Thực hiện chấm lại
               </button>
-              
+
               <div className="flex gap-3">
-                <button 
+                <button
                   onClick={() => setIsAiModalOpen(false)}
                   className="px-5 py-2.5 rounded-lg border border-slate-300 text-slate-600 font-bold text-sm hover:bg-slate-100 transition-colors cursor-pointer"
                 >
                   Đóng
                 </button>
-                <button 
+                <button
                   onClick={() => {
                     setScore(aiGradingResult.diem_bao_cao_cuoi_cung);
                     setComments(
@@ -1286,60 +1552,128 @@ TRANG 38
           </div>
         </div>
       )}
-      {/* Bulk AI Grading Modal */}
-      {isBulkAiModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col">
-            <div className="px-6 py-4 border-b border-[#E7E0C4] bg-[#fdfcf8] flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                  <Sparkles className="w-4 h-4 text-blue-600" />
-                </div>
-                <h2 className="font-bold text-slate-800">Chấm điểm AI hàng loạt</h2>
+      {/* Floating Background Progress Widget (Non-blocking) */}
+      {isBulkAiRunning && (
+        <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-5 duration-300">
+          {isBulkAiMinimized ? (
+            /* Minimized Pill View */
+            <div
+              onClick={() => setIsBulkAiMinimized(false)}
+              className="bg-white/95 backdrop-blur-md border border-[#E7E0C4] shadow-2xl rounded-full px-4 py-2.5 flex items-center gap-3 cursor-pointer hover:border-[#407F3E] transition-all group"
+            >
+              <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
+                <Sparkles className="w-3.5 h-3.5 text-blue-600 animate-pulse" />
               </div>
-            </div>
-            
-            <div className="p-6">
-              <div className="mb-4">
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="font-semibold text-slate-600">Tiến trình</span>
-                  <span className="font-bold text-[#407F3E]">{bulkAiProgress} / {bulkAiTotal}</span>
-                </div>
-                <div className="w-full bg-slate-200 rounded-full h-3">
-                  <div 
-                    className="bg-gradient-to-r from-[#89B449] to-[#407F3E] h-3 rounded-full transition-all duration-300"
-                    style={{ width: `${(bulkAiTotal > 0 ? bulkAiProgress / bulkAiTotal : 0) * 100}%` }}
-                  ></div>
-                </div>
+              <div className="text-xs font-bold text-slate-700">
+                {bulkAiIsCompleted ? (
+                  <span className="text-[#407F3E] flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Hoàn tất ({bulkAiProgress}/{bulkAiTotal})
+                  </span>
+                ) : (
+                  <span>AI đang chấm: <strong className="text-[#407F3E]">{bulkAiProgress}/{bulkAiTotal}</strong> bài</span>
+                )}
               </div>
-              
-              <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm">
-                <p className="font-semibold text-slate-700 mb-1 truncate">Đang xử lý: {bulkAiCurrentStudent}</p>
-                <p className="text-slate-500 animate-pulse">{bulkAiStatusText}</p>
-              </div>
-            </div>
-            
-            <div className="px-6 py-4 border-t border-[#E7E0C4] bg-slate-50 flex justify-end">
-              {bulkAiProgress === bulkAiTotal || isBulkAiCanceled.current ? (
+              <button
+                onClick={(e) => { e.stopPropagation(); setIsBulkAiMinimized(false); }}
+                className="text-slate-400 group-hover:text-slate-700 p-0.5 rounded transition-colors cursor-pointer"
+                title="Mở rộng chi tiết"
+              >
+                <Maximize2 className="w-3.5 h-3.5" />
+              </button>
+              {bulkAiIsCompleted && (
                 <button
-                  onClick={() => setIsBulkAiModalOpen(false)}
-                  className="px-5 py-2 rounded-lg bg-[#407F3E] text-white font-bold hover:bg-[#407F3E]/90 transition-colors cursor-pointer"
+                  onClick={(e) => { e.stopPropagation(); setIsBulkAiRunning(false); }}
+                  className="text-slate-400 hover:text-red-500 p-0.5 rounded transition-colors cursor-pointer"
+                  title="Đóng"
                 >
-                  Đóng
-                </button>
-              ) : (
-                <button
-                  onClick={() => {
-                    isBulkAiCanceled.current = true;
-                    setBulkAiStatusText('Đang dừng tiến trình...');
-                  }}
-                  className="px-5 py-2 rounded-lg border border-red-200 text-red-600 font-bold hover:bg-red-50 transition-colors cursor-pointer"
-                >
-                  Hủy tiến trình
+                  <X className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>
-          </div>
+          ) : (
+            /* Expanded Card View */
+            <div className="bg-white/95 backdrop-blur-md w-96 rounded-2xl shadow-2xl border border-[#E7E0C4] overflow-hidden flex flex-col">
+              {/* Header */}
+              <div className="px-5 py-3.5 border-b border-[#E7E0C4] bg-slate-50/80 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-blue-100 flex items-center justify-center">
+                    <Sparkles className="w-4 h-4 text-blue-600 animate-pulse" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-xs text-slate-800 uppercase tracking-wide">Chấm điểm AI hàng loạt</h3>
+                    <p className="text-[10px] text-slate-500 font-medium">Tiến trình đang chạy ngầm</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setIsBulkAiMinimized(true)}
+                    className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-lg transition-colors cursor-pointer"
+                    title="Thu nhỏ xuống góc màn hình"
+                  >
+                    <Minus className="w-4 h-4" />
+                  </button>
+                  {bulkAiIsCompleted && (
+                    <button
+                      onClick={() => setIsBulkAiRunning(false)}
+                      className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                      title="Đóng"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Body */}
+              <div className="p-4 space-y-3">
+                <div>
+                  <div className="flex justify-between text-xs mb-1.5 font-medium">
+                    <span className="text-slate-600">Tiến độ hoàn thành:</span>
+                    <span className="font-bold text-[#407F3E] font-mono">{bulkAiProgress} / {bulkAiTotal} bài</span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                    <div
+                      className="bg-gradient-to-r from-[#89B449] to-[#407F3E] h-2.5 rounded-full transition-all duration-300"
+                      style={{ width: `${(bulkAiTotal > 0 ? bulkAiProgress / bulkAiTotal : 0) * 100}%` }}
+                    ></div>
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+                  <p className="font-bold text-slate-800 truncate flex items-center gap-1.5">
+                    <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span className="truncate">{bulkAiCurrentStudent || 'Đang chuẩn bị...'}</span>
+                  </p>
+                  <p className="text-slate-500 text-[11px] animate-pulse pl-5">{bulkAiStatusText}</p>
+                </div>
+              </div>
+
+              {/* Footer Action */}
+              <div className="px-4 py-3 border-t border-[#E7E0C4] bg-slate-50/50 flex items-center justify-between">
+                <span className="text-[11px] text-slate-500 italic">
+                  {bulkAiIsCompleted ? 'Đã xong toàn bộ' : 'Bạn có thể đọc & chấm bài khác'}
+                </span>
+                {bulkAiIsCompleted ? (
+                  <button
+                    onClick={() => setIsBulkAiRunning(false)}
+                    className="px-4 py-1.5 rounded-lg bg-[#407F3E] text-white text-xs font-bold hover:bg-[#407F3E]/90 transition-colors shadow-sm cursor-pointer"
+                  >
+                    Đóng
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      isBulkAiCanceled.current = true;
+                      setBulkAiStatusText('Đang dừng tiến trình...');
+                    }}
+                    className="px-3.5 py-1.5 rounded-lg border border-red-200 text-red-600 text-xs font-bold hover:bg-red-50 transition-colors cursor-pointer"
+                  >
+                    Hủy tiến trình
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1349,7 +1683,7 @@ TRANG 38
           <div className="bg-white w-full max-w-4xl h-[80vh] rounded-2xl shadow-xl flex flex-col">
             <div className="px-6 py-4 border-b border-[#E7E0C4] bg-[#fdfcf8] flex items-center justify-between shrink-0">
               <h2 className="font-bold text-slate-800 text-lg">Nhận xét chi tiết</h2>
-              <button 
+              <button
                 onClick={() => setIsExpandedComments(false)}
                 className="text-slate-400 hover:text-slate-600 p-1.5 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
               >
@@ -1357,7 +1691,7 @@ TRANG 38
               </button>
             </div>
             <div className="p-6 flex-1 flex flex-col">
-              <textarea 
+              <textarea
                 value={comments}
                 onChange={(e) => setComments(e.target.value)}
                 placeholder="Nhận xét về nội dung, hình thức và tính thực tiễn của bài thu hoạch..."
@@ -1365,13 +1699,13 @@ TRANG 38
               />
             </div>
             <div className="px-6 py-4 border-t border-[#E7E0C4] bg-slate-50 flex items-center justify-end shrink-0 gap-3">
-              <button 
+              <button
                 onClick={handleInsertTemplate}
                 className="px-5 py-2.5 rounded-lg border border-slate-300 text-slate-600 font-bold text-sm hover:bg-slate-100 transition-colors cursor-pointer flex items-center gap-2"
               >
                 <Sparkles className="w-4 h-4 text-[#407F3E]" /> Chèn mẫu
               </button>
-              <button 
+              <button
                 onClick={() => setIsExpandedComments(false)}
                 className="px-6 py-2.5 rounded-lg bg-[#407F3E] text-white font-bold text-sm shadow-md hover:bg-[#407F3E]/90 hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer"
               >

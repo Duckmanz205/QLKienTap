@@ -27,7 +27,7 @@ import { QueueModule } from './queue/queue.module';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         type: 'mssql',
-        host: configService.get<string>('DB_HOST', 'localhost'),
+        host: configService.get<string>('DB_HOST', '127.0.0.1'),
         port: Number(configService.get('DB_PORT', 1433)),
         username: configService.get<string>('DB_USERNAME', 'sa'),
         password: configService.get<string>('DB_PASSWORD', ''),
@@ -35,9 +35,20 @@ import { QueueModule } from './queue/queue.module';
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
         synchronize: false, // TAT trong production, dung migrations thay the
         dropSchema: false,
+        pool: {
+          max: 10,
+          min: 2,
+          idleTimeoutMillis: 30000,
+          acquireTimeoutMillis: 30000,
+        },
+        extra: {
+          validateConnection: false,
+        },
         options: {
           encrypt: false, // Tat encrypt cho local development
           trustServerCertificate: true,
+          connectTimeout: 30000,
+          requestTimeout: 30000,
         },
       }),
     }),

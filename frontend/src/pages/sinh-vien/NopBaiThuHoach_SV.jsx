@@ -1,28 +1,39 @@
 import toast from 'react-hot-toast';
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  UploadCloud, FileText, CheckCircle2, AlertCircle, ChevronRight, Lock,
-  ArrowLeft, Search, ZoomIn, ZoomOut, AlertTriangle, Send, Maximize2, Minimize2
+  UploadCloud, FileText, CheckCircle2, AlertCircle, ChevronRight, Lock, Unlock,
+  ArrowLeft, Search, ZoomIn, ZoomOut, AlertTriangle, Send, Maximize2, Minimize2,
+  Star, Check, Building2, Monitor, RefreshCw, Calendar, MapPin, Users, Award, ShieldAlert,
+  FileCheck, ExternalLink, Image as ImageIcon
 } from 'lucide-react';
 import { sinhVienApi } from '../../services/api';
 import Toast from '../../components/Toast';
-import SearchableDropdown from '../../components/SearchableDropdown';
 
 export default function NopBaiThuHoach_SV() {
   const [student, setStudent] = useState(null);
   const [trips, setTrips] = useState([]);
   const [selectedTrip, setSelectedTrip] = useState(null);
   const [uploadedFile, setUploadedFile] = useState(null);
+  const [uploadedConfirmationFile, setUploadedConfirmationFile] = useState(null);
+  const [activePreviewTab, setActivePreviewTab] = useState('report'); // 'report' | 'confirmation'
   const [zoomLevel, setZoomLevel] = useState(100);
   const [uploading, setUploading] = useState(false);
+  const [uploadingConfirmation, setUploadingConfirmation] = useState(false);
   const fileInputRef = useRef(null);
+  const confirmationFileInputRef = useRef(null);
   const [popup, setPopup] = useState({ show: false, message: '', type: 'success' });
   const [confirmDelete, setConfirmDelete] = useState({ show: false, tripId: null });
+
+  // State quản lý Bộ 3 chuyến báo cáo & Hội đồng
+  const [repStatus, setRepStatus] = useState(null);
+  const [loadingRepStatus, setLoadingRepStatus] = useState(false);
+  const [selectedTripsForReport, setSelectedTripsForReport] = useState([]);
+  const [isEditingReportSelection, setIsEditingReportSelection] = useState(false);
+  const [isSubmittingRepTrips, setIsSubmittingRepTrips] = useState(false);
 
   const showPopup = (message, type = 'error') => {
     setPopup({ show: true, message, type });
   };
-
 
   useEffect(() => {
     const userJson = localStorage.getItem('user');
@@ -31,9 +42,29 @@ export default function NopBaiThuHoach_SV() {
       sinhVienApi.getProfile(user.id).then(res => {
         setStudent(res.data);
         fetchTrips(res.data.id);
+        fetchRepStatus();
       }).catch(err => console.error(err));
     }
   }, []);
+
+  const fetchRepStatus = async () => {
+    try {
+      setLoadingRepStatus(true);
+      const res = await sinhVienApi.getRepresentativeTripsStatus();
+      const data = res.data;
+      setRepStatus(data);
+      if (data?.selectedRegistrationIds?.length === 3) {
+        setSelectedTripsForReport(data.selectedRegistrationIds);
+        setIsEditingReportSelection(false);
+      } else {
+        setIsEditingReportSelection(true);
+      }
+    } catch (err) {
+      console.error('Lỗi lấy trạng thái bộ 3 chuyến:', err);
+    } finally {
+      setLoadingRepStatus(false);
+    }
+  };
 
   const fetchTrips = async (svId) => {
     try {
@@ -42,7 +73,18 @@ export default function NopBaiThuHoach_SV() {
       setTrips(validTrips.map(trip => {
         let status = 'Chưa nộp';
         const baiThuHoach = trip.phieuThamQuan?.baiThuHoach;
-        if (baiThuHoach) status = 'Đã nộp';
+        const isTuDo = trip.chuyenThamQuan?.cach_to_chuc === 'TuDo' || trip.chuyenThamQuan?.loai_chuyen === 'tu_do';
+        const diemDanhStatus = trip.phieuThamQuan?.diemDanh?.trang_thai;
+
+        if (baiThuHoach?.file_bao_cao) {
+          if (isTuDo && diemDanhStatus !== 'CoMat') {
+            status = 'Chờ duyệt điểm danh';
+          } else {
+            status = 'Đã nộp';
+          }
+        } else if (baiThuHoach?.file_xac_nhan_tham_quan) {
+          status = 'Chờ duyệt điểm danh';
+        }
         
         let hanNopStr = 'Chưa xác định';
         if (trip.chuyenThamQuan?.ngay_tham_quan) {
@@ -63,7 +105,7 @@ export default function NopBaiThuHoach_SV() {
           cachToChuc: trip.chuyenThamQuan?.cach_to_chuc,
           hoaDonStatus: trip.hoaDon?.trang_thai,
           hasPhieuThamQuan: !!trip.phieuThamQuan,
-          diemDanhStatus: trip.phieuThamQuan?.diemDanh?.trang_thai
+          diemDanhStatus: diemDanhStatus
         };
       }));
     } catch (err) {
@@ -79,6 +121,8 @@ export default function NopBaiThuHoach_SV() {
     switch (status) {
       case 'Đã nộp':
         return <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold bg-[#89B449] text-white shadow-sm border border-[#89B449]/20"><CheckCircle2 className="w-3.5 h-3.5" />{status}</span>;
+      case 'Chờ duyệt điểm danh':
+        return <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold bg-indigo-600 text-white shadow-sm border border-indigo-500"><FileCheck className="w-3.5 h-3.5" />{status}</span>;
       case 'Chưa nộp':
         return <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold bg-[#DBD468] text-slate-800 shadow-sm border border-[#DBD468]/20"><AlertCircle className="w-3.5 h-3.5" />{status}</span>;
       case 'Trễ hạn - trừ điểm':
@@ -116,19 +160,104 @@ export default function NopBaiThuHoach_SV() {
   };
 
 
+  const handleConfirmationFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const isImage = file.type.startsWith('image/') || /\.(png|jpe?g)$/i.test(file.name);
+    const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+    if (!isImage && !isPdf) {
+      showPopup('Giấy xác nhận chỉ chấp nhận định dạng PDF hoặc hình ảnh (JPG, PNG).', 'error');
+      if (confirmationFileInputRef.current) confirmationFileInputRef.current.value = null;
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      showPopup('Dung lượng giấy xác nhận tối đa là 5MB.', 'error');
+      if (confirmationFileInputRef.current) confirmationFileInputRef.current.value = null;
+      return;
+    }
+
+    setUploadingConfirmation(true);
+    try {
+      const res = await sinhVienApi.uploadAttachment(file);
+      const previewUrl = URL.createObjectURL(file);
+      setUploadedConfirmationFile({
+        name: res.data.fileName || res.data.originalName || file.name,
+        size: (file.size / (1024 * 1024)).toFixed(1) + ' MB',
+        url: res.data.url,
+        key: res.data.key,
+        previewUrl: previewUrl,
+        isImage,
+        isPdf,
+        rawFile: file
+      });
+      showPopup('Đã tải lên giấy xác nhận doanh nghiệp!', 'success');
+    } catch (err) {
+      console.error(err);
+      showPopup(err.response?.data?.message || 'Lỗi tải tệp giấy xác nhận lên. Xin thử lại.', 'error');
+    } finally {
+      setUploadingConfirmation(false);
+      if (confirmationFileInputRef.current) confirmationFileInputRef.current.value = null;
+    }
+  };
+
+  const handleSaveConfirmationOnly = async () => {
+    if (!uploadedConfirmationFile) {
+      showPopup('Vui lòng tải lên Giấy xác nhận tham quan doanh nghiệp', 'error');
+      return;
+    }
+    try {
+      await sinhVienApi.submitConfirmationPaper({
+        registrationId: selectedTrip.id,
+        fileXacNhanUrl: uploadedConfirmationFile.url || uploadedConfirmationFile.key,
+      });
+      showPopup('Đã gửi giấy xác nhận thành công! Vui lòng chờ Giảng viên duyệt điểm danh.', 'success');
+      setUploadedFile(null);
+      setUploadedConfirmationFile(null);
+      setSelectedTrip(null);
+      if (student) {
+        fetchTrips(student.id);
+        fetchRepStatus();
+      }
+    } catch (err) {
+      console.error(err);
+      showPopup(err.response?.data?.message || 'Có lỗi xảy ra khi gửi giấy xác nhận', 'error');
+    }
+  };
+
   const handleSubmit = async () => {
-    if (!uploadedFile) return;
+    if (!uploadedFile) {
+      showPopup('Vui lòng tải lên file bài thu hoạch', 'error');
+      return;
+    }
+
+    const isTuDo = selectedTrip?.cachToChuc === 'TuDo' || selectedTrip?.loaiChuyen === 'tu_do';
+    if (isTuDo && !uploadedConfirmationFile) {
+      showPopup('Chuyến tham quan tự do bắt buộc phải tải lên Giấy xác nhận tham quan doanh nghiệp (có dấu mộc đỏ)', 'error');
+      return;
+    }
+
     try {
       await sinhVienApi.submitReport({
         registrationId: selectedTrip.id,
         fileBaoCaoUrl: uploadedFile.url || uploadedFile.name,
-        fileXacNhanUrl: null,
+        fileXacNhanUrl: uploadedConfirmationFile ? (uploadedConfirmationFile.url || uploadedConfirmationFile.key) : null,
         extractedText: uploadedFile.text,
       });
-      showPopup("Nộp bài thành công!", "success");
+      showPopup(
+        isTuDo 
+          ? "Nộp bài thành công! Giấy xác nhận đã được gửi cho Giảng viên duyệt điểm danh." 
+          : "Nộp bài thành công!", 
+        "success"
+      );
       setUploadedFile(null);
+      setUploadedConfirmationFile(null);
       setSelectedTrip(null);
-      if (student) fetchTrips(student.id);
+      if (student) {
+        fetchTrips(student.id);
+        fetchRepStatus();
+      }
     } catch (err) {
       console.error(err);
       showPopup(err.response?.data?.message || "Có lỗi xảy ra khi nộp bài", "error");
@@ -154,7 +283,7 @@ export default function NopBaiThuHoach_SV() {
              </div>
           ) : (
             trips.map(trip => {
-              const isTuDo = trip.loaiChuyen === 'tu_do';
+              const isTuDo = trip.cachToChuc === 'TuDo' || trip.loaiChuyen === 'tu_do';
               const isDoKhoa = trip.cachToChuc === 'DoKhoaToChuc';
               let canSubmit = true;
               let disabledReason = '';
@@ -162,7 +291,7 @@ export default function NopBaiThuHoach_SV() {
               if (!trip.hasPhieuThamQuan) {
                 canSubmit = false;
                 disabledReason = isDoKhoa && trip.hoaDonStatus === 'ChuaDong' ? 'Chưa đóng lệ phí' : 'Chưa có PTQ';
-              } else if (trip.diemDanhStatus !== 'CoMat') {
+              } else if (isDoKhoa && trip.diemDanhStatus !== 'CoMat') {
                 canSubmit = false;
                 disabledReason = 'Chưa điểm danh';
               }
@@ -177,19 +306,137 @@ export default function NopBaiThuHoach_SV() {
                         <span>Hạn nộp: <strong>{trip.hanNop}</strong></span>
                         <span className="inline-block px-1.5 py-0.5 rounded border border-slate-200 bg-slate-50 text-[10px] uppercase tracking-wider">{trip.hinhThuc}</span>
                         {isTuDo && (
-                          <span className="inline-block px-1.5 py-0.5 rounded border border-indigo-200 bg-indigo-50 text-indigo-700 text-[10px] uppercase tracking-wider font-bold">Chuyến tự do</span>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-indigo-200 bg-indigo-50 text-indigo-700 text-[10px] uppercase tracking-wider font-bold">
+                            <Building2 className="w-3 h-3 text-indigo-600" />
+                            Chuyến tự do • Kèm giấy xác nhận DN
+                          </span>
+                        )}
+                        {repStatus?.selectedRegistrationIds?.includes(trip.id) && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-amber-300 bg-amber-50 text-amber-700 text-[10px] uppercase tracking-wider font-extrabold shadow-xs">
+                            <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
+                            Bộ 3 báo cáo
+                          </span>
                         )}
                       </div>
                     </div>
                     
                     <div className="flex items-center gap-4 shrink-0">
                       {getStatusBadge(trip.trangThai)}
-                      {trip.trangThai !== 'Đã nộp' ? (
+                      {trip.trangThai === 'Đã nộp' || trip.trangThai === 'Chờ duyệt điểm danh' ? (
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => setConfirmDelete({ show: true, tripId: trip.id })}
+                            className="px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-1.5 bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer shadow-sm border border-red-100"
+                          >
+                            {trip.trangThai === 'Đã nộp' ? 'Nộp lại' : 'Gửi lại'} <UploadCloud className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={async () => {
+                              setSelectedTrip(trip);
+                              setUploadedConfirmationFile(null);
+                              setActivePreviewTab(trip.baiThuHoach?.file_bao_cao ? 'report' : 'confirmation');
+                              if (trip.baiThuHoach) {
+                                const dbPath = trip.baiThuHoach.file_bao_cao;
+                                let apiPath = '';
+                                if (dbPath) {
+                                  if (dbPath.startsWith('/api/')) {
+                                    apiPath = dbPath;
+                                  } else if (dbPath.startsWith('reports/')) {
+                                    apiPath = `/upload/file/${dbPath}`;
+                                  } else {
+                                    apiPath = `/upload/file/reports/${dbPath}`;
+                                  }
+                                }
+
+                                // Fetch PDF and TXT via axiosClient (auto-attaches JWT)
+                                let blobUrl = '';
+                                let extractedText = 'Đây là nội dung bài làm đã nộp (đã được lưu trên hệ thống).';
+
+                                try {
+                                  const { default: api } = await import('../../services/axiosClient');
+                                  
+                                  if (apiPath) {
+                                    const cleanPath = apiPath.startsWith('/') ? apiPath : `/${apiPath}`;
+                                    // 1. Fetch PDF
+                                    const respPdf = await api.get(cleanPath, { responseType: 'blob' });
+                                    if (respPdf.data) {
+                                      blobUrl = URL.createObjectURL(respPdf.data);
+                                    }
+
+                                    // 2. Fetch Text File (.txt)
+                                    const txtApiPath = cleanPath.replace(/\.\w+$/, '.txt');
+                                    try {
+                                      const respTxt = await api.get(txtApiPath, { responseType: 'text' });
+                                      if (respTxt.data) {
+                                        extractedText = respTxt.data;
+                                      }
+                                    } catch (txtErr) {
+                                      console.warn('Không tìm thấy file text trích xuất:', txtErr);
+                                      if (trip.baiThuHoach.noi_dung_trich_xuat) {
+                                        extractedText = trip.baiThuHoach.noi_dung_trich_xuat;
+                                      }
+                                    }
+                                  }
+
+                                  // 3. Fetch Confirmation File nếu có
+                                  const xacNhanPath = trip.baiThuHoach.file_xac_nhan_tham_quan;
+                                  if (xacNhanPath) {
+                                    let xnApiPath = '';
+                                    if (xacNhanPath.startsWith('/api/')) {
+                                      xnApiPath = xacNhanPath;
+                                    } else if (xacNhanPath.startsWith('attachments/') || xacNhanPath.startsWith('payments/')) {
+                                      xnApiPath = `/upload/file/${xacNhanPath}`;
+                                    } else {
+                                      xnApiPath = `/upload/file/attachments/${xacNhanPath}`;
+                                    }
+
+                                    try {
+                                      const cleanXnPath = xnApiPath.startsWith('/') ? xnApiPath : `/${xnApiPath}`;
+                                      const respXn = await api.get(cleanXnPath, { responseType: 'blob' });
+                                      if (respXn.data) {
+                                        const xnBlobUrl = URL.createObjectURL(respXn.data);
+                                        const cType = respXn.headers['content-type'] || '';
+                                        const isImage = cType.startsWith('image/') || /\.(png|jpe?g)$/i.test(xacNhanPath);
+                                        const isPdf = cType.includes('pdf') || /\.pdf$/i.test(xacNhanPath);
+                                        setUploadedConfirmationFile({
+                                          name: xacNhanPath.split('/').pop() || 'Giay_xac_nhan_DN',
+                                          size: 'Đã nộp',
+                                          previewUrl: xnBlobUrl,
+                                          isImage,
+                                          isPdf,
+                                          url: cleanXnPath
+                                        });
+                                      }
+                                    } catch (xnErr) {
+                                      console.warn('Không tải được file xác nhận preview:', xnErr);
+                                    }
+                                  }
+                                } catch (err) {
+                                  console.error('Lỗi tải file preview:', err);
+                                }
+                                
+                                setUploadedFile({
+                                  name: trip.baiThuHoach.file_bao_cao_url || 'BaoCao_ThuHoach.pdf',
+                                  size: 'Đã nộp',
+                                  text: extractedText,
+                                  previewUrl: blobUrl,
+                                  url: apiPath
+                                });
+                              }
+                            }}
+                            className="px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
+                          >
+                            Xem lại <FileText className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
                         canSubmit ? (
                           <button 
                             onClick={() => {
                               setSelectedTrip(trip);
                               setUploadedFile(null);
+                              setUploadedConfirmationFile(null);
+                              setActivePreviewTab('report');
                             }}
                             className="px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-1.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 shadow-sm transition-colors cursor-pointer"
                           >
@@ -203,75 +450,6 @@ export default function NopBaiThuHoach_SV() {
                             <span className="text-[10px] text-red-500 font-bold mt-1 uppercase tracking-wide">{disabledReason}</span>
                           </div>
                         )
-                      ) : (
-                        <div className="flex gap-2">
-                          <button 
-                            onClick={() => setConfirmDelete({ show: true, tripId: trip.id })}
-                            className="px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-1.5 bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer shadow-sm border border-red-100"
-                          >
-                            Nộp lại <UploadCloud className="w-4 h-4" />
-                          </button>
-                          <button 
-                            onClick={async () => {
-                              setSelectedTrip(trip);
-                            if (trip.baiThuHoach) {
-                              const dbPath = trip.baiThuHoach.file_bao_cao;
-                              let apiPath = '';
-                              if (dbPath) {
-                                if (dbPath.startsWith('reports/')) {
-                                  apiPath = `/upload/file/${dbPath}`;
-                                } else {
-                                  apiPath = `/upload/file/reports/${dbPath}`;
-                                }
-                              }
-
-                              // Fetch PDF and TXT via axiosClient (auto-attaches JWT)
-                              let blobUrl = '';
-                              let extractedText = 'Đây là nội dung bài làm đã nộp (đã được lưu trên hệ thống).';
-
-                              if (apiPath) {
-                                try {
-                                  const { default: api } = await import('../../services/axiosClient');
-                                  
-                                  // 1. Fetch PDF
-                                  const respPdf = await api.get(apiPath, { responseType: 'blob' });
-                                  if (respPdf.data) {
-                                    blobUrl = URL.createObjectURL(respPdf.data);
-                                  }
-
-                                  // 2. Fetch Text File (.txt)
-                                  const txtApiPath = apiPath.replace(/\.\w+$/, '.txt');
-                                  try {
-                                    const respTxt = await api.get(txtApiPath, { responseType: 'text' });
-                                    if (respTxt.data) {
-                                      extractedText = respTxt.data;
-                                    }
-                                  } catch (txtErr) {
-                                    console.warn('Không tìm thấy file text trích xuất:', txtErr);
-                                    // Fallback if older report has it in DB
-                                    if (trip.baiThuHoach.noi_dung_trich_xuat) {
-                                      extractedText = trip.baiThuHoach.noi_dung_trich_xuat;
-                                    }
-                                  }
-                                } catch (err) {
-                                  console.error('Lỗi tải file preview:', err);
-                                }
-                              }
-                              
-                              setUploadedFile({
-                                name: trip.baiThuHoach.file_bao_cao_url || 'BaoCao_ThuHoach.pdf',
-                                size: 'Đã nộp',
-                                text: extractedText,
-                                previewUrl: blobUrl,
-                                url: apiPath
-                              });
-                            }
-                          }}
-                          className="px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
-                        >
-                          Xem lại <FileText className="w-4 h-4" />
-                        </button>
-                        </div>
                       )}
                     </div>
                   </div>
@@ -281,65 +459,409 @@ export default function NopBaiThuHoach_SV() {
           )}
         </div>
 
-        {/* Right Column: Committee Selection Card */}
+        {/* Right Column: Committee & Representative Trips Selection Card */}
         <div className="lg:col-span-1">
-          <div className="bg-[#407F3E] rounded-2xl p-6 text-white shadow-xl relative overflow-hidden h-full flex flex-col">
-            <div className="absolute top-0 right-0 p-4 opacity-10">
-              <CheckCircle2 className="w-32 h-32" />
-            </div>
-            
-            <div className="relative z-10 flex-1">
-              <h2 className="text-lg font-black uppercase tracking-wider mb-2">Đăng ký Hội đồng</h2>
-              
-              <div className="mb-6 pb-6 border-b border-white/20">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-white/80">Số chuyến đã hoàn thành:</span>
-                  <span className="text-2xl font-black">{completedTrips.length} / 3</span>
+          {(() => {
+            const completedTripsList = trips.filter(t => t.trangThai === 'Đã nộp');
+            const directCompleted = completedTripsList.filter(t => t.hinhThuc === 'Trực tiếp');
+            const onlineCompleted = completedTripsList.filter(t => t.hinhThuc === 'Trực tuyến');
+
+            const selectedTripsObjs = trips.filter(t => selectedTripsForReport.includes(t.id));
+            const selectedDirectCount = selectedTripsObjs.filter(t => t.hinhThuc === 'Trực tiếp').length;
+            const selectedOnlineCount = selectedTripsObjs.filter(t => t.hinhThuc === 'Trực tuyến').length;
+            const isSelectionValid = selectedTripsForReport.length === 3 && selectedDirectCount === 2 && selectedOnlineCount === 1;
+
+            const handleToggleTripSelection = (tripId) => {
+              if (repStatus?.isLockedByKhoa) {
+                toast.error('Quản lý Khoa đã khóa cổng đăng ký / thay đổi bộ chuyến');
+                return;
+              }
+              if (selectedTripsForReport.includes(tripId)) {
+                setSelectedTripsForReport(prev => prev.filter(id => id !== tripId));
+              } else {
+                if (selectedTripsForReport.length >= 3) {
+                  toast.error('Chỉ được chọn đúng 3 chuyến làm bộ chuyến báo cáo');
+                  return;
+                }
+                const targetTrip = trips.find(t => t.id === tripId);
+                if (!targetTrip) return;
+
+                if (targetTrip.hinhThuc === 'Trực tiếp' && selectedDirectCount >= 2) {
+                  toast.error('Bạn đã chọn đủ 2 chuyến Trực tiếp. Vui lòng bỏ chọn chuyến khác trước.');
+                  return;
+                }
+                if (targetTrip.hinhThuc === 'Trực tuyến' && selectedOnlineCount >= 1) {
+                  toast.error('Bạn đã chọn đủ 1 chuyến Trực tuyến. Vui lòng bỏ chọn chuyến khác trước.');
+                  return;
+                }
+
+                const existingFactoryTrip = selectedTripsObjs.find(t => t.nhaMay.toLowerCase() === targetTrip.nhaMay.toLowerCase());
+                if (existingFactoryTrip) {
+                  toast.error(`Trùng nhà máy "${targetTrip.nhaMay}". Quy định yêu cầu chọn 3 nhà máy khác nhau!`);
+                  return;
+                }
+
+                setSelectedTripsForReport(prev => [...prev, tripId]);
+              }
+            };
+
+            const handleSaveRepresentativeTrips = async () => {
+              if (!isSelectionValid) {
+                toast.error('Vui lòng chọn đúng 2 chuyến Trực tiếp và 1 chuyến Trực tuyến tại 3 nhà máy khác nhau.');
+                return;
+              }
+              try {
+                setIsSubmittingRepTrips(true);
+                const res = await sinhVienApi.selectRepresentativeTrips({
+                  registrationIds: selectedTripsForReport
+                });
+                toast.success(res.data?.message || 'Đăng ký Bộ 3 chuyến báo cáo thành công!');
+                setIsEditingReportSelection(false);
+                fetchRepStatus();
+              } catch (err) {
+                toast.error(err.response?.data?.message || 'Lỗi khi đăng ký bộ chuyến');
+              } finally {
+                setIsSubmittingRepTrips(false);
+              }
+            };
+
+            return (
+              <div className="bg-[#1E3A2F] rounded-2xl p-6 text-white shadow-xl relative overflow-hidden flex flex-col border border-emerald-900/40 h-full">
+                {/* Background Decor */}
+                <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+                  <Award className="w-36 h-36" />
                 </div>
-                
-                <div className="w-full bg-black/20 rounded-full h-2.5 overflow-hidden">
-                  <div 
-                    className="bg-[#DBD468] h-2.5 rounded-full transition-all duration-1000" 
-                    style={{ width: `${Math.min((completedTrips.length / 3) * 100, 100)}%` }}
-                  ></div>
+
+                <div className="relative z-10 flex-1 flex flex-col">
+                  {/* Card Title */}
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <h2 className="text-base font-black uppercase tracking-wider text-emerald-300 flex items-center gap-2">
+                      <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
+                      Bộ 3 chuyến báo cáo
+                    </h2>
+                    {repStatus?.isLockedByKhoa && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-extrabold bg-red-500/20 text-red-300 border border-red-500/30">
+                        <Lock className="w-3 h-3" /> Đã khóa
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="text-xs text-white/70 mb-4 leading-relaxed">
+                    Đăng ký 3 chuyến theo nguyện vọng (2 trực tiếp + 1 trực tuyến, 3 nhà máy khác nhau) để bảo vệ trước Hội đồng.
+                  </p>
+
+                  {/* Checklist Cơ Cấu Học Phần */}
+                  <div className="bg-black/25 rounded-xl p-3 mb-4 border border-white/10 space-y-2">
+                    <div className="flex items-center justify-between text-xs font-semibold text-white/90">
+                      <span>Tiến độ cơ cấu học phần:</span>
+                      <span className="font-bold text-amber-300">
+                        {repStatus?.completedTripsCount || 0} bài đã nộp
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-[11px]">
+                      <div className={`p-2 rounded-lg border flex items-center justify-between ${
+                        repStatus?.requirementDetails?.directOk
+                          ? 'bg-emerald-900/40 border-emerald-500/40 text-emerald-200'
+                          : 'bg-black/30 border-white/10 text-white/70'
+                      }`}>
+                        <span className="flex items-center gap-1 font-medium">
+                          <Building2 className="w-3.5 h-3.5 shrink-0" /> Trực tiếp:
+                        </span>
+                        <span className="font-bold">
+                          {repStatus?.directCount || 0}/2 {repStatus?.requirementDetails?.directOk ? '✓' : ''}
+                        </span>
+                      </div>
+
+                      <div className={`p-2 rounded-lg border flex items-center justify-between ${
+                        repStatus?.requirementDetails?.onlineOk
+                          ? 'bg-emerald-900/40 border-emerald-500/40 text-emerald-200'
+                          : 'bg-black/30 border-white/10 text-white/70'
+                      }`}>
+                        <span className="flex items-center gap-1 font-medium">
+                          <Monitor className="w-3.5 h-3.5 shrink-0" /> Trực tuyến:
+                        </span>
+                        <span className="font-bold">
+                          {repStatus?.onlineCount || 0}/1 {repStatus?.requirementDetails?.onlineOk ? '✓' : ''}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className={`text-[11px] px-2.5 py-1 rounded-lg border flex items-center justify-between ${
+                      repStatus?.requirementDetails?.factoriesOk
+                        ? 'bg-emerald-900/40 border-emerald-500/40 text-emerald-200'
+                        : 'bg-black/30 border-white/10 text-white/70'
+                    }`}>
+                      <span className="font-medium">Số nhà máy khác nhau:</span>
+                      <span className="font-bold">
+                        {repStatus?.distinctFactoryCount || 0}/3 {repStatus?.requirementDetails?.factoriesOk ? '✓ Đạt' : 'Chưa đạt'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Body: Các trạng thái */}
+                  {loadingRepStatus ? (
+                    <div className="py-8 flex flex-col items-center justify-center text-white/60 text-xs gap-2">
+                      <RefreshCw className="w-6 h-6 animate-spin text-amber-300" />
+                      <span>Đang tải thông tin...</span>
+                    </div>
+                  ) : !repStatus?.isEligible ? (
+                    /* TRẠNG THÁI 1: CHƯA ĐỦ ĐIỀU KIỆN */
+                    <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex flex-col items-center text-center gap-2">
+                      <ShieldAlert className="w-9 h-9 text-amber-400" />
+                      <h4 className="text-sm font-bold text-amber-300">Chưa đủ điều kiện báo cáo</h4>
+                      <p className="text-xs text-white/80 leading-relaxed">
+                        Theo quy định của học phần Kiến tập, sinh viên phải hoàn thành ít nhất <strong>2 nhà máy trực tiếp</strong> và <strong>1 nhà máy trực tuyến</strong> (tại 3 nhà máy khác nhau) để đủ điều kiện báo cáo.
+                      </p>
+                    </div>
+                  ) : isEditingReportSelection || !repStatus?.hasSelectedBoChuyen ? (
+                    /* TRẠNG THÁI 2: ĐỦ ĐIỀU KIỆN & CHỌN NGUYỆN VỌNG */
+                    <div className="space-y-3.5 flex-1 flex flex-col">
+                      {repStatus?.isLockedByKhoa ? (
+                        <div className="p-3 bg-red-500/20 border border-red-500/40 rounded-xl text-xs text-red-200 flex items-start gap-2">
+                          <Lock className="w-4 h-4 shrink-0 text-red-400 mt-0.5" />
+                          <div>
+                            <strong className="block font-bold">Cổng chọn bộ chuyến đã khóa</strong>
+                            Quản lý Khoa đã khóa cổng đăng ký cho đợt này. Bạn không thể thực hiện chọn hoặc thay đổi bộ chuyến.
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-bold text-emerald-300">Chọn chuyến theo nguyện vọng:</span>
+                            <span className="font-bold px-2 py-0.5 rounded bg-black/30 text-amber-300 border border-white/10">
+                              {selectedTripsForReport.length}/3 chuyến
+                            </span>
+                          </div>
+
+                          {/* Nhóm 1: Trực tiếp */}
+                          <div className="space-y-1">
+                            <div className="flex justify-between items-center text-[11px] font-bold text-white/80">
+                              <span className="flex items-center gap-1"><Building2 className="w-3.5 h-3.5 text-emerald-400" /> Trực tiếp (chọn 2):</span>
+                              <span className={selectedDirectCount === 2 ? 'text-emerald-400' : 'text-amber-300'}>
+                                {selectedDirectCount}/2
+                              </span>
+                            </div>
+                            <div className="space-y-1 max-h-36 overflow-y-auto pr-1">
+                              {directCompleted.length === 0 ? (
+                                <p className="text-[11px] text-white/50 italic">Chưa có chuyến trực tiếp nào đã nộp bài.</p>
+                              ) : (
+                                directCompleted.map(trip => {
+                                  const isChecked = selectedTripsForReport.includes(trip.id);
+                                  return (
+                                    <div
+                                      key={trip.id}
+                                      onClick={() => handleToggleTripSelection(trip.id)}
+                                      className={`p-2 rounded-lg border text-xs cursor-pointer transition-all flex items-center justify-between gap-2 ${
+                                        isChecked
+                                          ? 'bg-[#407F3E]/70 border-[#DBD468] text-white font-bold shadow-xs'
+                                          : 'bg-black/20 border-white/10 text-white/80 hover:bg-black/30'
+                                      }`}
+                                    >
+                                      <div className="min-w-0 flex-1 truncate">
+                                        <div className="truncate font-semibold">{trip.nhaMay}</div>
+                                        <div className="text-[10px] text-white/60 font-normal">{trip.ngayThamQuan}</div>
+                                      </div>
+                                      <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 border ${
+                                        isChecked ? 'bg-[#DBD468] border-[#DBD468] text-slate-900' : 'border-white/30'
+                                      }`}>
+                                        {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
+                                      </div>
+                                    </div>
+                                  );
+                                })
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Nhóm 2: Trực tuyến */}
+                          <div className="space-y-1">
+                            <div className="flex justify-between items-center text-[11px] font-bold text-white/80">
+                              <span className="flex items-center gap-1"><Monitor className="w-3.5 h-3.5 text-cyan-400" /> Trực tuyến (chọn 1):</span>
+                              <span className={selectedOnlineCount === 1 ? 'text-emerald-400' : 'text-amber-300'}>
+                                {selectedOnlineCount}/1
+                              </span>
+                            </div>
+                            <div className="space-y-1 max-h-28 overflow-y-auto pr-1">
+                              {onlineCompleted.length === 0 ? (
+                                <p className="text-[11px] text-white/50 italic">Chưa có chuyến trực tuyến nào đã nộp bài.</p>
+                              ) : (
+                                onlineCompleted.map(trip => {
+                                  const isChecked = selectedTripsForReport.includes(trip.id);
+                                  return (
+                                    <div
+                                      key={trip.id}
+                                      onClick={() => handleToggleTripSelection(trip.id)}
+                                      className={`p-2 rounded-lg border text-xs cursor-pointer transition-all flex items-center justify-between gap-2 ${
+                                        isChecked
+                                          ? 'bg-[#407F3E]/70 border-[#DBD468] text-white font-bold shadow-xs'
+                                          : 'bg-black/20 border-white/10 text-white/80 hover:bg-black/30'
+                                      }`}
+                                    >
+                                      <div className="min-w-0 flex-1 truncate">
+                                        <div className="truncate font-semibold">{trip.nhaMay}</div>
+                                        <div className="text-[10px] text-white/60 font-normal">{trip.ngayThamQuan}</div>
+                                      </div>
+                                      <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 border ${
+                                        isChecked ? 'bg-[#DBD468] border-[#DBD468] text-slate-900' : 'border-white/30'
+                                      }`}>
+                                        {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
+                                      </div>
+                                    </div>
+                                  );
+                                })
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Buttons */}
+                          <div className="pt-2 space-y-2 mt-auto">
+                            <button
+                              type="button"
+                              onClick={handleSaveRepresentativeTrips}
+                              disabled={!isSelectionValid || isSubmittingRepTrips}
+                              className={`w-full py-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer ${
+                                isSelectionValid && !isSubmittingRepTrips
+                                  ? 'bg-[#DBD468] hover:bg-[#c9c256] text-slate-900'
+                                  : 'bg-white/10 text-white/40 cursor-not-allowed border border-white/5'
+                              }`}
+                            >
+                              {isSubmittingRepTrips ? (
+                                <>
+                                  <RefreshCw className="w-4 h-4 animate-spin" />
+                                  Đang lưu bộ 3 chuyến...
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCircle2 className="w-4 h-4" />
+                                  Xác nhận Bộ 3 chuyến báo cáo
+                                </>
+                              )}
+                            </button>
+
+                            {repStatus?.hasSelectedBoChuyen && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedTripsForReport(repStatus.selectedRegistrationIds);
+                                  setIsEditingReportSelection(false);
+                                }}
+                                className="w-full py-1.5 bg-transparent hover:bg-white/10 text-white/70 hover:text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer text-center"
+                              >
+                                Hủy bỏ đổi nguyện vọng
+                              </button>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    /* TRẠNG THÁI 3 & 4: ĐÃ ĐĂNG KÝ THÀNH CÔNG */
+                    <div className="space-y-4 flex-1 flex flex-col">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs font-bold text-emerald-300">
+                          <span>3 chuyến đại diện đã đăng ký:</span>
+                          {repStatus?.canEdit && (
+                            <button
+                              type="button"
+                              onClick={() => setIsEditingReportSelection(true)}
+                              className="text-[11px] text-[#DBD468] hover:underline font-bold cursor-pointer"
+                            >
+                              Đổi nguyện vọng
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="space-y-1.5">
+                          {selectedTripsObjs.map((trip, idx) => (
+                            <div
+                              key={trip.id}
+                              className="p-2.5 bg-black/25 rounded-xl border border-white/15 flex items-center justify-between gap-2"
+                            >
+                              <div className="min-w-0 flex-1 truncate">
+                                <div className="text-xs font-bold truncate text-white">
+                                  {idx + 1}. {trip.nhaMay}
+                                </div>
+                                <div className="text-[10px] text-white/60">
+                                  {trip.hinhThuc} • {trip.ngayThamQuan}
+                                </div>
+                              </div>
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-[#DBD468] text-slate-900 shrink-0">
+                                ⭐ Báo cáo
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Thông tin Lịch Hội đồng do Khoa phân công */}
+                      <div className="mt-auto pt-3 border-t border-white/15">
+                        <div className="text-[11px] font-bold uppercase tracking-wider text-white/70 mb-2">
+                          Lịch bảo vệ Hội đồng (Khoa phân công)
+                        </div>
+
+                        {!repStatus?.assignedCouncil ? (
+                          <div className="p-3 bg-amber-500/15 border border-amber-500/30 rounded-xl space-y-1">
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-amber-300">
+                              <Calendar className="w-4 h-4 text-amber-400 shrink-0" />
+                              Đang chờ Khoa phân công Hội đồng
+                            </div>
+                            <p className="text-[11px] text-white/80 leading-relaxed">
+                              Khoa đang lập Hội đồng và xếp lịch bảo vệ. Lịch chính thức sẽ hiển thị tại đây ngay khi được xếp.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="p-3 bg-emerald-950/60 border border-emerald-400/40 rounded-xl space-y-2 shadow-sm">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-xs font-black text-emerald-300">
+                                {repStatus.assignedCouncil.tenHoiDong}
+                              </span>
+                              {repStatus.assignedCouncil.daKhoa ? (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-300 border border-red-500/30">
+                                  🔒 Đã khóa điểm
+                                </span>
+                              ) : (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                  ✓ Đã có lịch
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="space-y-1 text-xs text-white/90">
+                              <div className="flex items-center gap-1.5">
+                                <Calendar className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                                <span>
+                                  {repStatus.assignedCouncil.ngayBaoCao
+                                    ? new Date(repStatus.assignedCouncil.ngayBaoCao).toLocaleString('vi-VN')
+                                    : 'Chưa xếp thời gian'}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <MapPin className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                                <span>{repStatus.assignedCouncil.diaDiem || 'Chưa xếp phòng'}</span>
+                              </div>
+                            </div>
+
+                            {repStatus.assignedCouncil.thanhVien?.length > 0 && (
+                              <div className="pt-1.5 border-t border-white/10 space-y-0.5">
+                                <span className="text-[10px] font-bold text-white/60 uppercase">Giảng viên chấm:</span>
+                                {repStatus.assignedCouncil.thanhVien.map((tv, i) => (
+                                  <div key={i} className="text-[11px] text-white/80 flex items-center justify-between">
+                                    <span>{tv.hoTen}</span>
+                                    <span className="text-[10px] text-amber-300 font-semibold">{tv.vaiTro}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
-
-              {!hasEnoughTrips ? (
-                <div className="bg-black/20 rounded-xl p-4 flex flex-col items-center justify-center text-center gap-2">
-                  <Lock className="w-8 h-8 text-white/50" />
-                  <p className="text-sm font-bold">Chưa đủ điều kiện</p>
-                  <p className="text-xs text-white/70">Bạn cần hoàn thành báo cáo cho ít nhất 3 chuyến kiến tập để mở khóa chức năng này.</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <p className="text-sm font-medium text-white/90">Bạn đã đủ điều kiện để bảo vệ. Vui lòng chọn hội đồng phù hợp với lịch trình của bạn.</p>
-                  
-                  <div className="space-y-2">
-                    <label className="block text-xs font-bold text-white/70 uppercase tracking-wider">Chọn đợt bảo vệ</label>
-                    <SearchableDropdown 
-                      options={[
-                        { value: 'dot1', label: 'Đợt 1 (15/10/2026 - Phòng B.301)' },
-                        { value: 'dot2', label: 'Đợt 2 (20/10/2026 - Phòng C.105)' }
-                      ]}
-                      value={'dot1'}
-                      onChange={() => {}}
-                      searchPlaceholder="Tìm đợt bảo vệ..."
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {hasEnoughTrips && (
-              <button 
-                onClick={() => toast.error('Chức năng đăng ký hội đồng đang được cập nhật (UI mới)')}
-                className="w-full mt-6 py-3.5 bg-[#DBD468] hover:bg-[#c9c256] text-slate-900 rounded-xl font-black text-sm uppercase tracking-wider transition-colors shadow-lg cursor-pointer"
-              >
-                Đăng ký Hội đồng ngay
-              </button>
-            )}
-          </div>
+            );
+          })()}
         </div>
       </div>
     </div>
@@ -349,101 +871,482 @@ export default function NopBaiThuHoach_SV() {
   // ---------------------------------------------------------
   // VIEW 2: SPLIT-PANE UPLOAD & COMPARISON VIEW
   // ---------------------------------------------------------
-  const renderSubmissionView = () => (
-    <div className="flex flex-col h-[calc(100vh-64px)] animate-in fade-in zoom-in-95 duration-300">
-      
-      {/* Top Breadcrumb Bar */}
-      <div className="h-10 bg-white border-b border-[#E7E0C4] flex items-center justify-between px-4 shrink-0 z-10 shadow-sm">
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={() => { setSelectedTrip(null); setUploadedFile(null); }} 
-            className="w-7 h-7 flex items-center justify-center rounded-full text-slate-500 hover:text-[#407F3E] hover:bg-slate-100 transition-colors cursor-pointer"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </button>
-          <div>
-            <h2 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-              Nộp báo cáo <ChevronRight className="w-3.5 h-3.5 text-slate-400" /> <span className="text-[#407F3E] text-sm">{selectedTrip.nhaMay}</span>
-            </h2>
+  const renderSubmissionView = () => {
+    const isTuDo = selectedTrip?.cachToChuc === 'TuDo' || selectedTrip?.loaiChuyen === 'tu_do';
+    const isSubmitted = selectedTrip?.trangThai === 'Đã nộp';
+    const canSubmitNow = uploadedFile && (!isTuDo || uploadedConfirmationFile);
+
+    return (
+      <div className="flex flex-col h-[calc(100vh-64px)] animate-in fade-in zoom-in-95 duration-300">
+        
+        {/* Top Breadcrumb & Control Bar */}
+        <div className="h-12 bg-white border-b border-[#E7E0C4] flex items-center justify-between px-4 shrink-0 z-10 shadow-sm gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <button 
+              onClick={() => { 
+                setSelectedTrip(null); 
+                setUploadedFile(null); 
+                setUploadedConfirmationFile(null);
+                setActivePreviewTab('report');
+              }} 
+              className="w-8 h-8 flex items-center justify-center rounded-full text-slate-500 hover:text-[#407F3E] hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
+              title="Quay lại danh sách"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+            <div className="min-w-0 truncate">
+              <h2 className="text-xs font-bold text-slate-800 flex items-center gap-1.5 truncate">
+                <span>{isSubmitted ? 'Xem lại bài nộp' : 'Nộp báo cáo'}</span>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <span className="text-[#407F3E] text-sm truncate font-black">{selectedTrip.nhaMay}</span>
+              </h2>
+            </div>
+            {isTuDo && (
+              <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 shrink-0">
+                <Building2 className="w-3 h-3 text-indigo-600" />
+                Chuyến tự do
+              </span>
+            )}
           </div>
-        </div>
-        <div>
-          {!uploadedFile ? (
-            <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
-              Hạn nộp: {selectedTrip.hanNop}
-            </span>
-          ) : selectedTrip.trangThai === 'Đã nộp' ? (
-            <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
-              Bài nộp đã được ghi nhận
-            </span>
-          ) : (
-            <div className="flex gap-2">
-              <button 
-                onClick={() => setUploadedFile(null)}
-                className="px-3 py-1 rounded-md font-bold text-xs shadow-sm transition-all flex items-center gap-1.5 bg-slate-200 text-slate-700 hover:bg-slate-300 cursor-pointer"
+
+          {/* Center: Preview Tab Selector (if multiple files or TuDo view) */}
+          {(isTuDo || (isSubmitted && uploadedConfirmationFile)) && (
+            <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 shrink-0">
+              <button
+                type="button"
+                onClick={() => setActivePreviewTab('report')}
+                className={`px-3 py-1 rounded-md text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  activePreviewTab === 'report'
+                    ? 'bg-white text-[#407F3E] shadow-xs'
+                    : 'text-slate-600 hover:text-slate-800'
+                }`}
               >
-                <UploadCloud className="w-3.5 h-3.5" /> Chọn file khác
+                <FileText className="w-3.5 h-3.5" />
+                <span>Bài thu hoạch</span>
+                {uploadedFile && <Check className="w-3 h-3 text-[#407F3E]" />}
               </button>
-              <button 
-                onClick={handleSubmit}
-                className="px-3 py-1 rounded-md font-bold text-xs shadow-sm transition-all flex items-center gap-1.5 bg-[#407F3E] hover:bg-[#407F3E]/90 text-white cursor-pointer"
+              <button
+                type="button"
+                onClick={() => setActivePreviewTab('confirmation')}
+                className={`px-3 py-1 rounded-md text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  activePreviewTab === 'confirmation'
+                    ? 'bg-white text-indigo-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-800'
+                }`}
               >
-                <Send className="w-3.5 h-3.5" /> Xác nhận & Nộp bài
+                <Award className="w-3.5 h-3.5" />
+                <span>Giấy xác nhận DN</span>
+                {uploadedConfirmationFile && <Check className="w-3 h-3 text-indigo-600" />}
               </button>
             </div>
           )}
-        </div>
-      </div>
 
-      <div className="flex-1 flex overflow-hidden bg-slate-100 relative">
-        <div className="flex-1 flex flex-col relative overflow-hidden bg-white">
-          {!uploadedFile ? (
-            // Upload State
-            <div className="flex-1 flex flex-col items-center justify-center p-8 bg-[#E7E0C4]/20">
-              <div className="bg-white p-8 md:p-12 rounded-3xl shadow-sm border border-slate-200 w-full max-w-lg text-center flex flex-col items-center">
-                <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mb-6">
-                  <UploadCloud className="w-10 h-10 text-[#407F3E]" />
-                </div>
-                <h3 className="text-xl font-black text-slate-800 mb-2">Tải lên File PDF</h3>
-                <p className="text-sm font-medium text-slate-500 mb-8 max-w-xs leading-relaxed">
-                  Kéo thả file báo cáo thu hoạch của bạn vào đây, hoặc nhấn nút bên dưới để chọn file (Tối đa 15MB).
-                </p>
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  className="hidden" 
-                  accept=".pdf,.doc,.docx"
-                  onChange={handleFileChange} 
-                />
+          {/* Right Action Buttons */}
+          <div className="shrink-0 flex items-center gap-2">
+            {isSubmitted ? (
+              <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                Bài nộp đã được ghi nhận
+              </span>
+            ) : (
+              <div className="flex items-center gap-2">
+                {(uploadedFile || uploadedConfirmationFile) && (
+                  <button 
+                    onClick={() => {
+                      setUploadedFile(null);
+                      setUploadedConfirmationFile(null);
+                    }}
+                    className="px-3 py-1.5 rounded-lg font-bold text-xs transition-all flex items-center gap-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 cursor-pointer border border-slate-200"
+                  >
+                    <RefreshCw className="w-3 h-3 text-slate-500" /> Chọn lại
+                  </button>
+                )}
+                {isTuDo && uploadedConfirmationFile && !uploadedFile && (
+                  <button
+                    type="button"
+                    onClick={handleSaveConfirmationOnly}
+                    disabled={uploadingConfirmation}
+                    className="px-3.5 py-1.5 rounded-lg font-bold text-xs bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    {uploadingConfirmation ? 'Đang gửi...' : 'Gửi riêng giấy XN'}
+                  </button>
+                )}
                 <button 
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
-                  className="px-8 py-3.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl font-bold text-sm shadow-md transition-all cursor-pointer disabled:opacity-50"
+                  onClick={handleSubmit}
+                  disabled={!canSubmitNow || uploading || uploadingConfirmation}
+                  className={`px-4 py-1.5 rounded-lg font-bold text-xs shadow-sm transition-all flex items-center gap-1.5 ${
+                    canSubmitNow && !uploading && !uploadingConfirmation
+                      ? 'bg-[#407F3E] hover:bg-[#407F3E]/90 text-white cursor-pointer shadow-xs'
+                      : 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300'
+                  }`}
                 >
-                  {uploading ? 'Đang tải lên...' : 'Chọn file từ máy tính'}
+                  <Send className="w-3.5 h-3.5" />
+                  {uploading || uploadingConfirmation ? 'Đang xử lý...' : 'Xác nhận & Nộp bài'}
                 </button>
               </div>
+            )}
+          </div>
+        </div>
+
+        {/* Hidden File Inputs */}
+        <input 
+          type="file" 
+          ref={fileInputRef} 
+          className="hidden" 
+          accept=".pdf,.doc,.docx"
+          onChange={handleFileChange} 
+        />
+        <input 
+          type="file" 
+          ref={confirmationFileInputRef} 
+          className="hidden" 
+          accept=".pdf,.png,.jpg,.jpeg"
+          onChange={handleConfirmationFileChange} 
+        />
+
+        {/* Main Body */}
+        <div className="flex-1 flex flex-col overflow-hidden bg-slate-50 relative">
+          {isSubmitted ? (
+            /* VIEW MODE: Bản xem trước file đã nộp */
+            <div className="flex-1 flex flex-col h-full w-full bg-[#E7E0C4]/20 p-4">
+              <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+                {activePreviewTab === 'report' ? (
+                  uploadedFile?.previewUrl ? (
+                    <iframe 
+                      src={uploadedFile.previewUrl} 
+                      className="w-full h-full border-0" 
+                      title="Bản xem trước Bài thu hoạch" 
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 text-sm gap-2">
+                      <FileText className="w-10 h-10 text-slate-300" />
+                      <span>Không thể hiển thị bản xem trước bài thu hoạch</span>
+                    </div>
+                  )
+                ) : (
+                  uploadedConfirmationFile?.previewUrl ? (
+                    uploadedConfirmationFile.isImage ? (
+                      <div className="w-full h-full flex flex-col items-center justify-center p-6 bg-slate-900/5 overflow-auto">
+                        <div className="relative group max-w-2xl max-h-full">
+                          <img 
+                            src={uploadedConfirmationFile.previewUrl} 
+                            alt="Giấy xác nhận tham quan doanh nghiệp" 
+                            className="max-h-[75vh] w-auto object-contain rounded-xl shadow-lg border border-slate-200 bg-white"
+                          />
+                          <a
+                            href={uploadedConfirmationFile.previewUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="absolute top-3 right-3 px-3 py-1.5 bg-black/70 hover:bg-black text-white text-xs font-bold rounded-lg backdrop-blur-sm transition-all flex items-center gap-1.5 opacity-90 hover:opacity-100"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" /> Xem kích thước gốc
+                          </a>
+                        </div>
+                      </div>
+                    ) : (
+                      <iframe 
+                        src={uploadedConfirmationFile.previewUrl} 
+                        className="w-full h-full border-0" 
+                        title="Bản xem trước Giấy xác nhận doanh nghiệp" 
+                      />
+                    )
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 text-sm gap-2">
+                      <Building2 className="w-10 h-10 text-slate-300" />
+                      <span>Không tìm thấy giấy xác nhận doanh nghiệp đính kèm</span>
+                    </div>
+                  )
+                )}
+              </div>
+            </div>
+          ) : isTuDo ? (
+            /* SUBMIT MODE: Chuyến tự do (2 khối tải file song song) */
+            <div className="flex-1 flex flex-col overflow-y-auto p-4 md:p-6 space-y-6">
+              
+              {/* Informational Banner */}
+              <div className="max-w-5xl mx-auto w-full p-4 rounded-2xl bg-indigo-50/70 border border-indigo-200/80 flex items-start gap-3">
+                <Building2 className="w-5 h-5 text-indigo-700 shrink-0 mt-0.5" />
+                <div className="text-xs text-indigo-900 leading-relaxed">
+                  <span className="font-extrabold uppercase tracking-wide">Quy định chuyến tham quan tự do:</span> Bạn cần tải lên đầy đủ <strong>(1) Bài thu hoạch kiến tập</strong> và <strong>(2) Giấy xác nhận tham quan có chữ ký & con dấu mộc đỏ của doanh nghiệp</strong> để hệ thống ghi nhận có mặt và gửi bài cho giảng viên hướng dẫn.
+                </div>
+              </div>
+
+              {/* 2-Card Upload Section */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 max-w-5xl mx-auto w-full">
+                
+                {/* Card 1: Bài thu hoạch cá nhân */}
+                <div className={`p-6 rounded-2xl border transition-all flex flex-col justify-between ${
+                  uploadedFile 
+                    ? 'bg-emerald-50/50 border-emerald-300 ring-1 ring-emerald-200' 
+                    : 'bg-white border-slate-200 shadow-sm hover:border-[#407F3E]/40'
+                }`}>
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-100 text-[#407F3E] flex items-center justify-center font-bold">
+                          <FileText className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-black text-slate-800">1. Bài thu hoạch kiến tập</h4>
+                          <span className="text-[11px] font-semibold text-slate-500">Báo cáo nội dung tham quan</span>
+                        </div>
+                      </div>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        Bắt buộc
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-slate-500 leading-relaxed mb-4">
+                      Định dạng hỗ trợ: <strong>.pdf, .docx, .doc</strong> (Dung lượng tối đa 15MB).
+                    </p>
+
+                    {uploadedFile ? (
+                      <div className="p-3 bg-white rounded-xl border border-emerald-200 flex items-center justify-between gap-3 mb-4 shadow-2xs">
+                        <div className="min-w-0 flex-1 flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-[#407F3E] shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-slate-800 truncate">{uploadedFile.name}</p>
+                            <p className="text-[10px] text-slate-400">{uploadedFile.size}</p>
+                          </div>
+                        </div>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-[#407F3E] text-white shrink-0">
+                          Đã tải lên
+                        </span>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-2">
+                    {uploadedFile ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setActivePreviewTab('report')}
+                          className="flex-1 py-2 px-3 rounded-xl border border-[#407F3E] text-[#407F3E] hover:bg-[#407F3E]/5 text-xs font-bold transition-all cursor-pointer text-center"
+                        >
+                          Xem trước file
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={uploading}
+                          className="py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer"
+                        >
+                          Đổi file khác
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploading}
+                        className="w-full py-2.5 px-4 rounded-xl bg-[#407F3E] hover:bg-[#407F3E]/90 text-white text-xs font-bold transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <UploadCloud className="w-4 h-4" />
+                        {uploading ? 'Đang tải lên...' : 'Chọn file Bài thu hoạch'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Card 2: Giấy xác nhận tham quan doanh nghiệp */}
+                <div className={`p-6 rounded-2xl border transition-all flex flex-col justify-between ${
+                  uploadedConfirmationFile 
+                    ? 'bg-indigo-50/50 border-indigo-300 ring-1 ring-indigo-200' 
+                    : 'bg-white border-slate-200 shadow-sm hover:border-indigo-400/40'
+                }`}>
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
+                          <Building2 className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-black text-slate-800">2. Giấy xác nhận doanh nghiệp</h4>
+                          <span className="text-[11px] font-semibold text-slate-500">Minh chứng có mộc đỏ DN</span>
+                        </div>
+                      </div>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-red-100 text-red-700 border border-red-200">
+                        Cần mộc đỏ
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-slate-500 leading-relaxed mb-4">
+                      File scan PDF hoặc hình ảnh (<strong>.pdf, .jpg, .png</strong>) có chữ ký & con dấu tròn doanh nghiệp (tối đa 5MB).
+                    </p>
+
+                    {uploadedConfirmationFile ? (
+                      <div className="p-3 bg-white rounded-xl border border-indigo-200 flex items-center justify-between gap-3 mb-4 shadow-2xs">
+                        <div className="min-w-0 flex-1 flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-indigo-600 shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-slate-800 truncate">{uploadedConfirmationFile.name}</p>
+                            <p className="text-[10px] text-slate-400">{uploadedConfirmationFile.size}</p>
+                          </div>
+                        </div>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-indigo-600 text-white shrink-0">
+                          Đã tải lên
+                        </span>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-2">
+                    {uploadedConfirmationFile ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setActivePreviewTab('confirmation')}
+                          className="flex-1 py-2 px-3 rounded-xl border border-indigo-600 text-indigo-700 hover:bg-indigo-50 text-xs font-bold transition-all cursor-pointer text-center"
+                        >
+                          Xem trước giấy XN
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => confirmationFileInputRef.current?.click()}
+                          disabled={uploadingConfirmation}
+                          className="py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer"
+                        >
+                          Đổi file khác
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => confirmationFileInputRef.current?.click()}
+                        disabled={uploadingConfirmation}
+                        className="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <UploadCloud className="w-4 h-4" />
+                        {uploadingConfirmation ? 'Đang tải lên...' : 'Chọn Giấy xác nhận doanh nghiệp'}
+                      </button>
+                    )}
+                  </div>
+
+                  {uploadedConfirmationFile && !uploadedFile && (
+                    <button
+                      type="button"
+                      onClick={handleSaveConfirmationOnly}
+                      disabled={uploadingConfirmation}
+                      className="w-full mt-3 py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      {uploadingConfirmation ? 'Đang gửi...' : 'Gửi riêng giấy XN trước để GV duyệt điểm danh'}
+                    </button>
+                  )}
+                </div>
+
+              </div>
+
+              {/* Preview Container below cards */}
+              {(uploadedFile || uploadedConfirmationFile) && (
+                <div className="max-w-5xl mx-auto w-full flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[460px]">
+                  <div className="px-4 py-2.5 bg-slate-100/70 border-b border-slate-200 flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                      {activePreviewTab === 'report' ? (
+                        <>
+                          <FileText className="w-4 h-4 text-[#407F3E]" /> Bản xem trước Bài thu hoạch
+                        </>
+                      ) : (
+                        <>
+                          <Award className="w-4 h-4 text-indigo-600" /> Bản xem trước Giấy xác nhận doanh nghiệp
+                        </>
+                      )}
+                    </span>
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      {activePreviewTab === 'report' ? uploadedFile?.name : uploadedConfirmationFile?.name}
+                    </span>
+                  </div>
+
+                  <div className="flex-1 p-4 bg-slate-50 flex items-center justify-center">
+                    {activePreviewTab === 'report' ? (
+                      uploadedFile?.previewUrl ? (
+                        <iframe 
+                          src={uploadedFile.previewUrl} 
+                          className="w-full h-full min-h-[400px] border border-slate-200 rounded-xl bg-white shadow-2xs" 
+                          title="Bản xem trước Bài thu hoạch" 
+                        />
+                      ) : (
+                        <div className="text-center text-slate-400 py-12">
+                          <FileText className="w-10 h-10 mx-auto text-slate-300 mb-2" />
+                          <p className="text-xs">Chưa chọn file bài thu hoạch để xem trước</p>
+                        </div>
+                      )
+                    ) : (
+                      uploadedConfirmationFile?.previewUrl ? (
+                        uploadedConfirmationFile.isImage ? (
+                          <div className="flex flex-col items-center justify-center p-4">
+                            <img 
+                              src={uploadedConfirmationFile.previewUrl} 
+                              alt="Bản xem trước Giấy xác nhận" 
+                              className="max-h-[380px] w-auto object-contain rounded-xl shadow-md border border-slate-200 bg-white"
+                            />
+                          </div>
+                        ) : (
+                          <iframe 
+                            src={uploadedConfirmationFile.previewUrl} 
+                            className="w-full h-full min-h-[400px] border border-slate-200 rounded-xl bg-white shadow-2xs" 
+                            title="Bản xem trước Giấy xác nhận" 
+                          />
+                        )
+                      ) : (
+                        <div className="text-center text-slate-400 py-12">
+                          <Building2 className="w-10 h-10 mx-auto text-slate-300 mb-2" />
+                          <p className="text-xs">Chưa chọn giấy xác nhận doanh nghiệp để xem trước</p>
+                        </div>
+                      )
+                    )}
+                  </div>
+                </div>
+              )}
+
             </div>
           ) : (
-            // PDF Preview State
-            <div className="flex-1 flex flex-col h-full w-full bg-[#E7E0C4]/20">
-              {uploadedFile.previewUrl ? (
-                <iframe 
-                  src={uploadedFile.previewUrl} 
-                  className="w-full h-full border-0" 
-                  title="PDF Preview" 
-                />
+            /* SUBMIT MODE: Chuyến do Khoa tổ chức (1 file bài thu hoạch) */
+            <div className="flex-1 flex flex-col relative overflow-hidden bg-white">
+              {!uploadedFile ? (
+                <div className="flex-1 flex flex-col items-center justify-center p-8 bg-[#E7E0C4]/20">
+                  <div className="bg-white p-8 md:p-12 rounded-3xl shadow-sm border border-slate-200 w-full max-w-lg text-center flex flex-col items-center">
+                    <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mb-6">
+                      <UploadCloud className="w-10 h-10 text-[#407F3E]" />
+                    </div>
+                    <h3 className="text-xl font-black text-slate-800 mb-2">Tải lên File PDF</h3>
+                    <p className="text-sm font-medium text-slate-500 mb-8 max-w-xs leading-relaxed">
+                      Kéo thả file báo cáo thu hoạch của bạn vào đây, hoặc nhấn nút bên dưới để chọn file (Tối đa 15MB).
+                    </p>
+                    <button 
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading}
+                      className="px-8 py-3.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl font-bold text-sm shadow-md transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      {uploading ? 'Đang tải lên...' : 'Chọn file từ máy tính'}
+                    </button>
+                  </div>
+                </div>
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-slate-400 text-sm">
-                  Không thể hiển thị bản xem trước
+                <div className="flex-1 flex flex-col h-full w-full bg-[#E7E0C4]/20 p-4">
+                  <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+                    {uploadedFile.previewUrl ? (
+                      <iframe 
+                        src={uploadedFile.previewUrl} 
+                        className="w-full h-full border-0" 
+                        title="Bản xem trước Bài thu hoạch" 
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-slate-400 text-sm">
+                        Không thể hiển thị bản xem trước
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
           )}
         </div>
       </div>
-    </div>
-  );
+    );
+  };
   return (
     <div className={selectedTrip ? '' : 'bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300'}>
       {/* Custom Popup Toast */}
@@ -479,7 +1382,10 @@ export default function NopBaiThuHoach_SV() {
                     await sinhVienApi.deleteReport(confirmDelete.tripId);
                     showPopup('Đã xóa bài thu hoạch thành công', 'success');
                     setConfirmDelete({ show: false, tripId: null });
-                    if (student) fetchTrips(student.id);
+                    if (student) {
+                      fetchTrips(student.id);
+                      fetchRepStatus();
+                    }
                   } catch (err) {
                     console.error(err);
                     showPopup(err.response?.data?.message || 'Có lỗi xảy ra khi xóa bài thu hoạch', 'error');

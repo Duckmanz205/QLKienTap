@@ -23,6 +23,9 @@ import {
   DanhSachDen,
   LichKienTap,
   TaiKhoanThuHuong,
+  HoiDongChamBaoCao,
+  HoiDong_ThanhVien,
+  DotKienTap,
 } from '../entities/qlkt.entity';
 
 @Module({
@@ -46,6 +49,9 @@ import {
       DanhSachDen,
       LichKienTap,
       TaiKhoanThuHuong,
+      HoiDongChamBaoCao,
+      HoiDong_ThanhVien,
+      DotKienTap,
     ]),
     AuthModule,
     UploadModule,

@@ -3,6 +3,14 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import * as express from 'express';
 
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+});
+
 async function bootstrap() {
   const isProduction = process.env.NODE_ENV === 'production';
   const rawCorsOrigin = process.env.CORS_ORIGIN?.trim();

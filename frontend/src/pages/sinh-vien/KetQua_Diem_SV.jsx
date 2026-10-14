@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  GraduationCap, BookOpen, AlertCircle, CheckCircle2, XCircle
+  GraduationCap, BookOpen, AlertCircle, CheckCircle2, XCircle, Clock
 } from 'lucide-react';
 import { sinhVienApi } from '../../services/api';
 
@@ -33,8 +33,11 @@ export default function KetQua_Diem_SV() {
     }
   };
 
-    const calculateTripScore = (trip) => {
+  const calculateTripScore = (trip) => {
     if (!trip) return '-';
+    if (trip.diem_tong_chuyen !== null && trip.diem_tong_chuyen !== undefined) {
+      return Number(trip.diem_tong_chuyen).toFixed(1);
+    }
     if (trip.diem_chuan_bi === null || trip.diem_bai_thu_hoach === null || trip.diem_bao_cao_tqnm === null) {
       return '-';
     }
@@ -57,7 +60,43 @@ export default function KetQua_Diem_SV() {
   }
   
   const isScoreLocked = termGrade?.diem_tong_ket !== null && termGrade?.diem_tong_ket !== undefined;
-  const isPassed = finalScore >= 5.0;
+  const isPassed = finalScore !== '-' && Number(finalScore) >= 5.0;
+
+  const getTripResult = (trip) => {
+    if (!trip) return 'ChoDiem';
+    
+    // 1. Nếu sinh viên có kết quả học phần Đạt: TẤT CẢ các chuyến đều hiển thị Đạt
+    const isOverallPassed = 
+      termGrade?.trang_thai === 'Dat' || 
+      termGrade?.ket_qua === 'Dat' || 
+      (isScoreLocked && isPassed) || 
+      (finalScore !== '-' && isPassed);
+
+    if (isOverallPassed) {
+      return 'Dat';
+    }
+
+    // 2. Nếu sinh viên có kết quả học phần Không đạt: TẤT CẢ các chuyến đều hiển thị Không đạt
+    const isOverallFailed = 
+      termGrade?.trang_thai === 'KhongDat' || 
+      termGrade?.ket_qua === 'KhongDat' || 
+      (isScoreLocked && !isPassed) || 
+      (finalScore !== '-' && !isPassed);
+
+    if (isOverallFailed) {
+      return 'KhongDat';
+    }
+
+    // 3. Nếu chưa có kết quả chung của đợt: Hiển thị theo tiến độ chấm từng chuyến
+    if (trip.ket_qua === 'Dat' || trip.ket_qua === 'KhongDat') {
+      return trip.ket_qua;
+    }
+    const tripScore = calculateTripScore(trip);
+    if (tripScore !== '-') {
+      return Number(tripScore) >= 5.0 ? 'Dat' : 'KhongDat';
+    }
+    return 'ChoDiem';
+  };
 
   if (!student) {
     return (
@@ -137,41 +176,83 @@ export default function KetQua_Diem_SV() {
         </div>
         
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[800px]">
+          <table className="w-full text-left border-collapse min-w-[850px]">
             <thead>
               <tr className="bg-[#E7E0C4] text-slate-800 text-xs font-bold uppercase tracking-wider">
-                <th className="p-4 pl-6 w-[25%]">Nhà máy</th>
+                <th className="p-4 pl-6 w-[22%]">Nhà máy</th>
                 <th className="p-4 text-center">Điểm chuẩn bị<br/><span className="text-[10px] font-medium text-slate-600 normal-case">(30%)</span></th>
                 <th className="p-4 text-center">Điểm bài thu hoạch<br/><span className="text-[10px] font-medium text-slate-600 normal-case">(30%)</span></th>
                 <th className="p-4 text-center">Điểm báo cáo TQNM<br/><span className="text-[10px] font-medium text-slate-600 normal-case">(40%)</span></th>
                 <th className="p-4 text-center">Điểm cộng</th>
-                <th className="p-4 text-center pr-6 bg-[#E7E0C4]/70">Điểm chuyến</th>
+                <th className="p-4 text-center bg-[#E7E0C4]/70">Điểm chuyến</th>
+                <th className="p-4 text-center pr-6">Kết quả</th>
               </tr>
             </thead>
             <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
               {grades.map((trip) => {
                 const tripScore = calculateTripScore(trip);
+                const result = getTripResult(trip);
                 return (
                   <tr key={trip.id} className="hover:bg-slate-50 transition-colors group">
                     <td className="p-4 pl-6 font-bold text-slate-800">
                       {trip.ten_nha_may || 'Chưa xác định'}
                     </td>
                     <td className="p-4 text-center font-medium">
-                      {trip.diem_chuan_bi !== null && trip.diem_chuan_bi !== undefined ? Number(trip.diem_chuan_bi).toFixed(1) : '-'}
+                      {trip.diem_chuan_bi !== null && trip.diem_chuan_bi !== undefined ? (
+                        <span className="font-semibold text-slate-800">{Number(trip.diem_chuan_bi).toFixed(1)}</span>
+                      ) : (
+                        <span className="text-slate-400 font-normal text-xs" title="Chờ giảng viên dẫn đoàn chốt điểm">-</span>
+                      )}
                     </td>
                     <td className="p-4 text-center font-medium">
-                      {trip.diem_bai_thu_hoach !== null && trip.diem_bai_thu_hoach !== undefined ? Number(trip.diem_bai_thu_hoach).toFixed(1) : '-'}
+                      {trip.diem_bai_thu_hoach !== null && trip.diem_bai_thu_hoach !== undefined ? (
+                        <span className="font-semibold text-slate-800">{Number(trip.diem_bai_thu_hoach).toFixed(1)}</span>
+                      ) : (
+                        <span className="text-slate-400 font-normal text-xs" title="Chờ giảng viên hướng dẫn chốt điểm">-</span>
+                      )}
                     </td>
                     <td className="p-4 text-center font-medium">
-                      {trip.diem_bao_cao_tqnm !== null && trip.diem_bao_cao_tqnm !== undefined ? Number(trip.diem_bao_cao_tqnm).toFixed(1) : '-'}
+                      {trip.diem_bao_cao_tqnm !== null && trip.diem_bao_cao_tqnm !== undefined ? (
+                        <span className="font-semibold text-slate-800">{Number(trip.diem_bao_cao_tqnm).toFixed(1)}</span>
+                      ) : (
+                        <span className="text-slate-400 font-normal text-xs" title="Chờ hội đồng chấm báo cáo">-</span>
+                      )}
                     </td>
-                    <td className="p-4 text-center font-medium text-[#89B449]">
-                      {trip.diem_cong > 0 ? `+${Number(trip.diem_cong).toFixed(1)}` : (trip.diem_cong === 0 ? '0' : '-')}
+                    <td className="p-4 text-center font-medium">
+                      {trip.diem_cong !== null && trip.diem_cong !== undefined ? (
+                        Number(trip.diem_cong) > 0 ? (
+                          <span className="text-[#407F3E] font-bold">+{Number(trip.diem_cong).toFixed(1)}</span>
+                        ) : (
+                          <span className="text-slate-600 font-medium">0</span>
+                        )
+                      ) : (
+                        <span className="text-slate-400 font-normal text-xs">-</span>
+                      )}
                     </td>
-                    <td className="p-4 text-center pr-6 bg-slate-50 group-hover:bg-slate-100 transition-colors">
+                    <td className="p-4 text-center bg-slate-50 group-hover:bg-slate-100 transition-colors">
                       <span className="text-xl font-black text-[#407F3E]">
                         {tripScore}
                       </span>
+                    </td>
+                    <td className="p-4 text-center pr-6">
+                      {result === 'Dat' && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#89B449]/15 text-[#407F3E] border border-[#89B449]/30 shadow-sm">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          Đạt
+                        </span>
+                      )}
+                      {result === 'KhongDat' && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-700 border border-rose-200 shadow-sm">
+                          <XCircle className="w-3.5 h-3.5" />
+                          Không đạt
+                        </span>
+                      )}
+                      {result === 'ChoDiem' && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200/60">
+                          <Clock className="w-3.5 h-3.5" />
+                          Chờ chốt điểm
+                        </span>
+                      )}
                     </td>
                   </tr>
                 );

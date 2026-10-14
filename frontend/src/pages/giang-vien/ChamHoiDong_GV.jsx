@@ -101,7 +101,6 @@ export default function ChamHoiDong_GV() {
           id: sv.id,
           mssv: sv.mssv,
           name: sv.ho_ten,
-          avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(sv.ho_ten || 'SV')}&background=f1f5f9&color=475569`,
           reports: []
         });
       }
@@ -186,6 +185,15 @@ export default function ChamHoiDong_GV() {
   };
 
   const activeStudent = students.find(s => s.id === selectedStudentId);
+
+  const validScores = studentReports
+    .map(r => scores[r.id])
+    .filter(val => val !== '' && val !== null && val !== undefined && !isNaN(val))
+    .map(val => parseFloat(val));
+
+  const averageScore = validScores.length > 0
+    ? (validScores.reduce((sum, s) => sum + s, 0) / validScores.length).toFixed(1)
+    : '--';
 
   return (
     <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300">
@@ -291,11 +299,10 @@ export default function ChamHoiDong_GV() {
                 <div 
                   key={std.id}
                   onClick={() => handleSelectStudent(std)}
-                  className={`p-4 border-b border-[#E7E0C4]/50 flex items-center gap-3 cursor-pointer transition-colors ${
+                  className={`p-4 border-b border-[#E7E0C4]/50 flex items-center justify-between gap-3 cursor-pointer transition-colors ${
                     selectedStudentId === std.id ? 'bg-[#407F3E]/5 border-l-4 border-l-[#407F3E]' : 'hover:bg-slate-50 border-l-4 border-l-transparent'
                   }`}
                 >
-                  <img src={std.avatar} alt="avt" className="w-10 h-10 rounded-full border border-slate-200" />
                   <div className="flex-1 min-w-0">
                     <p className={`text-sm font-bold truncate ${selectedStudentId === std.id ? 'text-[#407F3E]' : 'text-slate-800'}`}>{std.name}</p>
                     <p className="text-[11px] font-medium text-slate-500">{std.mssv}</p>
@@ -326,9 +333,9 @@ export default function ChamHoiDong_GV() {
                   Đang chấm: <span className="font-bold text-[#407F3E]">{activeStudent?.name || '---'}</span>
                 </p>
               </div>
-              <div className="px-4 py-2 bg-[#E7E0C4]/40 border border-[#E7E0C4] rounded-lg">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">Điểm hội đồng (Trung bình)</span>
-                <span className="text-2xl font-black text-[#407F3E] leading-none">--</span>
+              <div className="px-4 py-2 bg-[#E7E0C4]/40 border border-[#E7E0C4] rounded-lg text-right">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">Điểm TB các chuyến (Bạn chấm)</span>
+                <span className="text-2xl font-black text-[#407F3E] leading-none">{averageScore}</span>
                 <span className="text-sm font-bold text-slate-400"> /10</span>
               </div>
             </div>
@@ -353,12 +360,10 @@ export default function ChamHoiDong_GV() {
                       <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Tiến độ hội đồng</p>
                       <div className="flex flex-wrap gap-2">
                         {rep.committee.map(member => {
-                          const avatarUrl = member.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name || 'GV')}&background=E7E0C4&color=407F3E`;
                           const isGraded = member.id === rep.memberId ? scores[rep.id] !== '' : member.status === 'Đã chấm';
                           
                           return (
                             <div key={member.id} className="flex items-center gap-1.5 bg-white border border-[#E7E0C4] px-2 py-1 rounded-md shadow-sm" title={member.score !== null ? `Đã chấm: ${member.score}` : 'Chưa chấm'}>
-                              <img src={avatarUrl} alt="avt" className="w-5 h-5 rounded-full" />
                               <span className="text-[10px] font-bold text-slate-600">{member.name}</span>
                               <div className={`w-1.5 h-1.5 rounded-full ${isGraded ? 'bg-[#89B449]' : 'bg-slate-300'}`}></div>
                             </div>

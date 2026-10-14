@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Plus, ChevronDown, Check, X, Calendar, Clock, MapPin,
   ChevronRight, Users, CheckCircle2, XCircle, RefreshCw, Search,
-  MoreVertical, Edit, PlayCircle, Trash2, CheckCircle, RotateCcw, Download, ArrowRight
+  MoreVertical, Edit, PlayCircle, Trash2, CheckCircle, RotateCcw, Download, ArrowRight,
+  UserCheck, Building2, Phone, Mail
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { khoaApi } from '../../services/api';
@@ -105,6 +106,22 @@ export default function ChuyenThamQuan_DSLoc() {
   const [lecturers, setLecturers] = useState([]);
   const [selectedLecturerId, setSelectedLecturerId] = useState('');
   const [pendingApprovalTripId, setPendingApprovalTripId] = useState(null);
+  const [pendingApprovalTrip, setPendingApprovalTrip] = useState(null);
+  const [lecturerSearchTerm, setLecturerSearchTerm] = useState('');
+  const selectedLecturer = lecturers.find(g => String(g.id) === String(selectedLecturerId));
+
+  const filteredModalLecturers = useMemo(() => {
+    if (!lecturerSearchTerm.trim()) return lecturers;
+    const q = lecturerSearchTerm.toLowerCase();
+    return lecturers.filter(gv => 
+      gv.ho_ten?.toLowerCase().includes(q) ||
+      gv.ma_gv?.toLowerCase().includes(q) ||
+      gv.magv?.toLowerCase().includes(q) ||
+      gv.ma_giang_vien?.toLowerCase().includes(q) ||
+      gv.bo_mon?.toLowerCase().includes(q) ||
+      gv.email?.toLowerCase().includes(q)
+    );
+  }, [lecturers, lecturerSearchTerm]);
 
 
   useEffect(() => {
@@ -322,15 +339,22 @@ export default function ChuyenThamQuan_DSLoc() {
     showConfirm(`Xác nhận ${actionText}`, `Bạn có chắc chắn muốn ${actionText} yêu cầu sửa đổi thông tin cho chuyến tham quan này?`, action);
   };
 
-  const handleApproveTrip = (tripId, isApproved) => {
+  const handleApproveTrip = (tripOrId, isApproved) => {
     if (!currentUser) {
       showPopup('Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.', 'error');
       return;
     }
 
+    const tripObj = typeof tripOrId === 'object' && tripOrId !== null
+      ? tripOrId
+      : tripsTuDo.find(t => t.id === tripOrId) || null;
+    const tripId = tripObj?.id || tripOrId;
+
     if (isApproved) {
+      setPendingApprovalTrip(tripObj);
       setPendingApprovalTripId(tripId);
       setSelectedLecturerId('');
+      setLecturerSearchTerm('');
       setIsLecturerModalOpen(true);
       return;
     }
@@ -356,18 +380,22 @@ export default function ChuyenThamQuan_DSLoc() {
     }
     
     try {
-      await khoaApi.approveTrip({ 
+      const res = await khoaApi.approveTrip({ 
         tripId: pendingApprovalTripId, 
         approverId: currentUser.id, 
         isApproved: true,
         giangVienId: parseInt(selectedLecturerId)
       });
-      showPopup('Duyệt chuyến tham quan và phân công giảng viên thành công', 'success');
+      showPopup(res.data?.message || 'Duyệt chuyến tham quan và phân công giảng viên thành công', 'success');
       setIsLecturerModalOpen(false);
       fetchTrips();
     } catch (err) {
       console.error(err);
-      showPopup(err.response?.data?.message || 'Có lỗi xảy ra khi xử lý yêu cầu', 'error');
+      let errMsg = err.response?.data?.message;
+      if (typeof errMsg === 'string' && (errMsg.includes('selection conditions') || errMsg.includes('single row'))) {
+        errMsg = 'Không thể xác định đợt kiến tập để tiếp nhận chuyến đi tự do. Vui lòng kiểm tra lại đợt kiến tập.';
+      }
+      showPopup(errMsg || 'Có lỗi xảy ra khi xử lý yêu cầu', 'error');
     }
   };
 
@@ -983,11 +1011,11 @@ export default function ChuyenThamQuan_DSLoc() {
                               </button>
                               {t.trang_thai_duyet === 'ChoDuyet' && (
                                 <>
-                                  <button onClick={() => handleApproveTrip(t.id, true)} className="px-3 py-1.5 bg-[#89B449] hover:bg-[#89B449]/90 text-white rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center gap-1 cursor-pointer">
+                                  <button onClick={() => handleApproveTrip(t, true)} className="px-3 py-1.5 bg-[#89B449] hover:bg-[#89B449]/90 text-white rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center gap-1 cursor-pointer">
                                     <CheckCircle2 className="w-4 h-4" />
                                     Duyệt
                                   </button>
-                                  <button onClick={() => handleApproveTrip(t.id, false)} className="px-3 py-1.5 border border-[#E68A8C] text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer">
+                                  <button onClick={() => handleApproveTrip(t, false)} className="px-3 py-1.5 border border-[#E68A8C] text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer">
                                     <XCircle className="w-4 h-4" />
                                     Từ chối
                                   </button>
@@ -1721,57 +1749,175 @@ export default function ChuyenThamQuan_DSLoc() {
         </div>
       )}
 
-      {/* Lecturer Selection Modal */}
+      {/* Lecturer Selection Modal - Clean 2-Column Layout */}
       {isLecturerModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl flex flex-col max-h-[90vh]">
-            <div className="p-6 border-b border-gray-100 flex items-center justify-between shrink-0">
-              <h2 className="text-xl font-bold text-gray-800">
-                Phân công Giảng viên dẫn đoàn
-              </h2>
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl w-full max-w-3xl shadow-xl flex flex-col border border-slate-200 overflow-hidden">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-slate-50/50">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-[#89B449]/15 border border-[#89B449]/30 flex items-center justify-center text-[#407F3E]">
+                  <UserCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-slate-800">
+                    Phê duyệt đề xuất & Phân công Giảng viên
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Chuyến tham quan tự do do sinh viên đề xuất
+                  </p>
+                </div>
+              </div>
               <button
                 onClick={() => setIsLecturerModalOpen(false)}
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
+                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
             
-            <div className="p-6 overflow-y-auto">
-              <p className="text-sm text-gray-600 mb-4">
-                Vui lòng chọn giảng viên dẫn đoàn cho chuyến tham quan tự do này trước khi duyệt.
-              </p>
-              
-              <div className="space-y-4">
+            {/* Modal Body - 2 Columns */}
+            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
+              {/* Cột trái: Tóm tắt thông tin đề xuất */}
+              <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 text-xs flex flex-col justify-between">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <div className="pb-3 border-b border-slate-200">
+                    <span className="text-slate-500 block text-[11px] mb-0.5">Sinh viên đề xuất</span>
+                    <div className="font-bold text-slate-800 text-sm">
+                      {pendingApprovalTrip?.sinhVien?.ho_ten || 'Sinh viên'}
+                    </div>
+                    <div className="text-xs text-slate-500 font-mono mt-0.5">
+                      {pendingApprovalTrip?.sinhVien?.mssv || '--'} • {pendingApprovalTrip?.sinhVien?.ten_lop || pendingApprovalTrip?.sinhVien?.lop || '--'}
+                    </div>
+                  </div>
+
+                  <div className="py-3 space-y-2.5 text-slate-700">
+                    <div>
+                      <span className="text-slate-400 block text-[11px]">Doanh nghiệp / Nhà máy:</span>
+                      <span className="font-bold text-slate-800 text-xs">
+                        {pendingApprovalTrip?.ten_nha_may_de_xuat || pendingApprovalTrip?.nhaMay?.ten_nha_may || 'Chưa cập nhật'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <span className="text-slate-400 block text-[11px]">Hình thức:</span>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold mt-0.5 ${
+                          pendingApprovalTrip?.hinh_thuc === 'TrucTiep' 
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : 'bg-blue-50 text-blue-700 border border-blue-200'
+                        }`}>
+                          {pendingApprovalTrip?.hinh_thuc === 'TrucTiep' ? 'Trực tiếp (Offline)' : 'Trực tuyến (Online)'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[11px]">Thời gian:</span>
+                        <span className="font-semibold text-slate-800 mt-0.5 block">
+                          {pendingApprovalTrip?.ngay_tham_quan_de_xuat ? new Date(pendingApprovalTrip.ngay_tham_quan_de_xuat).toLocaleDateString('vi-VN') : '--'}
+                          {pendingApprovalTrip?.gio_bat_dau_de_xuat && ` (${String(pendingApprovalTrip.gio_bat_dau_de_xuat).substring(0, 5)})`}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-slate-400 block text-[11px]">Người liên hệ DN:</span>
+                      <span className="font-medium text-slate-700">
+                        {pendingApprovalTrip?.nguoi_lien_he_de_xuat || '--'}
+                        {pendingApprovalTrip?.sdt_lien_he_de_xuat && ` - ${pendingApprovalTrip.sdt_lien_he_de_xuat}`}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {pendingApprovalTrip?.dia_chi_de_xuat && (
+                  <div className="pt-2 border-t border-slate-200 text-[11px] text-slate-500">
+                    <span className="text-slate-400 block mb-0.5">Địa chỉ:</span>
+                    <span className="line-clamp-2">{pendingApprovalTrip.dia_chi_de_xuat}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Cột phải: Chọn Giảng viên dẫn đoàn */}
+              <div className="flex flex-col">
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                     Giảng viên dẫn đoàn <span className="text-red-500">*</span>
                   </label>
-                  <SearchableDropdown
-                    options={lecturers.map(gv => ({
-                      value: gv.id,
-                      label: `${gv.ten_giang_vien} - ${gv.bo_mon}`
-                    }))}
-                    value={selectedLecturerId}
-                    onChange={(val) => setSelectedLecturerId(val)}
-                    placeholder="-- Chọn giảng viên --"
-                    searchPlaceholder="Tìm kiếm..."
-                    className="w-full"
+                  <span className="text-[11px] text-slate-400">
+                    {filteredModalLecturers.length} giảng viên
+                  </span>
+                </div>
+
+                {/* Input tìm kiếm nhanh */}
+                <div className="relative mb-2">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Tìm theo tên hoặc mã giảng viên..."
+                    value={lecturerSearchTerm}
+                    onChange={(e) => setLecturerSearchTerm(e.target.value)}
+                    className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-[#407F3E] focus:bg-white text-slate-800 transition-colors"
                   />
+                </div>
+
+                {/* Danh sách giảng viên trực quan cuộn bên trong */}
+                <div className="h-[210px] overflow-y-auto space-y-1.5 border border-slate-200 rounded-lg p-1.5 bg-slate-50/50">
+                  {filteredModalLecturers.length === 0 ? (
+                    <div className="h-full flex items-center justify-center text-xs text-slate-400 italic">
+                      Không tìm thấy giảng viên phù hợp
+                    </div>
+                  ) : (
+                    filteredModalLecturers.map((gv) => {
+                      const isSelected = String(selectedLecturerId) === String(gv.id);
+                      return (
+                        <div
+                          key={gv.id}
+                          onClick={() => setSelectedLecturerId(gv.id)}
+                          className={`p-2 rounded-lg cursor-pointer transition-all flex items-center justify-between text-xs ${
+                            isSelected
+                              ? 'bg-emerald-50 border border-[#89B449] text-slate-900 font-medium'
+                              : 'bg-white hover:bg-slate-100 border border-slate-200/60 text-slate-700'
+                          }`}
+                        >
+                          <div className="min-w-0 pr-2">
+                            <div className="font-bold text-slate-800 truncate">
+                              {gv.ho_ten}
+                            </div>
+                            <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
+                              <span className="font-mono">{gv.ma_gv || gv.magv || gv.ma_giang_vien || '--'}</span>
+                              {gv.bo_mon && <span>• {gv.bo_mon}</span>}
+                            </div>
+                          </div>
+
+                          <div className="shrink-0">
+                            {isSelected ? (
+                              <span className="w-4 h-4 rounded-full bg-[#89B449] text-white flex items-center justify-center">
+                                <Check className="w-3 h-3 stroke-[3]" />
+                              </span>
+                            ) : (
+                              <span className="w-4 h-4 rounded-full border border-slate-300 block" />
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </div>
             </div>
 
-            <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-3 shrink-0 rounded-b-2xl">
+            {/* Modal Footer */}
+            <div className="px-6 py-3.5 border-t border-slate-100 bg-slate-50/50 flex justify-end items-center gap-3 shrink-0">
               <button
                 onClick={() => setIsLecturerModalOpen(false)}
-                className="px-6 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-200 bg-gray-100 rounded-xl transition-colors cursor-pointer"
+                className="px-5 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 bg-slate-100 rounded-xl transition-colors cursor-pointer"
               >
                 Hủy
               </button>
               <button
                 onClick={submitApproveWithLecturer}
-                className="px-6 py-2.5 text-sm font-medium text-white bg-[#89B449] hover:bg-[#89B449]/90 rounded-xl transition-colors cursor-pointer flex items-center gap-2"
+                disabled={!selectedLecturerId}
+                className="px-6 py-2 text-sm font-bold text-white bg-[#89B449] hover:bg-[#89B449]/90 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition-colors cursor-pointer flex items-center gap-2 shadow-xs"
               >
                 <CheckCircle2 className="w-4 h-4" />
                 Xác nhận duyệt
