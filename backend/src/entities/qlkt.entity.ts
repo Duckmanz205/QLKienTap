@@ -984,6 +984,12 @@ export class DiemPhieuThamQuan {
   @Column({ type: 'datetime2', nullable: true })
   ngay_cham_chuan_bi: Date;
 
+  @Column({ default: false })
+  da_khoa_chuan_bi: boolean;
+
+  @Column({ type: 'datetime2', nullable: true })
+  ngay_khoa_chuan_bi: Date | null;
+
   // Điểm bài thu hoạch (30%) — GVHD chấm (gộp từ DiemBaiThuHoach cũ)
   @ManyToOne(() => GiangVien, { nullable: true })
   @JoinColumn({ name: 'giang_vien_hd_id' })
@@ -1006,6 +1012,12 @@ export class DiemPhieuThamQuan {
 
   @Column({ type: 'datetime2', nullable: true })
   ngay_cham_thu_hoach: Date;
+
+  @Column({ default: false })
+  da_khoa_thu_hoach: boolean;
+
+  @Column({ type: 'datetime2', nullable: true })
+  ngay_khoa_thu_hoach: Date | null;
 
   // Điểm hội đồng (40%) — tổng hợp từ DiemHoiDong_ChiTiet
   @Column({ type: 'decimal', precision: 4, scale: 2, nullable: true })

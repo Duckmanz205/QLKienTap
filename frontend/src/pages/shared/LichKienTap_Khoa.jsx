@@ -100,6 +100,22 @@ export default function LichKienTap_Khoa() {
   const [searchScheduleTerm, setSearchScheduleTerm] = useState('');
   const [isDotDropdownOpen, setIsDotDropdownOpen] = useState(false);
   const [dotSearchTermFilter, setDotSearchTermFilter] = useState('');
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+  const [statusSearchTerm, setStatusSearchTerm] = useState('');
+
+  const STATUS_FILTER_OPTIONS = [
+    { value: '', label: 'Tất cả trạng thái' },
+    { value: 'Nhap', label: 'Nháp' },
+    { value: 'ChoDuyet', label: 'Lịch gửi duyệt' },
+    { value: 'DaDuyet', label: 'Đã duyệt' },
+    { value: 'TuChoi', label: 'Từ chối' },
+    { value: 'MoDangKy', label: 'Mở đăng ký' },
+    { value: 'DangTrienKhai', label: 'Đang diễn ra' },
+    { value: 'DaKetThuc', label: 'Đã kết thúc' },
+    { value: 'DaKhoa', label: 'Đã khóa' },
+    { value: 'DaHuy', label: 'Đã hủy' },
+  ];
+
   const [isDotModalDropdownOpen, setIsDotModalDropdownOpen] = useState(false);
   const [dotSearchTermModal, setDotSearchTermModal] = useState('');
   const [unassignedTrips, setUnassignedTrips] = useState([]);
@@ -388,7 +404,7 @@ export default function LichKienTap_Khoa() {
   // Reset page when filter changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [filterDot]);
+  }, [filterDot, filterStatus]);
 
   // Trip Table Logic
   const availableTripsForModal = allTrips.filter(t => 
@@ -441,7 +457,10 @@ export default function LichKienTap_Khoa() {
   };
 
   return (
-    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300 relative">
+    <div 
+      onClick={() => { setIsDotDropdownOpen(false); setIsStatusDropdownOpen(false); }}
+      className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300 relative"
+    >
       {/* Header section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <h1 className="text-2xl font-bold text-slate-800">Lịch kiến tập</h1>
@@ -465,103 +484,135 @@ export default function LichKienTap_Khoa() {
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-[#E7E0C4] mb-6 flex flex-col gap-4 relative z-20">
-        <div className="flex flex-col md:flex-row gap-4 items-center w-full">
-          {/* Đợt Dropdown */}
-          <div className="relative w-full md:w-1/3 min-w-[250px]">
-            <div 
-              onClick={() => setIsDotDropdownOpen(!isDotDropdownOpen)}
-              className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-sm flex justify-between items-center cursor-pointer transition-all ${isDotDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-            >
-              <span className="text-slate-700 font-medium truncate pr-2">
-                {filterDot ? campaigns.find(c => c.id === filterDot)?.ten_dot : 'Tất cả đợt'}
-              </span>
-              <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-            </div>
-            {isDotDropdownOpen && (
-              <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 max-h-60 overflow-y-auto animate-in slide-in-from-top-1">
-                <div className="p-2 border-b border-slate-100 sticky top-0 bg-white z-10">
-                  <input 
-                    type="text" 
-                    placeholder="Tìm kiếm đợt..."
-                    value={dotSearchTermFilter}
-                    onChange={e => setDotSearchTermFilter(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E]"
-                  />
-                </div>
+      <div 
+        onClick={e => e.stopPropagation()}
+        className="bg-white p-4 rounded-xl shadow-sm border border-[#E7E0C4] mb-6 flex flex-col md:flex-row gap-4 items-center relative z-20"
+      >
+        {/* Đợt Dropdown */}
+        <div className="relative w-full md:w-1/4 min-w-[220px]">
+          <div 
+            onClick={() => {
+              setIsDotDropdownOpen(!isDotDropdownOpen);
+              setIsStatusDropdownOpen(false);
+            }}
+            className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-sm flex justify-between items-center cursor-pointer transition-all ${isDotDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+          >
+            <span className="text-slate-700 font-medium truncate pr-2">
+              {filterDot ? campaigns.find(c => c.id === filterDot)?.ten_dot : 'Tất cả đợt'}
+            </span>
+            <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isDotDropdownOpen ? 'rotate-180 text-[#407F3E]' : ''}`} />
+          </div>
+          {isDotDropdownOpen && (
+            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 max-h-60 overflow-y-auto animate-in slide-in-from-top-1">
+              <div className="p-2 border-b border-slate-100 sticky top-0 bg-white z-10">
+                <input 
+                  type="text" 
+                  placeholder="Tìm kiếm đợt..."
+                  value={dotSearchTermFilter}
+                  onChange={e => setDotSearchTermFilter(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E]"
+                />
+              </div>
+              <div 
+                onClick={() => { setFilterDot(''); setIsDotDropdownOpen(false); setDotSearchTermFilter(''); setCurrentPage(1); }}
+                className={`px-4 py-2.5 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                  !filterDot ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                }`}
+              >
+                <span className="truncate pr-2">Tất cả đợt</span>
+                {!filterDot && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+              </div>
+              {campaigns
+                .filter(opt => opt.ten_dot?.toLowerCase().includes(dotSearchTermFilter.toLowerCase()))
+                .map(opt => (
                 <div 
-                  onClick={() => { setFilterDot(''); setIsDotDropdownOpen(false); setDotSearchTermFilter(''); }}
+                  key={opt.id}
+                  onClick={() => { setFilterDot(opt.id); setIsDotDropdownOpen(false); setDotSearchTermFilter(''); setCurrentPage(1); }}
                   className={`px-4 py-2.5 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                    !filterDot ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                    (filterDot === opt.id) 
+                      ? 'bg-[#E7E0C4] text-slate-800 font-bold' 
+                      : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
                   }`}
                 >
-                  <span className="truncate pr-2">Tất cả đợt</span>
-                  {!filterDot && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                  <span className="truncate pr-2">{opt.ten_dot}</span>
+                  {filterDot === opt.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
                 </div>
-                {campaigns
-                  .filter(opt => opt.ten_dot?.toLowerCase().includes(dotSearchTermFilter.toLowerCase()))
-                  .map(opt => (
-                  <div 
-                    key={opt.id}
-                    onClick={() => { setFilterDot(opt.id); setIsDotDropdownOpen(false); setDotSearchTermFilter(''); }}
-                    className={`px-4 py-2.5 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                      (filterDot === opt.id) 
-                        ? 'bg-[#E7E0C4] text-slate-800 font-bold' 
-                        : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
-                    }`}
-                  >
-                    <span className="truncate pr-2">{opt.ten_dot}</span>
-                    {filterDot === opt.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                  </div>
-                ))}
-                {campaigns.filter(opt => opt.ten_dot?.toLowerCase().includes(dotSearchTermFilter.toLowerCase())).length === 0 && (
-                  <div className="px-4 py-3 text-sm text-slate-500 text-center">Không tìm thấy đợt kiến tập nào</div>
-                )}
-              </div>
-            )}
-          </div>
-          
-          {/* Search by schedule name */}
-          <div className="relative w-full md:w-2/3">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-slate-400" />
+              ))}
+              {campaigns.filter(opt => opt.ten_dot?.toLowerCase().includes(dotSearchTermFilter.toLowerCase())).length === 0 && (
+                <div className="px-4 py-3 text-sm text-slate-500 text-center">Không tìm thấy đợt kiến tập nào</div>
+              )}
             </div>
-            <input
-              type="text"
-              placeholder="Tìm kiếm tên lịch kiến tập..."
-              value={searchScheduleTerm}
-              onChange={(e) => setSearchScheduleTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all"
-            />
-          </div>
+          )}
         </div>
 
-        {/* Filter Status Pills */}
-        <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
-          {[
-            { label: 'Tất cả trạng thái', value: '' },
-            { label: 'Nháp', value: 'Nhap' },
-            { label: 'Lịch gửi duyệt', value: 'ChoDuyet' },
-            { label: 'Đã duyệt', value: 'DaDuyet' },
-            { label: 'Từ chối', value: 'TuChoi' },
-            { label: 'Mở đăng ký', value: 'MoDangKy' },
-            { label: 'Đang diễn ra', value: 'DangTrienKhai' },
-            { label: 'Đã kết thúc', value: 'DaKetThuc' },
-            { label: 'Đã khóa', value: 'DaKhoa' },
-            { label: 'Đã hủy', value: 'DaHuy' },
-          ].map(status => (
-            <button
-              key={status.value}
-              onClick={() => setFilterStatus(status.value)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                filterStatus === status.value 
-                  ? 'bg-[#407F3E] text-white shadow-sm' 
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              {status.label}
-            </button>
-          ))}
+        {/* Trạng thái Dropdown */}
+        <div className="relative w-full md:w-1/4 min-w-[220px]">
+          <div 
+            onClick={() => {
+              setIsStatusDropdownOpen(!isStatusDropdownOpen);
+              setIsDotDropdownOpen(false);
+            }}
+            className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-sm flex justify-between items-center cursor-pointer transition-all ${isStatusDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+          >
+            <span className={`truncate pr-2 font-medium ${filterStatus ? 'text-slate-800' : 'text-slate-600'}`}>
+              {STATUS_FILTER_OPTIONS.find(opt => opt.value === filterStatus)?.label || 'Tất cả trạng thái'}
+            </span>
+            <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isStatusDropdownOpen ? 'rotate-180 text-[#407F3E]' : ''}`} />
+          </div>
+          {isStatusDropdownOpen && (
+            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 max-h-64 overflow-y-auto animate-in slide-in-from-top-1">
+              <div className="p-2 border-b border-slate-100 sticky top-0 bg-white z-10">
+                <input 
+                  type="text" 
+                  placeholder="Tìm trạng thái..."
+                  value={statusSearchTerm}
+                  onChange={e => setStatusSearchTerm(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E]"
+                />
+              </div>
+              {STATUS_FILTER_OPTIONS
+                .filter(opt => opt.label.toLowerCase().includes(statusSearchTerm.toLowerCase()))
+                .map(opt => (
+                <div 
+                  key={opt.value}
+                  onClick={() => {
+                    setFilterStatus(opt.value);
+                    setIsStatusDropdownOpen(false);
+                    setStatusSearchTerm('');
+                    setCurrentPage(1);
+                  }}
+                  className={`px-4 py-2.5 text-sm cursor-pointer flex justify-between items-center transition-colors ${
+                    (filterStatus === opt.value) 
+                      ? 'bg-[#E7E0C4] text-slate-800 font-bold' 
+                      : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                  }`}
+                >
+                  <span className="truncate pr-2">{opt.label}</span>
+                  {filterStatus === opt.value && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                </div>
+              ))}
+              {STATUS_FILTER_OPTIONS.filter(opt => opt.label.toLowerCase().includes(statusSearchTerm.toLowerCase())).length === 0 && (
+                <div className="px-4 py-3 text-sm text-slate-500 text-center">Không tìm thấy trạng thái nào</div>
+              )}
+            </div>
+          )}
+        </div>
+        
+        {/* Search by schedule name */}
+        <div className="relative w-full md:w-2/4">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search className="h-4 w-4 text-slate-400" />
+          </div>
+          <input
+            type="text"
+            placeholder="Tìm kiếm tên lịch kiến tập..."
+            value={searchScheduleTerm}
+            onChange={(e) => {
+              setSearchScheduleTerm(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all"
+          />
         </div>
       </div>
 

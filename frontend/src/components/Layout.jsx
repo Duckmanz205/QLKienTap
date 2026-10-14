@@ -538,7 +538,7 @@ export default function Layout() {
           </div>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-4 sidebar-scrollbar">
+        <nav className="flex-1 overflow-y-auto px-3.5 pt-4 pb-6 space-y-3.5 sidebar-scrollbar overscroll-contain">
           {/* Top-level item: Trang chủ */}
           {(() => {
             const homeItem = khoaMenuItems.find(i => i.to === rolePrefix && i.category === 'TRANG CHỦ');
@@ -548,14 +548,14 @@ export default function Layout() {
               return (
                 <Link
                   to={homeItem.to}
-                  className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${isActive
-                    ? 'bg-white text-[#407F3E] shadow-md font-bold scale-[1.02]'
-                    : 'text-white hover:bg-[#89B449]/20 hover:text-white'
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm transition-all duration-200 cursor-pointer ${isActive
+                    ? 'bg-white/15 text-white font-bold border-l-4 border-[#DBD468] pl-3 shadow-xs'
+                    : 'text-white/80 hover:bg-white/10 hover:text-white font-medium'
                     }`}
                 >
                   <div className="flex items-center gap-3">
-                    <Icon className="w-[18px] h-[18px]" />
-                    {!isSidebarCollapsed && <span>{homeItem.label}</span>}
+                    <Icon className="w-5 h-5 shrink-0 stroke-[1.8]" />
+                    {!isSidebarCollapsed && <span className="text-[13.5px] truncate">{homeItem.label}</span>}
                   </div>
                 </Link>
               );
@@ -573,7 +573,7 @@ export default function Layout() {
               <div key={group} className="space-y-1">
                 <button
                   onClick={() => toggleGroup(group)}
-                  className="w-full flex items-center justify-between px-4 py-2 text-xs font-bold tracking-wider uppercase text-white/70 hover:text-white transition-colors cursor-pointer"
+                  className="w-full flex items-center justify-between px-3.5 py-1.5 text-[11px] font-semibold tracking-wider uppercase text-white/50 hover:text-white/85 transition-colors cursor-pointer select-none"
                 >
                   <span>{group}</span>
                   {isCollapsed ? (
@@ -584,7 +584,7 @@ export default function Layout() {
                 </button>
 
                 {!isCollapsed && (
-                  <div className="pl-2 space-y-1 transition-all duration-300">
+                  <div className="pl-1.5 space-y-1 transition-all duration-300">
                     {items.map((item) => {
                       const Icon = item.icon;
                       const isActive = location.pathname === item.to;
@@ -592,14 +592,14 @@ export default function Layout() {
                         <Link
                           key={item.to + '-' + item.label}
                           to={item.to}
-                          className={`w-full flex items-center justify-between px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${isActive
-                            ? 'bg-white text-[#407F3E] shadow-md font-bold scale-[1.02]'
-                            : 'text-white/80 hover:bg-[#89B449]/20 hover:text-white'
+                          className={`w-full flex items-center justify-between px-3.5 py-2 rounded-xl text-sm transition-all duration-200 cursor-pointer ${isActive
+                            ? 'bg-white/15 text-white font-bold border-l-4 border-[#DBD468] pl-3 shadow-xs'
+                            : 'text-white/80 hover:bg-white/10 hover:text-white font-medium'
                             }`}
                         >
                           <div className="flex items-center gap-3">
-                            <Icon className="w-[18px] h-[18px]" />
-                            {!isSidebarCollapsed && <span>{item.label}</span>}
+                            <Icon className="w-5 h-5 shrink-0 stroke-[1.8]" />
+                            {!isSidebarCollapsed && <span className="text-[13.5px] truncate">{item.label}</span>}
                           </div>
                         </Link>
                       );
@@ -621,17 +621,17 @@ export default function Layout() {
                   <Link
                     key={item.to + '-' + item.label}
                     to={item.to}
-                    className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${isActive
-                      ? 'bg-white text-[#407F3E] shadow-md font-bold scale-[1.02]'
-                      : 'text-white hover:bg-[#89B449]/20 hover:text-white'
+                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm transition-all duration-200 cursor-pointer ${isActive
+                      ? 'bg-white/15 text-white font-bold border-l-4 border-[#DBD468] pl-3 shadow-xs'
+                      : 'text-white/80 hover:bg-white/10 hover:text-white font-medium'
                       }`}
                   >
                     <div className="flex items-center gap-3">
-                      <Icon className="w-[18px] h-[18px]" />
-                      {!isSidebarCollapsed && <span>{item.label}</span>}
+                      <Icon className="w-5 h-5 shrink-0 stroke-[1.8]" />
+                      {!isSidebarCollapsed && <span className="text-[13.5px] truncate">{item.label}</span>}
                     </div>
                     {item.badge && !isSidebarCollapsed && (
-                      <span className="bg-[#DBD468] text-[#191d17] font-bold text-[10px] px-2 py-0.5 rounded-full shadow-sm">
+                      <span className="bg-[#DBD468] text-slate-900 font-bold text-[10px] px-2 py-0.5 rounded-full shadow-2xs leading-none">
                         Mới
                       </span>
                     )}
@@ -685,9 +685,9 @@ export default function Layout() {
                 <div className="w-8 h-8 rounded-full overflow-hidden">
                   <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=E7E0C4&color=407F3E`} alt="Avatar" className="w-full h-full object-cover" />
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2.5">
                   <span className="text-sm font-bold text-slate-800">{fullName}</span>
-                  <span className="px-2 py-0.5 bg-[#E7E0C4] text-[#407F3E] text-[10px] font-bold rounded-full uppercase tracking-wider">
+                  <span className="inline-flex items-center px-2.5 py-0.5 bg-[#407F3E]/10 text-[#407F3E] text-[10px] font-bold rounded-full uppercase tracking-wider border border-[#407F3E]/20">
                     {roleName}
                   </span>
                   <ChevronDown className="w-4 h-4 text-slate-400" />

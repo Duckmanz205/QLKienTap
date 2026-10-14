@@ -195,17 +195,17 @@ export default function LichTrinhDoan_SV() {
             <div className="bg-white/40 rounded-xl p-5 shrink-0 min-w-[280px]">
               <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-4">Giảng viên dẫn đoàn</p>
               {lecturers.length > 0 ? lecturers.map((gv, idx) => (
-                <div key={idx} className="flex items-center gap-4 mb-3 last:mb-0">
-                  <div className="w-12 h-12 rounded-full bg-slate-200 border-2 border-white shadow-sm overflow-hidden flex items-center justify-center shrink-0">
-                    <img src={`https://ui-avatars.com/api/?name=${gv.ho_ten.split(' ').pop()}&background=${gv.la_truong_doan ? '407F3E' : '89B449'}&color=fff`} alt="Avatar" className="w-full h-full object-cover" />
+                <div key={idx} className="flex items-center gap-3 mb-3 last:mb-0 p-2.5 rounded-xl bg-white/60 border border-white/80">
+                  <div className="w-9 h-9 rounded-lg bg-[#407F3E]/10 text-[#407F3E] flex items-center justify-center shrink-0">
+                    <User className="w-4 h-4 stroke-[2]" />
                   </div>
-                  <div>
-                    <h4 className="font-bold text-slate-800 text-[15px] leading-tight flex items-center gap-1.5">
-                      {gv.ho_ten}
-                      {gv.la_truong_doan && <span className="px-1.5 py-0.5 rounded-sm bg-[#407F3E]/10 text-[#407F3E] text-[9px] uppercase font-black">Trưởng đoàn</span>}
+                  <div className="min-w-0 flex-1">
+                    <h4 className="font-bold text-slate-800 text-sm leading-tight flex items-center gap-1.5">
+                      <span className="truncate">{gv.ho_ten}</span>
+                      {gv.la_truong_doan && <span className="px-1.5 py-0.5 rounded-sm bg-[#407F3E]/10 text-[#407F3E] text-[9px] uppercase font-black shrink-0">Trưởng đoàn</span>}
                     </h4>
-                    <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600 mt-1">
-                      <Phone className="w-3.5 h-3.5" />
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 mt-0.5">
+                      <Phone className="w-3 h-3 text-slate-400" />
                       <span>{gv.so_dien_thoai || '--'}</span>
                     </div>
                   </div>

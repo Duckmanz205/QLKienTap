@@ -19,6 +19,7 @@ import {
   RequestCancelDto,
   RequestRefundDto,
   SubmitReportDto,
+  SubmitConfirmationPaperDto,
   SelectRepresentativeTripsDto,
 } from './dto/sinh-vien.dto';
 
@@ -209,6 +210,19 @@ export class SinhVienController {
     );
   }
 
+  @Post('submit-confirmation-paper')
+  async submitConfirmationPaper(
+    @CurrentUser() user: JwtPayloadUser,
+    @Body() body: SubmitConfirmationPaperDto,
+  ) {
+    const student = await this.svService.getStudentByAccountId(user.sub);
+    return this.svService.submitConfirmationPaper(
+      student.id,
+      body.registrationId,
+      body.fileXacNhanUrl,
+    );
+  }
+
   @Delete('report/:registrationId')
   async deleteReport(
     @CurrentUser() user: JwtPayloadUser,
@@ -216,6 +230,12 @@ export class SinhVienController {
   ) {
     const student = await this.svService.getStudentByAccountId(user.sub);
     return this.svService.deleteReport(student.id, registrationId);
+  }
+
+  @Get('representative-trips-status')
+  async getRepresentativeTripsStatus(@CurrentUser() user: JwtPayloadUser) {
+    const student = await this.svService.getStudentByAccountId(user.sub);
+    return this.svService.getRepresentativeTripsStatus(student.id);
   }
 
   @Post('select-representative-trips')

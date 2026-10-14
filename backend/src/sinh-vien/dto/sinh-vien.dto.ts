@@ -113,10 +113,21 @@ export class SubmitReportDto {
   extractedText?: string;
 }
 
-export class SelectRepresentativeTripsDto {
+export class SubmitConfirmationPaperDto {
   @IsInt()
   @Min(1)
-  termStudentId: number;
+  registrationId: number;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Đường dẫn file xác nhận không được để trống' })
+  fileXacNhanUrl: string;
+}
+
+export class SelectRepresentativeTripsDto {
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  termStudentId?: number;
 
   @IsArray()
   @ArrayNotEmpty({ message: 'Danh sách phiếu đăng ký không được rỗng' })

@@ -67,6 +67,8 @@ export default function DiemChuanBi_DiemCong_GV() {
         diemChuanBi: phieu.diemPhieuThamQuan?.diem_chuan_bi !== undefined && phieu.diemPhieuThamQuan.diem_chuan_bi !== null ? String(phieu.diemPhieuThamQuan.diem_chuan_bi) : '',
         diemCong: phieu.diemPhieuThamQuan?.diem_cong !== undefined && phieu.diemPhieuThamQuan.diem_cong !== null ? Number(phieu.diemPhieuThamQuan.diem_cong) : 0,
         da_khoa: phieu.diemPhieuThamQuan?.da_khoa ?? false,
+        da_khoa_chuan_bi: phieu.diemPhieuThamQuan?.da_khoa_chuan_bi ?? false,
+        ngay_khoa_chuan_bi: phieu.diemPhieuThamQuan?.ngay_khoa_chuan_bi ?? null,
         ghiChu: '' // not stored in DB currently based on API, but keep in UI
       }));
 
@@ -97,6 +99,48 @@ export default function DiemChuanBi_DiemCong_GV() {
       }
       return s;
     }));
+  };
+
+  const isTripLocked = useMemo(() => {
+    if (students.length === 0) return false;
+    return students.every(s => s.da_khoa || s.da_khoa_chuan_bi);
+  }, [students]);
+
+  const lockDate = useMemo(() => {
+    const s = students.find(s => s.ngay_khoa_chuan_bi);
+    return s?.ngay_khoa_chuan_bi ? new Date(s.ngay_khoa_chuan_bi).toLocaleDateString('vi-VN') : null;
+  }, [students]);
+
+  const handleLockScores = async () => {
+    if (students.length === 0 || !selectedTrip) return;
+    const missing = students.filter(s => s.diemChuanBi === '' || s.diemChuanBi === null || s.diemChuanBi === undefined);
+    if (missing.length > 0) {
+      toast.error(`Còn ${missing.length} sinh viên chưa có điểm chuẩn bị. Vui lòng nhập điểm trước khi nộp lên Khoa.`);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      // Auto save scores first
+      const promises = students.map(student => {
+        return giangVienApi.gradePrepAndBonus({
+          phieuId: student.id,
+          diemChuanBi: student.diemChuanBi ? Number(student.diemChuanBi) : 0,
+          diemCong: Number(student.diemCong)
+        });
+      });
+      await Promise.all(promises);
+
+      // Call lock API
+      const res = await giangVienApi.lockTripPrepGrades({ tripId: selectedTrip.id });
+      toast.success(res.data?.message || 'Đã khóa và nộp điểm chuyến đi lên Khoa thành công!');
+      fetchStudents(selectedTrip.id);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Lỗi khi nộp điểm lên Khoa');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSaveScores = async () => {
@@ -258,10 +302,15 @@ export default function DiemChuanBi_DiemCong_GV() {
                         <input
                           type="number"
                           min="0" max="10" step="0.1"
+                          disabled={isTripLocked || student.da_khoa}
                           value={student.diemChuanBi}
                           onChange={(e) => handleScoreChange(student.id, 'diemChuanBi', e.target.value)}
                           placeholder="--"
-                          className="w-20 px-3 py-2 text-center bg-white border border-[#E7E0C4] rounded-lg text-sm font-bold text-[#407F3E] focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all placeholder-slate-300"
+                          className={`w-20 px-3 py-2 text-center rounded-lg text-sm font-bold transition-all placeholder-slate-300 ${
+                            isTripLocked || student.da_khoa
+                              ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                              : 'bg-white border border-[#E7E0C4] text-[#407F3E] focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E]'
+                          }`}
                         />
                       </div>
                     </td>
@@ -271,7 +320,7 @@ export default function DiemChuanBi_DiemCong_GV() {
                         <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
                           <button
                             onClick={() => handleBonusChange(student.id, -0.5)}
-                            disabled={student.diemCong <= 0 || student.da_khoa}
+                            disabled={student.diemCong <= 0 || isTripLocked || student.da_khoa}
                             className="w-6 h-6 flex items-center justify-center rounded bg-white border border-slate-200 text-slate-500 hover:text-slate-800 hover:border-slate-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                           >
                             <Minus className="w-3.5 h-3.5" />
@@ -285,7 +334,7 @@ export default function DiemChuanBi_DiemCong_GV() {
 
                           <button
                             onClick={() => handleBonusChange(student.id, 0.5)}
-                            disabled={student.diemCong >= 1.0 || student.da_khoa}
+                            disabled={student.diemCong >= 1.0 || isTripLocked || student.da_khoa}
                             className="w-6 h-6 flex items-center justify-center rounded bg-white border border-slate-200 text-slate-700 hover:text-[#407F3E] hover:border-[#407F3E] hover:bg-[#407F3E]/5 disabled:opacity-30 disabled:cursor-not-allowed transition-colors font-bold text-xs group"
                           >
                             <Plus className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
@@ -369,16 +418,33 @@ export default function DiemChuanBi_DiemCong_GV() {
         </div>
       </div>
 
-      {/* Floating Save Button */}
-      <div className="fixed bottom-6 right-6 z-40 animate-in slide-in-from-bottom-6 duration-500 delay-300">
-        <button
-          onClick={handleSaveScores}
-          disabled={loading || students.length === 0}
-          className="flex items-center gap-2 px-8 py-3.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-2xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all cursor-pointer font-bold text-sm tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Save className="w-5 h-5" />
-          Lưu điểm
-        </button>
+      {/* Floating Action Bar */}
+      <div className="fixed bottom-6 right-6 z-40 flex items-center gap-3 animate-in slide-in-from-bottom-6 duration-500 delay-300">
+        {isTripLocked ? (
+          <div className="px-5 py-3 bg-emerald-50 text-emerald-800 border border-emerald-300 rounded-2xl shadow-lg flex items-center gap-2 text-sm font-bold">
+            <Lock className="w-4 h-4 text-emerald-600" />
+            <span>Đã nộp điểm lên Khoa {lockDate ? `ngày ${lockDate}` : ''}</span>
+          </div>
+        ) : (
+          <>
+            <button
+              onClick={handleSaveScores}
+              disabled={loading || students.length === 0}
+              className="flex items-center gap-2 px-6 py-3.5 bg-white text-slate-700 hover:bg-slate-50 border border-slate-300 rounded-2xl shadow-lg hover:shadow-xl transition-all cursor-pointer font-bold text-sm tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Save className="w-4 h-4 text-slate-500" />
+              Lưu điểm
+            </button>
+            <button
+              onClick={handleLockScores}
+              disabled={loading || students.length === 0}
+              className="flex items-center gap-2 px-7 py-3.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-2xl shadow-xl hover:shadow-2xl hover:-translate-y-0.5 transition-all cursor-pointer font-bold text-sm tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Lock className="w-4 h-4" />
+              Khóa & Nộp điểm chuyến đi
+            </button>
+          </>
+        )}
       </div>
 
     </div>

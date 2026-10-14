@@ -74,7 +74,6 @@ export default function SinhVienHuongDan_GV() {
           soChuyenHT: studentReports.length, 
           soChuyenYC: 3, 
           baiChoCham: pendingReports.length,
-          avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(sv.ho_ten || 'SV')}&background=f1f5f9&color=475569`,
           rawSv: sv,
           studentReports: studentReports
         };
@@ -413,12 +412,9 @@ export default function SinhVienHuongDan_GV() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
             {/* Modal Header */}
             <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-slate-50/50">
-              <div className="flex items-center gap-4">
-                <img src={selectedStudentProfile.avatar} alt="Avatar" className="w-12 h-12 rounded-full border-2 border-white shadow-sm" />
-                <div>
-                  <h2 className="text-xl font-bold text-slate-800">{selectedStudentProfile.name}</h2>
-                  <p className="text-sm text-slate-500 font-medium">MSSV: {selectedStudentProfile.mssv} • Lớp: {selectedStudentProfile.lop}</p>
-                </div>
+              <div>
+                <h2 className="text-xl font-bold text-slate-800">{selectedStudentProfile.name}</h2>
+                <p className="text-sm text-slate-500 font-medium mt-0.5">MSSV: {selectedStudentProfile.mssv} • Lớp: {selectedStudentProfile.lop}</p>
               </div>
               <button 
                 onClick={() => setSelectedStudentProfile(null)}

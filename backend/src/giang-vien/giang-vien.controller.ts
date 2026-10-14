@@ -19,7 +19,10 @@ import {
   GradePrepBonusDto,
   GradeReportDto,
   SubmitBoardScoreDto,
+  SubmitBoardScoresBatchDto,
   GuidedReportsQueryDto,
+  LockTripPrepGradesDto,
+  LockGuidedReportsGradesDto,
 } from './dto/giang-vien.dto';
 
 @Controller('giang-vien')
@@ -92,6 +95,24 @@ export class GiangVienController {
       body.diemChuanBi,
       body.diemCong,
     );
+  }
+
+  @Post('lock-trip-prep-grades')
+  async lockTripPrepGrades(
+    @CurrentUser() user: JwtPayloadUser,
+    @Body() body: LockTripPrepGradesDto,
+  ) {
+    const gv = await this.gvService.getLecturerByAccountId(user.sub);
+    return this.gvService.lockTripPrepGrades(gv.id, body.tripId);
+  }
+
+  @Post('lock-guided-reports-grades')
+  async lockGuidedReportsGrades(
+    @CurrentUser() user: JwtPayloadUser,
+    @Body() body: LockGuidedReportsGradesDto,
+  ) {
+    const gv = await this.gvService.getLecturerByAccountId(user.sub);
+    return this.gvService.lockGuidedReportsGrades(gv.id, body.dotKienTapId);
   }
 
   @Get('guided-reports')
@@ -190,6 +211,20 @@ export class GiangVienController {
       gv.id,
       body.memberId,
       body.phieuId,
+      body.score,
+    );
+  }
+
+  @Post('submit-board-scores-batch')
+  async submitBoardScoresBatch(
+    @CurrentUser() user: JwtPayloadUser,
+    @Body() body: SubmitBoardScoresBatchDto,
+  ) {
+    const gv = await this.gvService.getLecturerByAccountId(user.sub);
+    return this.gvService.submitBoardScoresBatch(
+      gv.id,
+      body.memberId,
+      body.phieuIds,
       body.score,
     );
   }

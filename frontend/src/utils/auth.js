@@ -16,6 +16,27 @@ export const getDashboardPathForRole = (role) => {
   return '/login';
 };
 
+export const isTokenExpired = (token) => {
+  if (!token || typeof token !== 'string') return true;
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return true;
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    const payload = JSON.parse(jsonPayload);
+    if (!payload.exp) return false;
+    return payload.exp * 1000 <= Date.now();
+  } catch {
+    return true;
+  }
+};
+
 export const getValidSession = () => {
   const userJson = localStorage.getItem('user');
   if (!userJson) return null;
@@ -32,6 +53,10 @@ export const getValidSession = () => {
       typeof parsed.user.vai_tro === 'string' &&
       ['SinhVien', 'GiangVien', 'QuanLyKhoa', 'Khoa', 'QuanLyCLB', 'QuanTriVienHeThong'].includes(parsed.user.vai_tro)
     ) {
+      if (isTokenExpired(parsed.token)) {
+        localStorage.removeItem('user');
+        return null;
+      }
       return parsed;
     }
   } catch (e) {

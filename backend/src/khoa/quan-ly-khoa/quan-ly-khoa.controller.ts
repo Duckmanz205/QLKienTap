@@ -42,8 +42,12 @@ import {
   AutoAssignGvhdDto,
   ConfirmAutoAssignGvhdDto,
   CreateBoardDto,
+  UpdateBoardDto,
   AddBoardMemberDto,
+  UnassignStudentsDto,
   LockGradesDto,
+  UnlockTripPrepGradesDto,
+  UnlockLecturerReportGradesDto,
   ApproveRefundDto,
   CreateKhoaNotificationDto,
   ExportStudentListDto,
@@ -539,9 +543,107 @@ export class KhoaController {
   }
 
   @Roles('QuanLyKhoa')
+  @Put('boards/:id')
+  async updateBoard(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: UpdateBoardDto,
+  ) {
+    return this.khoaService.updateBoard(id, body);
+  }
+
+  @Roles('QuanLyKhoa')
+  @Delete('boards/:id')
+  async deleteBoard(@Param('id', ParseIntPipe) id: number) {
+    return this.khoaService.deleteBoard(id);
+  }
+
+  @Roles('QuanLyKhoa')
+  @Get('boards/:id/students')
+  async getBoardStudents(@Param('id', ParseIntPipe) id: number) {
+    return this.khoaService.getBoardStudents(id);
+  }
+
+  @Roles('QuanLyKhoa')
+  @Post('boards/:id/unassign-students')
+  async unassignStudentsFromBoard(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: UnassignStudentsDto,
+  ) {
+    return this.khoaService.unassignStudentsFromBoard(id, body.boChuyenIds);
+  }
+
+  @Roles('QuanLyKhoa')
+  @Post('boards/:id/lock-board')
+  async lockBoard(@Param('id', ParseIntPipe) id: number) {
+    return this.khoaService.lockBoard(id);
+  }
+
+  @Roles('QuanLyKhoa')
+  @Post('campaigns/:id/toggle-lock-bo-chuyen')
+  async toggleLockBoChuyen(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('isLocked') isLocked: boolean,
+  ) {
+    return this.khoaService.toggleLockBoChuyen(id, isLocked);
+  }
+
+  @Roles('QuanLyKhoa')
+  @Get('campaigns/:id/bo-chuyen-lock-status')
+  async getBoChuyenLockStatus(@Param('id', ParseIntPipe) id: number) {
+    return this.khoaService.getBoChuyenLockStatus(id);
+  }
+
+  @Roles('QuanLyKhoa')
   @Post('lock-grades')
   async lockGrades(@Body() body: LockGradesDto) {
     return this.khoaService.lockAndFinalizeGrades(body.lichKienTapId);
+  }
+
+  @Roles('QuanLyKhoa')
+  @Get('trip-grading-statuses/:lichKienTapId')
+  async getTripGradingStatuses(
+    @Param('lichKienTapId', ParseIntPipe) lichKienTapId: number,
+  ) {
+    return this.khoaService.getTripGradingStatuses(lichKienTapId);
+  }
+
+  @Roles('QuanLyKhoa')
+  @Get('supervisor-grading-statuses/:lichKienTapId')
+  async getSupervisorGradingStatuses(
+    @Param('lichKienTapId', ParseIntPipe) lichKienTapId: number,
+  ) {
+    return this.khoaService.getSupervisorGradingStatuses(lichKienTapId);
+  }
+
+  @Roles('QuanLyKhoa')
+  @Post('unlock-trip-prep-grades')
+  async unlockTripPrepGrades(
+    @CurrentUser() user: JwtPayloadUser,
+    @Body() body: UnlockTripPrepGradesDto,
+  ) {
+    return this.khoaService.unlockTripPrepGrades(body.tripId, body.lyDo, user?.sub);
+  }
+
+  @Roles('QuanLyKhoa')
+  @Post('unlock-lecturer-report-grades')
+  async unlockLecturerReportGrades(
+    @CurrentUser() user: JwtPayloadUser,
+    @Body() body: UnlockLecturerReportGradesDto,
+  ) {
+    return this.khoaService.unlockLecturerReportGrades(
+      body.dotKienTapId,
+      body.giangVienId,
+      body.lyDo,
+      user?.sub,
+    );
+  }
+
+  @Roles('QuanLyKhoa')
+  @Get('unsubmitted-lecturers/:lichKienTapId')
+  async getUnsubmittedLecturers(
+    @Param('lichKienTapId', ParseIntPipe) lichKienTapId: number,
+  ) {
+    return this.khoaService.getUnsubmittedLecturers(lichKienTapId);
   }
 
   @Roles('QuanLyKhoa')
