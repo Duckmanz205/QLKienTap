@@ -93,6 +93,7 @@ export default function ThongBao_GV() {
       case 'NhacNho': return 'Nhắc nhở';
       case 'ChuyenDi': return 'Chuyến đi';
       case 'TaiChinh': return 'Tài chính';
+      case 'ThanhCong': return 'Thành công';
       default: return 'Thông báo chung';
     }
   };
@@ -139,6 +140,7 @@ export default function ThongBao_GV() {
                 { value: 'CanhBao', label: 'Cảnh báo' },
                 { value: 'ChuyenDi', label: 'Chuyến đi' },
                 { value: 'TaiChinh', label: 'Tài chính' },
+                { value: 'ThanhCong', label: 'Thành công' },
               ]}
               value={selectedType}
               onChange={(val) => {

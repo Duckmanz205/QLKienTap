@@ -35,6 +35,8 @@ export default function ThongBao_Khoa() {
     { value: 'ALL', label: 'Tất cả' },
     { value: 'STUDENT', label: 'Sinh viên' },
     { value: 'LECTURER', label: 'Giảng viên' },
+    { value: 'CLB', label: 'Ban chủ nhiệm CLB' },
+    { value: 'KHOA', label: 'Quản lý Khoa' },
   ];
 
   const loaiThongBaoOptions = [
@@ -44,6 +46,7 @@ export default function ThongBao_Khoa() {
     { value: 'ChuyenDi', label: 'Chuyến đi' },
     { value: 'TaiChinh', label: 'Tài chính / Lệ phí' },
     { value: 'CanhBao', label: 'Cảnh báo' },
+    { value: 'ThanhCong', label: 'Thành công' },
   ];
 
   useEffect(() => {
@@ -128,6 +131,8 @@ export default function ThongBao_Khoa() {
         return <span className="inline-flex items-center px-2.5 py-0.5 rounded text-[11px] font-bold bg-[#89B449]/15 text-[#476d01] border border-[#89B449]/30">Tài chính</span>;
       case 'CanhBao':
         return <span className="inline-flex items-center px-2.5 py-0.5 rounded text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Cảnh báo</span>;
+      case 'ThanhCong':
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Thành công</span>;
       default:
         return <span className="inline-flex items-center px-2.5 py-0.5 rounded text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">Thông báo</span>;
     }
@@ -139,6 +144,10 @@ export default function ThongBao_Khoa() {
         return <span className="inline-flex items-center px-2.5 py-0.5 rounded text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">Sinh viên</span>;
       case 'LECTURER':
         return <span className="inline-flex items-center px-2.5 py-0.5 rounded text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200">Giảng viên</span>;
+      case 'CLB':
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">Ban chủ nhiệm CLB</span>;
+      case 'KHOA':
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Quản lý Khoa</span>;
       default:
         return <span className="inline-flex items-center px-2.5 py-0.5 rounded text-[11px] font-bold bg-[#89B449]/15 text-[#407F3E] border border-[#89B449]/25">Tất cả</span>;
     }
@@ -206,7 +215,9 @@ export default function ThongBao_Khoa() {
             options={[
               { value: 'ALL', label: 'Tất cả đối tượng' },
               { value: 'STUDENT', label: 'Sinh viên' },
-              { value: 'LECTURER', label: 'Giảng viên' }
+              { value: 'LECTURER', label: 'Giảng viên' },
+              { value: 'CLB', label: 'Ban chủ nhiệm CLB' },
+              { value: 'KHOA', label: 'Quản lý Khoa' },
             ]}
             value={selectedFilterDoiTuong}
             onChange={(val) => {

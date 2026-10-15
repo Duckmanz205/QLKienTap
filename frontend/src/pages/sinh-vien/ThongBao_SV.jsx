@@ -78,6 +78,9 @@ export default function ThongBao_SV() {
         return <AlertCircle className="w-5 h-5 text-[#E68A8C]" />;
       case 'PhanCong':
         return <FileText className="w-5 h-5 text-[#407F3E]" />;
+      case 'ThanhCong':
+      case 'success':
+        return <CheckCircle className="w-5 h-5 text-emerald-600" />;
       default:
         return <Bell className="w-5 h-5 text-slate-500" />;
     }
@@ -99,6 +102,9 @@ export default function ThongBao_SV() {
         return 'bg-[#E68A8C]/10 border-[#E68A8C]/20';
       case 'PhanCong':
         return 'bg-[#407F3E]/10 border-[#407F3E]/20';
+      case 'ThanhCong':
+      case 'success':
+        return 'bg-emerald-50 border-emerald-200';
       default:
         return 'bg-slate-100 border-slate-200';
     }
@@ -120,6 +126,9 @@ export default function ThongBao_SV() {
         return 'Cảnh báo';
       case 'PhanCong':
         return 'Phân công';
+      case 'ThanhCong':
+      case 'success':
+        return 'Thành công';
       default:
         return 'Thông báo chung';
     }
@@ -167,6 +176,7 @@ export default function ThongBao_SV() {
                 { value: 'ChuyenDi', label: 'Chuyến đi' },
                 { value: 'TaiChinh', label: 'Tài chính / Lệ phí' },
                 { value: 'CanhBao', label: 'Cảnh báo' },
+                { value: 'ThanhCong', label: 'Thành công' },
               ]}
               value={selectedType}
               onChange={(val) => {
