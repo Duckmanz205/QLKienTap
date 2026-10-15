@@ -394,10 +394,13 @@ export class ClbController {
   }
 
   @Post('schedules/:id/submit')
-  async submitSchedule(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+  async submitSchedule(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: JwtPayloadUser,
+  ) {
     return this.khoaService.submitScheduleForApproval(
       id,
-      req.user?.sub || req.user?.id,
+      user?.sub,
     );
   }
 
