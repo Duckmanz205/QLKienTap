@@ -301,7 +301,7 @@ export class ThongBao {
   khoa_hoc_id: number;
 
   @Column({ length: 20, default: 'ALL' })
-  doi_tuong_nhan: string; // 'ALL' | 'STUDENT' | 'LECTURER'
+  doi_tuong_nhan: string; // 'ALL' | 'STUDENT' | 'LECTURER' | 'CLB' | 'KHOA'
 
   @Column({ length: 50, default: 'ThongBao' })
   loai_thong_bao: string; // 'ThongBao' | 'NhacNho' | 'PhanCong' | 'ChuyenDi' | 'TaiChinh' | 'CanhBao' | 'ThanhCong'

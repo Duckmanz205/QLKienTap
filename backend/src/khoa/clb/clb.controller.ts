@@ -130,8 +130,12 @@ export class ClbController {
   }
 
   @Put('trips/:id')
-  async updateTrip(@Param('id', ParseIntPipe) id: number, @Body() body: any) {
-    return this.khoaService.updateTrip(id, body);
+  async updateTrip(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: any,
+    @CurrentUser() user: JwtPayloadUser,
+  ) {
+    return this.khoaService.updateTrip(id, body, user?.sub);
   }
 
   @Delete('trips/:id')
@@ -306,8 +310,8 @@ export class ClbController {
   }
 
   @Get('notifications')
-  async getNotifications() {
-    return this.khoaService.getNotifications();
+  async getNotifications(@CurrentUser() user: JwtPayloadUser) {
+    return this.khoaService.getNotifications(user?.role || 'QuanLyCLB', user?.sub);
   }
 
   @Post('notifications')

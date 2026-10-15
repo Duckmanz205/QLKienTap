@@ -1010,7 +1010,6 @@ export class GiangVienService {
   async getNotifications(_lecturerId: number) {
     const list = await this.thongBaoRepo.find({
       where: {
-        khoa_hoc_id: IsNull(),
         doi_tuong_nhan: In(['ALL', 'LECTURER']),
       },
       relations: {

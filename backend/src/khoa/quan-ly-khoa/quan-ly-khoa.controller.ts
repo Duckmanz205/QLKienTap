@@ -267,8 +267,11 @@ export class KhoaController {
 
   @Roles('QuanLyKhoa')
   @Post('campaigns')
-  async createCampaign(@Body() body: CreateCampaignDto) {
-    return this.khoaService.createCampaign(body);
+  async createCampaign(
+    @Body() body: CreateCampaignDto,
+    @CurrentUser() user: JwtPayloadUser,
+  ) {
+    return this.khoaService.createCampaign(body, user?.sub);
   }
 
   @Roles('QuanLyKhoa')
@@ -351,8 +354,11 @@ export class KhoaController {
 
   @Roles('QuanLyKhoa')
   @Post('schedules/:id/approve')
-  async approveSchedule(@Param('id', ParseIntPipe) id: number) {
-    return this.khoaService.approveSchedule(id);
+  async approveSchedule(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: JwtPayloadUser,
+  ) {
+    return this.khoaService.approveSchedule(id, user?.sub);
   }
 
   @Roles('QuanLyKhoa')
@@ -360,8 +366,9 @@ export class KhoaController {
   async rejectSchedule(
     @Param('id', ParseIntPipe) id: number,
     @Body('lyDo') lyDo: string,
+    @CurrentUser() user: JwtPayloadUser,
   ) {
-    return this.khoaService.rejectSchedule(id, lyDo);
+    return this.khoaService.rejectSchedule(id, lyDo, user?.sub);
   }
 
   @Roles('QuanLyKhoa', 'QuanLyCLB')
@@ -396,8 +403,9 @@ export class KhoaController {
   async approveTripEdit(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { isApproved: boolean },
+    @CurrentUser() user: JwtPayloadUser,
   ) {
-    return this.khoaService.approveEmergencyEdit(id, body.isApproved);
+    return this.khoaService.approveEmergencyEdit(id, body.isApproved, user?.sub);
   }
 
   @Roles('QuanLyCLB')
@@ -748,8 +756,8 @@ export class KhoaController {
 
   @Roles('QuanLyKhoa')
   @Get('notifications')
-  async getNotifications() {
-    return this.khoaService.getNotifications();
+  async getNotifications(@CurrentUser() user: JwtPayloadUser) {
+    return this.khoaService.getNotifications(user?.role || 'QuanLyKhoa', user?.sub);
   }
 
   @Roles('QuanLyKhoa')

@@ -609,7 +609,7 @@ export class KhoaService {
       totalPages: Math.ceil(total / limit),
     };
   }
-  async createCampaign(data: any) {
+  async createCampaign(data: any, userId?: number) {
     return this.dataSource.transaction(async (manager: EntityManager) => {
       // 1. Kiểm tra trùng tên đợt trong cùng hoc_ky_id + khoa_id
       const existing = await manager.findOne(DotKienTap, {
@@ -691,6 +691,27 @@ export class KhoaService {
             await manager.save(DotKienTap_SinhVien, dksv);
           }
         }
+      }
+
+      // Gửi thông báo đến Duyệt lịch CLB
+      try {
+        const thoiGianStr =
+          savedDot.ngay_bat_dau && savedDot.ngay_ket_thuc
+            ? ` (Từ ${new Date(savedDot.ngay_bat_dau).toLocaleDateString('vi-VN')} đến ${new Date(savedDot.ngay_ket_thuc).toLocaleDateString('vi-VN')})`
+            : '';
+
+        const notif = new ThongBao();
+        notif.tieu_de = `[Đợt kiến tập mới] ${savedDot.ten_dot}`;
+        notif.noi_dung = `Khoa đã khởi tạo đợt kiến tập mới: "${savedDot.ten_dot}"${thoiGianStr}. Ban chủ nhiệm CLB vui lòng chuẩn bị kế hoạch tham quan và lập lịch kiến tập cho sinh viên.`;
+        notif.nguoi_gui_id = userId || 1;
+        notif.doi_tuong_nhan = 'CLB';
+        notif.loai_thong_bao = 'NhacNho';
+        if (savedDot.khoa_hoc_id) notif.khoa_hoc_id = savedDot.khoa_hoc_id;
+        notif.ngay_gui = new Date();
+        notif.da_chinh_sua = false;
+        await manager.save(ThongBao, notif);
+      } catch (err) {
+        console.warn('Lỗi khi gửi thông báo đợt kiến tập mới cho CLB:', err);
       }
 
       return savedDot;
@@ -976,15 +997,20 @@ export class KhoaService {
         tieu_de: 'Lịch kiến tập chờ duyệt',
         noi_dung: `Câu lạc bộ đã gửi yêu cầu duyệt cho lịch kiến tập "${lich.ten_lich}". Vui lòng kiểm tra và phản hồi.`,
         nguoi_gui_id: userId,
-        khoa_hoc_id: lich.dotKienTap.khoa_hoc_id,
+        khoa_hoc_id: lich.dotKienTap?.khoa_hoc_id,
+        doi_tuong_nhan: 'KHOA',
+        loai_thong_bao: 'NhacNho',
       });
     }
 
     return lich;
   }
 
-  async approveSchedule(id: number) {
-    const lich = await this.lichRepo.findOne({ where: { id } });
+  async approveSchedule(id: number, userId?: number) {
+    const lich = await this.lichRepo.findOne({
+      where: { id },
+      relations: { dotKienTap: true },
+    });
     if (!lich) throw new BadRequestException('Không tìm thấy lịch kiến tập');
     if (lich.trang_thai !== 'ChoDuyet') {
       throw new BadRequestException('Lịch không ở trạng thái chờ duyệt');
@@ -1024,11 +1050,43 @@ export class KhoaService {
     );
     // Đồng bộ trạng thái đợt kiến tập cha
     await this.updateDotKienTapStatus(lich.dot_kien_tap_id);
+
+    // 1. Gửi thông báo đến Duyệt lịch CLB
+    try {
+      await this.createNotification({
+        tieu_de: `[Đã duyệt] Lịch kiến tập đã được phê duyệt`,
+        noi_dung: `Khoa đã phê duyệt lịch kiến tập "${lich.ten_lich}" (Đợt: ${lich.dotKienTap?.ten_dot || ''}). Ban chủ nhiệm CLB có thể tiến hành các hoạt động tổ chức tiếp theo.`,
+        nguoi_gui_id: userId || 1,
+        khoa_hoc_id: lich.dotKienTap?.khoa_hoc_id,
+        doi_tuong_nhan: 'CLB',
+        loai_thong_bao: 'ThanhCong',
+      });
+    } catch (err) {
+      console.warn('Lỗi gửi thông báo duyệt lịch cho CLB:', err);
+    }
+
+    // 2. Gửi thông báo đến Sinh viên & Giảng viên (công bố lịch chính thức)
+    try {
+      await this.createNotification({
+        tieu_de: `[Lịch kiến tập] Công bố lịch kiến tập chính thức: ${lich.ten_lich}`,
+        noi_dung: `Lịch kiến tập "${lich.ten_lich}" thuộc đợt "${lich.dotKienTap?.ten_dot || ''}" đã chính thức được phê duyệt. Sinh viên vui lòng theo dõi danh sách các chuyến tham quan và đăng ký tham gia đúng hạn.`,
+        nguoi_gui_id: userId || 1,
+        khoa_hoc_id: lich.dotKienTap?.khoa_hoc_id,
+        doi_tuong_nhan: 'ALL',
+        loai_thong_bao: 'ChuyenDi',
+      });
+    } catch (err) {
+      console.warn('Lỗi gửi thông báo công bố lịch kiến tập cho SV/GV:', err);
+    }
+
     return lich;
   }
 
-  async rejectSchedule(id: number, reason: string) {
-    const lich = await this.lichRepo.findOne({ where: { id } });
+  async rejectSchedule(id: number, reason: string, userId?: number) {
+    const lich = await this.lichRepo.findOne({
+      where: { id },
+      relations: { dotKienTap: true },
+    });
     if (!lich) throw new BadRequestException('Không tìm thấy lịch kiến tập');
     if (lich.trang_thai !== 'ChoDuyet') {
       throw new BadRequestException('Lịch không ở trạng thái chờ duyệt');
@@ -1044,6 +1102,21 @@ export class KhoaService {
     );
     // Đồng bộ trạng thái đợt kiến tập cha
     await this.updateDotKienTapStatus(lich.dot_kien_tap_id);
+
+    // Gửi thông báo đến Duyệt lịch CLB (kèm lý do, KHÔNG gửi SV/GV)
+    try {
+      await this.createNotification({
+        tieu_de: `[Từ chối] Lịch kiến tập không được phê duyệt`,
+        noi_dung: `Lịch kiến tập "${lich.ten_lich}" đã bị Khoa từ chối phê duyệt. Lý do: "${reason || 'Chưa nhập lý do'}". Vui lòng điều chỉnh lại lịch trình và gửi duyệt lại.`,
+        nguoi_gui_id: userId || 1,
+        khoa_hoc_id: lich.dotKienTap?.khoa_hoc_id,
+        doi_tuong_nhan: 'CLB',
+        loai_thong_bao: 'CanhBao',
+      });
+    } catch (err) {
+      console.warn('Lỗi gửi thông báo từ chối lịch cho CLB:', err);
+    }
+
     return lich;
   }
 
@@ -1329,7 +1402,7 @@ export class KhoaService {
     }
   }
 
-  async updateTrip(id: number, data: any) {
+  async updateTrip(id: number, data: any, userId?: number) {
     const trip = await this.chuyenRepo.findOne({ where: { id } });
     if (!trip) throw new NotFoundException('Không tìm thấy chuyến tham quan');
     if (['DaDienRa', 'DaHuy'].includes(trip.trang_thai)) {
@@ -1346,8 +1419,7 @@ export class KhoaService {
       data.suc_chua < trip.suc_chua &&
       ['MoDangKy', 'DaChotDanhSach'].includes(trip.trang_thai) // This is basically always false now because of !isRequiresApproval
     ) {
-      // Logic for reducing capacity immediately is blocked here, but for ChoDuyet we validate later or now?
-      // Let's validate now just in case
+      // Logic for reducing capacity immediately is blocked here, but for ChoDuyet we validate later or now
     }
     if (data.suc_chua && data.suc_chua < trip.suc_chua && ['MoDangKy', 'DaChotDanhSach'].includes(trip.trang_thai)) {
       const acceptedCount = await this.phieuRepo.count({
@@ -1418,7 +1490,27 @@ export class KhoaService {
       Object.assign(trip, data);
       const savedTrip = await this.chuyenRepo.save(trip);
 
-      // Removed the immediate notification for MoDangKy/DaChotDanhSach because it's now in approveEmergencyEdit
+      // Gửi thông báo đến Quản lý Khoa nếu đây là yêu cầu thay đổi khẩn cấp
+      if (isRequiresApproval) {
+        try {
+          const tripFull = await this.chuyenRepo.findOne({
+            where: { id },
+            relations: { nhaMay: true },
+          });
+          const nhaMayName = tripFull?.nhaMay?.ten_nha_may || 'N/A';
+          const maChuyen = `CTQ#${id}`;
+
+          await this.createNotification({
+            tieu_de: `[Khẩn cấp] Đề xuất sửa đổi chuyến tham quan: ${nhaMayName}`,
+            noi_dung: `Ban chủ nhiệm CLB đã gửi yêu cầu thay đổi khẩn cấp cho chuyến tham quan tại ${nhaMayName} (Mã chuyến: ${maChuyen}). Vui lòng xem xét và phê duyệt.`,
+            nguoi_gui_id: userId || 1,
+            doi_tuong_nhan: 'KHOA',
+            loai_thong_bao: 'CanhBao',
+          });
+        } catch (notifErr) {
+          console.warn('Lỗi gửi thông báo yêu cầu sửa chuyến khẩn cấp cho Khoa:', notifErr);
+        }
+      }
 
       // Keep TuDo logic if it's not approved yet (meaning it's just Nhap)
       if (trip.cach_to_chuc === 'TuDo' && !isRequiresApproval) {
@@ -1442,42 +1534,65 @@ export class KhoaService {
     }
   }
 
-  async approveEmergencyEdit(tripId: number, isApproved: boolean) {
-    const trip = await this.chuyenRepo.findOne({ where: { id: tripId } });
+  async approveEmergencyEdit(tripId: number, isApproved: boolean, userId?: number) {
+    const trip = await this.chuyenRepo.findOne({
+      where: { id: tripId },
+      relations: { nhaMay: true },
+    });
     if (!trip) throw new NotFoundException('Không tìm thấy chuyến tham quan');
 
     if (trip.trang_thai_sua_doi !== 'ChoDuyet') {
       throw new BadRequestException('Chuyến tham quan không có yêu cầu sửa đổi nào đang chờ duyệt');
     }
 
+    const nhaMayName = trip.nhaMay?.ten_nha_may || 'N/A';
+
     if (isApproved) {
       // Copy shadow data to main columns
-      const oldDate = trip.ngay_tham_quan;
-      const oldTime = trip.gio_bat_dau;
-
       if (trip.ngay_tham_quan_moi) trip.ngay_tham_quan = trip.ngay_tham_quan_moi;
       if (trip.gio_bat_dau_moi) trip.gio_bat_dau = trip.gio_bat_dau_moi;
       if (trip.suc_chua_moi) trip.suc_chua = trip.suc_chua_moi;
       if (trip.han_dong_le_phi_moi !== undefined) trip.han_dong_le_phi = trip.han_dong_le_phi_moi;
 
-      // Notify students if time changed
-      const isDateChanged = new Date(oldDate).getTime() !== new Date(trip.ngay_tham_quan).getTime();
-      const isTimeChanged = oldTime !== trip.gio_bat_dau;
-
-      if (isDateChanged || isTimeChanged) {
-        const dateStr = new Date(trip.ngay_tham_quan).toLocaleDateString('vi-VN');
-        let senderId = 1;
-        const adminAcc = await this.taiKhoanRepo.findOne({
-          where: { vaiTro: { ten_vai_tro: 'QuanTriVienHeThong' } },
-          relations: { vaiTro: true },
-        });
-        if (adminAcc) senderId = adminAcc.id;
-
+      // 1. Gửi thông báo đến Duyệt lịch CLB
+      try {
         await this.createNotification({
-          tieu_de: 'Cập nhật lịch trình tham quan khẩn cấp',
-          noi_dung: `Chuyến tham quan của bạn đã bị dời lịch sang ngày ${dateStr} lúc ${trip.gio_bat_dau} do yêu cầu đột xuất từ nhà máy. Nếu bạn kẹt lịch mới, bạn có quyền Hủy đăng ký tự do mà không bị phạt.`,
-          nguoi_gui_id: senderId,
+          tieu_de: `[Phê duyệt] Thay đổi khẩn cấp chuyến: ${nhaMayName}`,
+          noi_dung: `Khoa đã phê duyệt yêu cầu thay đổi lịch trình khẩn cấp cho chuyến tham quan tại ${nhaMayName}. Thông tin mới đã được cập nhật thành công trên hệ thống.`,
+          nguoi_gui_id: userId || 1,
+          doi_tuong_nhan: 'CLB',
+          loai_thong_bao: 'ThanhCong',
         });
+      } catch (e) {
+        console.warn('Lỗi gửi thông báo duyệt thay đổi khẩn cấp cho CLB:', e);
+      }
+
+      // 2. Gửi thông báo đến Sinh viên & Giảng viên (theo yêu cầu 3)
+      try {
+        const dateStr = trip.ngay_tham_quan ? new Date(trip.ngay_tham_quan).toLocaleDateString('vi-VN') : 'N/A';
+        await this.createNotification({
+          tieu_de: `[Khẩn cấp] Cập nhật lịch trình tham quan: ${nhaMayName}`,
+          noi_dung: `Chuyến tham quan tại ${nhaMayName} đã được cập nhật lịch sang ngày ${dateStr} lúc ${trip.gio_bat_dau || ''}. Nếu bạn bị kẹt lịch mới, bạn có quyền Hủy đăng ký tự do mà không bị phạt.`,
+          nguoi_gui_id: userId || 1,
+          doi_tuong_nhan: 'ALL',
+          loai_thong_bao: 'CanhBao',
+        });
+      } catch (e) {
+        console.warn('Lỗi gửi thông báo thay đổi lịch trình cho sinh viên:', e);
+      }
+    } else {
+      // isApproved === false: Từ chối yêu cầu thay đổi
+      // 1. Gửi thông báo đến Duyệt lịch CLB (kèm từ chối, KHÔNG gửi SV/GV)
+      try {
+        await this.createNotification({
+          tieu_de: `[Từ chối] Thay đổi khẩn cấp chuyến: ${nhaMayName}`,
+          noi_dung: `Khoa đã từ chối yêu cầu thay đổi lịch trình khẩn cấp cho chuyến tham quan tại ${nhaMayName}. Lịch trình ban đầu vẫn được giữ nguyên.`,
+          nguoi_gui_id: userId || 1,
+          doi_tuong_nhan: 'CLB',
+          loai_thong_bao: 'CanhBao',
+        });
+      } catch (e) {
+        console.warn('Lỗi gửi thông báo từ chối thay đổi khẩn cấp cho CLB:', e);
       }
     }
 
@@ -3977,9 +4092,18 @@ export class KhoaService {
     };
   }
 
-  // Get all notifications
-  async getNotifications() {
+  // Get all notifications (filtered by role if CLB)
+  async getNotifications(role?: string, userSub?: number) {
+    let whereCondition: any = undefined;
+    if (role === 'QuanLyCLB') {
+      whereCondition = [
+        { doi_tuong_nhan: In(['ALL', 'CLB']) },
+        ...(userSub ? [{ nguoi_gui_id: userSub }] : []),
+      ];
+    }
+
     const list = await this.thongBaoRepo.find({
+      where: whereCondition,
       relations: {
         nguoiGui: true,
         khoaHoc: true,
@@ -4030,18 +4154,20 @@ export class KhoaService {
       savedNotif.files = [file];
     }
 
-    // Queue background jobs for email and reminder notification
-    await this.taskQueueService.addJob('send-email', {
-      to: 'sinhvien-khoa@hcmute.edu.vn',
-      subject: `[Thông báo kiến tập] ${savedNotif.tieu_de}`,
-      body: savedNotif.noi_dung,
-    });
+    // Queue background jobs for email and reminder notification ONLY for students/all
+    if (savedNotif.doi_tuong_nhan === 'ALL' || savedNotif.doi_tuong_nhan === 'STUDENT') {
+      await this.taskQueueService.addJob('send-email', {
+        to: 'sinhvien-khoa@hcmute.edu.vn',
+        subject: `[Thông báo kiến tập] ${savedNotif.tieu_de}`,
+        body: savedNotif.noi_dung,
+      });
 
-    await this.taskQueueService.addJob('send-reminder', {
-      studentId: 0, // 0 denotes all students in the campaign
-      title: savedNotif.tieu_de,
-      message: 'Khoa vừa cập nhật thông báo mới về đợt kiến tập.',
-    });
+      await this.taskQueueService.addJob('send-reminder', {
+        studentId: 0, // 0 denotes all students in the campaign
+        title: savedNotif.tieu_de,
+        message: 'Khoa vừa cập nhật thông báo mới về đợt kiến tập.',
+      });
+    }
 
     return savedNotif;
   }
