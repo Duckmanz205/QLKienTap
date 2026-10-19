@@ -55,6 +55,7 @@ export const khoaApi = {
   importStudents: (data) => api.post(`${getAdminPrefix()}/import-students`, data),
   getTrips: (params) => api.get(`${getAdminPrefix()}/trips`, { params }),
   getProposals: () => api.get(`${getAdminPrefix()}/proposals`),
+  getMatchingTrips: (id) => api.get(`${getAdminPrefix()}/proposals/${id}/matching-trips`),
   createTrip: (data) => api.post(`${getAdminPrefix()}/trips`, data),
   updateTrip: (id, data) => api.put(`${getAdminPrefix()}/trips/${id}`, data),
   deleteTrip: (id) => api.delete(`${getAdminPrefix()}/trips/${id}`),

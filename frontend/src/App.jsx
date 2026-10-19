@@ -179,14 +179,10 @@ export default function App() {
             <Route path="clb/fees" element={<QuanLyLePhi_Khoa />} />
             <Route path="clb/refund-approval" element={<DuyetHoanPhi_Khoa />} />
             <Route path="clb/visit-report" element={<XemTruocBaoCaoThamQuan_Khoa />} />
-            <Route path="clb/results" element={<KetQuaKienTap_MaTranDiem_Khoa />} />
             <Route path="clb/notifications" element={<ThongBao_Khoa />} />
             <Route path="clb/reports" element={<BaoCaoThongKe_Khoa />} />
             <Route path="clb/visited-students" element={<BaoCao_SVThamQuan_Khoa />} />
             <Route path="clb/not-visited-students" element={<BaoCao_SVChuaThamQuan_Khoa />} />
-            <Route path="clb/eligible-students" element={<BaoCao_SVDuDieuKien_Khoa />} />
-            <Route path="clb/retake-students" element={<BaoCao_SVKhongThucHien_Khoa />} />
-            <Route path="clb/final-results" element={<BaoCao_SVDatKhongDat_Khoa />} />
           </Route>
 
           {/* QTV Portal Routes */}

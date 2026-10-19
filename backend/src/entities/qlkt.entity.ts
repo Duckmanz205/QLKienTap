@@ -590,7 +590,7 @@ export class PhieuDeXuatChuyenThamQuan {
   @Column({ type: 'datetime2', nullable: true })
   ngay_duyet: Date;
 
-  @OneToOne(() => ChuyenThamQuan, { nullable: true })
+  @ManyToOne(() => ChuyenThamQuan, { nullable: true })
   @JoinColumn({ name: 'chuyen_tham_quan_id' })
   chuyenThamQuan: ChuyenThamQuan;
 

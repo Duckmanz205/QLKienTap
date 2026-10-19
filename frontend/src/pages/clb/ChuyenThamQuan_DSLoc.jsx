@@ -111,6 +111,14 @@ export default function ChuyenThamQuan_DSLoc() {
   const [lecturerSearchTerm, setLecturerSearchTerm] = useState('');
   const selectedLecturer = lecturers.find(g => String(g.id) === String(selectedLecturerId));
 
+  // State gộp chuyến tham quan tự do
+  const [matchingLoading, setMatchingLoading] = useState(false);
+  const [matchingTripsData, setMatchingTripsData] = useState([]);
+  const [otherPendingProposalsData, setOtherPendingProposalsData] = useState([]);
+  const [approvalMode, setApprovalMode] = useState('new'); // 'new' | 'merge_existing'
+  const [selectedMergeTripId, setSelectedMergeTripId] = useState(null);
+  const [selectedBatchProposalIds, setSelectedBatchProposalIds] = useState([]);
+
   const filteredModalLecturers = useMemo(() => {
     if (!lecturerSearchTerm.trim()) return lecturers;
     const q = lecturerSearchTerm.toLowerCase();
@@ -340,6 +348,24 @@ export default function ChuyenThamQuan_DSLoc() {
     showConfirm(`Xác nhận ${actionText}`, `Bạn có chắc chắn muốn ${actionText} yêu cầu sửa đổi thông tin cho chuyến tham quan này?`, action);
   };
 
+  const fetchMatchingTrips = async (proposalId) => {
+    setMatchingLoading(true);
+    try {
+      const res = await khoaApi.getMatchingTrips(proposalId);
+      const matches = res.data?.matchingTrips || [];
+      const others = res.data?.otherPendingProposals || [];
+      setMatchingTripsData(matches);
+      setOtherPendingProposalsData(others);
+      if (matches.length > 0) {
+        setSelectedMergeTripId(matches[0].id);
+      }
+    } catch (err) {
+      console.error('Lỗi khi lấy thông tin chuyến trùng khớp:', err);
+    } finally {
+      setMatchingLoading(false);
+    }
+  };
+
   const handleApproveTrip = (tripOrId, isApproved) => {
     if (!currentUser) {
       showPopup('Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.', 'error');
@@ -361,9 +387,15 @@ export default function ChuyenThamQuan_DSLoc() {
         return;
       }
 
-      // Nếu là CLB: Mở Modal chọn giảng viên dẫn đoàn
+      // Nếu là CLB: Mở Modal chọn giảng viên / Gộp chuyến
       setSelectedLecturerId(tripObj?.giang_vien_id || tripObj?.giangVien?.id ? String(tripObj?.giang_vien_id || tripObj?.giangVien?.id) : '');
       setLecturerSearchTerm('');
+      setApprovalMode('new');
+      setSelectedMergeTripId(null);
+      setSelectedBatchProposalIds([]);
+      setMatchingTripsData([]);
+      setOtherPendingProposalsData([]);
+      fetchMatchingTrips(tripId);
       setIsLecturerModalOpen(true);
       return;
     }
@@ -399,8 +431,32 @@ export default function ChuyenThamQuan_DSLoc() {
     }
   };
 
-  // Xác nhận Duyệt Sơ Bộ từ CLB (Bắt buộc chọn Giảng viên)
+  // Xác nhận Duyệt Sơ Bộ từ CLB (Hỗ trợ Tạo mới hoặc Gộp vào chuyến tự do đã có)
   const submitApproveWithLecturer = async () => {
+    if (approvalMode === 'merge_existing') {
+      if (!selectedMergeTripId) {
+        showPopup('Vui lòng chọn chuyến tham quan tự do muốn gộp vào', 'error');
+        return;
+      }
+      try {
+        const res = await khoaApi.approveTrip({ 
+          tripId: pendingApprovalTripId, 
+          approverId: currentUser.id, 
+          isApproved: true,
+          gopVaoChuyenId: Number(selectedMergeTripId),
+          gopCacPhieuDeXuatIds: selectedBatchProposalIds.length > 0 ? selectedBatchProposalIds : undefined,
+        });
+        showPopup(res.data?.message || 'Đã gộp đề xuất vào chuyến tham quan thành công', 'success');
+        setIsLecturerModalOpen(false);
+        fetchTrips();
+      } catch (err) {
+        console.error(err);
+        showPopup(err.response?.data?.message || 'Có lỗi xảy ra khi gộp chuyến', 'error');
+      }
+      return;
+    }
+
+    // Chế độ 'new'
     if (!selectedLecturerId) {
       showPopup('Vui lòng chọn giảng viên dẫn đoàn', 'error');
       return;
@@ -411,7 +467,8 @@ export default function ChuyenThamQuan_DSLoc() {
         tripId: pendingApprovalTripId, 
         approverId: currentUser.id, 
         isApproved: true,
-        giangVienId: parseInt(selectedLecturerId)
+        giangVienId: parseInt(selectedLecturerId),
+        gopCacPhieuDeXuatIds: selectedBatchProposalIds.length > 0 ? selectedBatchProposalIds : undefined,
       });
       showPopup(res.data?.message || 'CLB đã duyệt sơ bộ đề xuất thành công', 'success');
       setIsLecturerModalOpen(false);
@@ -1052,6 +1109,11 @@ export default function ChuyenThamQuan_DSLoc() {
                             {!['ChoDuyet', 'ChoKhoaDuyet', 'DaDuyet', 'TuChoi'].includes(t.trang_thai_duyet) && (
                               <span className="inline-flex items-center px-2 py-1 rounded bg-slate-100 text-slate-500 text-[10px] font-bold border border-slate-200 whitespace-nowrap">
                                 {t.trang_thai_duyet}
+                              </span>
+                            )}
+                            {t.chuyen_tham_quan_id && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-mono border border-slate-200 ml-1.5" title={`Thuộc chuyến tham quan #${t.chuyen_tham_quan_id}`}>
+                                #{t.chuyen_tham_quan_id}
                               </span>
                             )}
                           </td>
@@ -1871,10 +1933,10 @@ export default function ChuyenThamQuan_DSLoc() {
         </div>
       )}
 
-      {/* CLB Duyệt Sơ Bộ: Modal Chọn Giảng Viên Dẫn Đoàn (2-Column Layout) */}
+      {/* CLB Duyệt Sơ Bộ: Modal Chọn Giảng Viên / Gộp Chuyến Tự Do */}
       {!isAdmin && isLecturerModalOpen && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl w-full max-w-3xl shadow-xl flex flex-col border border-slate-200 overflow-hidden">
+          <div className="bg-white rounded-2xl w-full max-w-4xl shadow-xl flex flex-col border border-slate-200 overflow-hidden max-h-[92vh]">
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-slate-50/50">
               <div className="flex items-center gap-3">
@@ -1883,10 +1945,10 @@ export default function ChuyenThamQuan_DSLoc() {
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-slate-800">
-                    CLB duyệt sơ bộ & Đề xuất Giảng viên
+                    CLB duyệt sơ bộ & Phân bổ Chuyến tham quan
                   </h2>
                   <p className="text-xs text-slate-500">
-                    Thẩm định đề xuất của sinh viên và phân công giảng viên dẫn đoàn
+                    Thẩm định đề xuất tự do, gộp chuyến thông minh hoặc phân công giảng viên dẫn đoàn
                   </p>
                 </div>
               </div>
@@ -1897,13 +1959,87 @@ export default function ChuyenThamQuan_DSLoc() {
                 <X className="w-5 h-5" />
               </button>
             </div>
+
+            {/* Smart Banner: Gợi ý gộp chuyến nếu có chuyến trùng hợp */}
+            {matchingTripsData.length > 0 && (
+              <div className="mx-6 mt-3 p-3 bg-amber-50/80 border border-amber-200/80 rounded-xl text-xs text-amber-900 flex items-start gap-2.5 shrink-0">
+                <span className="text-base leading-none">💡</span>
+                <div className="flex-1">
+                  <div className="font-bold">
+                    Phát hiện có {matchingTripsData.length} chuyến tự do đến cùng nhà máy trong ngày này!
+                  </div>
+                  <div className="text-amber-800 text-[11px] mt-0.5">
+                    Bạn có thể chọn <strong>"Gộp vào chuyến đã có"</strong> để tránh tạo thêm chuyến mới làm loãng danh sách.
+                  </div>
+                </div>
+                {approvalMode !== 'merge_existing' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setApprovalMode('merge_existing');
+                      if (matchingTripsData.length > 0 && !selectedMergeTripId) {
+                        setSelectedMergeTripId(matchingTripsData[0].id);
+                      }
+                    }}
+                    className="px-2.5 py-1 text-[11px] font-bold bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors shrink-0 cursor-pointer shadow-xs"
+                  >
+                    Chuyển sang gộp chuyến
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Segmented Mode Selector */}
+            <div className="px-6 pt-3 shrink-0 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setApprovalMode('new')}
+                className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl border transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                  approvalMode === 'new'
+                    ? 'bg-[#89B449] border-[#89B449] text-white shadow-xs'
+                    : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <span>⚡ Tạo chuyến mới</span>
+                {selectedBatchProposalIds.length > 0 && (
+                  <span className="px-1.5 py-0.2 bg-white/20 text-white rounded-full text-[10px]">
+                    +{selectedBatchProposalIds.length} SV
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setApprovalMode('merge_existing');
+                  if (matchingTripsData.length > 0 && !selectedMergeTripId) {
+                    setSelectedMergeTripId(matchingTripsData[0].id);
+                  }
+                }}
+                disabled={matchingTripsData.length === 0}
+                className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl border transition-all flex items-center justify-center gap-2 ${
+                  matchingTripsData.length === 0
+                    ? 'opacity-40 border-dashed border-slate-200 text-slate-400 cursor-not-allowed bg-slate-50'
+                    : approvalMode === 'merge_existing'
+                    ? 'bg-[#407F3E] border-[#407F3E] text-white shadow-xs cursor-pointer'
+                    : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 cursor-pointer'
+                }`}
+              >
+                <span>🔗 Gộp vào chuyến tự do đã có</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                  approvalMode === 'merge_existing' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                }`}>
+                  {matchingTripsData.length}
+                </span>
+              </button>
+            </div>
             
             {/* Modal Body - 2 Columns */}
-            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
-              {/* Cột trái: Tóm tắt thông tin đề xuất */}
-              <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 text-xs flex flex-col justify-between">
-                <div>
-                  <div className="pb-3 border-b border-slate-200">
+            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-5 overflow-y-auto min-h-0">
+              {/* Cột trái: Tóm tắt thông tin đề xuất & Các đề xuất cùng ngày chờ gom */}
+              <div className="space-y-3 flex flex-col justify-between">
+                <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 text-xs space-y-3">
+                  <div className="pb-2.5 border-b border-slate-200">
                     <span className="text-slate-500 block text-[11px] mb-0.5">Sinh viên đề xuất</span>
                     <div className="font-bold text-slate-800 text-sm">
                       {pendingApprovalTrip?.sinhVien?.ho_ten || 'Sinh viên'}
@@ -1913,7 +2049,7 @@ export default function ChuyenThamQuan_DSLoc() {
                     </div>
                   </div>
 
-                  <div className="py-3 space-y-2.5 text-slate-700">
+                  <div className="space-y-2 text-slate-700 text-xs">
                     <div>
                       <span className="text-slate-400 block text-[11px]">Doanh nghiệp / Nhà máy:</span>
                       <span className="font-bold text-slate-800 text-xs">
@@ -1941,109 +2077,261 @@ export default function ChuyenThamQuan_DSLoc() {
                       </div>
                     </div>
 
-                    <div>
-                      <span className="text-slate-400 block text-[11px]">Người liên hệ DN:</span>
-                      <span className="font-medium text-slate-700">
-                        {pendingApprovalTrip?.nguoi_lien_he_de_xuat || '--'}
-                        {pendingApprovalTrip?.sdt_lien_he_de_xuat && ` - ${pendingApprovalTrip.sdt_lien_he_de_xuat}`}
-                      </span>
-                    </div>
+                    {pendingApprovalTrip?.nguoi_lien_he_de_xuat && (
+                      <div>
+                        <span className="text-slate-400 block text-[11px]">Người liên hệ DN:</span>
+                        <span className="font-medium text-slate-700">
+                          {pendingApprovalTrip?.nguoi_lien_he_de_xuat}
+                          {pendingApprovalTrip?.sdt_lien_he_de_xuat && ` - ${pendingApprovalTrip.sdt_lien_he_de_xuat}`}
+                        </span>
+                      </div>
+                    )}
+
+                    {pendingApprovalTrip?.dia_chi_de_xuat && (
+                      <div className="pt-1.5 border-t border-slate-200/80 text-[11px] text-slate-500">
+                        <span className="text-slate-400 block mb-0.5">Địa chỉ:</span>
+                        <span className="line-clamp-2">{pendingApprovalTrip.dia_chi_de_xuat}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                {pendingApprovalTrip?.dia_chi_de_xuat && (
-                  <div className="pt-2 border-t border-slate-200 text-[11px] text-slate-500">
-                    <span className="text-slate-400 block mb-0.5">Địa chỉ:</span>
-                    <span className="line-clamp-2">{pendingApprovalTrip.dia_chi_de_xuat}</span>
+                {/* Danh sách các đề xuất tự do khác cùng ngày & nhà máy có thể gom duyệt cùng lúc */}
+                {otherPendingProposalsData.length > 0 && (
+                  <div className="bg-emerald-50/50 border border-emerald-200/80 rounded-xl p-3 text-xs">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-bold text-[#407F3E] text-xs flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5" />
+                        Gom thêm đề xuất cùng ngày ({otherPendingProposalsData.length})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (selectedBatchProposalIds.length === otherPendingProposalsData.length) {
+                            setSelectedBatchProposalIds([]);
+                          } else {
+                            setSelectedBatchProposalIds(otherPendingProposalsData.map(p => p.id));
+                          }
+                        }}
+                        className="text-[11px] text-[#407F3E] hover:underline font-semibold cursor-pointer"
+                      >
+                        {selectedBatchProposalIds.length === otherPendingProposalsData.length ? 'Bỏ chọn' : 'Chọn tất cả'}
+                      </button>
+                    </div>
+
+                    <div className="max-h-[140px] overflow-y-auto space-y-1.5 pr-1">
+                      {otherPendingProposalsData.map((p) => {
+                        const isChecked = selectedBatchProposalIds.includes(p.id);
+                        return (
+                          <div
+                            key={p.id}
+                            onClick={() => {
+                              setSelectedBatchProposalIds(prev => 
+                                isChecked ? prev.filter(id => id !== p.id) : [...prev, p.id]
+                              );
+                            }}
+                            className={`p-2 rounded-lg border text-xs cursor-pointer transition-colors flex items-center justify-between ${
+                              isChecked
+                                ? 'bg-white border-[#89B449] shadow-xs'
+                                : 'bg-white/60 border-slate-200 hover:bg-white text-slate-700'
+                            }`}
+                          >
+                            <div className="min-w-0 pr-2">
+                              <div className="font-bold text-slate-800 truncate">
+                                {p.ho_ten || 'Sinh viên'}
+                              </div>
+                              <div className="text-[11px] text-slate-500 font-mono">
+                                {p.ma_sinh_vien} • {p.lop || '--'} {p.gio_bat_dau_de_xuat ? `(${p.gio_bat_dau_de_xuat.substring(0, 5)})` : ''}
+                              </div>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {}}
+                              className="w-4 h-4 rounded text-[#89B449] focus:ring-[#89B449] accent-[#89B449] cursor-pointer"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>
 
-              {/* Cột phải: Chọn Giảng viên dẫn đoàn */}
-              <div className="flex flex-col">
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    Giảng viên dẫn đoàn <span className="text-red-500">*</span>
-                  </label>
-                  <span className="text-[11px] text-slate-400">
-                    {filteredModalLecturers.length} giảng viên
-                  </span>
-                </div>
+              {/* Cột phải: Thay đổi theo Mode */}
+              {approvalMode === 'merge_existing' ? (
+                /* CHẾ ĐỘ 1: Chọn Chuyến Tham Quan Tự Do Đã Có Để Gộp Vào */
+                <div className="flex flex-col">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Chọn chuyến tự do muốn gộp vào <span className="text-red-500">*</span>
+                    </label>
+                    <span className="text-[11px] text-slate-400">
+                      {matchingTripsData.length} chuyến khả dụng
+                    </span>
+                  </div>
 
-                {/* Input tìm kiếm nhanh */}
-                <div className="relative mb-2">
-                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="Tìm theo tên hoặc mã giảng viên..."
-                    value={lecturerSearchTerm}
-                    onChange={(e) => setLecturerSearchTerm(e.target.value)}
-                    className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-[#89B449] focus:bg-white text-slate-800 transition-colors"
-                  />
-                </div>
-
-                {/* Danh sách giảng viên trực quan cuộn bên trong */}
-                <div className="h-[210px] overflow-y-auto space-y-1.5 border border-slate-200 rounded-lg p-1.5 bg-slate-50/50">
-                  {filteredModalLecturers.length === 0 ? (
-                    <div className="h-full flex items-center justify-center text-xs text-slate-400 italic">
-                      Không tìm thấy giảng viên phù hợp
-                    </div>
-                  ) : (
-                    filteredModalLecturers.map((gv) => {
-                      const isSelected = String(selectedLecturerId) === String(gv.id);
+                  <div className="h-[280px] overflow-y-auto space-y-2 border border-slate-200 rounded-xl p-2 bg-slate-50/50">
+                    {matchingTripsData.map((t) => {
+                      const isSelected = selectedMergeTripId === t.id;
+                      const gvText = t.giang_vien_dan_doan?.length > 0
+                        ? t.giang_vien_dan_doan.map(g => g.ho_ten).join(', ')
+                        : 'Chưa có GV';
                       return (
                         <div
-                          key={gv.id}
-                          onClick={() => setSelectedLecturerId(gv.id)}
-                          className={`p-2 rounded-lg cursor-pointer transition-all flex items-center justify-between text-xs ${
+                          key={t.id}
+                          onClick={() => setSelectedMergeTripId(t.id)}
+                          className={`p-3 rounded-xl cursor-pointer transition-all border text-xs ${
                             isSelected
-                              ? 'bg-emerald-50 border border-[#89B449] text-slate-900 font-medium'
-                              : 'bg-white hover:bg-slate-100 border border-slate-200/60 text-slate-700'
+                              ? 'bg-emerald-50 border-[#407F3E] shadow-xs'
+                              : 'bg-white hover:bg-slate-100 border-slate-200/80 text-slate-700'
                           }`}
                         >
-                          <div className="min-w-0 pr-2">
-                            <div className="font-bold text-slate-800 truncate">
-                              {gv.ho_ten}
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <div className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                                <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-mono text-[11px]">
+                                  #{t.id}
+                                </span>
+                                <span>{t.ten_nha_may}</span>
+                              </div>
+                              <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-2">
+                                <span>🕒 {t.gio_bat_dau ? String(t.gio_bat_dau).substring(0, 5) : '--'}</span>
+                                <span>•</span>
+                                <span>👥 Hiện tại: <strong>{t.so_luong_hien_tai}/{t.suc_chua}</strong> SV</span>
+                              </div>
+                              <div className="text-[11px] text-slate-600 mt-1 flex items-center gap-1">
+                                <span className="text-slate-400">GV dẫn đoàn:</span>
+                                <span className="font-medium text-slate-700 truncate">{gvText}</span>
+                              </div>
                             </div>
-                            <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
-                              <span className="font-mono">{gv.ma_gv || gv.magv || gv.ma_giang_vien || '--'}</span>
-                              {gv.bo_mon && <span>• {gv.bo_mon}</span>}
-                            </div>
-                          </div>
 
-                          <div className="shrink-0">
-                            {isSelected ? (
-                              <span className="w-4 h-4 rounded-full bg-[#89B449] text-white flex items-center justify-center">
-                                <Check className="w-3 h-3 stroke-[3]" />
-                              </span>
-                            ) : (
-                              <span className="w-4 h-4 rounded-full border border-slate-300 block" />
-                            )}
+                            <div className="shrink-0 mt-1">
+                              {isSelected ? (
+                                <span className="w-5 h-5 rounded-full bg-[#407F3E] text-white flex items-center justify-center">
+                                  <Check className="w-3.5 h-3.5 stroke-[3]" />
+                                </span>
+                              ) : (
+                                <span className="w-5 h-5 rounded-full border border-slate-300 block" />
+                              )}
+                            </div>
                           </div>
                         </div>
                       );
-                    })
-                  )}
+                    })}
+                  </div>
+
+                  <p className="text-[11px] text-slate-500 mt-2 italic">
+                    ℹ️ Khi gộp, hệ thống sẽ tự động tăng sức chứa của chuyến tham quan và liên kết tất cả sinh viên được chọn vào chuyến này.
+                  </p>
                 </div>
-              </div>
+              ) : (
+                /* CHẾ ĐỘ 2: Tạo Chuyến Mới & Chọn Giảng Viên Dẫn Đoàn */
+                <div className="flex flex-col">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Giảng viên dẫn đoàn <span className="text-red-500">*</span>
+                    </label>
+                    <span className="text-[11px] text-slate-400">
+                      {filteredModalLecturers.length} giảng viên
+                    </span>
+                  </div>
+
+                  {/* Input tìm kiếm nhanh */}
+                  <div className="relative mb-2">
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Tìm theo tên hoặc mã giảng viên..."
+                      value={lecturerSearchTerm}
+                      onChange={(e) => setLecturerSearchTerm(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-[#89B449] focus:bg-white text-slate-800 transition-colors"
+                    />
+                  </div>
+
+                  {/* Danh sách giảng viên trực quan cuộn bên trong */}
+                  <div className="h-[230px] overflow-y-auto space-y-1.5 border border-slate-200 rounded-lg p-1.5 bg-slate-50/50">
+                    {filteredModalLecturers.length === 0 ? (
+                      <div className="h-full flex items-center justify-center text-xs text-slate-400 italic">
+                        Không tìm thấy giảng viên phù hợp
+                      </div>
+                    ) : (
+                      filteredModalLecturers.map((gv) => {
+                        const isSelected = String(selectedLecturerId) === String(gv.id);
+                        return (
+                          <div
+                            key={gv.id}
+                            onClick={() => setSelectedLecturerId(gv.id)}
+                            className={`p-2 rounded-lg cursor-pointer transition-all flex items-center justify-between text-xs ${
+                              isSelected
+                                ? 'bg-emerald-50 border border-[#89B449] text-slate-900 font-medium'
+                                : 'bg-white hover:bg-slate-100 border border-slate-200/60 text-slate-700'
+                            }`}
+                          >
+                            <div className="min-w-0 pr-2">
+                              <div className="font-bold text-slate-800 truncate">
+                                {gv.ho_ten}
+                              </div>
+                              <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
+                                <span className="font-mono">{gv.ma_gv || gv.magv || gv.ma_giang_vien || '--'}</span>
+                                {gv.bo_mon && <span>• {gv.bo_mon}</span>}
+                              </div>
+                            </div>
+
+                            <div className="shrink-0">
+                              {isSelected ? (
+                                <span className="w-4 h-4 rounded-full bg-[#89B449] text-white flex items-center justify-center">
+                                  <Check className="w-3 h-3 stroke-[3]" />
+                                </span>
+                              ) : (
+                                <span className="w-4 h-4 rounded-full border border-slate-300 block" />
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Modal Footer */}
-            <div className="px-6 py-3.5 border-t border-slate-100 bg-slate-50/50 flex justify-end items-center gap-3 shrink-0">
-              <button
-                onClick={() => setIsLecturerModalOpen(false)}
-                className="px-5 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 bg-slate-100 rounded-xl transition-colors cursor-pointer"
-              >
-                Hủy
-              </button>
-              <button
-                onClick={submitApproveWithLecturer}
-                disabled={!selectedLecturerId}
-                className="px-6 py-2 text-sm font-bold text-white bg-[#89B449] hover:bg-[#89B449]/90 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition-colors cursor-pointer flex items-center gap-2 shadow-xs"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                Xác nhận duyệt sơ bộ
-              </button>
+            <div className="px-6 py-3.5 border-t border-slate-100 bg-slate-50/50 flex justify-between items-center gap-3 shrink-0">
+              <div className="text-xs text-slate-500">
+                {approvalMode === 'merge_existing' ? (
+                  <span>Đang chọn: <strong>Chuyến #{selectedMergeTripId || '--'}</strong> (Gộp {1 + selectedBatchProposalIds.length} sinh viên)</span>
+                ) : (
+                  <span>Tạo chuyến mới cho <strong>{1 + selectedBatchProposalIds.length}</strong> sinh viên</span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsLecturerModalOpen(false)}
+                  className="px-5 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  onClick={submitApproveWithLecturer}
+                  disabled={approvalMode === 'merge_existing' ? !selectedMergeTripId : !selectedLecturerId}
+                  className={`px-6 py-2 text-sm font-bold text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition-colors cursor-pointer flex items-center gap-2 shadow-xs ${
+                    approvalMode === 'merge_existing'
+                      ? 'bg-[#407F3E] hover:bg-[#407F3E]/90'
+                      : 'bg-[#89B449] hover:bg-[#89B449]/90'
+                  }`}
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  {approvalMode === 'merge_existing'
+                    ? `Xác nhận gộp vào chuyến #${selectedMergeTripId}`
+                    : selectedBatchProposalIds.length > 0
+                    ? `Xác nhận duyệt gom ${1 + selectedBatchProposalIds.length} đề xuất`
+                    : 'Xác nhận duyệt sơ bộ'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
