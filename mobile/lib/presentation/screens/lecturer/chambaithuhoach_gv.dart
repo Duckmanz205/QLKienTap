@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/network/api_service.dart';
 import '../../../data/models/app_models.dart';
@@ -21,30 +20,58 @@ class ChamBaiThuHoachGVScreen extends StatefulWidget {
 }
 
 class _ChamBaiThuHoachGVScreenState extends State<ChamBaiThuHoachGVScreen> {
-  String _gradeScreenTab = 'preparation'; // 'preparation' or 'report'
   late TextEditingController _commentController;
   late TextEditingController _gradeController;
   bool _isAIGrading = false;
+  bool _isSaving = false;
   double? _aiGrade;
+
+  @override
+  void initState() {
+    super.initState();
+    _commentController = TextEditingController(text: widget.student.comment ?? '');
+    _gradeController = TextEditingController(
+      text: widget.student.gvhdGrade > 0 ? widget.student.gvhdGrade.toString() : '',
+    );
+    _aiGrade = widget.student.aiSuggestedGrade;
+  }
+
+  @override
+  void didUpdateWidget(covariant ChamBaiThuHoachGVScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.student.comment != oldWidget.student.comment) {
+      _commentController.text = widget.student.comment ?? '';
+    }
+    if (widget.student.gvhdGrade != oldWidget.student.gvhdGrade) {
+      _gradeController.text = widget.student.gvhdGrade > 0 ? widget.student.gvhdGrade.toString() : '';
+    }
+  }
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    _gradeController.dispose();
+    super.dispose();
+  }
 
   Future<void> _handleAIGrading() async {
     if (widget.student.reportFileUrl == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sinh viên chưa nộp bài')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sinh viên chưa nộp bài báo cáo.')));
       return;
     }
-    
-    setState(() {
-      _isAIGrading = true;
-    });
-    
+
+    setState(() => _isAIGrading = true);
+
     try {
       final text = await ApiService.fetchReportText(widget.student.reportFileUrl!);
       final data = await ApiService.gradeWithAI(text);
-      
+
       setState(() {
         _aiGrade = double.tryParse(data['diem_bao_cao_cuoi_cung']?.toString() ?? '');
-        _gradeController.text = _aiGrade?.toString() ?? '';
-        
+        if (_aiGrade != null) {
+          _gradeController.text = _aiGrade!.toString();
+        }
+
         List<String> commentLines = [];
         final ht = data['hinh_thuc_tong_quan'];
         if (ht != null) {
@@ -59,19 +86,21 @@ class _ChamBaiThuHoachGVScreenState extends State<ChamBaiThuHoachGVScreen> {
         if (vs != null) {
           commentLines.add('4. VSATTP (${vs['diem_vsattp']}): ${vs['ly_do_vsattp']}');
         }
-        
+
         _commentController.text = commentLines.join('\n\n');
       });
-      
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Chấm điểm AI thành công! Hãy lưu lại.'), backgroundColor: AppColors.secondary));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Chấm điểm AI hoàn tất! Hãy kiểm tra và lưu lại.'), backgroundColor: AppColors.secondary),
+        );
       }
     } catch (e) {
       if (mounted) {
         showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('Lỗi chấm AI', style: TextStyle(color: Colors.red)),
+            title: const Text('Lỗi chấm AI', style: TextStyle(color: AppColors.danger)),
             content: Text(e.toString()),
             actions: [
               TextButton(
@@ -84,42 +113,64 @@ class _ChamBaiThuHoachGVScreenState extends State<ChamBaiThuHoachGVScreen> {
       }
     } finally {
       if (mounted) {
-        setState(() {
-          _isAIGrading = false;
-        });
+        setState(() => _isAIGrading = false);
+      }
+    }
+  }
+
+  Future<void> _saveGrade() async {
+    final gradeText = _gradeController.text.trim();
+    final grade = double.tryParse(gradeText);
+    if (grade == null || grade < 0 || grade > 10) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng nhập điểm hợp lệ từ 0 đến 10.'), backgroundColor: AppColors.danger),
+      );
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    final appStateProvider = AppStateProvider.of(context);
+
+    try {
+      final repId = widget.student.reportId;
+      if (repId != null && repId > 0) {
+        await ApiService.gradeReport(repId, grade, _commentController.text.trim());
+        if (_aiGrade != null) {
+          await ApiService.saveAIGrade(repId, _aiGrade!, _commentController.text.trim());
+        }
+      }
+
+      appStateProvider.updateStudentGrade(
+        widget.student.id,
+        gvhdGrade: grade,
+        comment: _commentController.text.trim(),
+        isGraded: true,
+      );
+
+      widget.onGradeSaved();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đã lưu điểm bài thu hoạch thành công!'), backgroundColor: AppColors.secondary),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi lưu điểm: $e'), backgroundColor: AppColors.danger),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
       }
     }
   }
 
   @override
-  void initState() {
-    super.initState();
-    _commentController = TextEditingController(text: widget.student.comment ?? '');
-    _gradeController = TextEditingController(text: widget.student.gvhdGrade.toString());
-    _aiGrade = widget.student.aiSuggestedGrade;
-  }
-
-  @override
-  void didUpdateWidget(covariant ChamBaiThuHoachGVScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.student.comment != oldWidget.student.comment) {
-      _commentController.text = widget.student.comment ?? '';
-    }
-    if (widget.student.gvhdGrade != oldWidget.student.gvhdGrade) {
-      _gradeController.text = widget.student.gvhdGrade.toString();
-    }
-  }
-
-  @override
-  void dispose() {
-    _commentController.dispose();
-    _gradeController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final appStateProvider = AppStateProvider.of(context);
+    final hasReportFile = widget.student.reportFileUrl != null && widget.student.reportFileUrl!.isNotEmpty;
+    final hasConfirmFile = widget.student.confirmationFileUrl != null && widget.student.confirmationFileUrl!.isNotEmpty;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -128,112 +179,193 @@ class _ChamBaiThuHoachGVScreenState extends State<ChamBaiThuHoachGVScreen> {
         children: [
           // Profile Info Card
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: const Color(0xFFE9E5D3), // yellow/beige tint
-              borderRadius: BorderRadius.circular(12),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.beigeBorder),
+              boxShadow: const [
+                BoxShadow(color: AppColors.cardShadow, blurRadius: 6, offset: Offset(0, 2)),
+              ],
             ),
             child: Row(
               children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(8), 
-                  child: Image.network(widget.student.avatar, width: 64, height: 64, fit: BoxFit.cover),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    widget.student.avatar,
+                    width: 60,
+                    height: 60,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => Container(
+                      width: 60,
+                      height: 60,
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      alignment: Alignment.center,
+                      child: const Icon(Icons.person, color: AppColors.primary, size: 30),
+                    ),
+                  ),
                 ),
-                const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('MSSV: ${widget.student.id}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87)),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(Icons.business, size: 14, color: Color(0xFF3B711A)),
-                        const SizedBox(width: 4),
-                        Text(widget.student.company, style: const TextStyle(fontSize: 11, color: Colors.black87)),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        const Icon(Icons.calendar_today, size: 14, color: Color(0xFF3B711A)),
-                        const SizedBox(width: 4),
-                        Text(widget.student.submittedDate, style: const TextStyle(fontSize: 11, color: Colors.black87)),
-                      ],
-                    ),
-                  ],
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(widget.student.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.darkSlate)),
+                      const SizedBox(height: 2),
+                      Text('MSSV: ${widget.student.id} • Lớp: ${widget.student.className}', style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(Icons.business, size: 13, color: AppColors.primary),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              widget.student.company,
+                              style: const TextStyle(fontSize: 11, color: AppColors.darkSlate, fontWeight: FontWeight.w500),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 16),
-          
-          // PDF Box
+
+          // Report PDF File Box
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade200),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.beigeBorder),
             ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                const Text('Bài báo cáo thu hoạch', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.darkSlate)),
+                const SizedBox(height: 10),
                 Container(
-                  height: 100,
+                  height: 80,
                   width: double.infinity,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEBEBEB),
-                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.grey.shade200),
                   ),
-                  child: Column(
+                  child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: widget.student.reportFileUrl != null ? Colors.red.shade100 : Colors.grey.shade300,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(Icons.picture_as_pdf, color: widget.student.reportFileUrl != null ? Colors.red : Colors.grey, size: 24),
+                      Icon(
+                        Icons.picture_as_pdf,
+                        color: hasReportFile ? AppColors.danger : Colors.grey,
+                        size: 32,
                       ),
-                      const SizedBox(height: 8),
-                      Text(widget.student.reportFileUrl?.split('/').last ?? 'Chưa nộp file báo cáo', style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                      const SizedBox(width: 10),
+                      Flexible(
+                        child: Text(
+                          hasReportFile ? widget.student.reportFileUrl!.split('/').last : 'Chưa nộp file báo cáo',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: hasReportFile ? AppColors.darkSlate : Colors.grey,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 OutlinedButton.icon(
-                  onPressed: widget.student.reportFileUrl == null ? null : () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => PdfViewerScreen(
-                          title: widget.student.reportFileUrl!.split('/').last,
-                          pdfUrl: widget.student.reportFileUrl!,
-                        ),
-                      ),
-                    );
-                  },
-                  icon: Icon(Icons.fullscreen, size: 16, color: widget.student.reportFileUrl != null ? const Color(0xFF3B711A) : Colors.grey),
-                  label: Text('XEM TOÀN MÀN HÌNH', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: widget.student.reportFileUrl != null ? const Color(0xFF3B711A) : Colors.grey)),
+                  onPressed: !hasReportFile
+                      ? null
+                      : () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => PdfViewerScreen(
+                                title: widget.student.reportFileUrl!.split('/').last,
+                                pdfUrl: widget.student.reportFileUrl!,
+                              ),
+                            ),
+                          );
+                        },
+                  icon: const Icon(Icons.fullscreen, size: 16),
+                  label: const Text('XEM TOÀN MÀN HÌNH', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                   style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: widget.student.reportFileUrl != null ? const Color(0xFF3B711A) : Colors.grey),
+                    foregroundColor: AppColors.primary,
+                    side: const BorderSide(color: AppColors.primary),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
                     minimumSize: const Size.fromHeight(40),
                   ),
                 ),
               ],
             ),
           ),
+
+          // Confirmation Paper Box if self-contacted trip
+          if (hasConfirmFile) ...[
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.secondary.withValues(alpha: 0.5)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.verified, size: 16, color: AppColors.secondary),
+                      const SizedBox(width: 6),
+                      const Text(
+                        'Giấy xác nhận tham quan (Chuyến tự liên hệ)',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.secondary),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => PdfViewerScreen(
+                            title: 'Giấy xác nhận tham quan',
+                            pdfUrl: widget.student.confirmationFileUrl!,
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.visibility_outlined, size: 16),
+                    label: const Text('XEM GIẤY XÁC NHẬN DOANH NGHIỆP', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.secondary,
+                      side: const BorderSide(color: AppColors.secondary),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      minimumSize: const Size.fromHeight(38),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
-          
+
           // Grading Box
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade200),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.beigeBorder),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -241,34 +373,37 @@ class _ChamBaiThuHoachGVScreenState extends State<ChamBaiThuHoachGVScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Đánh giá', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87)),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE9E5D3),
-                        borderRadius: BorderRadius.circular(16),
+                    const Text('Đánh giá & Chấm điểm', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.darkSlate)),
+                    if (_aiGrade != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          'AI đề xuất: ${_aiGrade!.toStringAsFixed(1)}',
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary),
+                        ),
                       ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.psychology, size: 12, color: Colors.black54),
-                          const SizedBox(width: 4),
-                          Text('AI đề xuất: ${_aiGrade ?? "Chưa có"}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black54)),
-                        ],
-                      ),
-                    ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
+
+                // AI Grading Button
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: _isAIGrading || widget.student.reportFileUrl == null ? null : _handleAIGrading,
-                    icon: _isAIGrading 
+                    onPressed: _isAIGrading || !hasReportFile ? null : _handleAIGrading,
+                    icon: _isAIGrading
                         ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                         : const Icon(Icons.auto_awesome, size: 16),
-                    label: Text(_isAIGrading ? 'Đang chấm điểm...' : 'Chấm tự động bằng AI', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    label: Text(
+                      _isAIGrading ? 'Đang phân tích bài nộp...' : 'Chấm điểm tự động bằng AI',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF407F3E),
+                      backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -276,12 +411,14 @@ class _ChamBaiThuHoachGVScreenState extends State<ChamBaiThuHoachGVScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text('ĐIỂM GVHD', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black54)),
-                const SizedBox(height: 4),
+
+                // Score Input
+                const Text('ĐIỂM GVHD (HỆ SỐ 0.3)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textMuted)),
+                const SizedBox(height: 6),
                 Container(
                   height: 48,
                   decoration: BoxDecoration(
-                    border: Border.all(color: const Color(0xFF3B711A)),
+                    border: Border.all(color: AppColors.primary),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -289,82 +426,57 @@ class _ChamBaiThuHoachGVScreenState extends State<ChamBaiThuHoachGVScreen> {
                       Expanded(
                         child: TextField(
                           controller: _gradeController,
-                          keyboardType: TextInputType.number,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black45),
-                          decoration: InputDecoration(
+                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.primary),
+                          decoration: const InputDecoration(
                             border: InputBorder.none,
-                            hintText: widget.student.gvhdGrade.toString(),
+                            hintText: '0.0',
                           ),
                         ),
                       ),
                       const Padding(
                         padding: EdgeInsets.only(right: 16.0),
-                        child: Text('/ 10', style: TextStyle(fontSize: 14, color: Colors.black54)),
+                        child: Text('/ 10', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textMuted)),
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text('NHẬN XÉT', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black54)),
-                const SizedBox(height: 4),
+
+                // Comment Input
+                const Text('NHẬN XÉT CỦA GIẢNG VIÊN HƯỚNG DẪN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textMuted)),
+                const SizedBox(height: 6),
                 TextField(
                   controller: _commentController,
                   maxLines: 4,
                   decoration: InputDecoration(
-                    hintText: 'Nhận xét về bài thu hoạch...',
-                    hintStyle: const TextStyle(fontSize: 12, color: Colors.black38),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Color(0xFFE9E5D3)),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Color(0xFFE9E5D3)),
-                    ),
+                    hintText: 'Nhập nhận xét chi tiết về bài thu hoạch của sinh viên...',
+                    hintStyle: const TextStyle(fontSize: 12, color: Colors.grey),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.beigeBorder)),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.beigeBorder)),
                   ),
                 ),
               ],
             ),
           ),
-          
-          const SizedBox(height: 24),
-          
-          // Bottom Buttons
+          const SizedBox(height: 20),
+
+          // Save Grade Button
           ElevatedButton.icon(
-            onPressed: () {
-              final grade = double.tryParse(_gradeController.text) ?? widget.student.gvhdGrade;
-              appStateProvider.updateStudentGrade(
-                widget.student.id, 
-                gvhdGrade: grade,
-                comment: _commentController.text,
-                isGraded: true
-              );
-              widget.onGradeSaved();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Đã lưu điểm!'), backgroundColor: AppColors.secondary),
-              );
-            },
-            icon: const Icon(Icons.save, size: 16),
-            label: const Text('LƯU ĐIỂM', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            onPressed: _isSaving ? null : _saveGrade,
+            icon: _isSaving
+                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : const Icon(Icons.save, size: 16),
+            label: const Text('LƯU ĐIỂM BÀI THU HOẠCH', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF3B711A),
+              backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
-              minimumSize: const Size.fromHeight(44),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              minimumSize: const Size.fromHeight(46),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
           ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: () {},
-            icon: const Icon(Icons.warning_amber_rounded, size: 16, color: Color(0xFFE57373)),
-            label: const Text('YÊU CẦU BỔ SUNG', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFE57373))),
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Color(0xFFE57373)),
-              minimumSize: const Size.fromHeight(44),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-          ),
+          const SizedBox(height: 16),
         ],
       ),
     );

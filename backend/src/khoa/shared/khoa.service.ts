@@ -992,16 +992,14 @@ export class KhoaService {
     );
 
     // Gửi thông báo đến Quản lý Khoa
-    if (userId) {
-      await this.createNotification({
-        tieu_de: 'Lịch kiến tập chờ duyệt',
-        noi_dung: `Câu lạc bộ đã gửi yêu cầu duyệt cho lịch kiến tập "${lich.ten_lich}". Vui lòng kiểm tra và phản hồi.`,
-        nguoi_gui_id: userId,
-        khoa_hoc_id: lich.dotKienTap?.khoa_hoc_id,
-        doi_tuong_nhan: 'KHOA',
-        loai_thong_bao: 'NhacNho',
-      });
-    }
+    await this.createNotification({
+      tieu_de: 'Lịch kiến tập chờ duyệt',
+      noi_dung: `Câu lạc bộ đã gửi yêu cầu duyệt cho lịch kiến tập "${lich.ten_lich}". Vui lòng kiểm tra và phản hồi.`,
+      nguoi_gui_id: userId || 1,
+      khoa_hoc_id: lich.dotKienTap?.khoa_hoc_id,
+      doi_tuong_nhan: 'KHOA',
+      loai_thong_bao: 'NhacNho',
+    });
 
     return lich;
   }
