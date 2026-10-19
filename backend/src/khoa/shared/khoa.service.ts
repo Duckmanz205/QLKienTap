@@ -2051,30 +2051,47 @@ export class KhoaService {
         // 1. Xóa phân công giảng viên
         await this.danDoanRepo.delete({ chuyen_tham_quan_id: tripId });
 
-        // 2. Cập nhật phiếu đề xuất: chuyen_tham_quan_id = null, trang_thai_duyet = 'TuChoi'
-        dexuat.chuyen_tham_quan_id = null as any;
-        dexuat.trang_thai_duyet = 'TuChoi';
-        dexuat.ngay_duyet = new Date();
-        await this.deXuatRepo.save(dexuat);
+        // 2. Xóa phiếu đăng ký & phiếu tham quan nếu có
+        const phieus = await this.phieuRepo.find({
+          where: { chuyen_tham_quan_id: tripId },
+        });
+        if (phieus.length > 0) {
+          const phieuIds = phieus.map((p) => p.id);
+          await this.phieuTQRepo.delete({ phieu_dang_ky_id: In(phieuIds) });
+          await this.phieuRepo.delete({ chuyen_tham_quan_id: tripId });
+        }
 
-        // 3. Xóa chuyến đi nháp
+        // 3. Cập nhật phiếu đề xuất: dùng update để TypeORM thực thi câu lệnh SQL:
+        // SET "chuyen_tham_quan_id" = NULL, "trang_thai_duyet" = 'TuChoi'
+        // thỏa mãn CHECK constraint CK_PhieuDeXuat_TrangThai
+        await this.deXuatRepo.update(deXuatId, {
+          chuyen_tham_quan_id: null as any,
+          trang_thai_duyet: 'TuChoi',
+          ngay_duyet: new Date(),
+        });
+
+        // 4. Xóa chuyến đi nháp
         await this.chuyenRepo.delete(tripId);
 
         return {
-          message: 'Khoa đã từ chối chuyến đi tự do thành công.',
+          message: 'Khoa đã từ chối chuyến tham quan tự do thành công.',
         };
       }
     } catch (error: any) {
-      console.error('Lỗi khi Khoa duyệt chuyến đi:', error);
+      console.error(
+        `Lỗi khi Khoa ${isApproved ? 'duyệt' : 'từ chối'} chuyến đi:`,
+        error,
+      );
       if (
         error instanceof NotFoundException ||
         error instanceof BadRequestException
       ) {
         throw error;
       }
+      const actionText = isApproved ? 'phê duyệt' : 'từ chối';
       throw new BadRequestException(
         error?.message ||
-          'Không thể phê duyệt chuyến tham quan do lỗi xử lý dữ liệu hệ thống. Vui lòng thử lại.',
+          `Không thể ${actionText} chuyến tham quan do lỗi xử lý dữ liệu hệ thống. Vui lòng thử lại.`,
       );
     }
   }
