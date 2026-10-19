@@ -1,16 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Compass, 
-  CheckCircle, 
-  AlertCircle, 
-  Star, 
-  ArrowRight, 
-  Calendar, 
-  Clock, 
-  MapPin, 
-  Bell, 
-  Laptop
+import {
+  Compass,
+  CheckCircle,
+  AlertCircle,
+  ArrowRight,
+  Calendar,
+  Clock,
+  MapPin,
+  Bell,
+  Laptop,
+  FileText,
+  CreditCard,
+  ShieldCheck,
+  ShieldAlert
 } from 'lucide-react';
 import { sinhVienApi } from '../../services/api';
 
@@ -19,12 +22,20 @@ export default function DashBoard_SV() {
   const [student, setStudent] = useState(null);
   const [trips, setTrips] = useState([]);
   const [notifications, setNotifications] = useState([]);
-  const [grades, setGrades] = useState([]);
   const [stats, setStats] = useState({
+    totalTrips: 0,
     registered: 0,
     completed: 0,
+    submittedReports: 0,
     pendingReports: 0,
-    avgScore: 'Chưa có'
+    unpaidInvoicesCount: 0,
+    totalUnpaidAmount: 0,
+    bannedTripsCount: 0,
+    isBlacklisted: false,
+    blacklistReason: null,
+    avgScore: 'Chưa có',
+    termStatus: 'DangThucHien',
+    boChuyenStatus: null,
   });
 
   useEffect(() => {
@@ -47,12 +58,10 @@ export default function DashBoard_SV() {
       const notifsRes = await sinhVienApi.getNotifications(svId);
       setNotifications(notifsRes.data || []);
 
-      const gradesRes = await sinhVienApi.getGrades(svId);
-      setGrades(gradesRes.data || []);
-
       const statsRes = await sinhVienApi.getDashboardStats(svId);
-      setStats(statsRes.data);
-
+      if (statsRes.data) {
+        setStats(statsRes.data);
+      }
     } catch (err) {
       console.error('Error loading dashboard data:', err);
     }
@@ -66,69 +75,164 @@ export default function DashBoard_SV() {
     );
   }
 
+  // Filter & sort upcoming trips chronologically (from today onwards)
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
   const upcomingTrips = trips
-    .filter(t => t.trang_thai === 'HopLe' || t.trang_thai === 'ChoDuyet')
+    .filter(t => {
+      if (!t.chuyenThamQuan?.ngay_tham_quan) return false;
+      const tripDate = new Date(t.chuyenThamQuan.ngay_tham_quan);
+      tripDate.setHours(23, 59, 59, 999);
+      const isFutureOrToday = tripDate >= today;
+      const isValidStatus = ['HopLe', 'ChoDuyet', 'DaThamGia', 'HoanThanh'].includes(t.trang_thai);
+      return isFutureOrToday && isValidStatus;
+    })
+    .sort((a, b) => {
+      const dateA = new Date(a.chuyenThamQuan.ngay_tham_quan).getTime();
+      const dateB = new Date(b.chuyenThamQuan.ngay_tham_quan).getTime();
+      return dateA - dateB;
+    })
     .slice(0, 4);
 
   const recentNotifications = notifications.slice(0, 5);
 
   return (
     <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300">
-      <div className="mb-8">
+      <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-800">Trang chủ</h1>
         <p className="text-sm font-medium text-slate-500 mt-1">Chào mừng quay trở lại, {student.ho_ten}!</p>
       </div>
 
-      {/* Row of 4 stat cards */}
+      {/* Unpaid Invoices Warning (if any) */}
+      {stats.unpaidInvoicesCount > 0 && (
+        <div
+          onClick={() => navigate('/sinh-vien/payment')}
+          className="mb-6 p-4 rounded-2xl bg-amber-50 border border-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer hover:bg-amber-100/60 transition-all shadow-sm"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
+              <AlertCircle className="w-5 h-5 stroke-[2.5]" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-amber-900">
+                Bạn có {stats.unpaidInvoicesCount} chuyến tham quan chưa hoàn tất đóng lệ phí
+              </p>
+              <p className="text-xs text-amber-700 mt-0.5">
+                Vui lòng thanh toán trước hạn để hệ thống không tự động hủy phiếu đăng ký.
+              </p>
+            </div>
+          </div>
+          <span className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl transition-colors shadow-sm shrink-0">
+            Thanh toán ngay <ArrowRight className="w-3.5 h-3.5" />
+          </span>
+        </div>
+      )}
+
+      {/* Row of 4 essential stat cards (Basic & Clean) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {/* Card 1 */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E7E0C4] flex items-center gap-5">
-          <div className="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-            <Compass className="w-6 h-6 text-slate-600" />
+
+        {/* Card 1: Số chuyến tham quan */}
+        <div
+          onClick={() => navigate('/sinh-vien/schedule')}
+          className="bg-white p-5 rounded-2xl shadow-sm border border-[#E7E0C4] flex items-center gap-4 hover:border-[#407F3E]/40 transition-all cursor-pointer group"
+        >
+          <div className="w-12 h-12 rounded-2xl bg-[#407F3E]/10 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+            <Compass className="w-6 h-6 text-[#407F3E]" />
           </div>
-          <div>
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Chuyến đã đăng ký</p>
-            <p className="text-3xl font-black text-slate-800 leading-none">{stats.registered}</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold text-slate-500 mb-1">Số chuyến tham quan</p>
+            <div className="flex items-baseline gap-1.5">
+              <p className="text-2xl font-bold text-slate-800 leading-none">{stats.totalTrips || stats.registered || 0}</p>
+              <span className="text-xs text-slate-500">chuyến</span>
+            </div>
+            <p className="text-xs text-slate-400 mt-2 truncate">
+              {(stats.completed || 0) > 0 ? `Đã hoàn thành ${stats.completed} chuyến` : 'Đã đăng ký tham gia'}
+            </p>
           </div>
         </div>
 
-        {/* Card 2 */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E7E0C4] flex items-center gap-5">
-          <div className="w-14 h-14 rounded-full bg-[#89B449]/10 flex items-center justify-center shrink-0">
-            <CheckCircle className="w-6 h-6 text-[#89B449]" />
+        {/* Card 2: Bài thu hoạch chưa nộp */}
+        <div
+          onClick={() => navigate('/sinh-vien/reports')}
+          className="bg-white p-5 rounded-2xl shadow-sm border border-[#E7E0C4] flex items-center gap-4 hover:border-[#407F3E]/40 transition-all cursor-pointer group"
+        >
+          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform ${(stats.pendingReports || 0) > 0 ? 'bg-amber-100/70 text-amber-600' : 'bg-slate-100 text-slate-600'
+            }`}>
+            <FileText className="w-6 h-6" />
           </div>
-          <div>
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Chuyến đã hoàn thành</p>
-            <p className="text-3xl font-black text-slate-800 leading-none">{stats.completed}</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold text-slate-500 mb-1">Bài thu hoạch chưa nộp</p>
+            <div className="flex items-baseline gap-1.5">
+              <p className={`text-2xl font-bold leading-none ${(stats.pendingReports || 0) > 0 ? 'text-amber-600' : 'text-slate-800'
+                }`}>
+                {stats.pendingReports || 0}
+              </p>
+              <span className="text-xs text-slate-500">bài</span>
+            </div>
+            <p className={`text-xs mt-2 truncate ${(stats.pendingReports || 0) > 0 ? 'text-amber-600 font-medium' : 'text-slate-400'
+              }`}>
+              {(stats.pendingReports || 0) > 0
+                ? `Đã nộp ${stats.submittedReports || 0} bài`
+                : 'Đã hoàn tất nộp các bài'}
+            </p>
           </div>
         </div>
 
-        {/* Card 3 */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E7E0C4] flex items-center gap-5">
-          <div className={`w-14 h-14 rounded-full flex items-center justify-center shrink-0 ${stats.pendingReports > 0 ? 'bg-[#DBD468]/20' : 'bg-slate-100'}`}>
-            <AlertCircle className={`w-6 h-6 ${stats.pendingReports > 0 ? 'text-[#DBD468]' : 'text-slate-400'}`} />
+        {/* Card 3: Lệ phí chưa đóng */}
+        <div
+          onClick={() => navigate('/sinh-vien/payment')}
+          className="bg-white p-5 rounded-2xl shadow-sm border border-[#E7E0C4] flex items-center gap-4 hover:border-[#407F3E]/40 transition-all cursor-pointer group"
+        >
+          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform ${stats.unpaidInvoicesCount > 0 ? 'bg-amber-100/60' : 'bg-slate-100'}`}>
+            <CreditCard className={`w-6 h-6 ${stats.unpaidInvoicesCount > 0 ? 'text-amber-600' : 'text-slate-600'}`} />
           </div>
-          <div>
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Bài thu hoạch cần nộp</p>
-            <p className={`text-3xl font-black leading-none ${stats.pendingReports > 0 ? 'text-[#DBD468]' : 'text-slate-800'}`}>{stats.pendingReports}</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold text-slate-500 mb-1">Lệ phí chưa đóng</p>
+            <div className="flex items-baseline gap-1.5">
+              <p className={`text-2xl font-bold leading-none ${stats.unpaidInvoicesCount > 0 ? 'text-amber-600' : 'text-slate-800'}`}>
+                {stats.unpaidInvoicesCount || 0}
+              </p>
+              <span className="text-xs text-slate-500">khoản</span>
+            </div>
+            <p className={`text-xs mt-2 truncate ${stats.unpaidInvoicesCount > 0 ? 'text-amber-600 font-medium' : 'text-slate-400'}`}>
+              {stats.unpaidInvoicesCount > 0 ? 'Cần thanh toán lệ phí' : 'Đã hoàn tất thanh toán'}
+            </p>
           </div>
         </div>
 
-        {/* Card 4 */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E7E0C4] flex items-center gap-5">
-          <div className="w-14 h-14 rounded-full bg-[#407F3E]/10 flex items-center justify-center shrink-0">
-            <Star className="w-6 h-6 text-[#407F3E]" />
+        {/* Card 4: Số chuyến bị cấm (trong danh sách đen) */}
+        <div
+          className="bg-white p-5 rounded-2xl shadow-sm border border-[#E7E0C4] flex items-center gap-4 hover:border-[#407F3E]/40 transition-all group"
+        >
+          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform ${stats.bannedTripsCount > 0 || stats.isBlacklisted ? 'bg-rose-100 text-rose-600' : 'bg-slate-100 text-slate-600'}`}>
+            {stats.bannedTripsCount > 0 || stats.isBlacklisted ? (
+              <ShieldAlert className="w-6 h-6 text-rose-600" />
+            ) : (
+              <ShieldCheck className="w-6 h-6 text-slate-600" />
+            )}
           </div>
-          <div>
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Điểm trung bình hiện tại</p>
-            <p className="text-3xl font-black text-[#407F3E] leading-none">{stats.avgScore}</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold text-slate-500 mb-1" title="Trong danh sách đen">
+              Số chuyến bị cấm
+            </p>
+            <div className="flex items-baseline gap-1.5">
+              <p className={`text-2xl font-bold leading-none ${stats.bannedTripsCount > 0 || stats.isBlacklisted ? 'text-rose-600' : 'text-slate-800'}`}>
+                {stats.bannedTripsCount || 0}
+              </p>
+              <span className="text-xs text-slate-500">chuyến</span>
+            </div>
+            <p className={`text-xs mt-2 truncate ${stats.bannedTripsCount > 0 || stats.isBlacklisted ? 'text-rose-600 font-medium' : 'text-slate-400'}`}>
+              {stats.bannedTripsCount > 0 || stats.isBlacklisted ? 'Trong danh sách đen vi phạm' : 'Không vi phạm quy chế'}
+            </p>
           </div>
         </div>
+
       </div>
 
       {/* 2-column layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        
+
         {/* Left card: Chuyến tham quan sắp tới */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E7E0C4] flex flex-col h-[400px]">
           <div className="flex items-center justify-between mb-6 shrink-0">
@@ -136,7 +240,7 @@ export default function DashBoard_SV() {
               <Compass className="w-5 h-5 text-[#407F3E]" />
               Chuyến tham quan sắp tới
             </h2>
-            <button 
+            <button
               onClick={() => navigate('/sinh-vien/schedule')}
               className="text-xs font-bold text-[#407F3E] hover:underline flex items-center gap-1 cursor-pointer"
             >
@@ -155,16 +259,19 @@ export default function DashBoard_SV() {
                 {upcomingTrips.map((trip) => {
                   const isOnline = trip.chuyenThamQuan?.hinh_thuc === 'TrucTuyen';
                   return (
-                    <div key={trip.id} className="relative flex flex-col">
-                      <div className="absolute -left-[29px] top-1.5 w-3 h-3 rounded-full bg-[#407F3E] ring-4 ring-white z-10"></div>
-                      <div className="bg-[#E7E0C4]/10 rounded-xl p-4 border border-[#E7E0C4] hover:border-[#407F3E]/50 transition-colors">
+                    <div
+                      key={trip.id}
+                      onClick={() => navigate('/sinh-vien/schedule')}
+                      className="relative flex flex-col cursor-pointer group"
+                    >
+                      <div className="absolute -left-[29px] top-1.5 w-3 h-3 rounded-full bg-[#407F3E] ring-4 ring-white z-10 group-hover:scale-125 transition-transform"></div>
+                      <div className="bg-[#E7E0C4]/10 rounded-xl p-4 border border-[#E7E0C4] hover:border-[#407F3E]/50 hover:bg-[#E7E0C4]/20 transition-all">
                         <div className="flex justify-between items-start gap-3 mb-2">
-                          <h3 className="font-bold text-sm text-slate-800 line-clamp-1">
+                          <h3 className="font-bold text-sm text-slate-800 line-clamp-1 group-hover:text-[#407F3E] transition-colors">
                             {trip.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Chưa xác định'}
                           </h3>
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shrink-0 ${
-                            isOnline ? 'bg-slate-100 text-slate-600' : 'bg-[#89B449]/10 text-[#407F3E]'
-                          }`}>
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shrink-0 ${isOnline ? 'bg-slate-100 text-slate-600' : 'bg-[#89B449]/10 text-[#407F3E]'
+                            }`}>
                             {isOnline ? <Laptop className="w-3 h-3" /> : <MapPin className="w-3 h-3" />}
                             {isOnline ? 'Trực tuyến' : 'Trực tiếp'}
                           </span>
@@ -195,7 +302,7 @@ export default function DashBoard_SV() {
               <Bell className="w-5 h-5 text-[#DBD468]" />
               Thông báo gần đây
             </h2>
-            <button 
+            <button
               onClick={() => navigate('/sinh-vien/notifications')}
               className="text-xs font-bold text-[#407F3E] hover:underline flex items-center gap-1 cursor-pointer"
             >
@@ -211,7 +318,7 @@ export default function DashBoard_SV() {
               </div>
             ) : (
               recentNotifications.map((notif) => (
-                <div 
+                <div
                   key={notif.id}
                   onClick={() => navigate('/sinh-vien/notifications')}
                   className="flex gap-4 p-4 rounded-xl border border-[#E7E0C4] hover:bg-slate-50 transition-colors cursor-pointer group"

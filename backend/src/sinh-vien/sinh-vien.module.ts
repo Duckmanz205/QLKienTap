@@ -60,4 +60,4 @@ import {
   providers: [SinhVienService],
   exports: [SinhVienService],
 })
-export class SinhVienModule {}
+export class SinhVienModule { }

@@ -80,13 +80,6 @@ export default function Layout() {
     }
   }, [vai_tro, details, phai_doi_mat_khau]);
 
-  // Tự động thu gọn sidebar khi vào trang nộp bài để tiết kiệm không gian
-  useEffect(() => {
-    if (location.pathname === '/sinh-vien/reports') {
-      setIsSidebarCollapsed(true);
-    }
-  }, [location.pathname]);
-
   const confirmLogout = () => {
     setShowLogoutModal(true);
   };
@@ -174,7 +167,6 @@ export default function Layout() {
     if (path === '/clb/trips') return 'Chuyến tham quan';
     if (path === '/clb/notifications') return 'Thông báo';
     if (path === '/clb/reports') return 'Báo cáo thống kê';
-    if (path === '/clb/results') return 'Kết quả kiến tập';
 
     return 'IMS Portal';
   };
@@ -492,7 +484,6 @@ export default function Layout() {
       { to: '/clb/trips', label: 'Chuyến tham quan', icon: Compass, category: 'VẬN HÀNH KIẾN TẬP' },
       { to: '/clb/registrations', label: 'Quản lý đăng ký', icon: FileCheck, category: 'VẬN HÀNH KIẾN TẬP' },
       { to: '/clb/leaders', label: 'Phân công GV dẫn đoàn', icon: UserCheck, category: 'VẬN HÀNH KIẾN TẬP' },
-      { to: '/clb/results', label: 'Kết quả kiến tập', icon: Award, category: 'VẬN HÀNH KIẾN TẬP' },
       // TÀI CHÍNH
       { to: '/clb/fees', label: 'Quản lý lệ phí', icon: CreditCard, category: 'TÀI CHÍNH' },
       { to: '/clb/refund-approval', label: 'Duyệt hoàn phí', icon: RotateCcw, category: 'TÀI CHÍNH' },

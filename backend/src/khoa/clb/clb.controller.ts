@@ -124,6 +124,11 @@ export class ClbController {
     return this.khoaService.getProposals();
   }
 
+  @Get('proposals/:id/matching-trips')
+  async getMatchingTrips(@Param('id', ParseIntPipe) id: number) {
+    return this.khoaService.getMatchingTripsForProposal(id);
+  }
+
   @Post('trips')
   async createTrip(@Body() body: CreateTripDto) {
     return this.khoaService.createTrip(body);
@@ -170,6 +175,8 @@ export class ClbController {
       body.isApproved!,
       body.giangVienId,
       body.nhaMayIdGop,
+      body.gopVaoChuyenId,
+      body.gopCacPhieuDeXuatIds,
     );
   }
 

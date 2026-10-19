@@ -19,7 +19,8 @@ import {
   LayoutGrid,
   List,
   ArrowRight,
-  MapPin
+  MapPin,
+  Lock
 } from 'lucide-react';
 import { giangVienApi } from '../../services/api';
 import SearchableDropdown from '../../components/SearchableDropdown';
@@ -790,6 +791,11 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
                   const scoredCount = st.scoredCount ?? trips.filter(t => t.myScore != null).length;
                   const isFully = st.isFullyScored || (totalTrips > 0 && scoredCount === totalTrips);
 
+                  const isStudentItemLocked = Boolean(
+                    st.isLocked ||
+                    (trips.length > 0 && trips.every(t => t.daKhoa || t.daKhoaHoiDong))
+                  );
+
                   return (
                     <div
                       key={st.boChuyenId || st.id || idx}
@@ -804,19 +810,30 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
                         <p className="font-bold text-xs text-slate-800 truncate">{sv?.ho_ten}</p>
                         <p className="text-[10px] font-mono font-medium text-slate-500 mt-0.5">{sv?.mssv || sv?.ma_sv || '—'} - {sv?.ten_lop || sv?.lop || ''}</p>
                       </div>
-                      {isFully ? (
-                        <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded font-bold text-[9px] uppercase tracking-wider shrink-0 font-mono">
-                          {st.overallMyAvg != null ? `${Number(st.overallMyAvg).toFixed(1)}đ` : `${totalTrips}/${totalTrips}`}
-                        </span>
-                      ) : scoredCount > 0 ? (
-                        <span className="px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded font-bold text-[9px] uppercase tracking-wider shrink-0 font-mono">
-                          {scoredCount}/{totalTrips} chuyến
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 bg-slate-50 text-slate-600 border border-slate-200 rounded font-bold text-[9px] uppercase tracking-wider shrink-0 font-mono">
-                          0/{totalTrips} chuyến
-                        </span>
-                      )}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {isStudentItemLocked && (
+                          <span title="Điểm hội đồng đã khóa" className="text-slate-400">
+                            <Lock className="w-3.5 h-3.5" />
+                          </span>
+                        )}
+                        {isFully ? (
+                          <span className={`px-2 py-0.5 rounded font-bold text-[9px] uppercase tracking-wider shrink-0 font-mono ${
+                            isStudentItemLocked
+                              ? 'bg-slate-100 text-slate-700 border border-slate-300'
+                              : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          }`}>
+                            {st.overallMyAvg != null ? `${Number(st.overallMyAvg).toFixed(1)}đ` : `${totalTrips}/${totalTrips}`}
+                          </span>
+                        ) : scoredCount > 0 ? (
+                          <span className="px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded font-bold text-[9px] uppercase tracking-wider shrink-0 font-mono">
+                            {scoredCount}/{totalTrips} chuyến
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 bg-slate-50 text-slate-600 border border-slate-200 rounded font-bold text-[9px] uppercase tracking-wider shrink-0 font-mono">
+                            0/{totalTrips} chuyến
+                          </span>
+                        )}
+                      </div>
                     </div>
                   );
                 })
@@ -830,6 +847,10 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
               const trips = selectedReg.trips || [];
               const totalTrips = selectedReg.totalTrips || trips.length || 3;
               const scoredCount = selectedReg.scoredCount ?? trips.filter(t => t.myScore != null).length;
+              const isCurrentStudentLocked = Boolean(
+                selectedReg.isLocked ||
+                (trips.length > 0 && trips.every(t => t.daKhoa || t.daKhoaHoiDong))
+              );
 
               return (
                 <form onSubmit={handleSaveAllCouncilGrades} className="flex flex-col h-full justify-between">
@@ -859,6 +880,19 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
                       </div>
                     </div>
 
+                    {/* Banner cảnh báo khi đã khóa điểm hội đồng */}
+                    {isCurrentStudentLocked && (
+                      <div className="p-3 bg-slate-100 border border-slate-200 rounded-xl text-xs text-slate-700 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <Lock className="w-4 h-4 text-slate-500 shrink-0" />
+                          <span><strong>Điểm hội đồng đã khóa:</strong> Điểm của sinh viên này đã được chốt chính thức. Giao diện đang ở chế độ chỉ xem.</span>
+                        </div>
+                        <span className="px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold shrink-0">
+                          Chỉ xem
+                        </span>
+                      </div>
+                    )}
+
                     {/* Section title */}
                     <div className="flex items-center justify-between">
                       <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
@@ -866,7 +900,9 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
                         <span>Chấm điểm báo cáo các chuyến tham quan ({trips.length} chuyến):</span>
                       </label>
                       <span className="text-[10px] text-slate-400 italic">
-                        * Nhập điểm trực tiếp từ 0 đến 10 cho từng chuyến
+                        {isCurrentStudentLocked 
+                          ? '* Điểm đã khóa không thể chỉnh sửa' 
+                          : '* Nhập điểm trực tiếp từ 0 đến 10 cho từng chuyến'}
                       </span>
                     </div>
 
@@ -879,6 +915,11 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
                           const tripId = trip.phieuThamQuanId || trip.id;
                           const currentScore = tripScores[tripId] ?? '';
                           const hasScore = trip.myScore != null;
+                          const isTripLocked = Boolean(
+                            trip.daKhoa ||
+                            trip.daKhoaHoiDong ||
+                            isCurrentStudentLocked
+                          );
 
                           return (
                             <div
@@ -887,7 +928,7 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
                             >
                               {/* Left: Info */}
                               <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2 mb-1.5">
+                                <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                                   <span className="w-5 h-5 rounded-md bg-slate-200/80 text-slate-700 font-mono font-bold text-[11px] flex items-center justify-center shrink-0">
                                     #{idx + 1}
                                   </span>
@@ -899,6 +940,12 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
                                     <span className={`w-1.5 h-1.5 rounded-full ${trip.hinhThuc === 'TrucTiep' ? 'bg-[#407F3E]' : 'bg-blue-600'}`}></span>
                                     {trip.hinhThuc === 'TrucTiep' ? 'Trực tiếp' : 'Trực tuyến'}
                                   </span>
+                                  {isTripLocked && (
+                                    <span className="px-2 py-0.5 bg-slate-100 text-slate-600 border border-slate-200 rounded font-medium text-[10px] flex items-center gap-1">
+                                      <Lock className="w-3 h-3 text-slate-500" />
+                                      Đã khóa
+                                    </span>
+                                  )}
                                   {hasScore ? (
                                     <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded font-mono font-bold text-[10px]">
                                       Đã chấm: {Number(trip.myScore).toFixed(1)}đ
@@ -931,8 +978,14 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
                                     step="0.1"
                                     placeholder="—"
                                     value={currentScore}
+                                    disabled={isTripLocked}
+                                    readOnly={isTripLocked}
                                     onChange={(e) => handleTripScoreChange(tripId, e.target.value)}
-                                    className="w-full pl-3 pr-9 py-2 font-mono font-bold text-base text-center text-[#407F3E] bg-white border border-slate-300 rounded-xl focus:outline-none focus:border-[#407F3E] focus:ring-2 focus:ring-[#407F3E]/20 shadow-2xs transition-all"
+                                    className={`w-full pl-3 pr-9 py-2 font-mono font-bold text-base text-center rounded-xl focus:outline-none transition-all ${
+                                      isTripLocked
+                                        ? 'bg-slate-100 text-slate-500 border border-slate-200 cursor-not-allowed select-none shadow-none'
+                                        : 'text-[#407F3E] bg-white border border-slate-300 focus:border-[#407F3E] focus:ring-2 focus:ring-[#407F3E]/20 shadow-2xs'
+                                    }`}
                                   />
                                   <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">/ 10</span>
                                 </div>
@@ -961,18 +1014,26 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
                         </span>
                       )}
 
-                      <button
-                        type="submit"
-                        disabled={loading || !hasAnyValidScore}
-                        className="px-6 py-2.5 bg-[#407F3E] hover:bg-[#326631] text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-sm transition-all flex items-center gap-2 cursor-pointer active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <Gavel className="w-4 h-4" />
-                        <span>
-                          {loading 
-                            ? 'Đang lưu...' 
-                            : 'Lưu điểm hội đồng'}
-                        </span>
-                      </button>
+                      {/* Khi điểm hội đồng đã khóa: Ẩn nút lưu điểm và thay thế bằng huy hiệu trạng thái */}
+                      {isCurrentStudentLocked ? (
+                        <div className="flex items-center gap-2 px-5 py-2.5 bg-slate-100 text-slate-600 border border-slate-200 rounded-xl text-xs font-bold shadow-2xs select-none">
+                          <Lock className="w-4 h-4 text-slate-500" />
+                          <span>Điểm hội đồng đã khóa</span>
+                        </div>
+                      ) : (
+                        <button
+                          type="submit"
+                          disabled={loading || !hasAnyValidScore}
+                          className="px-6 py-2.5 bg-[#407F3E] hover:bg-[#326631] text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-sm transition-all flex items-center gap-2 cursor-pointer active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Gavel className="w-4 h-4" />
+                          <span>
+                            {loading 
+                              ? 'Đang lưu...' 
+                              : 'Lưu điểm hội đồng'}
+                          </span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 </form>

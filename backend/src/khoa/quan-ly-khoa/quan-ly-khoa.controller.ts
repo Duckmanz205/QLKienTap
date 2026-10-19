@@ -384,6 +384,12 @@ export class KhoaController {
     return this.khoaService.getProposals();
   }
 
+  @Roles('QuanLyKhoa', 'QuanLyCLB')
+  @Get('proposals/:id/matching-trips')
+  async getMatchingTrips(@Param('id', ParseIntPipe) id: number) {
+    return this.khoaService.getMatchingTripsForProposal(id);
+  }
+
   @Roles('QuanLyCLB')
   @Post('trips')
   async createTrip(@Body() body: CreateTripDto) {

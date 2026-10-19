@@ -29,7 +29,7 @@ import {
 @UseGuards(AuthGuard, RolesGuard)
 @Roles('SinhVien')
 export class SinhVienController {
-  constructor(private readonly svService: SinhVienService) {}
+  constructor(private readonly svService: SinhVienService) { }
 
   @Get('profile')
   async getMyProfile(@CurrentUser() user: JwtPayloadUser) {
@@ -280,7 +280,7 @@ export class SinhVienController {
   @Get('grades/:studentId')
   async getGrades(@CurrentUser() user: JwtPayloadUser) {
     const student = await this.svService.getStudentByAccountId(user.sub);
-    try { return await this.svService.getStudentGrades(student.id); } catch(e) { console.error('API FATAL ERROR:', e); throw e; }
+    try { return await this.svService.getStudentGrades(student.id); } catch (e) { console.error('API FATAL ERROR:', e); throw e; }
   }
 
   @Get('dashboard-stats/:studentId')

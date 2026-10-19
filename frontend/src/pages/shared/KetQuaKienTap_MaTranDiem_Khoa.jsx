@@ -55,6 +55,28 @@ export default function KetQuaKienTap_Khoa() {
   const [currentPage, setCurrentPage] = useState(1);
   const [limit, setLimit] = useState(15);
 
+  // Kiểm tra lịch/đợt hiện tại đã khóa sổ toàn diện hay chưa
+  const isScheduleLocked = useMemo(() => {
+    if (!selectedLich) return false;
+    const current = schedules.find(s => s.id === Number(selectedLich));
+    if (!current) return false;
+    if (current.trang_thai === 'DaKhoa' || current.dotKienTap?.trang_thai === 'DaKhoa') {
+      return true;
+    }
+    // Nếu bất kỳ lịch nào cùng đợt đã khóa
+    if (current.dot_kien_tap_id) {
+      const anyLockedInDot = schedules.some(
+        s => s.dot_kien_tap_id === current.dot_kien_tap_id && s.trang_thai === 'DaKhoa'
+      );
+      if (anyLockedInDot) return true;
+    }
+    // Dự phòng qua kết quả enrollments nếu có
+    if (results.length > 0 && results[0]?.dotKienTap?.trang_thai === 'DaKhoa') {
+      return true;
+    }
+    return false;
+  }, [schedules, selectedLich, results]);
+
   useEffect(() => {
     fetchSchedules();
   }, []);
@@ -146,6 +168,21 @@ export default function KetQuaKienTap_Khoa() {
       await khoaApi.lockGrades({ lichKienTapId: selectedLich });
       toast.success('Đã khóa điểm đợt này thành công! Sinh viên chưa có điểm đã được tự động tính 0đ.');
       setIsConfirmModalOpen(false);
+
+      // Đồng bộ trạng thái ngay lập tức cho toàn bộ các lịch thuộc đợt trong state
+      const currentDotId = schedules.find(s => s.id === Number(selectedLich))?.dot_kien_tap_id;
+      setSchedules(prev => prev.map(s => {
+        if (s.id === Number(selectedLich) || (currentDotId && s.dot_kien_tap_id === currentDotId)) {
+          return {
+            ...s,
+            trang_thai: 'DaKhoa',
+            dotKienTap: { ...(s.dotKienTap || {}), trang_thai: 'DaKhoa' }
+          };
+        }
+        return s;
+      }));
+
+      fetchSchedules();
       fetchEnrollments();
       if (activeTab === 'gvdd') fetchTripGradingStatuses();
       if (activeTab === 'gvhd') fetchSupervisorGradingStatuses();
@@ -437,23 +474,30 @@ export default function KetQuaKienTap_Khoa() {
             )}
           </div>
           {isKhoa && (
-            <button 
-              onClick={handleOpenLockModal}
-              disabled={loadingCheckLock}
-              className="px-5 py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 disabled:opacity-50 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer"
-            >
-              {loadingCheckLock ? (
-                <>
-                  <RotateCw className="w-4 h-4 animate-spin" />
-                  <span>Đang kiểm tra...</span>
-                </>
-              ) : (
-                <>
-                  <Lock className="w-4 h-4" />
-                  <span>Khóa điểm đợt này</span>
-                </>
-              )}
-            </button>
+            isScheduleLocked ? (
+              <div className="px-4 py-2 bg-emerald-50 text-[#407F3E] border border-[#407F3E]/30 rounded-xl text-sm font-bold flex items-center gap-2 shadow-2xs select-none">
+                <CheckCircle2 className="w-4 h-4 text-[#407F3E]" />
+                <span>Đã khóa điểm đợt này</span>
+              </div>
+            ) : (
+              <button 
+                onClick={handleOpenLockModal}
+                disabled={loadingCheckLock}
+                className="px-5 py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 disabled:opacity-50 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer"
+              >
+                {loadingCheckLock ? (
+                  <>
+                    <RotateCw className="w-4 h-4 animate-spin" />
+                    <span>Đang kiểm tra...</span>
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-4 h-4" />
+                    <span>Khóa điểm đợt này</span>
+                  </>
+                )}
+              </button>
+            )
           )}
         </div>
       </div>
@@ -1050,14 +1094,20 @@ export default function KetQuaKienTap_Khoa() {
                         </td>
                         <td className="p-3 text-center">
                           {isKhoa && trip.da_khoa_chuan_bi ? (
-                            <button
-                              onClick={() => handleOpenUnlockModal('GVDD', trip)}
-                              className="px-3 py-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-300 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 transition shadow-sm cursor-pointer"
-                              title="Mở khóa để GVDĐ chỉnh sửa điểm theo đơn"
-                            >
-                              <Unlock className="w-3.5 h-3.5" />
-                              <span>Mở khóa điểm</span>
-                            </button>
+                            isScheduleLocked ? (
+                              <span className="text-xs text-slate-400 font-medium italic" title="Đợt kiến tập đã khóa sổ toàn diện">
+                                Đã khóa sổ toàn đợt
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => handleOpenUnlockModal('GVDD', trip)}
+                                className="px-3 py-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-300 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 transition shadow-sm cursor-pointer"
+                                title="Mở khóa để GVDĐ chỉnh sửa điểm theo đơn"
+                              >
+                                <Unlock className="w-3.5 h-3.5" />
+                                <span>Mở khóa điểm</span>
+                              </button>
+                            )
                           ) : (
                             <span className="text-xs text-slate-400 italic">
                               {trip.da_khoa_chuan_bi ? '--' : 'Đang cho phép nhập'}
@@ -1231,14 +1281,20 @@ export default function KetQuaKienTap_Khoa() {
                         </td>
                         <td className="p-3 text-center">
                           {isKhoa && sup.da_khoa_thu_hoach ? (
-                            <button
-                              onClick={() => handleOpenUnlockModal('GVHD', sup)}
-                              className="px-3 py-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-300 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 transition shadow-sm cursor-pointer"
-                              title="Mở khóa để GVHD chỉnh sửa điểm theo đơn"
-                            >
-                              <Unlock className="w-3.5 h-3.5" />
-                              <span>Mở khóa điểm</span>
-                            </button>
+                            isScheduleLocked ? (
+                              <span className="text-xs text-slate-400 font-medium italic" title="Đợt kiến tập đã khóa sổ toàn diện">
+                                Đã khóa sổ toàn đợt
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => handleOpenUnlockModal('GVHD', sup)}
+                                className="px-3 py-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-300 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 transition shadow-sm cursor-pointer"
+                                title="Mở khóa để GVHD chỉnh sửa điểm theo đơn"
+                              >
+                                <Unlock className="w-3.5 h-3.5" />
+                                <span>Mở khóa điểm</span>
+                              </button>
+                            )
                           ) : (
                             <span className="text-xs text-slate-400 italic">
                               {sup.da_khoa_thu_hoach ? '--' : 'Đang cho phép nhập'}

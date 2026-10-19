@@ -476,13 +476,15 @@ export class GiangVienService {
 
     if (status && status !== 'all') {
       if (status === 'graded') {
-        queryBuilder.andWhere('baiThu.trang_thai = :statusVal', {
-          statusVal: 'DaCham',
-        });
+        queryBuilder.andWhere(
+          '(baiThu.trang_thai = :statusVal OR diemPhieu.diem_thu_hoach IS NOT NULL)',
+          { statusVal: 'DaCham' },
+        );
       } else if (status === 'pending') {
-        queryBuilder.andWhere('baiThu.trang_thai != :statusVal', {
-          statusVal: 'DaCham',
-        });
+        queryBuilder.andWhere(
+          '(baiThu.trang_thai != :statusVal AND diemPhieu.diem_thu_hoach IS NULL)',
+          { statusVal: 'DaCham' },
+        );
       }
     }
 
@@ -841,7 +843,14 @@ export class GiangVienService {
             ngayThamQuan: ctq?.ngay_tham_quan || null,
             gioBatDau: ctq?.gio_bat_dau || null,
             baiThuHoach: ptq?.baiThuHoach || null,
-            daKhoa: ptq?.diemPhieuThamQuan?.da_khoa || false,
+            daKhoa: Boolean(
+              ptq?.diemPhieuThamQuan?.da_khoa ||
+              ptq?.diemPhieuThamQuan?.da_khoa_hoi_dong
+            ),
+            daKhoaHoiDong: Boolean(
+              ptq?.diemPhieuThamQuan?.da_khoa_hoi_dong ||
+              ptq?.diemPhieuThamQuan?.da_khoa
+            ),
             diemHoiDongFinal: ptq?.diemPhieuThamQuan?.diem_hoi_dong_final ?? null,
             myScore: myScoreRecord?.score != null ? Number(myScoreRecord.score) : null,
             status: myScoreRecord?.score != null ? 'Đã chấm' : 'Chưa chấm',
@@ -852,6 +861,7 @@ export class GiangVienService {
         const scoredTrips = trips.filter((t: any) => t.myScore != null);
         const totalTrips = trips.length;
         const isFullyScored = totalTrips > 0 && scoredTrips.length === totalTrips;
+        const isLocked = trips.length > 0 && trips.every((t: any) => t.daKhoa);
         const overallMyAvg = scoredTrips.length > 0
           ? Number((scoredTrips.reduce((acc: number, curr: any) => acc + curr.myScore, 0) / scoredTrips.length).toFixed(2))
           : null;
@@ -862,14 +872,21 @@ export class GiangVienService {
           totalTrips,
           scoredCount: scoredTrips.length,
           isFullyScored,
+          isLocked,
           overallMyAvg,
           myScore: overallMyAvg, // For backward compatibility
           committee: trips[0]?.committee || [],
         };
       });
 
+      const isBoardLocked = students.length > 0 && students.every((st: any) => st.isLocked);
+
       results.push({
-        session: map.hoiDong,
+        session: {
+          ...map.hoiDong,
+          isBoardLocked,
+        },
+        isBoardLocked,
         vai_tro: map.vai_tro,
         memberId: map.id,
         committeeMembers: committeeMembers,
@@ -1046,44 +1063,27 @@ export class GiangVienService {
     const gv = await this.gvRepo.findOne({ where: { id: lecturerId } });
     if (!gv) throw new NotFoundException('Không tìm thấy giảng viên');
 
-    const now = new Date();
-
     const doanDangDan = await this.danDoanRepo
       .createQueryBuilder('danDoan')
       .leftJoin('danDoan.chuyenThamQuan', 'chuyen')
       .where('danDoan.giang_vien_id = :lecturerId', { lecturerId })
-      .andWhere('chuyen.ngay_tham_quan >= :now', { now })
       .getCount();
 
     const buoiBaoCao = await this.hoiDongThanhVienRepo
       .createQueryBuilder('thanhVien')
       .leftJoin('thanhVien.hoiDong', 'hoiDong')
       .where('thanhVien.giang_vien_id = :lecturerId', { lecturerId })
-      .andWhere('hoiDong.ngay_bao_cao >= :now', { now })
       .getCount();
 
-    const guidedSvIds = (
-      await this.phanCongRepo.find({
-        where: { giang_vien_id: lecturerId, trang_thai: 'DangHoatDong' },
-        relations: { dotKienTapSinhVien: true },
-      })
-    ).map((a) => a.dotKienTapSinhVien.sinh_vien_id);
-
-    let baiCanCham = 0;
-    if (guidedSvIds.length > 0) {
-      baiCanCham = await this.baiThuRepo
-        .createQueryBuilder('baiThu')
-        .leftJoin('baiThu.phieuThamQuan', 'phieuTQ')
-        .leftJoin('phieuTQ.phieuDangKy', 'phieu')
-        .leftJoin(
-          'DiemPhieuThamQuan',
-          'diem',
-          'diem.phieu_tham_quan_id = phieuTQ.id',
-        )
-        .where('phieu.sinh_vien_id IN (:...guidedSvIds)', { guidedSvIds })
-        .andWhere('diem.diem_thu_hoach IS NULL')
-        .getCount();
-    }
+    // Đồng bộ số bài chờ chấm với getGuidedStudentReports (Single Source of Truth)
+    const pendingReportsResult = await this.getGuidedStudentReports(
+      lecturerId,
+      1,
+      1,
+      undefined,
+      'pending',
+    );
+    const baiCanCham = pendingReportsResult.total;
 
     const tongSvHuongDan = await this.phanCongRepo.count({
       where: { giang_vien_id: lecturerId, trang_thai: 'DangHoatDong' },

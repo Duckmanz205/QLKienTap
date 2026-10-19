@@ -4,7 +4,7 @@ import {
   UploadCloud, FileText, CheckCircle2, AlertCircle, ChevronRight, Lock, Unlock,
   ArrowLeft, Search, ZoomIn, ZoomOut, AlertTriangle, Send, Maximize2, Minimize2,
   Star, Check, Building2, Monitor, RefreshCw, Calendar, MapPin, Users, Award, ShieldAlert,
-  FileCheck, ExternalLink, Image as ImageIcon
+  FileCheck, ExternalLink, Image as ImageIcon, RotateCcw, Layers
 } from 'lucide-react';
 import { sinhVienApi } from '../../services/api';
 import Toast from '../../components/Toast';
@@ -526,74 +526,85 @@ export default function NopBaiThuHoach_SV() {
             };
 
             return (
-              <div className="bg-[#1E3A2F] rounded-2xl p-6 text-white shadow-xl relative overflow-hidden flex flex-col border border-emerald-900/40 h-full">
-                {/* Background Decor */}
-                <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-                  <Award className="w-36 h-36" />
-                </div>
+              <div className="bg-[#1c221a] rounded-2xl p-5 text-white shadow-lg flex flex-col border border-white/10 h-full">
+                <div className="flex-1 flex flex-col">
+                  {/* Card Title & Header Status */}
+                  <div className="flex items-center justify-between gap-2 mb-3 pb-3 border-b border-white/10">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                        <Layers className="w-4 h-4 text-emerald-400" />
+                      </div>
+                      <div className="min-w-0">
+                        <h2 className="text-sm font-bold text-white tracking-wide truncate">
+                          Bộ 3 chuyến báo cáo
+                        </h2>
+                        <p className="text-[11px] text-slate-400 truncate">Bảo vệ trước Hội đồng chấm điểm</p>
+                      </div>
+                    </div>
 
-                <div className="relative z-10 flex-1 flex flex-col">
-                  {/* Card Title */}
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <h2 className="text-base font-black uppercase tracking-wider text-emerald-300 flex items-center gap-2">
-                      <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
-                      Bộ 3 chuyến báo cáo
-                    </h2>
-                    {repStatus?.isLockedByKhoa && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-extrabold bg-red-500/20 text-red-300 border border-red-500/30">
-                        <Lock className="w-3 h-3" /> Đã khóa
+                    {repStatus?.isLockedByKhoa ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-500/15 text-slate-300 border border-slate-500/25 shrink-0">
+                        <Lock className="w-3 h-3 text-slate-400" /> Đã khóa
+                      </span>
+                    ) : repStatus?.hasSelectedBoChuyen ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
+                        <CheckCircle2 className="w-3 h-3" /> Đã chọn
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/20 shrink-0">
+                        Chưa chọn
                       </span>
                     )}
                   </div>
 
-                  <p className="text-xs text-white/70 mb-4 leading-relaxed">
-                    Đăng ký 3 chuyến theo nguyện vọng (2 trực tiếp + 1 trực tuyến, 3 nhà máy khác nhau) để bảo vệ trước Hội đồng.
+                  <p className="text-xs text-slate-300 mb-3 leading-relaxed">
+                    Cơ cấu yêu cầu: <strong className="text-slate-100">2 trực tiếp + 1 trực tuyến</strong> tại <strong className="text-slate-100">3 nhà máy khác nhau</strong>.
                   </p>
 
                   {/* Checklist Cơ Cấu Học Phần */}
-                  <div className="bg-black/25 rounded-xl p-3 mb-4 border border-white/10 space-y-2">
-                    <div className="flex items-center justify-between text-xs font-semibold text-white/90">
-                      <span>Tiến độ cơ cấu học phần:</span>
-                      <span className="font-bold text-amber-300">
+                  <div className="bg-black/30 rounded-xl p-3 mb-4 border border-white/5 space-y-2">
+                    <div className="flex items-center justify-between text-xs text-slate-400">
+                      <span>Tiến độ bài thu hoạch:</span>
+                      <span className="font-semibold text-slate-200">
                         {repStatus?.completedTripsCount || 0} bài đã nộp
                       </span>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 text-[11px]">
-                      <div className={`p-2 rounded-lg border flex items-center justify-between ${
+                      <div className={`p-2 rounded-lg border flex items-center justify-between transition-colors ${
                         repStatus?.requirementDetails?.directOk
-                          ? 'bg-emerald-900/40 border-emerald-500/40 text-emerald-200'
-                          : 'bg-black/30 border-white/10 text-white/70'
+                          ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
+                          : 'bg-white/[0.02] border-white/5 text-slate-400'
                       }`}>
-                        <span className="flex items-center gap-1 font-medium">
-                          <Building2 className="w-3.5 h-3.5 shrink-0" /> Trực tiếp:
+                        <span className="flex items-center gap-1.5">
+                          <Building2 className="w-3.5 h-3.5 opacity-80" /> Trực tiếp:
                         </span>
-                        <span className="font-bold">
+                        <span className="font-bold font-mono">
                           {repStatus?.directCount || 0}/2 {repStatus?.requirementDetails?.directOk ? '✓' : ''}
                         </span>
                       </div>
 
-                      <div className={`p-2 rounded-lg border flex items-center justify-between ${
+                      <div className={`p-2 rounded-lg border flex items-center justify-between transition-colors ${
                         repStatus?.requirementDetails?.onlineOk
-                          ? 'bg-emerald-900/40 border-emerald-500/40 text-emerald-200'
-                          : 'bg-black/30 border-white/10 text-white/70'
+                          ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
+                          : 'bg-white/[0.02] border-white/5 text-slate-400'
                       }`}>
-                        <span className="flex items-center gap-1 font-medium">
-                          <Monitor className="w-3.5 h-3.5 shrink-0" /> Trực tuyến:
+                        <span className="flex items-center gap-1.5">
+                          <Monitor className="w-3.5 h-3.5 opacity-80" /> Trực tuyến:
                         </span>
-                        <span className="font-bold">
+                        <span className="font-bold font-mono">
                           {repStatus?.onlineCount || 0}/1 {repStatus?.requirementDetails?.onlineOk ? '✓' : ''}
                         </span>
                       </div>
                     </div>
 
-                    <div className={`text-[11px] px-2.5 py-1 rounded-lg border flex items-center justify-between ${
+                    <div className={`text-[11px] p-2 rounded-lg border flex items-center justify-between transition-colors ${
                       repStatus?.requirementDetails?.factoriesOk
-                        ? 'bg-emerald-900/40 border-emerald-500/40 text-emerald-200'
-                        : 'bg-black/30 border-white/10 text-white/70'
+                        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
+                        : 'bg-white/[0.02] border-white/5 text-slate-400'
                     }`}>
-                      <span className="font-medium">Số nhà máy khác nhau:</span>
-                      <span className="font-bold">
+                      <span className="flex items-center gap-1.5">Số nhà máy khác nhau:</span>
+                      <span className="font-bold font-mono">
                         {repStatus?.distinctFactoryCount || 0}/3 {repStatus?.requirementDetails?.factoriesOk ? '✓ Đạt' : 'Chưa đạt'}
                       </span>
                     </div>
@@ -601,50 +612,52 @@ export default function NopBaiThuHoach_SV() {
 
                   {/* Body: Các trạng thái */}
                   {loadingRepStatus ? (
-                    <div className="py-8 flex flex-col items-center justify-center text-white/60 text-xs gap-2">
-                      <RefreshCw className="w-6 h-6 animate-spin text-amber-300" />
+                    <div className="py-8 flex flex-col items-center justify-center text-slate-400 text-xs gap-2">
+                      <RefreshCw className="w-5 h-5 animate-spin text-emerald-400" />
                       <span>Đang tải thông tin...</span>
                     </div>
                   ) : !repStatus?.isEligible ? (
                     /* TRẠNG THÁI 1: CHƯA ĐỦ ĐIỀU KIỆN */
-                    <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex flex-col items-center text-center gap-2">
-                      <ShieldAlert className="w-9 h-9 text-amber-400" />
-                      <h4 className="text-sm font-bold text-amber-300">Chưa đủ điều kiện báo cáo</h4>
-                      <p className="text-xs text-white/80 leading-relaxed">
-                        Theo quy định của học phần Kiến tập, sinh viên phải hoàn thành ít nhất <strong>2 nhà máy trực tiếp</strong> và <strong>1 nhà máy trực tuyến</strong> (tại 3 nhà máy khác nhau) để đủ điều kiện báo cáo.
+                    <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4 flex flex-col items-center text-center gap-2">
+                      <ShieldAlert className="w-8 h-8 text-amber-400" />
+                      <h4 className="text-xs font-bold text-amber-300 uppercase tracking-wide">Chưa đủ điều kiện báo cáo</h4>
+                      <p className="text-xs text-slate-300 leading-relaxed">
+                        Theo quy định của học phần, sinh viên phải hoàn thành ít nhất <strong>2 nhà máy trực tiếp</strong> và <strong>1 nhà máy trực tuyến</strong> (tại 3 nhà máy khác nhau) để đủ điều kiện chọn bộ 3 chuyến.
                       </p>
                     </div>
                   ) : isEditingReportSelection || !repStatus?.hasSelectedBoChuyen ? (
                     /* TRẠNG THÁI 2: ĐỦ ĐIỀU KIỆN & CHỌN NGUYỆN VỌNG */
-                    <div className="space-y-3.5 flex-1 flex flex-col">
+                    <div className="space-y-3 flex-1 flex flex-col">
                       {repStatus?.isLockedByKhoa ? (
-                        <div className="p-3 bg-red-500/20 border border-red-500/40 rounded-xl text-xs text-red-200 flex items-start gap-2">
-                          <Lock className="w-4 h-4 shrink-0 text-red-400 mt-0.5" />
+                        <div className="p-3 bg-slate-500/10 border border-slate-500/20 rounded-xl text-xs text-slate-300 flex items-start gap-2.5">
+                          <Lock className="w-4 h-4 shrink-0 text-slate-400 mt-0.5" />
                           <div>
-                            <strong className="block font-bold">Cổng chọn bộ chuyến đã khóa</strong>
+                            <strong className="block font-semibold text-white">Cổng chọn bộ chuyến đã khóa</strong>
                             Quản lý Khoa đã khóa cổng đăng ký cho đợt này. Bạn không thể thực hiện chọn hoặc thay đổi bộ chuyến.
                           </div>
                         </div>
                       ) : (
                         <>
                           <div className="flex items-center justify-between text-xs">
-                            <span className="font-bold text-emerald-300">Chọn chuyến theo nguyện vọng:</span>
-                            <span className="font-bold px-2 py-0.5 rounded bg-black/30 text-amber-300 border border-white/10">
+                            <span className="font-semibold text-slate-200">Chọn chuyến theo nguyện vọng:</span>
+                            <span className="font-mono text-xs px-2 py-0.5 rounded bg-white/5 border border-white/10 text-emerald-400 font-bold">
                               {selectedTripsForReport.length}/3 chuyến
                             </span>
                           </div>
 
                           {/* Nhóm 1: Trực tiếp */}
-                          <div className="space-y-1">
-                            <div className="flex justify-between items-center text-[11px] font-bold text-white/80">
-                              <span className="flex items-center gap-1"><Building2 className="w-3.5 h-3.5 text-emerald-400" /> Trực tiếp (chọn 2):</span>
-                              <span className={selectedDirectCount === 2 ? 'text-emerald-400' : 'text-amber-300'}>
+                          <div className="space-y-1.5">
+                            <div className="flex justify-between items-center text-[11px] text-slate-300 font-semibold">
+                              <span className="flex items-center gap-1.5">
+                                <Building2 className="w-3.5 h-3.5 text-emerald-400" /> Trực tiếp (chọn 2):
+                              </span>
+                              <span className={`font-mono font-bold ${selectedDirectCount === 2 ? 'text-emerald-400' : 'text-slate-400'}`}>
                                 {selectedDirectCount}/2
                               </span>
                             </div>
-                            <div className="space-y-1 max-h-36 overflow-y-auto pr-1">
+                            <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
                               {directCompleted.length === 0 ? (
-                                <p className="text-[11px] text-white/50 italic">Chưa có chuyến trực tiếp nào đã nộp bài.</p>
+                                <p className="text-[11px] text-slate-500 italic py-2">Chưa có chuyến trực tiếp nào đã nộp bài.</p>
                               ) : (
                                 directCompleted.map(trip => {
                                   const isChecked = selectedTripsForReport.includes(trip.id);
@@ -652,18 +665,18 @@ export default function NopBaiThuHoach_SV() {
                                     <div
                                       key={trip.id}
                                       onClick={() => handleToggleTripSelection(trip.id)}
-                                      className={`p-2 rounded-lg border text-xs cursor-pointer transition-all flex items-center justify-between gap-2 ${
+                                      className={`p-2.5 rounded-xl border text-xs cursor-pointer transition-all flex items-center justify-between gap-2.5 ${
                                         isChecked
-                                          ? 'bg-[#407F3E]/70 border-[#DBD468] text-white font-bold shadow-xs'
-                                          : 'bg-black/20 border-white/10 text-white/80 hover:bg-black/30'
+                                          ? 'bg-emerald-500/15 border-emerald-500/40 text-white font-medium shadow-xs'
+                                          : 'bg-white/[0.02] border-white/10 text-slate-300 hover:bg-white/[0.05]'
                                       }`}
                                     >
                                       <div className="min-w-0 flex-1 truncate">
                                         <div className="truncate font-semibold">{trip.nhaMay}</div>
-                                        <div className="text-[10px] text-white/60 font-normal">{trip.ngayThamQuan}</div>
+                                        <div className="text-[10px] text-slate-400 mt-0.5">{trip.ngayThamQuan}</div>
                                       </div>
-                                      <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 border ${
-                                        isChecked ? 'bg-[#DBD468] border-[#DBD468] text-slate-900' : 'border-white/30'
+                                      <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 border transition-colors ${
+                                        isChecked ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-white/30'
                                       }`}>
                                         {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
                                       </div>
@@ -675,16 +688,18 @@ export default function NopBaiThuHoach_SV() {
                           </div>
 
                           {/* Nhóm 2: Trực tuyến */}
-                          <div className="space-y-1">
-                            <div className="flex justify-between items-center text-[11px] font-bold text-white/80">
-                              <span className="flex items-center gap-1"><Monitor className="w-3.5 h-3.5 text-cyan-400" /> Trực tuyến (chọn 1):</span>
-                              <span className={selectedOnlineCount === 1 ? 'text-emerald-400' : 'text-amber-300'}>
+                          <div className="space-y-1.5">
+                            <div className="flex justify-between items-center text-[11px] text-slate-300 font-semibold">
+                              <span className="flex items-center gap-1.5">
+                                <Monitor className="w-3.5 h-3.5 text-cyan-400" /> Trực tuyến (chọn 1):
+                              </span>
+                              <span className={`font-mono font-bold ${selectedOnlineCount === 1 ? 'text-emerald-400' : 'text-slate-400'}`}>
                                 {selectedOnlineCount}/1
                               </span>
                             </div>
-                            <div className="space-y-1 max-h-28 overflow-y-auto pr-1">
+                            <div className="space-y-1.5 max-h-28 overflow-y-auto pr-1">
                               {onlineCompleted.length === 0 ? (
-                                <p className="text-[11px] text-white/50 italic">Chưa có chuyến trực tuyến nào đã nộp bài.</p>
+                                <p className="text-[11px] text-slate-500 italic py-2">Chưa có chuyến trực tuyến nào đã nộp bài.</p>
                               ) : (
                                 onlineCompleted.map(trip => {
                                   const isChecked = selectedTripsForReport.includes(trip.id);
@@ -692,18 +707,18 @@ export default function NopBaiThuHoach_SV() {
                                     <div
                                       key={trip.id}
                                       onClick={() => handleToggleTripSelection(trip.id)}
-                                      className={`p-2 rounded-lg border text-xs cursor-pointer transition-all flex items-center justify-between gap-2 ${
+                                      className={`p-2.5 rounded-xl border text-xs cursor-pointer transition-all flex items-center justify-between gap-2.5 ${
                                         isChecked
-                                          ? 'bg-[#407F3E]/70 border-[#DBD468] text-white font-bold shadow-xs'
-                                          : 'bg-black/20 border-white/10 text-white/80 hover:bg-black/30'
+                                          ? 'bg-emerald-500/15 border-emerald-500/40 text-white font-medium shadow-xs'
+                                          : 'bg-white/[0.02] border-white/10 text-slate-300 hover:bg-white/[0.05]'
                                       }`}
                                     >
                                       <div className="min-w-0 flex-1 truncate">
                                         <div className="truncate font-semibold">{trip.nhaMay}</div>
-                                        <div className="text-[10px] text-white/60 font-normal">{trip.ngayThamQuan}</div>
+                                        <div className="text-[10px] text-slate-400 mt-0.5">{trip.ngayThamQuan}</div>
                                       </div>
-                                      <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 border ${
-                                        isChecked ? 'bg-[#DBD468] border-[#DBD468] text-slate-900' : 'border-white/30'
+                                      <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 border transition-colors ${
+                                        isChecked ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-white/30'
                                       }`}>
                                         {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
                                       </div>
@@ -720,21 +735,21 @@ export default function NopBaiThuHoach_SV() {
                               type="button"
                               onClick={handleSaveRepresentativeTrips}
                               disabled={!isSelectionValid || isSubmittingRepTrips}
-                              className={`w-full py-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer ${
+                              className={`w-full py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer ${
                                 isSelectionValid && !isSubmittingRepTrips
-                                  ? 'bg-[#DBD468] hover:bg-[#c9c256] text-slate-900'
-                                  : 'bg-white/10 text-white/40 cursor-not-allowed border border-white/5'
+                                  ? 'bg-[#407F3E] hover:bg-[#326631] text-white active:scale-[0.99]'
+                                  : 'bg-white/10 text-slate-500 cursor-not-allowed border border-white/5'
                               }`}
                             >
                               {isSubmittingRepTrips ? (
                                 <>
-                                  <RefreshCw className="w-4 h-4 animate-spin" />
-                                  Đang lưu bộ 3 chuyến...
+                                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                  <span>Đang lưu...</span>
                                 </>
                               ) : (
                                 <>
-                                  <CheckCircle2 className="w-4 h-4" />
-                                  Xác nhận Bộ 3 chuyến báo cáo
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  <span>Xác nhận Bộ 3 chuyến báo cáo</span>
                                 </>
                               )}
                             </button>
@@ -743,12 +758,12 @@ export default function NopBaiThuHoach_SV() {
                               <button
                                 type="button"
                                 onClick={() => {
-                                  setSelectedTripsForReport(repStatus.selectedRegistrationIds);
+                                  setSelectedTripsForReport(repStatus.selectedRegistrationIds || []);
                                   setIsEditingReportSelection(false);
                                 }}
-                                className="w-full py-1.5 bg-transparent hover:bg-white/10 text-white/70 hover:text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer text-center"
+                                className="w-full py-2 bg-transparent hover:bg-white/5 text-slate-400 hover:text-white rounded-xl text-xs font-medium transition-colors cursor-pointer text-center"
                               >
-                                Hủy bỏ đổi nguyện vọng
+                                Hủy bỏ thay đổi
                               </button>
                             )}
                           </div>
@@ -756,80 +771,105 @@ export default function NopBaiThuHoach_SV() {
                       )}
                     </div>
                   ) : (
-                    /* TRẠNG THÁI 3 & 4: ĐÃ ĐĂNG KÝ THÀNH CÔNG */
+                    /* TRẠNG THÁI 3 & 4: ĐÃ ĐĂNG KÝ THÀNH CÔNG (HIỂN THỊ BASIC & GỌN GÀNG) */
                     <div className="space-y-4 flex-1 flex flex-col">
                       <div className="space-y-2">
-                        <div className="flex items-center justify-between text-xs font-bold text-emerald-300">
+                        <div className="flex items-center justify-between text-xs font-semibold text-slate-300">
                           <span>3 chuyến đại diện đã đăng ký:</span>
-                          {repStatus?.canEdit && (
-                            <button
-                              type="button"
-                              onClick={() => setIsEditingReportSelection(true)}
-                              className="text-[11px] text-[#DBD468] hover:underline font-bold cursor-pointer"
-                            >
-                              Đổi nguyện vọng
-                            </button>
+                          {!repStatus?.isLockedByKhoa && (
+                            <span className="text-[11px] text-emerald-400 font-normal">Có thể thay đổi</span>
                           )}
                         </div>
 
-                        <div className="space-y-1.5">
+                        <div className="space-y-2">
                           {selectedTripsObjs.map((trip, idx) => (
                             <div
                               key={trip.id}
-                              className="p-2.5 bg-black/25 rounded-xl border border-white/15 flex items-center justify-between gap-2"
+                              className="p-3 bg-white/[0.03] hover:bg-white/[0.05] rounded-xl border border-white/10 flex items-center justify-between gap-3 transition-colors"
                             >
-                              <div className="min-w-0 flex-1 truncate">
-                                <div className="text-xs font-bold truncate text-white">
-                                  {idx + 1}. {trip.nhaMay}
-                                </div>
-                                <div className="text-[10px] text-white/60">
-                                  {trip.hinhThuc} • {trip.ngayThamQuan}
+                              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                <span className="w-5 h-5 rounded-md bg-white/10 text-slate-300 text-[11px] font-bold font-mono flex items-center justify-center shrink-0">
+                                  {idx + 1}
+                                </span>
+                                <div className="min-w-0 flex-1 truncate">
+                                  <div className="text-xs font-semibold truncate text-white">
+                                    {trip.nhaMay}
+                                  </div>
+                                  <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-2">
+                                    <span>{trip.ngayThamQuan}</span>
+                                    <span>•</span>
+                                    <span className={trip.hinhThuc === 'Trực tiếp' ? 'text-emerald-400' : 'text-cyan-400'}>
+                                      {trip.hinhThuc}
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-[#DBD468] text-slate-900 shrink-0">
-                                ⭐ Báo cáo
-                              </span>
                             </div>
                           ))}
                         </div>
-                      </div>
 
-                      {/* Thông tin Lịch Hội đồng do Khoa phân công */}
-                      <div className="mt-auto pt-3 border-t border-white/15">
-                        <div className="text-[11px] font-bold uppercase tracking-wider text-white/70 mb-2">
-                          Lịch bảo vệ Hội đồng (Khoa phân công)
-                        </div>
-
-                        {!repStatus?.assignedCouncil ? (
-                          <div className="p-3 bg-amber-500/15 border border-amber-500/30 rounded-xl space-y-1">
-                            <div className="flex items-center gap-1.5 text-xs font-bold text-amber-300">
-                              <Calendar className="w-4 h-4 text-amber-400 shrink-0" />
-                              Đang chờ Khoa phân công Hội đồng
-                            </div>
-                            <p className="text-[11px] text-white/80 leading-relaxed">
-                              Khoa đang lập Hội đồng và xếp lịch bảo vệ. Lịch chính thức sẽ hiển thị tại đây ngay khi được xếp.
+                        {/* Nút thay đổi bộ 3 chuyến rõ ràng và lịch thiệp */}
+                        {!repStatus?.isLockedByKhoa ? (
+                          <div className="pt-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedTripsForReport(repStatus.selectedRegistrationIds || []);
+                                setIsEditingReportSelection(true);
+                              }}
+                              className="w-full py-2.5 px-3 rounded-xl border border-white/10 hover:border-emerald-500/40 bg-white/5 hover:bg-emerald-500/10 text-xs font-semibold text-slate-200 hover:text-white transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-[0.99]"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5 text-emerald-400" />
+                              <span>Thay đổi bộ 3 chuyến</span>
+                            </button>
+                            <p className="text-[10px] text-slate-400 text-center mt-1.5 italic">
+                              * Bạn có thể chọn lại các chuyến khác trước khi Khoa chốt danh sách hoặc khóa cổng.
                             </p>
                           </div>
                         ) : (
-                          <div className="p-3 bg-emerald-950/60 border border-emerald-400/40 rounded-xl space-y-2 shadow-sm">
+                          <p className="text-[11px] text-slate-400 text-center mt-2 italic flex items-center justify-center gap-1.5">
+                            <Lock className="w-3.5 h-3.5 text-slate-500" />
+                            <span>Khoa đã khóa cổng đăng ký. Bộ chuyến không thể thay đổi.</span>
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Thông tin Lịch Hội đồng do Khoa phân công */}
+                      <div className="mt-auto pt-3 border-t border-white/10">
+                        <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                          Lịch bảo vệ Hội đồng
+                        </div>
+
+                        {!repStatus?.assignedCouncil ? (
+                          <div className="p-3 bg-white/[0.02] border border-white/5 rounded-xl space-y-1">
+                            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-300">
+                              <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                              <span>Chờ Khoa phân công Hội đồng</span>
+                            </div>
+                            <p className="text-[11px] text-slate-400 leading-relaxed">
+                              Khoa đang lập danh sách Hội đồng và xếp phòng. Lịch chính thức sẽ hiển thị tại đây khi hoàn tất.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="p-3 bg-white/[0.03] border border-white/10 rounded-xl space-y-2">
                             <div className="flex items-center justify-between gap-2">
-                              <span className="text-xs font-black text-emerald-300">
+                              <span className="text-xs font-bold text-emerald-400">
                                 {repStatus.assignedCouncil.tenHoiDong}
                               </span>
                               {repStatus.assignedCouncil.daKhoa ? (
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-300 border border-red-500/30">
+                                <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-500/20 text-slate-300 border border-slate-500/30">
                                   🔒 Đã khóa điểm
                                 </span>
                               ) : (
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                                   ✓ Đã có lịch
                                 </span>
                               )}
                             </div>
 
-                            <div className="space-y-1 text-xs text-white/90">
+                            <div className="space-y-1 text-xs text-slate-300">
                               <div className="flex items-center gap-1.5">
-                                <Calendar className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                                <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                                 <span>
                                   {repStatus.assignedCouncil.ngayBaoCao
                                     ? new Date(repStatus.assignedCouncil.ngayBaoCao).toLocaleString('vi-VN')
@@ -837,18 +877,18 @@ export default function NopBaiThuHoach_SV() {
                                 </span>
                               </div>
                               <div className="flex items-center gap-1.5">
-                                <MapPin className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                                <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                                 <span>{repStatus.assignedCouncil.diaDiem || 'Chưa xếp phòng'}</span>
                               </div>
                             </div>
 
                             {repStatus.assignedCouncil.thanhVien?.length > 0 && (
-                              <div className="pt-1.5 border-t border-white/10 space-y-0.5">
-                                <span className="text-[10px] font-bold text-white/60 uppercase">Giảng viên chấm:</span>
+                              <div className="pt-2 border-t border-white/5 space-y-1">
+                                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Hội đồng chấm:</span>
                                 {repStatus.assignedCouncil.thanhVien.map((tv, i) => (
-                                  <div key={i} className="text-[11px] text-white/80 flex items-center justify-between">
+                                  <div key={i} className="text-[11px] text-slate-300 flex items-center justify-between">
                                     <span>{tv.hoTen}</span>
-                                    <span className="text-[10px] text-amber-300 font-semibold">{tv.vaiTro}</span>
+                                    <span className="text-[10px] text-slate-400 font-medium">{tv.vaiTro}</span>
                                   </div>
                                 ))}
                               </div>

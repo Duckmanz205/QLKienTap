@@ -1,6 +1,6 @@
 import toast from 'react-hot-toast';
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   ChevronDown, Check, Eye, Download,
   BarChart2, Users, UserX, CheckCircle, XOctagon, FileCheck, X
@@ -10,6 +10,10 @@ import ConfirmModal from '../../components/ConfirmModal';
 import * as XLSX from 'xlsx';
 
 export default function BaoCaoThongKe_Khoa() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isCLB = location.pathname.startsWith('/clb');
+
   // Dropdown States for Filters
   const [isNamHocDropdownOpen, setIsNamHocDropdownOpen] = useState(false);
   const [selectedNamHoc, setSelectedNamHoc] = useState(() => sessionStorage.getItem('report_selectedNamHoc') || 'Tất cả');
@@ -72,8 +76,6 @@ export default function BaoCaoThongKe_Khoa() {
       }
     }
   }, [filteredSchedules, selectedLich, schedules.length]);
-
-  const navigate = useNavigate();
 
   const [alertMessage, setAlertMessage] = useState('');
 
@@ -451,40 +453,44 @@ export default function BaoCaoThongKe_Khoa() {
           ))}
         </div>
 
-        <h2 className="text-xl font-bold text-slate-700 mb-4 border-l-4 border-indigo-600 pl-3">Báo cáo Kết quả học tập</h2>
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 relative z-10">
-          {reports.filter(r => r.group === 'Kết quả học tập').map(report => (
-            <div key={report.id} className="bg-white rounded-2xl p-6 border border-[#E7E0C4] shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
-              <div>
-                <div className="flex items-center gap-4 mb-3">
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${report.bgIcon}`}>
-                    {report.icon}
+        {!isCLB && (
+          <>
+            <h2 className="text-xl font-bold text-slate-700 mb-4 border-l-4 border-indigo-600 pl-3">Báo cáo Kết quả học tập</h2>
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 relative z-10">
+              {reports.filter(r => r.group === 'Kết quả học tập').map(report => (
+                <div key={report.id} className="bg-white rounded-2xl p-6 border border-[#E7E0C4] shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-4 mb-3">
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${report.bgIcon}`}>
+                        {report.icon}
+                      </div>
+                      <h3 className="text-lg font-black text-slate-800">{report.name}</h3>
+                    </div>
+                    <p className="text-sm font-medium text-slate-500 mb-6 leading-relaxed">
+                      {report.desc}
+                    </p>
                   </div>
-                  <h3 className="text-lg font-black text-slate-800">{report.name}</h3>
+                  <div className="flex items-center gap-3 pt-4 border-t border-[#E7E0C4]/50">
+                    <button
+                      onClick={() => handleView(report.id)}
+                      className="flex-1 py-2.5 border border-[#E7E0C4] hover:bg-slate-50 text-slate-600 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                    >
+                      <Eye className="w-4 h-4" />
+                      Xem
+                    </button>
+                    <button
+                      onClick={() => handleExportExcel(report.id)}
+                      className="flex-1 py-2.5 bg-[#407F3E] hover:bg-[#407F3E]/90 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-sm cursor-pointer"
+                    >
+                      <Download className="w-4 h-4" />
+                      Xuất Excel
+                    </button>
+                  </div>
                 </div>
-                <p className="text-sm font-medium text-slate-500 mb-6 leading-relaxed">
-                  {report.desc}
-                </p>
-              </div>
-              <div className="flex items-center gap-3 pt-4 border-t border-[#E7E0C4]/50">
-                <button
-                  onClick={() => handleView(report.id)}
-                  className="flex-1 py-2.5 border border-[#E7E0C4] hover:bg-slate-50 text-slate-600 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
-                >
-                  <Eye className="w-4 h-4" />
-                  Xem
-                </button>
-                <button
-                  onClick={() => handleExportExcel(report.id)}
-                  className="flex-1 py-2.5 bg-[#407F3E] hover:bg-[#407F3E]/90 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-sm cursor-pointer"
-                >
-                  <Download className="w-4 h-4" />
-                  Xuất Excel
-                </button>
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </>
+        )}
       </div>
 
 

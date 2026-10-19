@@ -374,6 +374,15 @@ export class ApproveTripDto {
   @IsInt()
   @Min(1)
   nhaMayIdGop?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  gopVaoChuyenId?: number;
+
+  @IsOptional()
+  @IsArray()
+  gopCacPhieuDeXuatIds?: number[];
 }
 
 export class ApproveCancelDto {
