@@ -408,7 +408,7 @@ export class KhoaController {
     return this.khoaService.approveEmergencyEdit(id, body.isApproved, user?.sub);
   }
 
-  @Roles('QuanLyCLB')
+  @Roles('QuanLyKhoa')
   @Post('approve-trip')
   async approveTrip(@Body() body: ApproveTripDto) {
     if (body.registrationId) {
@@ -418,7 +418,7 @@ export class KhoaController {
         isApproved,
       );
     }
-    return this.khoaService.approveProposeTrip(
+    return this.khoaService.khoaApproveProposeTrip(
       body.tripId!,
       body.approverId!,
       body.isApproved!,
@@ -584,6 +584,12 @@ export class KhoaController {
   @Post('boards/:id/lock-board')
   async lockBoard(@Param('id', ParseIntPipe) id: number) {
     return this.khoaService.lockBoard(id);
+  }
+
+  @Roles('QuanLyKhoa')
+  @Post('boards/:id/unlock-board')
+  async unlockBoard(@Param('id', ParseIntPipe) id: number) {
+    return this.khoaService.unlockBoard(id);
   }
 
   @Roles('QuanLyKhoa')

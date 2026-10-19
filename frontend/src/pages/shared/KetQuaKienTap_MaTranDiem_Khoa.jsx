@@ -172,7 +172,7 @@ export default function KetQuaKienTap_Khoa() {
     try {
       if (unlockTarget.type === 'GVDD') {
         await khoaApi.unlockTripPrepGrades({
-          tripId: unlockTarget.item.chuyen_id,
+          tripId: unlockTarget.item.chuyen_id || unlockTarget.item.id,
           lyDo: unlockReason.trim()
         });
         toast.success(`Đã mở khóa điểm chuyến ${unlockTarget.item.ten_nha_may} cho GVDĐ!`);
@@ -180,10 +180,10 @@ export default function KetQuaKienTap_Khoa() {
       } else if (unlockTarget.type === 'GVHD') {
         await khoaApi.unlockLecturerReportGrades({
           dotKienTapId: unlockTarget.item.dot_kien_tap_id,
-          giangVienId: unlockTarget.item.giang_vien_id,
+          giangVienId: unlockTarget.item.giang_vien_id || unlockTarget.item.giangVien?.id,
           lyDo: unlockReason.trim()
         });
-        toast.success(`Đã mở khóa bảng điểm cho GVHD ${unlockTarget.item.ho_ten}!`);
+        toast.success(`Đã mở khóa bảng điểm cho GVHD ${unlockTarget.item.ho_ten || unlockTarget.item.giangVien?.ho_ten}!`);
         fetchSupervisorGradingStatuses();
       }
       setUnlockModalOpen(false);
@@ -223,9 +223,11 @@ export default function KetQuaKienTap_Khoa() {
   const filteredResults = useMemo(() => {
     return results.filter(r => {
       const sv = r.sinhVien || {};
+      const gvhdName = r.giangVienHuongDan?.ho_ten || sv.details?.giangVienHuongDan?.ho_ten || r.gvhd || '';
       const matchSearch = !searchTerm || 
         sv.mssv?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        sv.ho_ten?.toLowerCase().includes(searchTerm.toLowerCase());
+        sv.ho_ten?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        gvhdName.toLowerCase().includes(searchTerm.toLowerCase());
       const lop = sv.ten_lop || sv.lop;
       const matchClass = selectedClass === 'ALL' || lop === selectedClass;
       return matchSearch && matchClass;
@@ -241,8 +243,9 @@ export default function KetQuaKienTap_Khoa() {
     const q = searchTrip.toLowerCase();
     return tripStatuses.filter(t => 
       t.ten_nha_may?.toLowerCase().includes(q) ||
+      t.ten_lich?.toLowerCase().includes(q) ||
       t.gvdd?.ho_ten?.toLowerCase().includes(q) ||
-      t.gvdd?.ma_giang_vien?.toLowerCase().includes(q)
+      (t.gvdd?.ma_giang_vien || t.gvdd?.ma_gv)?.toLowerCase().includes(q)
     );
   }, [tripStatuses, searchTrip]);
 
@@ -250,11 +253,14 @@ export default function KetQuaKienTap_Khoa() {
   const filteredSupervisorStatuses = useMemo(() => {
     if (!searchSupervisor) return supervisorStatuses;
     const q = searchSupervisor.toLowerCase();
-    return supervisorStatuses.filter(s =>
-      s.ho_ten?.toLowerCase().includes(q) ||
-      s.ma_giang_vien?.toLowerCase().includes(q) ||
-      s.bo_mon?.toLowerCase().includes(q)
-    );
+    return supervisorStatuses.filter(s => {
+      const hoTen = s.ho_ten || s.giangVien?.ho_ten || '';
+      const maGv = s.ma_giang_vien || s.giangVien?.ma_gv || '';
+      const boMon = s.bo_mon || s.giangVien?.bo_mon || '';
+      return hoTen.toLowerCase().includes(q) ||
+        maGv.toLowerCase().includes(q) ||
+        boMon.toLowerCase().includes(q);
+    });
   }, [supervisorStatuses, searchSupervisor]);
 
   // Helpers
@@ -656,7 +662,7 @@ export default function KetQuaKienTap_Khoa() {
 
                     {/* Dynamic Trip Columns */}
                     {Array.from({ length: maxTrips }).map((_, i) => (
-                      <th key={i} className="p-2 border-r border-white text-center bg-[#E2EFDA] text-emerald-950 font-extrabold" colSpan={6}>
+                      <th key={i} className="p-2 border-r border-white text-center bg-[#E2EFDA] text-emerald-950 font-extrabold" colSpan={7}>
                         NHÀ MÁY THỨ {i + 1}
                       </th>
                     ))}
@@ -665,7 +671,7 @@ export default function KetQuaKienTap_Khoa() {
                   {/* Subheaders */}
                   <tr className="bg-[#E7E0C4]/70 text-slate-700 text-[10px] font-bold uppercase tracking-wider">
                     {/* Subheaders for Thống kê Nhà máy */}
-                    <th className="p-1.5 border-r border-white text-center bg-[#FCE4D6]/70 min-w-[70px]">NM Thực tế</th>
+                    <th className="p-1.5 border-r border-white text-center bg-[#FCE4D6]/70 min-w-[95px]">Nhà máy trực tiếp</th>
                     <th className="p-1.5 border-r border-white text-center bg-[#FCE4D6]/70 min-w-[70px]">NM Online</th>
                     <th className="p-1.5 border-r border-white text-center bg-[#FCE4D6]/70 min-w-[70px]">Tổng NM</th>
                     <th className="p-1.5 border-r border-white text-center bg-[#FCE4D6]/70 min-w-[75px]">Tiêu chuẩn</th>
@@ -678,6 +684,7 @@ export default function KetQuaKienTap_Khoa() {
                         <th className="p-1.5 border-r border-white text-center bg-[#E2EFDA]/70 min-w-[80px]">Hình thức</th>
                         <th className="p-1.5 border-r border-white text-center bg-[#E2EFDA]/70 min-w-[55px]">Điểm CB</th>
                         <th className="p-1.5 border-r border-white text-center bg-[#E2EFDA]/70 min-w-[55px]">Điểm TH</th>
+                        <th className="p-1.5 border-r border-white text-center bg-[#E2EFDA]/70 min-w-[70px]" title="Điểm báo cáo hội đồng (40%)">Điểm BC Hội đồng</th>
                         <th className="p-1.5 border-r border-white text-center bg-[#E2EFDA]/70 min-w-[55px]">Điểm Cộng</th>
                         <th className="p-1.5 border-r border-white text-center bg-[#E2EFDA]/70 min-w-[55px]">Tổng Điểm</th>
                       </React.Fragment>
@@ -687,7 +694,7 @@ export default function KetQuaKienTap_Khoa() {
                 <tbody className="divide-y divide-[#E7E0C4]/50 text-xs">
                   {paginatedResults.length === 0 ? (
                     <tr>
-                      <td colSpan={13 + maxTrips * 6} className="p-8 text-center text-slate-400 italic">
+                      <td colSpan={13 + maxTrips * 7} className="p-8 text-center text-slate-400 italic">
                         Không có dữ liệu sinh viên phù hợp.
                       </td>
                     </tr>
@@ -714,7 +721,7 @@ export default function KetQuaKienTap_Khoa() {
                             {r.sinhVien?.ten_lop || r.sinhVien?.lop || '--'}
                           </td>
                           <td className="p-2 border-r border-[#E7E0C4]/50 text-slate-700 font-medium whitespace-nowrap">
-                            {r.giangVienHuongDan?.ho_ten || '--'}
+                            {r.giangVienHuongDan?.ho_ten || r.sinhVien?.details?.giangVienHuongDan?.ho_ten || r.gvhd || '--'}
                           </td>
                           <td className="p-2 text-center border-r border-[#E7E0C4]/50">
                             {getStatusBadge(r.trang_thai)}
@@ -725,13 +732,13 @@ export default function KetQuaKienTap_Khoa() {
 
                           {/* Data Thống kê Nhà máy */}
                           <td className="p-2 text-center border-r border-[#E7E0C4]/50 bg-[#FCE4D6]/20 font-bold text-slate-700">
-                            {r.nm_thuc_te != null ? r.nm_thuc_te : '--'}
+                            {r.nm_thuc_te != null ? r.nm_thuc_te : (r.so_nm_off != null ? r.so_nm_off : '--')}
                           </td>
                           <td className="p-2 text-center border-r border-[#E7E0C4]/50 bg-[#FCE4D6]/20 font-bold text-slate-700">
-                            {r.nm_online != null ? r.nm_online : '--'}
+                            {r.nm_online != null ? r.nm_online : (r.so_nm_onl != null ? r.so_nm_onl : '--')}
                           </td>
                           <td className="p-2 text-center border-r border-[#E7E0C4]/50 bg-[#FCE4D6]/30 font-black text-slate-800">
-                            {r.tong_nm != null ? r.tong_nm : '--'}
+                            {r.tong_nm != null ? r.tong_nm : (r.so_nm_khong_trung != null ? r.so_nm_khong_trung : (r.so_nm_di != null ? r.so_nm_di : '--'))}
                           </td>
                           <td className="p-2 text-center border-r border-[#E7E0C4]/50 bg-[#FCE4D6]/20 text-slate-500 font-semibold">
                             &gt;= 3
@@ -748,13 +755,26 @@ export default function KetQuaKienTap_Khoa() {
                           {Array.from({ length: maxTrips }).map((_, tripIdx) => {
                             const trip = trips[tripIdx];
                             if (trip) {
+                              const tenNM = trip.ten_chuyen || trip.ten_nha_may || trip.nhaMay || '--';
+                              const diemTH = trip.diem_thu_hoach != null ? Number(trip.diem_thu_hoach).toFixed(1) : (trip.diem_bao_cao != null ? Number(trip.diem_bao_cao).toFixed(1) : '--');
+                              const diemBCHoiDong = trip.diem_bao_cao_hoi_dong != null
+                                ? Number(trip.diem_bao_cao_hoi_dong).toFixed(1)
+                                : (trip.diem_bao_cao_hd != null
+                                  ? Number(trip.diem_bao_cao_hd).toFixed(1)
+                                  : (trip.diem_hoi_dong != null
+                                    ? Number(trip.diem_hoi_dong).toFixed(1)
+                                    : (trip.diem_hoi_dong_final != null
+                                      ? Number(trip.diem_hoi_dong_final).toFixed(1)
+                                      : '--')));
+                              const diemTong = trip.diem_tong != null ? Number(trip.diem_tong).toFixed(1) : (trip.diem_tong_nm != null ? Number(trip.diem_tong_nm).toFixed(1) : '--');
+
                               return (
                                 <React.Fragment key={tripIdx}>
-                                  <td className="p-2 border-r border-[#E7E0C4]/50 font-medium text-slate-800 text-[11px] max-w-[200px] truncate" title={trip.ten_chuyen || trip.ten_nha_may}>
-                                    {trip.ten_chuyen || trip.ten_nha_may || '--'}
+                                  <td className="p-2 border-r border-[#E7E0C4]/50 font-medium text-slate-800 text-[11px] max-w-[200px] truncate" title={tenNM}>
+                                    {tenNM}
                                   </td>
                                   <td className="p-2 text-center border-r border-[#E7E0C4]/50 text-slate-600 text-[11px]">
-                                    {trip.hinh_thuc === 'Online' ? (
+                                    {trip.hinh_thuc === 'Online' || trip.hinh_thuc === 'TrucTuyen' ? (
                                       <span className="text-blue-600 font-semibold">Online</span>
                                     ) : (
                                       <span className="text-slate-700 font-medium">Trực tiếp</span>
@@ -764,19 +784,23 @@ export default function KetQuaKienTap_Khoa() {
                                     {trip.diem_chuan_bi != null ? Number(trip.diem_chuan_bi).toFixed(1) : '--'}
                                   </td>
                                   <td className="p-2 text-center border-r border-[#E7E0C4]/50 text-slate-700 font-medium">
-                                    {trip.diem_thu_hoach != null ? Number(trip.diem_thu_hoach).toFixed(1) : '--'}
+                                    {diemTH}
+                                  </td>
+                                  <td className="p-2 text-center border-r border-[#E7E0C4]/50 text-slate-700 font-medium">
+                                    {diemBCHoiDong}
                                   </td>
                                   <td className="p-2 text-center border-r border-[#E7E0C4]/50 text-slate-700 font-medium">
                                     {trip.diem_cong != null ? Number(trip.diem_cong).toFixed(1) : '--'}
                                   </td>
                                   <td className="p-2 text-center border-r border-[#E7E0C4]/50 font-bold bg-[#E2EFDA]/30 text-emerald-900">
-                                    {trip.diem_tong != null ? Number(trip.diem_tong).toFixed(1) : '--'}
+                                    {diemTong}
                                   </td>
                                 </React.Fragment>
                               );
                             } else {
                               return (
                                 <React.Fragment key={tripIdx}>
+                                  <td className="p-2 text-center border-r border-[#E7E0C4]/50 text-slate-300">--</td>
                                   <td className="p-2 text-center border-r border-[#E7E0C4]/50 text-slate-300">--</td>
                                   <td className="p-2 text-center border-r border-[#E7E0C4]/50 text-slate-300">--</td>
                                   <td className="p-2 text-center border-r border-[#E7E0C4]/50 text-slate-300">--</td>
@@ -969,7 +993,7 @@ export default function KetQuaKienTap_Khoa() {
                     </tr>
                   ) : (
                     filteredTripStatuses.map((trip, idx) => (
-                      <tr key={trip.chuyen_id} className="hover:bg-[#E7E0C4]/15 transition-colors">
+                      <tr key={trip.chuyen_id || trip.id || idx} className="hover:bg-[#E7E0C4]/15 transition-colors">
                         <td className="p-3 text-center font-bold text-slate-500 border-r border-[#E7E0C4]/40">
                           {idx + 1}
                         </td>
@@ -978,6 +1002,11 @@ export default function KetQuaKienTap_Khoa() {
                           <div className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
                             <Clock className="w-3.5 h-3.5 text-slate-400" />
                             <span>{formatDate(trip.ngay_tham_quan)}</span>
+                            {trip.ten_lich && (
+                              <span className="ml-1.5 px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded text-[11px] font-medium border border-slate-200">
+                                {trip.ten_lich.startsWith('Lịch') ? trip.ten_lich : `Lịch ${trip.ten_lich}`}
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td className="p-3 border-r border-[#E7E0C4]/40">
@@ -985,8 +1014,8 @@ export default function KetQuaKienTap_Khoa() {
                             <div>
                               <div className="font-bold text-slate-800">{trip.gvdd.ho_ten}</div>
                               <div className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
-                                <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-[11px]">{trip.gvdd.ma_giang_vien}</span>
-                                {trip.gvdd.so_dien_thoai && <span>{trip.gvdd.so_dien_thoai}</span>}
+                                <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-[11px]">{trip.gvdd.ma_giang_vien || trip.gvdd.ma_gv}</span>
+                                {(trip.gvdd.so_dien_thoai || trip.gvdd.sdt) && <span>{trip.gvdd.so_dien_thoai || trip.gvdd.sdt}</span>}
                               </div>
                             </div>
                           ) : (
@@ -995,7 +1024,7 @@ export default function KetQuaKienTap_Khoa() {
                         </td>
                         <td className="p-3 text-center border-r border-[#E7E0C4]/40">
                           <div className="font-bold text-slate-700">
-                            {trip.so_sv_co_diem} / {trip.so_luong_sv}
+                            {trip.so_sv_co_diem ?? 0} / {trip.so_luong_sv ?? 0}
                           </div>
                           <div className="text-[11px] text-slate-400">sinh viên có điểm</div>
                         </td>
@@ -1160,23 +1189,23 @@ export default function KetQuaKienTap_Khoa() {
                     </tr>
                   ) : (
                     filteredSupervisorStatuses.map((sup, idx) => (
-                      <tr key={sup.giang_vien_id} className="hover:bg-[#E7E0C4]/15 transition-colors">
+                      <tr key={sup.giang_vien_id || sup.giangVien?.id || idx} className="hover:bg-[#E7E0C4]/15 transition-colors">
                         <td className="p-3 text-center font-bold text-slate-500 border-r border-[#E7E0C4]/40">
                           {idx + 1}
                         </td>
                         <td className="p-3 border-r border-[#E7E0C4]/40">
-                          <div className="font-bold text-slate-800">{sup.ho_ten}</div>
+                          <div className="font-bold text-slate-800">{sup.ho_ten || sup.giangVien?.ho_ten}</div>
                           <div className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
-                            <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-[11px]">{sup.ma_giang_vien}</span>
+                            <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-[11px]">{sup.ma_giang_vien || sup.giangVien?.ma_gv}</span>
                             {sup.email && <span>{sup.email}</span>}
                           </div>
                         </td>
                         <td className="p-3 border-r border-[#E7E0C4]/40">
-                          <span className="font-medium text-slate-700">{sup.bo_mon || 'Khoa CNTT'}</span>
+                          <span className="font-medium text-slate-700">{sup.bo_mon || sup.giangVien?.bo_mon || 'Khoa CNTT'}</span>
                         </td>
                         <td className="p-3 text-center border-r border-[#E7E0C4]/40">
                           <div className="font-bold text-slate-700">
-                            {sup.so_sv_da_cham} / {sup.so_luong_sv}
+                            {sup.so_sv_da_cham ?? sup.so_bai_da_cham ?? 0} / {sup.so_luong_sv ?? sup.so_sv_huong_dan ?? 0}
                           </div>
                           <div className="text-[11px] text-slate-400">sinh viên đã chấm</div>
                         </td>
@@ -1261,9 +1290,9 @@ export default function KetQuaKienTap_Khoa() {
                 </>
               ) : (
                 <>
-                  <div><span className="font-bold text-slate-500">Giảng viên hướng dẫn:</span> <span className="font-semibold text-slate-800">{unlockTarget.item.ho_ten}</span> ({unlockTarget.item.ma_giang_vien})</div>
-                  <div><span className="font-bold text-slate-500">Bộ môn / Khoa:</span> {unlockTarget.item.bo_mon || 'Khoa CNTT'}</div>
-                  <div><span className="font-bold text-slate-500">Số lượng sinh viên hướng dẫn:</span> {unlockTarget.item.so_sv_da_cham} / {unlockTarget.item.so_luong_sv} SV</div>
+                  <div><span className="font-bold text-slate-500">Giảng viên hướng dẫn:</span> <span className="font-semibold text-slate-800">{unlockTarget.item.ho_ten || unlockTarget.item.giangVien?.ho_ten}</span> ({unlockTarget.item.ma_giang_vien || unlockTarget.item.giangVien?.ma_gv})</div>
+                  <div><span className="font-bold text-slate-500">Bộ môn / Khoa:</span> {unlockTarget.item.bo_mon || unlockTarget.item.giangVien?.bo_mon || 'Khoa CNTT'}</div>
+                  <div><span className="font-bold text-slate-500">Số lượng sinh viên hướng dẫn:</span> {unlockTarget.item.so_sv_da_cham ?? unlockTarget.item.so_bai_da_cham ?? 0} / {unlockTarget.item.so_luong_sv ?? unlockTarget.item.so_sv_huong_dan ?? 0} SV</div>
                   <div><span className="font-bold text-slate-500">Nội dung điểm:</span> Bảng điểm bài thu hoạch kiến tập</div>
                   <div><span className="font-bold text-slate-500">Thời gian GVHD đã nộp:</span> {formatDateTime(unlockTarget.item.ngay_khoa_thu_hoach)}</div>
                 </>

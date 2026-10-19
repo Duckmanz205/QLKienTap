@@ -164,11 +164,12 @@ export class ClbController {
         isApproved,
       );
     }
-    return this.khoaService.approveProposeTrip(
+    return this.khoaService.clbApproveProposeTrip(
       body.tripId!,
       body.approverId!,
       body.isApproved!,
       body.giangVienId,
+      body.nhaMayIdGop,
     );
   }
 

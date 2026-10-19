@@ -22,8 +22,8 @@ export const exportDiemQuaTrinh = (results, tenLich = '') => {
   const header2 = ['(1)', '(2)', '(3)', '(4)', '(5)'];
   
   for (let i = 0; i < maxTrips; i++) {
-    header1.push('TÊN', 'THỜI GIAN', 'HÌNH THỨC', 'ĐIỂM', 'ĐIỂM CỘNG');
-    header2.push('(6)', '(7)', '', '', ''); // Following exactly the structure approximation
+    header1.push('TÊN', 'THỜI GIAN', 'HÌNH THỨC', 'ĐIỂM CB', 'ĐIỂM TH', 'ĐIỂM BC HỘI ĐỒNG', 'ĐIỂM CỘNG', 'TỔNG ĐIỂM');
+    header2.push('', '', '', '', '', '', '', '');
   }
 
   const data = [header1, header2];
@@ -44,14 +44,17 @@ export const exportDiemQuaTrinh = (results, tenLich = '') => {
       const trip = trips[i];
       if (trip) {
         row.push(
-          trip.nhaMay || '',
+          trip.ten_nha_may || trip.nhaMay || '',
           trip.ngay_tham_quan ? formatDate(trip.ngay_tham_quan) : '',
-          trip.hinh_thuc === 'TrucTiep' ? 'Offline' : (trip.hinh_thuc === 'TrucTuyen' ? 'Online' : trip.hinh_thuc || ''),
+          trip.hinh_thuc === 'TrucTiep' ? 'Offline' : (trip.hinh_thuc === 'TrucTuyen' || trip.hinh_thuc === 'Online' ? 'Online' : trip.hinh_thuc || ''),
           trip.diem_chuan_bi ?? '',
-          trip.diem_cong ?? ''
+          trip.diem_thu_hoach ?? trip.diem_bao_cao ?? '',
+          trip.diem_bao_cao_hoi_dong ?? trip.diem_hoi_dong ?? trip.diem_hoi_dong_final ?? '',
+          trip.diem_cong ?? '',
+          trip.diem_tong ?? trip.diem_tong_nm ?? ''
         );
       } else {
-        row.push('', '', '', '', '');
+        row.push('', '', '', '', '', '', '', '');
       }
     }
     data.push(row);
@@ -71,7 +74,7 @@ export const exportDanhSachPhang = (results, tenLich = '') => {
   data.push([]);
   data.push([
     'STT', 'MSSV', 'Họ và tên', 'Lớp', 'Chữ kí', 'Mã nhà máy', 'Ngày TQNM', 
-    'Mã chuyến', 'Tên NM', 'Khoá chính (MASV+MANM)', 'Điểm chuẩn bị', 
+    'Mã chuyến', 'Tên NM', 'Khoá chính (MASV+MANM)', 'Điểm chuẩn bị', 'Điểm thu hoạch', 'Điểm BC hội đồng', 
     'Điểm thưởng', 'Tình trạng nộp BC', 'Hình thức đi', 'GV dẫn đoàn', 'Kết quả lọc'
   ]);
 
@@ -81,8 +84,10 @@ export const exportDanhSachPhang = (results, tenLich = '') => {
     const trips = r.trips || [];
     
     trips.forEach(trip => {
-      const maNM = trip.nhaMay ? trip.nhaMay.substring(0, 5).toUpperCase().replace(/[^A-Z]/g, '') : '';
-      const gv = sv.details?.giangVienHuongDan?.ho_ten || ''; // Note: We only have GVHD available, not GV Dan doan exactly
+      const tenNM = trip.ten_nha_may || trip.nhaMay || '';
+      const maNM = tenNM ? tenNM.substring(0, 5).toUpperCase().replace(/[^A-Z]/g, '') : '';
+      const gv = r.giangVienHuongDan?.ho_ten || sv.details?.giangVienHuongDan?.ho_ten || r.gvhd || ''; // Fallback GVHD
+      const hasReport = trip.diem_thu_hoach != null || trip.diem_bao_cao != null;
       
       data.push([
         stt++,
@@ -93,12 +98,14 @@ export const exportDanhSachPhang = (results, tenLich = '') => {
         maNM,
         trip.ngay_tham_quan ? formatDate(trip.ngay_tham_quan) : '',
         trip.ma_chuyen_tham_quan || '', // Mã chuyến
-        trip.nhaMay || '',
+        tenNM,
         `${sv.mssv}-${maNM}`,
         trip.diem_chuan_bi ?? '',
+        trip.diem_thu_hoach ?? trip.diem_bao_cao ?? '',
+        trip.diem_bao_cao_hoi_dong ?? trip.diem_hoi_dong ?? trip.diem_hoi_dong_final ?? '',
         trip.diem_cong ?? '',
-        trip.diem_bao_cao !== null ? 'Đã nộp' : 'Chưa nộp',
-        trip.hinh_thuc === 'TrucTiep' ? 'trực tiếp (offline)' : (trip.hinh_thuc === 'TrucTuyen' ? 'trực tuyến (online)' : trip.hinh_thuc || ''),
+        hasReport ? 'Đã nộp' : 'Chưa nộp',
+        trip.hinh_thuc === 'TrucTiep' ? 'trực tiếp (offline)' : (trip.hinh_thuc === 'TrucTuyen' || trip.hinh_thuc === 'Online' ? 'trực tuyến (online)' : trip.hinh_thuc || ''),
         gv, // Tạm mượn GVHD
         '' // Kết quả lọc
       ]);
@@ -129,8 +136,8 @@ export const exportTongHopKienTap = (results, tenLich = '') => {
     const trips = r.trips || [];
     
     const offlineTrips = trips.filter(t => t.hinh_thuc === 'TrucTiep' || t.hinh_thuc?.toLowerCase().includes('offline'));
-    const reportsCount = trips.filter(t => t.diem_bao_cao !== null && t.diem_bao_cao !== undefined).length;
-    const gvhd = sv.details?.giangVienHuongDan?.ho_ten || '';
+    const reportsCount = trips.filter(t => t.diem_thu_hoach != null || t.diem_bao_cao != null).length;
+    const gvhd = r.giangVienHuongDan?.ho_ten || sv.details?.giangVienHuongDan?.ho_ten || r.gvhd || '';
 
     data.push([
       idx + 1,

@@ -59,9 +59,15 @@ export class ProposeTripDto {
 }
 
 export class RequestCancelDto {
+  @IsOptional()
   @IsInt()
   @Min(1)
-  registrationId: number;
+  registrationId?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  dangKyId?: number;
 
   @IsString()
   @IsNotEmpty({ message: 'Lý do hủy không được để trống' })
