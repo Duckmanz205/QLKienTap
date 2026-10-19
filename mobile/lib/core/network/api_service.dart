@@ -272,12 +272,15 @@ class ApiService {
     return await get('sinh-vien/registered-trips/$studentId');
   }
 
+  static Future<dynamic> getTripInfo(int tripId) async {
+    return await get('sinh-vien/trip-info/$tripId');
+  }
+
   static Future<dynamic> registerTrip(int tripId) async {
     return await post('sinh-vien/register', {
       'tripId': tripId,
     });
   }
-
 
   static Future<dynamic> getProposals() async {
     return await get('sinh-vien/proposals');
@@ -302,14 +305,26 @@ class ApiService {
     return await post('sinh-vien/submit-report', data);
   }
 
+  static Future<dynamic> submitConfirmationPaper(
+      int registrationId, String fileXacNhanUrl) async {
+    return await post('sinh-vien/submit-confirmation-paper', {
+      'registrationId': registrationId,
+      'fileXacNhanUrl': fileXacNhanUrl,
+    });
+  }
+
   static Future<dynamic> deleteReport(int registrationId) async {
     return await delete('sinh-vien/report/$registrationId');
   }
 
+  static Future<dynamic> getRepresentativeTripsStatus() async {
+    return await get('sinh-vien/representative-trips-status');
+  }
+
   static Future<dynamic> selectRepresentativeTrips(
-      int termStudentId, List<int> registrationIds) async {
+      List<int> registrationIds, {int? termStudentId}) async {
     return await post('sinh-vien/select-representative-trips', {
-      'termStudentId': termStudentId,
+      if (termStudentId != null) 'termStudentId': termStudentId,
       'registrationIds': registrationIds,
     });
   }
@@ -359,12 +374,29 @@ class ApiService {
   }
 
   // Student propose trip
-  static Future<dynamic> proposeTrip(int studentId, String companyName, String address, String description) async {
+  static Future<dynamic> proposeTrip({
+    int? nhaMayId,
+    String? tenNhaMayDeXuat,
+    String? diaChiDeXuat,
+    String? nguoiLienHeDeXuat,
+    String? sdtLienHeDeXuat,
+    required String ngayThamQuan,
+    required String gioBatDau,
+    required String hinhThuc,
+  }) async {
     return await post('sinh-vien/propose-trip', {
-      'sinh_vien_id': studentId,
-      'ten_doanh_nghiep': companyName,
-      'dia_chi': address,
-      'ly_do': description,
+      if (nhaMayId != null) 'nhaMayId': nhaMayId,
+      if (tenNhaMayDeXuat != null && tenNhaMayDeXuat.isNotEmpty)
+        'tenNhaMayDeXuat': tenNhaMayDeXuat,
+      if (diaChiDeXuat != null && diaChiDeXuat.isNotEmpty)
+        'diaChiDeXuat': diaChiDeXuat,
+      if (nguoiLienHeDeXuat != null && nguoiLienHeDeXuat.isNotEmpty)
+        'nguoiLienHeDeXuat': nguoiLienHeDeXuat,
+      if (sdtLienHeDeXuat != null && sdtLienHeDeXuat.isNotEmpty)
+        'sdtLienHeDeXuat': sdtLienHeDeXuat,
+      'ngayThamQuan': ngayThamQuan,
+      'gioBatDau': gioBatDau,
+      'hinhThuc': hinhThuc,
     });
   }
 
@@ -406,6 +438,13 @@ class ApiService {
     });
   }
 
+  // Lecturer lock trip preparation grades
+  static Future<dynamic> lockTripPrepGrades(int tripId) async {
+    return await post('giang-vien/lock-trip-prep-grades', {
+      'tripId': tripId,
+    });
+  }
+
   // Lecturer guided reports
   static Future<dynamic> getGuidedReports(int lecturerId,
       {String? search, String? status, int? page, int? limit}) async {
@@ -443,6 +482,23 @@ class ApiService {
     });
   }
 
+  // Lecturer save AI suggested grade
+  static Future<dynamic> saveAIGrade(
+      int reportId, double score, String comment) async {
+    return await post('giang-vien/save-ai-grade', {
+      'reportId': reportId,
+      'score': score,
+      'comment': comment,
+    });
+  }
+
+  // Lecturer lock guided reports grades
+  static Future<dynamic> lockGuidedReportsGrades(int dotKienTapId) async {
+    return await post('giang-vien/lock-guided-reports-grades', {
+      'dotKienTapId': dotKienTapId,
+    });
+  }
+
   // Lecturer board sessions
   static Future<dynamic> getBoardSessions(int lecturerId) async {
     return await get('giang-vien/board-sessions/$lecturerId');
@@ -454,6 +510,16 @@ class ApiService {
     return await post('giang-vien/submit-board-score', {
       'memberId': memberId,
       'phieuId': phieuId,
+      'score': score,
+    });
+  }
+
+  // Lecturer submit board scores batch
+  static Future<dynamic> submitBoardScoresBatch(
+      int memberId, List<int> phieuIds, double score) async {
+    return await post('giang-vien/submit-board-scores-batch', {
+      'memberId': memberId,
+      'phieuIds': phieuIds,
       'score': score,
     });
   }

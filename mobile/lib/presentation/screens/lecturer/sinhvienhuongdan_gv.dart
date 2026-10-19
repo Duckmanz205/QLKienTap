@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../data/models/app_models.dart';
 import '../../../data/state/app_state.dart';
 import '../../widgets/paginated_list.dart';
 
@@ -17,6 +18,61 @@ class SinhVienHuongDanGVScreen extends StatefulWidget {
 
 class _SinhVienHuongDanGVScreenState extends State<SinhVienHuongDanGVScreen> {
   String _filter = 'all'; // 'all', 'graded', 'ungraded'
+  bool _isLocking = false;
+
+  Future<void> _lockAllGuidedReports(int dotKienTapId) async {
+    final appStateProvider = AppStateProvider.of(context);
+    final uncompleteCount = appStateProvider.state.lecturerStudents.where((s) => s.papersLeft > 0).length;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Khóa điểm toàn đợt', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        content: Text(
+          uncompleteCount > 0
+              ? 'Hiện còn $uncompleteCount sinh viên chưa hoàn tất việc chấm điểm bài thu hoạch. Bạn có chắc chắn muốn khóa điểm toàn bộ đợt kiến tập không?'
+              : 'Bạn có chắc chắn muốn khóa toàn bộ điểm bài thu hoạch đợt kiến tập này? Sau khi khóa, điểm sẽ được chuyển đến Hội đồng và Khoa để tổng kết.',
+          style: const TextStyle(fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('HỦY', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger, foregroundColor: Colors.white),
+            child: const Text('XÁC NHẬN KHÓA'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && mounted) {
+      setState(() => _isLocking = true);
+      try {
+        await appStateProvider.lockGuidedReportsGrades(dotKienTapId);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Đã khóa điểm toàn đợt thành công! Điểm đã được gửi lên Khoa.'),
+              backgroundColor: AppColors.secondary,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Lỗi khóa điểm: $e'), backgroundColor: AppColors.danger),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _isLocking = false);
+        }
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -24,25 +80,60 @@ class _SinhVienHuongDanGVScreenState extends State<SinhVienHuongDanGVScreen> {
     final appState = appStateProvider.state;
 
     final allStudents = appState.lecturerStudents;
-    final filteredStudents = allStudents.where((s) {
-      if (_filter == 'graded') return s.isGraded;
-      if (_filter == 'ungraded') return !s.isGraded;
-      return true; // 'all'
+    final filtered = allStudents.where((s) {
+      if (_filter == 'graded') return s.papersLeft == 0;
+      if (_filter == 'ungraded') return s.papersLeft > 0;
+      return true;
     }).toList();
 
     return Column(
       children: [
+        // Filter Chips Row & Lock Button
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          color: Colors.white,
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  _buildFilterTab('all', 'Tất cả (${allStudents.length})'),
+                  const SizedBox(width: 8),
+                  _buildFilterTab('graded', 'Đã chấm đủ'),
+                  const SizedBox(width: 8),
+                  _buildFilterTab('ungraded', 'Chưa xong'),
+                ],
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _isLocking ? null : () => _lockAllGuidedReports(1),
+                  icon: _isLocking
+                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(color: AppColors.danger, strokeWidth: 2))
+                      : const Icon(Icons.lock_outline, size: 16, color: AppColors.danger),
+                  label: const Text('KHÓA ĐIỂM TOÀN ĐỢT KIẾN TẬP', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.danger)),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppColors.danger),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
         Expanded(
-          child: PaginatedList<dynamic>(
-            items: allStudents,
+          child: PaginatedList<LecturerStudent>(
+            items: filtered,
             searchHint: 'Tìm theo MSSV/họ tên',
-            dropdownTitle: 'Lịch kiến tập',
-            dropdownOptions: const ['Đợt 1 - Học kỳ 1 (2023-2024)', 'Đợt 2 - Học kỳ 1 (2023-2024)'],
+            dropdownTitle: 'Trạng thái',
+            dropdownOptions: const ['Tất cả'],
             itemName: 'sinh viên',
-            verticalFilters: true,
+            verticalFilters: false,
             filter: (student, query, dot) {
-              final matchQuery = student.name.toLowerCase().contains(query.toLowerCase()) || 
-                                 student.id.toLowerCase().contains(query.toLowerCase());
+              final matchQuery = student.name.toLowerCase().contains(query.toLowerCase()) ||
+                  student.id.toLowerCase().contains(query.toLowerCase());
               return matchQuery;
             },
             itemBuilder: (student) {
@@ -51,104 +142,86 @@ class _SinhVienHuongDanGVScreenState extends State<SinhVienHuongDanGVScreen> {
               final isFullyGraded = student.papersLeft == 0;
 
               return Card(
-                margin: const EdgeInsets.only(bottom: 16),
+                margin: const EdgeInsets.only(bottom: 14),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: Colors.grey.shade200),
+                  borderRadius: BorderRadius.circular(14),
+                  side: const BorderSide(color: AppColors.beigeBorder),
                 ),
                 elevation: 0,
                 color: Colors.white,
                 child: Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.all(14.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Row(
                         children: [
-                          CircleAvatar(backgroundImage: NetworkImage(student.avatar), radius: 24),
+                          CircleAvatar(
+                            backgroundImage: NetworkImage(student.avatar),
+                            radius: 22,
+                            onBackgroundImageError: (_, _) {},
+                          ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(student.id, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: Color(0xFF3B711A))),
-                                Text(student.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black87)),
-                                Text('Lớp: ${student.className}', style: const TextStyle(fontSize: 11, color: Colors.black54)),
+                                Text(student.id, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppColors.primary)),
+                                Text(student.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.darkSlate)),
+                                Text('Lớp: ${student.className}', style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
                               ],
                             ),
                           ),
                         ],
                       ),
+                      const SizedBox(height: 10),
+
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: isCompletedTours ? AppColors.secondary.withValues(alpha: 0.15) : AppColors.warning.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              'Chuyến: ${student.completedTours}',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: isCompletedTours ? AppColors.primary : AppColors.darkSlate,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: isFullyGraded ? AppColors.secondary.withValues(alpha: 0.15) : AppColors.danger.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              isFullyGraded ? 'Đã chấm đủ' : 'Còn ${student.papersLeft} bài',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: isFullyGraded ? AppColors.primary : AppColors.danger,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 12),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: isCompletedTours ? const Color(0xFF8CB654) : const Color(0xFFD7CD61),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                isCompletedTours ? Icons.check_circle : Icons.more_horiz,
-                                size: 12,
-                                color: isCompletedTours ? Colors.white : const Color(0xFF333333),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                'Số chuyến hoàn thành: ${student.completedTours}',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: isCompletedTours ? Colors.white : const Color(0xFF333333),
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: isFullyGraded ? const Color(0xFF8CB654) : const Color(0xFFD7CD61),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                isFullyGraded ? Icons.assignment_turned_in : Icons.warning_amber_rounded,
-                                size: 12,
-                                color: isFullyGraded ? Colors.white : const Color(0xFF333333),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                isFullyGraded ? 'Đã chấm đủ' : 'Còn ${student.papersLeft} bài',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: isFullyGraded ? Colors.white : const Color(0xFF333333),
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
+
                       ElevatedButton.icon(
                         onPressed: () => widget.onStudentTap(student.id),
                         icon: const Icon(Icons.edit_note, size: 16),
-                        label: const Text('Xem & chấm', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                        label: const Text('Xem & chấm bài', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF457B3B),
+                          backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
                         ),
                       ),
                     ],
@@ -168,10 +241,10 @@ class _SinhVienHuongDanGVScreenState extends State<SinhVienHuongDanGVScreen> {
       child: GestureDetector(
         onTap: () => setState(() => _filter = filterKey),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
-            color: isActive ? AppColors.secondary : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
+            color: isActive ? AppColors.primary : Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(8),
           ),
           child: Text(
             label,
@@ -183,19 +256,6 @@ class _SinhVienHuongDanGVScreenState extends State<SinhVienHuongDanGVScreen> {
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String val) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
-          Text(val, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.darkSlate)),
-        ],
       ),
     );
   }

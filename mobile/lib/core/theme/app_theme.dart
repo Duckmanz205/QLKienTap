@@ -7,6 +7,7 @@ class AppColors {
   static const Color danger = Color(0xFFE68A8C); // Coral Pink
   
   static const Color appBackground = Color(0xFFE7E0C4); // Light Beige
+  static const Color beigeBorder = Color(0xFFE7E0C4); // Border matching appBackground
   static const Color baseBackground = Color(0xFFFFFFFF); // Pure White
   
   static const Color darkSlate = Color(0xFF2C3E50); // Text

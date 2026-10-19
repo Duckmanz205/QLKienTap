@@ -306,12 +306,14 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           ),
         ),
         const SizedBox(width: 6),
-        Text(
-          text,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: isMet ? AppColors.primary : AppColors.textMuted,
+        Flexible(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: isMet ? AppColors.primary : AppColors.textMuted,
+            ),
           ),
         ),
       ],

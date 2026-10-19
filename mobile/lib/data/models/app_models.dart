@@ -282,6 +282,276 @@ class RefundRequest {
   });
 }
 
+// --- Proposal Entity ---
+class TripProposal {
+  final int id;
+  final String tenDoanhNghiep;
+  final String? diaChi;
+  final String? ngayThamQuan;
+  final String? gioBatDau;
+  final String? hinhThuc;
+  final String trangThai; // 'ChoDuyet', 'ChapNhan', 'TuChoi'
+  final String? lyDo;
+  final String? phanHoi;
+
+  TripProposal({
+    required this.id,
+    required this.tenDoanhNghiep,
+    this.diaChi,
+    this.ngayThamQuan,
+    this.gioBatDau,
+    this.hinhThuc,
+    required this.trangThai,
+    this.lyDo,
+    this.phanHoi,
+  });
+}
+
+// --- Term Grade & Trip Grades Entities ---
+class TripGradeItem {
+  final int id;
+  final String tenNhaMay;
+  final String hinhThuc;
+  final double? diemChuanBi;
+  final double? diemBaiThuHoach;
+  final double? diemBaoCaoTQNM;
+  final double? diemCong;
+  final double? diemTongChuyen;
+  final String? ketQua; // 'Dat', 'KhongDat', 'ChoDiem'
+  final String? nhanXetGvhd;
+  final String? nhanXetHoiDong;
+
+  TripGradeItem({
+    required this.id,
+    required this.tenNhaMay,
+    this.hinhThuc = 'Trực tiếp',
+    this.diemChuanBi,
+    this.diemBaiThuHoach,
+    this.diemBaoCaoTQNM,
+    this.diemCong,
+    this.diemTongChuyen,
+    this.ketQua,
+    this.nhanXetGvhd,
+    this.nhanXetHoiDong,
+  });
+
+  double? calculateCalculatedScore() {
+    if (diemTongChuyen != null) return diemTongChuyen;
+    if (diemChuanBi == null || diemBaiThuHoach == null || diemBaoCaoTQNM == null) {
+      return null;
+    }
+    final score = (diemChuanBi! * 0.3) +
+        (diemBaiThuHoach! * 0.3) +
+        (diemBaoCaoTQNM! * 0.4) +
+        (diemCong ?? 0);
+    return score > 10.0 ? 10.0 : score;
+  }
+}
+
+class StudentTermGrade {
+  final double? diemTongKet;
+  final String? trangThai; // 'Dat', 'KhongDat', 'ChoDiem'
+  final bool isScoreLocked;
+  final List<TripGradeItem> tripGrades;
+
+  StudentTermGrade({
+    this.diemTongKet,
+    this.trangThai,
+    required this.isScoreLocked,
+    required this.tripGrades,
+  });
+
+  bool get isPassed {
+    if (diemTongKet != null) {
+      return diemTongKet! >= 5.0;
+    }
+    final validGrades = tripGrades
+        .map((t) => t.calculateCalculatedScore())
+        .where((s) => s != null)
+        .toList();
+    if (validGrades.isNotEmpty) {
+      final avg = validGrades.fold<double>(0, (acc, s) => acc + s!) / validGrades.length;
+      return avg >= 5.0;
+    }
+    return false;
+  }
+}
+
+// --- Representative Trips Status & Committee Info ---
+class RepresentativeTripsStatus {
+  final List<int> selectedRegistrationIds;
+  final bool isLockedByKhoa;
+  final String? councilSessionName;
+  final String? councilRoom;
+  final String? councilTime;
+  final List<String> councilMembers;
+
+  RepresentativeTripsStatus({
+    this.selectedRegistrationIds = const [],
+    this.isLockedByKhoa = false,
+    this.councilSessionName,
+    this.councilRoom,
+    this.councilTime,
+    this.councilMembers = const [],
+  });
+}
+
+// --- Trip Bus Info & Members ---
+class TripBusMember {
+  final int id;
+  final String hoTen;
+  final String mssv;
+  final bool isLeader;
+
+  TripBusMember({
+    required this.id,
+    required this.hoTen,
+    required this.mssv,
+    this.isLeader = false,
+  });
+}
+
+class TripBusInfo {
+  final int tripId;
+  final String tenChuyenDi;
+  final String gioBatDau;
+  final String gioKetThuc;
+  final String hinhThuc;
+  final String? lecturerName;
+  final String? lecturerPhone;
+  final List<TripBusMember> students;
+
+  TripBusInfo({
+    required this.tripId,
+    required this.tenChuyenDi,
+    required this.gioBatDau,
+    required this.gioKetThuc,
+    required this.hinhThuc,
+    this.lecturerName,
+    this.lecturerPhone,
+    required this.students,
+  });
+}
+
+// --- Trip Registration Student (For Lecturer Led Trip) ---
+class TripRegistrationStudent {
+  final int phieuId;
+  final int sinhVienId;
+  final String mssv;
+  final String hoTen;
+  final String className;
+  final String? soDienThoai;
+  final String? email;
+  final String avatar;
+  final String feeStatus; // 'DaDongDungHan', 'ChuaDong', 'ViPham'
+  final String attendanceStatus; // 'CoMat', 'Vang', 'TuChoiThamGia', 'ChuaDiemDanh'
+  final String? excuseReason;
+  final double prelimGrade; // Điểm chuẩn bị
+  final double extraGrade;  // Điểm cộng
+  final bool isLockedPrep;
+
+  TripRegistrationStudent({
+    required this.phieuId,
+    required this.sinhVienId,
+    required this.mssv,
+    required this.hoTen,
+    required this.className,
+    this.soDienThoai,
+    this.email,
+    required this.avatar,
+    required this.feeStatus,
+    required this.attendanceStatus,
+    this.excuseReason,
+    this.prelimGrade = 0.0,
+    this.extraGrade = 0.0,
+    this.isLockedPrep = false,
+  });
+
+  TripRegistrationStudent copyWith({
+    String? attendanceStatus,
+    String? excuseReason,
+    double? prelimGrade,
+    double? extraGrade,
+    bool? isLockedPrep,
+  }) {
+    return TripRegistrationStudent(
+      phieuId: phieuId,
+      sinhVienId: sinhVienId,
+      mssv: mssv,
+      hoTen: hoTen,
+      className: className,
+      soDienThoai: soDienThoai,
+      email: email,
+      avatar: avatar,
+      feeStatus: feeStatus,
+      attendanceStatus: attendanceStatus ?? this.attendanceStatus,
+      excuseReason: excuseReason ?? this.excuseReason,
+      prelimGrade: prelimGrade ?? this.prelimGrade,
+      extraGrade: extraGrade ?? this.extraGrade,
+      isLockedPrep: isLockedPrep ?? this.isLockedPrep,
+    );
+  }
+}
+
+// --- Council Board Session Models ---
+class CouncilStudentTripItem {
+  final int phieuId;
+  final String tenNhaMay;
+  final String hinhThuc;
+  final double? myScore;
+  final double? diemTong;
+
+  CouncilStudentTripItem({
+    required this.phieuId,
+    required this.tenNhaMay,
+    required this.hinhThuc,
+    this.myScore,
+    this.diemTong,
+  });
+}
+
+class CouncilStudentItem {
+  final int studentId;
+  final String mssv;
+  final String hoTen;
+  final String className;
+  final String? topic;
+  final List<CouncilStudentTripItem> trips;
+
+  CouncilStudentItem({
+    required this.studentId,
+    required this.mssv,
+    required this.hoTen,
+    required this.className,
+    this.topic,
+    required this.trips,
+  });
+}
+
+class CouncilBoardItem {
+  final int sessionId;
+  final int memberId;
+  final String sessionName;
+  final String room;
+  final String date;
+  final String timeRange;
+  final String role; // 'ChuTich', 'ThuKy', 'UyVien'
+  final String status; // 'upcoming', 'ongoing', 'completed'
+  final List<CouncilStudentItem> students;
+
+  CouncilBoardItem({
+    required this.sessionId,
+    required this.memberId,
+    required this.sessionName,
+    required this.room,
+    required this.date,
+    required this.timeRange,
+    required this.role,
+    required this.status,
+    required this.students,
+  });
+}
+
 // --- Lecturer Specific Entities ---
 
 class LecturerStudent {
