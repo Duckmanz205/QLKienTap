@@ -369,6 +369,11 @@ export class ApproveTripDto {
   @IsInt()
   @Min(1)
   giangVienId?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  nhaMayIdGop?: number;
 }
 
 export class ApproveCancelDto {

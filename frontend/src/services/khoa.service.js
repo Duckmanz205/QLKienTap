@@ -83,6 +83,7 @@ export const khoaApi = {
   assignStudentsToBoard: (id, boChuyenIds) => api.post(`${getAdminPrefix()}/boards/${id}/assign-students`, { boChuyenIds }),
   unassignStudentsFromBoard: (id, boChuyenIds) => api.post(`${getAdminPrefix()}/boards/${id}/unassign-students`, { boChuyenIds }),
   lockBoard: (id) => api.post(`${getAdminPrefix()}/boards/${id}/lock-board`),
+  unlockBoard: (id) => api.post(`${getAdminPrefix()}/boards/${id}/unlock-board`),
   toggleLockBoChuyen: (dotId, data) => api.post(`${getAdminPrefix()}/campaigns/${dotId}/toggle-lock-bo-chuyen`, data),
   getBoChuyenLockStatus: (dotId) => api.get(`${getAdminPrefix()}/campaigns/${dotId}/bo-chuyen-lock-status`),
   lockGrades: (data) => api.post(`${getAdminPrefix()}/lock-grades`, data),

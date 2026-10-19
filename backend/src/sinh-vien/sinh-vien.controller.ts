@@ -4,9 +4,11 @@ import {
   Post,
   Body,
   Param,
+  Query,
   ParseIntPipe,
   UseGuards,
   Delete,
+  BadRequestException,
 } from '@nestjs/common';
 import { SinhVienService } from './sinh-vien.service';
 import { AuthGuard } from '../auth/guards/auth.guard';
@@ -41,6 +43,11 @@ export class SinhVienController {
   ) {
     // Ep buoc luon lay profile cua sinh vien dang dang nhap de chong IDOR
     return this.svService.getStudentByAccountId(user.sub);
+  }
+
+  @Get('factories/search')
+  async searchFactories(@Query('q') query: string) {
+    return this.svService.searchFactories(query || '');
   }
 
   @Get('factories')
@@ -92,6 +99,15 @@ export class SinhVienController {
     return this.svService.getStudentProposals(student.id);
   }
 
+  @Delete('proposals/:id')
+  async cancelProposal(
+    @CurrentUser() user: JwtPayloadUser,
+    @Param('id', ParseIntPipe) proposalId: number,
+  ) {
+    const student = await this.svService.getStudentByAccountId(user.sub);
+    return this.svService.cancelProposal(student.id, proposalId);
+  }
+
   @Post('register')
   async registerTrip(
     @CurrentUser() user: JwtPayloadUser,
@@ -126,9 +142,13 @@ export class SinhVienController {
     @Body() body: RequestCancelDto,
   ) {
     const student = await this.svService.getStudentByAccountId(user.sub);
+    const regId = body.registrationId || body.dangKyId;
+    if (!regId) {
+      throw new BadRequestException('Mã phiếu đăng ký không hợp lệ');
+    }
     return this.svService.requestCancel(
       student.id,
-      body.registrationId,
+      regId,
       body.lyDo,
       body.fileMinhChung || '',
     );

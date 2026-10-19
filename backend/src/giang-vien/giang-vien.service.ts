@@ -915,10 +915,23 @@ export class GiangVienService {
       );
     }
 
-    const phieuTQ = await this.phieuTQRepo.findOne({
-      where: [{ id: phieuId }, { phieu_dang_ky_id: phieuId }],
+    // Ưu tiên tìm chính xác theo id của PhieuThamQuan (ID do giao diện chấm điểm gửi lên)
+    let phieuTQ = await this.phieuTQRepo.findOne({
+      where: { id: phieuId },
       relations: { boChuyenBaoCao: true },
     });
+
+    // Fallback: Nếu không tìm thấy hoặc phiếu không thuộc hội đồng, kiểm tra xem phieuId có phải là phieu_dang_ky_id không
+    if (!phieuTQ || phieuTQ.boChuyenBaoCao?.hoi_dong_id !== member.hoi_dong_id) {
+      const altPhieuTQ = await this.phieuTQRepo.findOne({
+        where: { phieu_dang_ky_id: phieuId },
+        relations: { boChuyenBaoCao: true },
+      });
+      if (altPhieuTQ && altPhieuTQ.boChuyenBaoCao?.hoi_dong_id === member.hoi_dong_id) {
+        phieuTQ = altPhieuTQ;
+      }
+    }
+
     if (!phieuTQ) {
       throw new NotFoundException('Không tìm thấy phiếu tham quan');
     }
@@ -935,9 +948,9 @@ export class GiangVienService {
     const diemPhieuCheck = await this.diemPhieuRepo.findOne({
       where: { phieu_tham_quan_id: phieuTQ.id },
     });
-    if (diemPhieuCheck && diemPhieuCheck.da_khoa) {
+    if (diemPhieuCheck && (diemPhieuCheck.da_khoa || diemPhieuCheck.da_khoa_hoi_dong)) {
       throw new BadRequestException(
-        'Điểm của phiếu tham quan này đã được khóa, không thể chỉnh sửa',
+        'Điểm hội đồng của phiếu tham quan này đã được khóa, không thể chỉnh sửa',
       );
     }
 

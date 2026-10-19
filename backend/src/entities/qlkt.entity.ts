@@ -550,27 +550,27 @@ export class PhieuDeXuatChuyenThamQuan {
   @JoinColumn({ name: 'lich_kien_tap_id' })
   lichKienTap: LichKienTap;
 
-  @Column({ nullable: true })
+  @Column({ type: 'int', nullable: true })
   lich_kien_tap_id: number | null;
 
   @ManyToOne(() => NhaMay, { nullable: true })
   @JoinColumn({ name: 'nha_may_id' })
   nhaMay: NhaMay;
 
-  @Column({ nullable: true })
-  nha_may_id: number;
+  @Column({ type: 'int', nullable: true })
+  nha_may_id: number | null;
 
-  @Column({ nullable: true })
-  ten_nha_may_de_xuat: string;
+  @Column({ type: 'nvarchar', length: 150, nullable: true })
+  ten_nha_may_de_xuat: string | null;
 
-  @Column({ nullable: true })
-  dia_chi_de_xuat: string;
+  @Column({ type: 'nvarchar', length: 255, nullable: true })
+  dia_chi_de_xuat: string | null;
 
-  @Column({ nullable: true })
-  nguoi_lien_he_de_xuat: string;
+  @Column({ type: 'nvarchar', length: 100, nullable: true })
+  nguoi_lien_he_de_xuat: string | null;
 
-  @Column({ nullable: true })
-  sdt_lien_he_de_xuat: string;
+  @Column({ type: 'nvarchar', length: 15, nullable: true })
+  sdt_lien_he_de_xuat: string | null;
 
   @Column({ type: 'date' })
   ngay_tham_quan_de_xuat: Date;
@@ -1022,6 +1022,12 @@ export class DiemPhieuThamQuan {
   // Điểm hội đồng (40%) — tổng hợp từ DiemHoiDong_ChiTiet
   @Column({ type: 'decimal', precision: 4, scale: 2, nullable: true })
   diem_hoi_dong_final: number;
+
+  @Column({ default: false })
+  da_khoa_hoi_dong: boolean;
+
+  @Column({ type: 'datetime2', nullable: true })
+  ngay_khoa_hoi_dong: Date | null;
 
   // Điểm cộng — GVDĐ UPDATE trực tiếp (thay cho NhatKyDiemCong cũ)
   @Column({ type: 'decimal', precision: 4, scale: 2, default: 0 })

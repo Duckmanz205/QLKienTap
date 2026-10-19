@@ -14,6 +14,7 @@ export default function HoiDongChamBaoCao_Khoa() {
   // Modal Dropdown States (Create)
   const [isLichDropdownOpen, setIsLichDropdownOpen] = useState(false);
   const [isMembersOpen, setIsMembersOpen] = useState(false);
+  const [memberSearchTerm, setMemberSearchTerm] = useState('');
 
   // Edit Modal States
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -209,6 +210,7 @@ export default function HoiDongChamBaoCao_Khoa() {
       setDateTime('');
       setRoom('');
       setSelectedMembers([]);
+      setMemberSearchTerm('');
       fetchData();
 
     } catch (err) {
@@ -346,10 +348,44 @@ export default function HoiDongChamBaoCao_Khoa() {
     });
   };
 
+  const handleUnlockBoard = () => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Mở khóa điểm hội đồng',
+      message: `Xác nhận mở khóa điểm hội đồng "${viewingDetail.ten}"? Giảng viên trong hội đồng sẽ có thể tiếp tục chỉnh sửa điểm.`,
+      type: 'warning',
+      confirmText: 'Mở khóa điểm',
+      cancelText: 'Hủy',
+      onConfirm: async () => {
+        try {
+          setIsLockingBoard(true);
+          const res = await khoaApi.unlockBoard(viewingDetail.id);
+          toast.success(res.data?.message || 'Mở khóa điểm hội đồng thành công!');
+          const updatedStudents = await khoaApi.getBoardStudents(viewingDetail.id);
+          setBoardStudents(updatedStudents.data || []);
+          fetchData();
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        } catch (err) {
+          console.error(err);
+          toast.error(err.response?.data?.message || 'Lỗi mở khóa điểm hội đồng');
+        } finally {
+          setIsLockingBoard(false);
+        }
+      }
+    });
+  };
+
+  const isBoardLocked = useMemo(() => {
+    return boardStudents.length > 0 && boardStudents.every(s => 
+      s.trips && s.trips.length > 0 && s.trips.every(t => t.daKhoa)
+    );
+  }, [boardStudents]);
+
   // Close all modal dropdowns
   const closeAllModalDropdowns = () => {
     setIsLichDropdownOpen(false);
     setIsMembersOpen(false);
+    setMemberSearchTerm('');
   };
 
   const handleOpenAssignModal = async (board) => {
@@ -799,15 +835,17 @@ export default function HoiDongChamBaoCao_Khoa() {
           ></div>
           
           <div 
-            className="bg-white w-full max-w-3xl rounded-2xl shadow-xl relative z-10 animate-in zoom-in-95 duration-200 overflow-visible flex flex-col"
+            className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl relative z-10 animate-in zoom-in-95 duration-200 flex flex-col max-h-[88vh] overflow-hidden"
             onClick={closeAllModalDropdowns}
           >
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-white rounded-t-2xl">
+            {/* Header cố định */}
+            <div className="shrink-0 px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-white rounded-t-2xl">
               <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                 <Plus className="w-5 h-5 text-[#407F3E]" />
                 Tạo buổi hội đồng
               </h2>
               <button 
+                type="button"
                 onClick={() => setIsModalOpen(false)}
                 className="p-1.5 text-slate-400 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg transition-colors cursor-pointer"
               >
@@ -815,9 +853,11 @@ export default function HoiDongChamBaoCao_Khoa() {
               </button>
             </div>
 
-            <form onSubmit={handleCreateBoard} className="flex flex-col">
-              <div className="p-6 space-y-5">
-                <div className="grid grid-cols-2 gap-5 relative z-30">
+            {/* Form với Body cuộn độc lập và Footer cố định */}
+            <form onSubmit={handleCreateBoard} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+                {/* Hàng 1: Tên hội đồng & Đợt kiến tập */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 relative z-30">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Tên hội đồng *</label>
                     <input
@@ -845,7 +885,7 @@ export default function HoiDongChamBaoCao_Khoa() {
                     </div>
                     {isLichDropdownOpen && (
                       <div 
-                        className="absolute top-full left-0 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl py-2 max-h-48 overflow-y-auto animate-in slide-in-from-top-1"
+                        className="absolute top-full left-0 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl py-2 max-h-48 overflow-y-auto animate-in slide-in-from-top-1 z-50"
                         onClick={(e) => e.stopPropagation()}
                       >
                         {campaigns.map(camp => {
@@ -881,7 +921,8 @@ export default function HoiDongChamBaoCao_Khoa() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-5 relative z-20">
+                {/* Hàng 2: Ngày giờ & Địa điểm */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 relative z-20">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Ngày giờ *</label>
                     <div className="relative">
@@ -890,7 +931,7 @@ export default function HoiDongChamBaoCao_Khoa() {
                         required
                         value={dateTime}
                         onChange={e => setDateTime(e.target.value)}
-                        className="w-full pl-4 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-800 font-medium"
+                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-800 font-medium"
                       />
                     </div>
                   </div>
@@ -911,9 +952,10 @@ export default function HoiDongChamBaoCao_Khoa() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-5 relative z-40">
+                {/* Hàng 3: Thành viên hội đồng */}
+                <div className="relative z-10 pt-1">
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Thành viên hội đồng</label>
                   <div className="relative">
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Thành viên hội đồng</label>
                     <div 
                       onClick={(e) => handleModalDropdownClick(e, setIsMembersOpen)}
                       className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm flex justify-between items-center cursor-pointer hover:border-[#407F3E]"
@@ -925,67 +967,106 @@ export default function HoiDongChamBaoCao_Khoa() {
                     </div>
                     {isMembersOpen && (
                       <div 
-                        className="absolute bottom-full left-0 w-full mb-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-2 max-h-48 overflow-y-auto animate-in slide-in-from-bottom-1"
+                        className="absolute top-full left-0 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-2 max-h-52 overflow-hidden flex flex-col animate-in slide-in-from-top-1"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        {lecturers.map(lec => {
-                          const isChecked = selectedMembers.some(m => m.id === lec.id);
-                          return (
-                            <div 
-                              key={lec.id}
-                              onClick={() => {
-                                if (isChecked) {
-                                  setSelectedMembers(selectedMembers.filter(m => m.id !== lec.id));
-                                } else {
-                                  setSelectedMembers([...selectedMembers, { id: lec.id, role: 'ThanhVien' }]);
-                                }
-                              }}
-                              className="px-4 py-1.5 text-sm flex items-center gap-2 cursor-pointer hover:bg-slate-50"
-                            >
-                              <input 
-                                type="checkbox" 
-                                className="w-3.5 h-3.5 text-[#407F3E] rounded border-slate-300 focus:ring-[#407F3E]" 
-                                checked={isChecked} 
-                                readOnly 
-                              />
-                              <span className={isChecked ? "font-bold text-slate-800" : "font-medium text-slate-600"}>
-                                {lec.ho_ten} ({lec.ma_gv})
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                    {selectedMembers.length > 0 && (
-                      <div className="mt-3 flex flex-col gap-2">
-                        {selectedMembers.map(m => {
-                          const lec = lecturers.find(l => l.id === m.id);
-                          return (
-                            <div key={m.id} className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded-xl">
-                              <span className="text-sm font-semibold text-slate-800">{lec?.ho_ten}</span>
-                              <SearchableDropdown
-                                options={[
-                                  { value: 'ChuTich', label: 'Chủ tịch' },
-                                  { value: 'ThuKy', label: 'Thư ký' },
-                                  { value: 'ThanhVien', label: 'Thành viên' }
-                                ]}
-                                value={m.role}
-                                onChange={(val) => {
-                                  setSelectedMembers(selectedMembers.map(item => item.id === m.id ? { ...item, role: val } : item));
-                                }}
-                                searchPlaceholder="Tìm..."
-                                className="min-w-[140px]"
-                              />
-                            </div>
-                          );
-                        })}
+                        <div className="px-3 pb-2 pt-1 border-b border-slate-100">
+                          <div className="relative">
+                            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            <input
+                              type="text"
+                              value={memberSearchTerm}
+                              onChange={(e) => setMemberSearchTerm(e.target.value)}
+                              placeholder="Tìm tên hoặc mã GV..."
+                              className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-[#407F3E]"
+                            />
+                          </div>
+                        </div>
+                        <div className="overflow-y-auto max-h-40 py-1">
+                          {lecturers
+                            .filter(lec => 
+                              !memberSearchTerm || 
+                              lec.ho_ten?.toLowerCase().includes(memberSearchTerm.toLowerCase()) ||
+                              lec.ma_gv?.toLowerCase().includes(memberSearchTerm.toLowerCase())
+                            )
+                            .map(lec => {
+                              const isChecked = selectedMembers.some(m => m.id === lec.id);
+                              return (
+                                <div 
+                                  key={lec.id}
+                                  onClick={() => {
+                                    if (isChecked) {
+                                      setSelectedMembers(selectedMembers.filter(m => m.id !== lec.id));
+                                    } else {
+                                      setSelectedMembers([...selectedMembers, { id: lec.id, role: 'ThanhVien' }]);
+                                    }
+                                  }}
+                                  className="px-4 py-1.5 text-sm flex items-center gap-2 cursor-pointer hover:bg-slate-50 transition-colors"
+                                >
+                                  <input 
+                                    type="checkbox" 
+                                    className="w-3.5 h-3.5 text-[#407F3E] rounded border-slate-300 focus:ring-[#407F3E] cursor-pointer" 
+                                    checked={isChecked} 
+                                    readOnly 
+                                  />
+                                  <span className={isChecked ? "font-bold text-slate-800" : "font-medium text-slate-600"}>
+                                    {lec.ho_ten} {lec.ma_gv ? `(${lec.ma_gv})` : ''}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                        </div>
                       </div>
                     )}
                   </div>
+
+                  {/* Danh sách thành viên đã chọn có max-h và nút xóa nhanh */}
+                  {selectedMembers.length > 0 && (
+                    <div className="mt-2.5 max-h-48 overflow-y-auto space-y-2 pr-1">
+                      {selectedMembers.map(m => {
+                        const lec = lecturers.find(l => l.id === m.id);
+                        return (
+                          <div key={m.id} className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded-xl hover:border-slate-300 transition-colors">
+                            <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                              <div className="w-7 h-7 rounded-lg bg-[#407F3E]/10 text-[#407F3E] flex items-center justify-center font-bold text-xs shrink-0">
+                                {lec?.ho_ten?.charAt(0) || 'G'}
+                              </div>
+                              <div className="truncate">
+                                <span className="text-sm font-semibold text-slate-800 truncate block">{lec?.ho_ten}</span>
+                                {lec?.ma_gv && <span className="text-xs text-slate-400 block font-normal">{lec.ma_gv}</span>}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <select
+                                value={m.role}
+                                onChange={(e) => {
+                                  setSelectedMembers(selectedMembers.map(item => item.id === m.id ? { ...item, role: e.target.value } : item));
+                                }}
+                                className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 focus:outline-none focus:border-[#407F3E] cursor-pointer shadow-2xs"
+                              >
+                                <option value="ChuTich">Chủ tịch</option>
+                                <option value="ThuKy">Thư ký</option>
+                                <option value="ThanhVien">Thành viên</option>
+                              </select>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedMembers(selectedMembers.filter(item => item.id !== m.id))}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                title="Xóa thành viên"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <div className="px-6 py-4 border-t border-slate-200 bg-white flex items-center justify-end gap-3 rounded-b-2xl z-10">
+              {/* Footer CỐ ĐỊNH Ở ĐÁY - LUÔN HIỂN THỊ */}
+              <div className="shrink-0 px-6 py-3.5 border-t border-slate-200 bg-white flex items-center justify-end gap-3 rounded-b-2xl">
                 <button 
                   type="button"
                   onClick={() => setIsModalOpen(false)}
@@ -999,13 +1080,14 @@ export default function HoiDongChamBaoCao_Khoa() {
                   className="px-6 py-2.5 bg-[#407F3E] text-white hover:bg-[#326631] disabled:opacity-50 disabled:cursor-not-allowed rounded-xl text-sm font-bold transition-colors shadow-sm cursor-pointer flex items-center gap-2"
                 >
                   {isSubmittingBoard && <RefreshCw className="w-4 h-4 animate-spin" />}
-                  <span>Lưu</span>
+                  <span>Xác nhận tạo</span>
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
 
       {/* Modal - Chỉnh sửa hội đồng */}
       {isEditModalOpen && (
@@ -1269,9 +1351,10 @@ export default function HoiDongChamBaoCao_Khoa() {
                               <td className="p-3 text-right pr-4">
                                 <button
                                   type="button"
+                                  disabled={isLocked}
                                   onClick={() => handleUnassignStudent(item.boChuyenId)}
-                                  className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                                  title="Hủy phân công sinh viên khỏi hội đồng"
+                                  className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg transition-colors cursor-pointer"
+                                  title={isLocked ? "Không thể hủy phân công sinh viên khi điểm đã bị khóa" : "Hủy phân công sinh viên khỏi hội đồng"}
                                 >
                                   <UserMinus className="w-4 h-4" />
                                 </button>
@@ -1289,18 +1372,33 @@ export default function HoiDongChamBaoCao_Khoa() {
             {/* Detail modal footer */}
             <div className="px-6 py-4 border-t border-slate-200 bg-white flex items-center justify-between rounded-b-2xl">
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={isLockingBoard || boardStudents.length === 0}
-                  onClick={handleLockBoard}
-                  className="px-4 py-2 bg-[#407F3E] hover:bg-[#326631] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
-                  title="Chốt điểm hội đồng cho toàn bộ sinh viên đã được phân công"
-                >
-                  <Lock className="w-3.5 h-3.5" />
-                  <span>{isLockingBoard ? 'Đang khóa điểm...' : 'Khóa điểm Hội đồng'}</span>
-                </button>
+                {isBoardLocked ? (
+                  <button
+                    type="button"
+                    disabled={isLockingBoard || boardStudents.length === 0}
+                    onClick={handleUnlockBoard}
+                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+                    title="Mở khóa điểm hội đồng để giảng viên có thể tiếp tục chấm"
+                  >
+                    <Unlock className="w-3.5 h-3.5" />
+                    <span>{isLockingBoard ? 'Đang mở khóa...' : 'Mở khóa điểm Hội đồng'}</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={isLockingBoard || boardStudents.length === 0}
+                    onClick={handleLockBoard}
+                    className="px-4 py-2 bg-[#407F3E] hover:bg-[#326631] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+                    title="Chốt điểm hội đồng cho toàn bộ sinh viên đã được phân công"
+                  >
+                    <Lock className="w-3.5 h-3.5" />
+                    <span>{isLockingBoard ? 'Đang khóa điểm...' : 'Khóa điểm Hội đồng'}</span>
+                  </button>
+                )}
                 <span className="text-[11px] text-slate-400 italic hidden sm:inline">
-                  * Khóa điểm sẽ tính trung bình điểm các GV chấm và lưu vào điểm chính thức của phiếu
+                  {isBoardLocked
+                    ? '* Điểm hội đồng hiện đang bị khóa. Sinh viên đã xem được điểm.'
+                    : '* Khóa điểm sẽ tính trung bình điểm các GV chấm và lưu vào điểm chính thức của phiếu'}
                 </span>
               </div>
 

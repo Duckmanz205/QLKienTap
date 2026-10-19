@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import * as allEntities from './entities/qlkt.entity';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -32,7 +33,10 @@ import { QueueModule } from './queue/queue.module';
         username: configService.get<string>('DB_USERNAME', 'sa'),
         password: configService.get<string>('DB_PASSWORD', ''),
         database: configService.get<string>('DB_DATABASE', 'QLKienTap'),
-        entities: [__dirname + '/**/*.entity{.ts,.js}'],
+        entities: Object.values(allEntities).filter(
+          (val) => typeof val === 'function',
+        ),
+        autoLoadEntities: true,
         synchronize: false, // TAT trong production, dung migrations thay the
         dropSchema: false,
         pool: {

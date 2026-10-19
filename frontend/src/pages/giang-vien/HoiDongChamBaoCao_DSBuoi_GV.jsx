@@ -151,15 +151,13 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
     setLoading(true);
 
     try {
-      await Promise.all(
-        toSave.map(item => 
-          giangVienApi.submitBoardScore({
-            memberId: activeBoard.memberId,
-            phieuId: item.tripId,
-            score: item.score
-          })
-        )
-      );
+      for (const item of toSave) {
+        await giangVienApi.submitBoardScore({
+          memberId: activeBoard.memberId,
+          phieuId: item.tripId,
+          score: item.score
+        });
+      }
 
       const succMsg = `Đã lưu điểm hội đồng cho ${toSave.length} chuyến của ${selectedReg.sinhVien?.ho_ten}!`;
       setMessage(succMsg);

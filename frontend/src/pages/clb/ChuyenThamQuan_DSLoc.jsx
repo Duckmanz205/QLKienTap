@@ -101,8 +101,9 @@ export default function ChuyenThamQuan_DSLoc() {
   const [cancelReason, setCancelReason] = useState('');
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
 
-  // Approve Trip (Lecturer Selection) Modal State
-  const [isLecturerModalOpen, setIsLecturerModalOpen] = useState(false);
+  // Approve Trip Modal States
+  const [isLecturerModalOpen, setIsLecturerModalOpen] = useState(false); // Cho CLB chọn giảng viên
+  const [isKhoaConfirmModalOpen, setIsKhoaConfirmModalOpen] = useState(false); // Cho Khoa xác nhận phê duyệt
   const [lecturers, setLecturers] = useState([]);
   const [selectedLecturerId, setSelectedLecturerId] = useState('');
   const [pendingApprovalTripId, setPendingApprovalTripId] = useState(null);
@@ -353,7 +354,15 @@ export default function ChuyenThamQuan_DSLoc() {
     if (isApproved) {
       setPendingApprovalTrip(tripObj);
       setPendingApprovalTripId(tripId);
-      setSelectedLecturerId('');
+
+      // Nếu là Quản lý Khoa: Mở Modal xác nhận phê duyệt (Read-only, không chọn GV)
+      if (isAdmin) {
+        setIsKhoaConfirmModalOpen(true);
+        return;
+      }
+
+      // Nếu là CLB: Mở Modal chọn giảng viên dẫn đoàn
+      setSelectedLecturerId(tripObj?.giang_vien_id || tripObj?.giangVien?.id ? String(tripObj?.giang_vien_id || tripObj?.giangVien?.id) : '');
       setLecturerSearchTerm('');
       setIsLecturerModalOpen(true);
       return;
@@ -361,8 +370,8 @@ export default function ChuyenThamQuan_DSLoc() {
 
     const action = async () => {
       try {
-        await khoaApi.approveTrip({ tripId, approverId: currentUser.id, isApproved });
-        showPopup('Từ chối chuyến tham quan thành công', 'success');
+        const res = await khoaApi.approveTrip({ tripId, approverId: currentUser.id, isApproved: false });
+        showPopup(res.data?.message || (isAdmin ? 'Khoa đã từ chối chuyến tham quan tự do' : 'CLB đã từ chối chuyến tham quan'), 'success');
         fetchTrips();
       } catch (err) {
         console.error(err);
@@ -373,6 +382,24 @@ export default function ChuyenThamQuan_DSLoc() {
     showConfirm("Xác nhận từ chối", "Bạn có chắc chắn muốn từ chối chuyến tham quan này?", action);
   };
 
+  // Xác nhận Phê Duyệt từ Quản lý Khoa (Không gửi giảng viên, chỉ duyệt/từ chối)
+  const submitKhoaApprove = async () => {
+    try {
+      const res = await khoaApi.approveTrip({ 
+        tripId: pendingApprovalTripId, 
+        approverId: currentUser.id, 
+        isApproved: true
+      });
+      showPopup(res.data?.message || 'Khoa đã phê duyệt chính thức chuyến tham quan tự do thành công', 'success');
+      setIsKhoaConfirmModalOpen(false);
+      fetchTrips();
+    } catch (err) {
+      console.error(err);
+      showPopup(err.response?.data?.message || 'Có lỗi xảy ra khi xử lý yêu cầu phê duyệt', 'error');
+    }
+  };
+
+  // Xác nhận Duyệt Sơ Bộ từ CLB (Bắt buộc chọn Giảng viên)
   const submitApproveWithLecturer = async () => {
     if (!selectedLecturerId) {
       showPopup('Vui lòng chọn giảng viên dẫn đoàn', 'error');
@@ -386,7 +413,7 @@ export default function ChuyenThamQuan_DSLoc() {
         isApproved: true,
         giangVienId: parseInt(selectedLecturerId)
       });
-      showPopup(res.data?.message || 'Duyệt chuyến tham quan và phân công giảng viên thành công', 'success');
+      showPopup(res.data?.message || 'CLB đã duyệt sơ bộ đề xuất thành công', 'success');
       setIsLecturerModalOpen(false);
       fetchTrips();
     } catch (err) {
@@ -495,21 +522,21 @@ export default function ChuyenThamQuan_DSLoc() {
             <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[#89B449] rounded-t-full"></div>
           )}
         </button>
-        {!isAdmin && (
-          <button
-            onClick={() => setActiveTab('tudo')}
-            className={`pb-3 text-sm font-bold transition-all relative flex items-center gap-2 ${activeTab === 'tudo' ? 'text-[#89B449]' : 'text-slate-500 hover:text-slate-700'
-              }`}
-          >
-            Đề xuất chuyến tự do
-            <span className="bg-[#DBD468] text-slate-800 text-[10px] px-1.5 py-0.5 rounded-full font-bold shadow-sm">
-              {tripsTuDo.filter(t => t.trang_thai_duyet === 'ChoDuyet').length}
-            </span>
-            {activeTab === 'tudo' && (
-              <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[#89B449] rounded-t-full"></div>
-            )}
-          </button>
-        )}
+        <button
+          onClick={() => setActiveTab('tudo')}
+          className={`pb-3 text-sm font-bold transition-all relative flex items-center gap-2 ${activeTab === 'tudo' ? 'text-[#89B449]' : 'text-slate-500 hover:text-slate-700'
+            }`}
+        >
+          Đề xuất chuyến tự do
+          <span className="bg-[#DBD468] text-slate-800 text-[10px] px-1.5 py-0.5 rounded-full font-bold shadow-sm">
+            {isAdmin
+              ? tripsTuDo.filter(t => t.trang_thai_duyet === 'ChoKhoaDuyet').length
+              : tripsTuDo.filter(t => t.trang_thai_duyet === 'ChoDuyet').length}
+          </span>
+          {activeTab === 'tudo' && (
+            <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[#89B449] rounded-t-full"></div>
+          )}
+        </button>
       </div>
 
       {/* Tab 1: Khoa tổ chức */}
@@ -899,9 +926,10 @@ export default function ChuyenThamQuan_DSLoc() {
               >
                 <span className={`truncate pr-2 font-medium ${filterStatusTuDo !== 'ALL' ? 'text-slate-800' : 'text-slate-600'}`}>
                   {filterStatusTuDo === 'ALL' ? 'Tất cả trạng thái' :
-                    filterStatusTuDo === 'ChoDuyet' ? 'Chờ duyệt' :
-                      filterStatusTuDo === 'DaDuyet' ? 'Đã duyệt' :
-                        filterStatusTuDo === 'TuChoi' ? 'Từ chối' : filterStatusTuDo}
+                    filterStatusTuDo === 'ChoDuyet' ? 'Chờ CLB duyệt' :
+                      filterStatusTuDo === 'ChoKhoaDuyet' ? 'Chờ Khoa duyệt' :
+                        filterStatusTuDo === 'DaDuyet' ? 'Đã duyệt' :
+                          filterStatusTuDo === 'TuChoi' ? 'Từ chối' : filterStatusTuDo}
                 </span>
                 <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isFilterStatusTuDoOpen ? 'rotate-180 text-[#407F3E]' : ''}`} />
               </div>
@@ -920,7 +948,8 @@ export default function ChuyenThamQuan_DSLoc() {
                   <div className="max-h-60 overflow-y-auto">
                     {[
                       { value: 'ALL', label: 'Tất cả trạng thái' },
-                      { value: 'ChoDuyet', label: 'Chờ duyệt' },
+                      { value: 'ChoDuyet', label: 'Chờ CLB duyệt' },
+                      { value: 'ChoKhoaDuyet', label: 'Chờ Khoa duyệt' },
                       { value: 'DaDuyet', label: 'Đã duyệt' },
                       { value: 'TuChoi', label: 'Từ chối' },
                     ]
@@ -943,7 +972,8 @@ export default function ChuyenThamQuan_DSLoc() {
                       ))}
                     {[
                       { value: 'ALL', label: 'Tất cả trạng thái' },
-                      { value: 'ChoDuyet', label: 'Chờ duyệt' },
+                      { value: 'ChoDuyet', label: 'Chờ CLB duyệt' },
+                      { value: 'ChoKhoaDuyet', label: 'Chờ Khoa duyệt' },
                       { value: 'DaDuyet', label: 'Đã duyệt' },
                       { value: 'TuChoi', label: 'Từ chối' },
                     ].filter(opt => opt.label.toLowerCase().includes(searchStatusTuDo.toLowerCase())).length === 0 && searchStatusTuDo && (
@@ -988,7 +1018,6 @@ export default function ChuyenThamQuan_DSLoc() {
                         <tr key={t.id} className="hover:bg-slate-50 transition-colors">
                           <td className="p-4 pl-6">
                             <div className="flex items-center gap-3">
-
                               <div>
                                 <div className="font-bold text-slate-800">{t.sinhVien?.ho_ten}</div>
                                 <div className="text-xs font-mono text-slate-500">{t.sinhVien?.mssv}</div>
@@ -1000,20 +1029,58 @@ export default function ChuyenThamQuan_DSLoc() {
                             {t.ngay_tham_quan_de_xuat ? new Date(t.ngay_tham_quan_de_xuat).toLocaleDateString('vi-VN') : 'N/A'}
                           </td>
                           <td className="p-4">
-                            <span className="inline-flex items-center px-2 py-1 rounded bg-slate-100 text-slate-500 text-[10px] font-bold border border-slate-200 whitespace-nowrap">
-                              {t.trang_thai_duyet === 'ChoDuyet' ? 'Chờ duyệt' : t.trang_thai_duyet}
-                            </span>
+                            {t.trang_thai_duyet === 'ChoDuyet' && (
+                              <span className="inline-flex items-center px-2 py-1 rounded bg-[#DBD468]/20 text-[#8B8000] text-[10px] font-bold border border-[#DBD468]/40 whitespace-nowrap">
+                                Chờ CLB duyệt
+                              </span>
+                            )}
+                            {t.trang_thai_duyet === 'ChoKhoaDuyet' && (
+                              <span className="inline-flex items-center px-2 py-1 rounded bg-blue-50 text-blue-600 text-[10px] font-bold border border-blue-200 whitespace-nowrap">
+                                Chờ Khoa duyệt
+                              </span>
+                            )}
+                            {t.trang_thai_duyet === 'DaDuyet' && (
+                              <span className="inline-flex items-center px-2 py-1 rounded bg-[#89B449]/15 text-[#407F3E] text-[10px] font-bold border border-[#89B449]/30 whitespace-nowrap">
+                                Đã duyệt
+                              </span>
+                            )}
+                            {t.trang_thai_duyet === 'TuChoi' && (
+                              <span className="inline-flex items-center px-2 py-1 rounded bg-rose-50 text-rose-500 text-[10px] font-bold border border-rose-200 whitespace-nowrap">
+                                Đã từ chối
+                              </span>
+                            )}
+                            {!['ChoDuyet', 'ChoKhoaDuyet', 'DaDuyet', 'TuChoi'].includes(t.trang_thai_duyet) && (
+                              <span className="inline-flex items-center px-2 py-1 rounded bg-slate-100 text-slate-500 text-[10px] font-bold border border-slate-200 whitespace-nowrap">
+                                {t.trang_thai_duyet}
+                              </span>
+                            )}
                           </td>
                           <td className="p-4 text-right pr-6">
                             <div className="flex items-center justify-end gap-2">
                               <button onClick={() => setViewingDetail(t)} className="p-1.5 text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer" title="Chi tiết">
                                 <ChevronRight className="w-5 h-5" />
                               </button>
-                              {t.trang_thai_duyet === 'ChoDuyet' && (
+
+                              {/* CLB Duyệt sơ bộ */}
+                              {!isAdmin && t.trang_thai_duyet === 'ChoDuyet' && (
                                 <>
                                   <button onClick={() => handleApproveTrip(t, true)} className="px-3 py-1.5 bg-[#89B449] hover:bg-[#89B449]/90 text-white rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center gap-1 cursor-pointer">
                                     <CheckCircle2 className="w-4 h-4" />
-                                    Duyệt
+                                    Duyệt sơ bộ
+                                  </button>
+                                  <button onClick={() => handleApproveTrip(t, false)} className="px-3 py-1.5 border border-[#E68A8C] text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer">
+                                    <XCircle className="w-4 h-4" />
+                                    Từ chối
+                                  </button>
+                                </>
+                              )}
+
+                              {/* Khoa Phê duyệt chính thức */}
+                              {isAdmin && t.trang_thai_duyet === 'ChoKhoaDuyet' && (
+                                <>
+                                  <button onClick={() => handleApproveTrip(t, true)} className="px-3 py-1.5 bg-[#407F3E] hover:bg-[#407F3E]/90 text-white rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center gap-1 cursor-pointer">
+                                    <CheckCircle2 className="w-4 h-4" />
+                                    Phê duyệt
                                   </button>
                                   <button onClick={() => handleApproveTrip(t, false)} className="px-3 py-1.5 border border-[#E68A8C] text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer">
                                     <XCircle className="w-4 h-4" />
@@ -1482,19 +1549,74 @@ export default function ChuyenThamQuan_DSLoc() {
                   </div>
                 )}
 
+                {viewingDetail.trang_thai_duyet && viewingDetail.sinhVien && (
+                  <div className="flex gap-3">
+                    <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                      <UserCheck className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Sinh viên đề xuất</label>
+                      <p className="text-sm font-bold text-slate-800 mt-0.5">
+                        {viewingDetail.sinhVien.ho_ten} ({viewingDetail.sinhVien.mssv})
+                      </p>
+                      <span className="text-xs text-slate-500 block">
+                        Lớp: {viewingDetail.sinhVien.ten_lop || viewingDetail.sinhVien.lop || '--'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {viewingDetail.giangVien && (
+                  <div className="flex gap-3">
+                    <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                      <UserCheck className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Giảng viên dẫn đoàn đề cử</label>
+                      <p className="text-sm font-bold text-slate-800 mt-0.5">
+                        {viewingDetail.giangVien.ho_ten}
+                      </p>
+                      <span className="text-xs text-slate-500 block">
+                        {viewingDetail.giangVien.bo_mon ? `Bộ môn: ${viewingDetail.giangVien.bo_mon}` : ''}
+                        {viewingDetail.giangVien.email ? ` • ${viewingDetail.giangVien.email}` : ''}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {viewingDetail.ngay_clb_duyet && (
+                  <div className="flex gap-3">
+                    <div className="w-8 h-8 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                      <Clock className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Thời điểm CLB duyệt sơ bộ</label>
+                      <p className="text-sm font-medium text-slate-700 mt-0.5">
+                        {new Date(viewingDetail.ngay_clb_duyet).toLocaleDateString('vi-VN')} {new Date(viewingDetail.ngay_clb_duyet).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex gap-3">
                   <div className="w-8 h-8 rounded-full bg-green-50 text-green-600 flex items-center justify-center shrink-0">
                     <CheckCircle2 className="w-4 h-4" />
                   </div>
                   <div>
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Trạng thái</label>
-                    <p className="text-sm font-medium text-slate-700 mt-0.5">
+                    <p className="text-sm font-bold text-slate-700 mt-0.5">
                       {
-                        viewingDetail.trang_thai_duyet ? (viewingDetail.trang_thai_duyet === 'ChoDuyet' ? 'Chờ duyệt' : viewingDetail.trang_thai_duyet) :
-                          (viewingDetail.trang_thai === 'MoDangKy' ? 'Mở đăng ký' :
+                        viewingDetail.trang_thai_duyet ? (
+                          viewingDetail.trang_thai_duyet === 'ChoDuyet' ? 'Chờ CLB duyệt' :
+                            viewingDetail.trang_thai_duyet === 'ChoKhoaDuyet' ? 'Chờ Khoa duyệt' :
+                              viewingDetail.trang_thai_duyet === 'DaDuyet' ? 'Đã duyệt' :
+                                viewingDetail.trang_thai_duyet === 'TuChoi' ? 'Đã từ chối' : viewingDetail.trang_thai_duyet
+                        ) : (
+                          viewingDetail.trang_thai === 'MoDangKy' ? 'Mở đăng ký' :
                             viewingDetail.trang_thai === 'DaChotDanhSach' ? 'Đã chốt danh sách' :
                               viewingDetail.trang_thai === 'DaDienRa' ? 'Đã diễn ra' :
-                                viewingDetail.trang_thai === 'DaHuy' ? 'Đã huỷ' : 'Nháp')
+                                viewingDetail.trang_thai === 'DaHuy' ? 'Đã huỷ' : 'Nháp'
+                        )
                       }
                     </p>
                   </div>
@@ -1749,8 +1871,8 @@ export default function ChuyenThamQuan_DSLoc() {
         </div>
       )}
 
-      {/* Lecturer Selection Modal - Clean 2-Column Layout */}
-      {isLecturerModalOpen && (
+      {/* CLB Duyệt Sơ Bộ: Modal Chọn Giảng Viên Dẫn Đoàn (2-Column Layout) */}
+      {!isAdmin && isLecturerModalOpen && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl w-full max-w-3xl shadow-xl flex flex-col border border-slate-200 overflow-hidden">
             {/* Modal Header */}
@@ -1761,10 +1883,10 @@ export default function ChuyenThamQuan_DSLoc() {
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-slate-800">
-                    Phê duyệt đề xuất & Phân công Giảng viên
+                    CLB duyệt sơ bộ & Đề xuất Giảng viên
                   </h2>
                   <p className="text-xs text-slate-500">
-                    Chuyến tham quan tự do do sinh viên đề xuất
+                    Thẩm định đề xuất của sinh viên và phân công giảng viên dẫn đoàn
                   </p>
                 </div>
               </div>
@@ -1856,7 +1978,7 @@ export default function ChuyenThamQuan_DSLoc() {
                     placeholder="Tìm theo tên hoặc mã giảng viên..."
                     value={lecturerSearchTerm}
                     onChange={(e) => setLecturerSearchTerm(e.target.value)}
-                    className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-[#407F3E] focus:bg-white text-slate-800 transition-colors"
+                    className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-[#89B449] focus:bg-white text-slate-800 transition-colors"
                   />
                 </div>
 
@@ -1920,7 +2042,145 @@ export default function ChuyenThamQuan_DSLoc() {
                 className="px-6 py-2 text-sm font-bold text-white bg-[#89B449] hover:bg-[#89B449]/90 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition-colors cursor-pointer flex items-center gap-2 shadow-xs"
               >
                 <CheckCircle2 className="w-4 h-4" />
-                Xác nhận duyệt
+                Xác nhận duyệt sơ bộ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Khoa Phê Duyệt: Modal Xác Nhận (Read-Only Giảng Viên, Không Cho Chọn GV) */}
+      {isAdmin && isKhoaConfirmModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl flex flex-col border border-slate-200 overflow-hidden">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-slate-50/50">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-[#407F3E]/15 border border-[#407F3E]/30 flex items-center justify-center text-[#407F3E]">
+                  <CheckCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-slate-800">
+                    Xác nhận phê duyệt chuyến tham quan tự do
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Kiểm tra thông tin chuyến tham quan và giảng viên do CLB đề cử
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsKhoaConfirmModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4 text-xs">
+              {/* Thông tin sinh viên */}
+              <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200/80">
+                <span className="text-slate-400 block text-[11px] uppercase tracking-wider font-semibold mb-1">
+                  Sinh viên đề xuất
+                </span>
+                <div className="font-bold text-slate-800 text-sm">
+                  {pendingApprovalTrip?.sinhVien?.ho_ten || 'Sinh viên'}
+                </div>
+                <div className="text-slate-500 font-mono mt-0.5">
+                  {pendingApprovalTrip?.sinhVien?.mssv || '--'} • Lớp: {pendingApprovalTrip?.sinhVien?.ten_lop || pendingApprovalTrip?.sinhVien?.lop || '--'}
+                </div>
+              </div>
+
+              {/* Thông tin doanh nghiệp & chuyến đi */}
+              <div className="space-y-2.5 bg-white border border-slate-200 rounded-xl p-3.5">
+                <div>
+                  <span className="text-slate-400 block text-[11px]">Doanh nghiệp tiếp nhận:</span>
+                  <span className="font-bold text-slate-800 text-xs">
+                    {pendingApprovalTrip?.ten_nha_may_de_xuat || pendingApprovalTrip?.nhaMay?.ten_nha_may || 'Chưa cập nhật'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Thời gian tham quan:</span>
+                    <span className="font-semibold text-slate-700">
+                      {pendingApprovalTrip?.ngay_tham_quan_de_xuat ? new Date(pendingApprovalTrip.ngay_tham_quan_de_xuat).toLocaleDateString('vi-VN') : '--'}
+                      {pendingApprovalTrip?.gio_bat_dau_de_xuat && ` (${String(pendingApprovalTrip.gio_bat_dau_de_xuat).substring(0, 5)})`}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Hình thức:</span>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold mt-0.5 ${
+                      pendingApprovalTrip?.hinh_thuc === 'TrucTiep' 
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : 'bg-blue-50 text-blue-700 border border-blue-200'
+                    }`}>
+                      {pendingApprovalTrip?.hinh_thuc === 'TrucTiep' ? 'Trực tiếp (Offline)' : 'Trực tuyến (Online)'}
+                    </span>
+                  </div>
+                </div>
+
+                {pendingApprovalTrip?.dia_chi_de_xuat && (
+                  <div className="pt-1 text-slate-500">
+                    <span className="text-slate-400 block text-[11px]">Địa chỉ:</span>
+                    <span className="line-clamp-2">{pendingApprovalTrip.dia_chi_de_xuat}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Thông tin Giảng viên dẫn đoàn (READ-ONLY) */}
+              <div className="rounded-xl p-3.5 border border-[#407F3E]/30 bg-emerald-50/40">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[#407F3E] text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5">
+                    <UserCheck className="w-3.5 h-3.5" />
+                    Giảng viên dẫn đoàn (CLB đã phân công)
+                  </span>
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                    Chỉ xem
+                  </span>
+                </div>
+
+                {pendingApprovalTrip?.giangVien ? (
+                  <div className="mt-1">
+                    <div className="font-bold text-slate-900 text-sm">
+                      {pendingApprovalTrip.giangVien.ho_ten}
+                    </div>
+                    <div className="text-slate-600 flex items-center gap-2 mt-0.5 text-xs">
+                      <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                        {pendingApprovalTrip.giangVien.ma_gv || pendingApprovalTrip.giangVien.magv || '--'}
+                      </span>
+                      {pendingApprovalTrip.giangVien.bo_mon && (
+                        <span>Bộ môn: {pendingApprovalTrip.giangVien.bo_mon}</span>
+                      )}
+                    </div>
+                    {pendingApprovalTrip.giangVien.email && (
+                      <div className="text-slate-500 mt-1">
+                        Email: {pendingApprovalTrip.giangVien.email}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="mt-1 p-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-[11px]">
+                    <span className="font-bold">Lưu ý:</span> Đề xuất này chưa có giảng viên dẫn đoàn được phân công từ trước. Hệ thống sẽ tự động gán giảng viên phụ trách khi bạn xác nhận phê duyệt.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-3.5 border-t border-slate-100 bg-slate-50/50 flex justify-end items-center gap-3 shrink-0">
+              <button
+                onClick={() => setIsKhoaConfirmModalOpen(false)}
+                className="px-5 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={submitKhoaApprove}
+                className="px-6 py-2 text-sm font-bold text-white bg-[#407F3E] hover:bg-[#407F3E]/90 rounded-xl transition-colors cursor-pointer flex items-center gap-2 shadow-xs"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                Xác nhận phê duyệt
               </button>
             </div>
           </div>

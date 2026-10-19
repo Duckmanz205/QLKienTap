@@ -105,7 +105,7 @@ export default function ChamHoiDong_GV() {
         });
       }
       studentMap.get(sv.id).reports.push({
-        id: reg.id,
+        id: reg.phieuThamQuan?.id || reg.id,
         nhaMay: reg.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Chuyến đi',
         hinhThuc: reg.chuyenThamQuan?.hinh_thuc === 'TrucTuyen' ? 'Trực tuyến' : 'Trực tiếp',
         score: reg.committee?.find(c => c.id === item.memberId)?.score || '', 
