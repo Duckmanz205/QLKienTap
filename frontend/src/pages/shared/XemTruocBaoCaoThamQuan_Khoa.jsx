@@ -1,11 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Building2, CheckCircle, Clock, XCircle, FileSpreadsheet, Award, Users, Percent } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, Building2, CheckCircle, Clock, XCircle, FileSpreadsheet, Award, Users, Percent, ChevronRight } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { khoaApi } from '../../services/api';
 import SearchableDropdown from '../../components/SearchableDropdown';
 
 export default function XemTruocBaoCaoThamQuan_Khoa() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const isCLB = location.pathname.includes('/clb');
+
+  const handleBack = () => {
+    navigate(isCLB ? '/clb/reports' : '/khoa/reports');
+  };
 
   const [tripsData, setTripsData] = useState([]);
   const [topFactoriesData, setTopFactoriesData] = useState([]);
@@ -223,16 +229,34 @@ export default function XemTruocBaoCaoThamQuan_Khoa() {
   };
 
   return (
-    <div className="flex flex-col gap-8 pb-8 print:bg-white print:p-0">
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300 print:bg-white print:p-0">
+      
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-sm font-semibold text-slate-500 mb-6 flex-wrap print:hidden">
+        <span className="cursor-pointer hover:text-[#407F3E] transition-colors" onClick={handleBack}>
+          Báo cáo thống kê
+        </span>
+        <ChevronRight className="w-4 h-4 shrink-0" />
+        <span className="text-[#407F3E] font-bold">Tổng hợp dữ liệu tham quan & Doanh nghiệp</span>
+      </div>
+
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 print:hidden">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/khoa/reports')} className="p-2 bg-white border border-slate-200 hover:border-[#407F3E] text-slate-500 hover:text-[#407F3E] rounded-xl transition-all cursor-pointer shadow-sm">
+          <button 
+            onClick={handleBack} 
+            className="p-2 bg-white border border-[#E7E0C4] hover:border-[#407F3E] text-slate-500 hover:text-[#407F3E] rounded-xl transition-all cursor-pointer shadow-sm shrink-0"
+          >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h1 className="text-2xl font-black text-[#407F3E] tracking-tight">Tổng hợp dữ liệu tham quan</h1>
-            <p className="text-sm text-slate-500">Báo cáo tổng quan về hoạt động kiến tập và doanh nghiệp.</p>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="text-2xl font-black text-slate-800 tracking-tight">Tổng hợp dữ liệu tham quan & Doanh nghiệp</h1>
+              <span className="px-3 py-1 bg-[#407F3E]/10 border border-[#407F3E]/30 text-[#407F3E] text-xs font-bold rounded-full">
+                Vận Hành Doanh Nghiệp
+              </span>
+            </div>
+            <p className="text-sm text-slate-500 mt-1">Báo cáo tổng quan về hoạt động kiến tập, tỷ lệ tham gia và mạng lưới doanh nghiệp hợp tác.</p>
           </div>
         </div>
         <button 

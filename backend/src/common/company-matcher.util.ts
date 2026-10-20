@@ -165,6 +165,35 @@ export class CompanyMatcher {
   }
 
   /**
+   * Rút gọn tên nhà máy dùng cho mã / nội dung chuyển khoản (tối đa maxLength ký tự, mặc định 10)
+   * Loại bỏ các từ pháp lý, chi nhánh, ngành nghề phổ biến để giữ lại thương hiệu đặc trưng ngắn gọn.
+   */
+  public static shortenFactoryName(factoryName: string, maxLength: number = 10): string {
+    if (!factoryName) return 'NM';
+    let brand = this.extractCoreBrand(factoryName);
+    const extraIndustryWords =
+      /\b(nuoc giai khat|thuc pham|san xuat|thuong mai|dich vu|che bien|nha may|sua|bia|ruou|banh keo|chan nuoi)\b/gi;
+    brand = brand.replace(extraIndustryWords, ' ');
+    let clean = brand
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'D')
+      .replace(/[^a-zA-Z0-9]/g, '')
+      .toUpperCase();
+    if (!clean || clean.length < 2) {
+      clean = factoryName
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd')
+        .replace(/Đ/g, 'D')
+        .replace(/[^a-zA-Z0-9]/g, '')
+        .toUpperCase();
+    }
+    return clean.substring(0, maxLength);
+  }
+
+  /**
    * Bóc tách cac tu khoa dia danh cu the (KCN, quan huyen, tinh thanh)
    */
   public static extractSpecificLocations(text: string): string[] {

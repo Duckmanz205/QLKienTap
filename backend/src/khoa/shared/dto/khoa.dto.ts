@@ -665,6 +665,12 @@ export class GetEnrollmentsQueryDto {
   @IsInt()
   @Min(1)
   lichKienTapId?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  dotKienTapId?: number;
 }
 
 // (v11) khoa_id → khoa_hoc_id, ten_khoa → ten_khoa_hoc

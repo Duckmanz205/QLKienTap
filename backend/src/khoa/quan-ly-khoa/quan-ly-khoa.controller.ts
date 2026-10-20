@@ -668,8 +668,10 @@ export class KhoaController {
 
   @Roles('QuanLyKhoa')
   @Get('retake-students-report')
-  async getRetakeStudentsReport() {
-    return this.khoaService.getRetakeStudentsReport();
+  async getRetakeStudentsReport(@Query('dotKienTapId') dotKienTapId?: string) {
+    return this.khoaService.getRetakeStudentsReport(
+      dotKienTapId ? parseInt(dotKienTapId) : undefined,
+    );
   }
 
   @Roles('QuanLyKhoa')
@@ -684,9 +686,11 @@ export class KhoaController {
   @Get('report/visited-students')
   async getVisitedStudentsReport(
     @Query('lichKienTapId') lichKienTapId?: string,
+    @Query('dotKienTapId') dotKienTapId?: string,
   ) {
     return this.khoaService.getVisitedStudentsReport(
       lichKienTapId ? parseInt(lichKienTapId) : undefined,
+      dotKienTapId ? parseInt(dotKienTapId) : undefined,
     );
   }
 
@@ -694,19 +698,21 @@ export class KhoaController {
   @Get('report/not-visited-students')
   async getNotVisitedStudentsReport(
     @Query('lichKienTapId') lichKienTapId?: string,
+    @Query('dotKienTapId') dotKienTapId?: string,
   ) {
-    return this.khoaService.getNotVisitedStudentsReport(
-      lichKienTapId ? parseInt(lichKienTapId) : undefined,
-    );
+    const targetDot = dotKienTapId ? parseInt(dotKienTapId) : (lichKienTapId ? parseInt(lichKienTapId) : undefined);
+    return this.khoaService.getNotVisitedStudentsReport(targetDot);
   }
 
   @Roles('QuanLyKhoa')
   @Get('report/eligible-students')
   async getEligibleStudentsReport(
     @Query('lichKienTapId') lichKienTapId?: string,
+    @Query('dotKienTapId') dotKienTapId?: string,
   ) {
     return this.khoaService.getEligibleStudentsReport(
       lichKienTapId ? parseInt(lichKienTapId) : undefined,
+      dotKienTapId ? parseInt(dotKienTapId) : undefined,
     );
   }
 
@@ -758,6 +764,7 @@ export class KhoaController {
         query.page || 1,
         query.limit || 10,
         query.search,
+        query.dotKienTapId,
         query.lichKienTapId,
       );
     } catch (error) {
