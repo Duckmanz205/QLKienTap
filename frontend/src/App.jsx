@@ -51,6 +51,8 @@ import BaoCao_SVChuaThamQuan_Khoa from './pages/shared/BaoCao_SVChuaThamQuan_Kho
 import BaoCao_SVDuDieuKien_Khoa from './pages/shared/BaoCao_SVDuDieuKien_Khoa';
 import BaoCao_SVKhongThucHien_Khoa from './pages/shared/BaoCao_SVKhongThucHien_Khoa';
 import BaoCao_SVDatKhongDat_Khoa from './pages/shared/BaoCao_SVDatKhongDat_Khoa';
+import BaoCao_TongHopKienTap_Khoa from './pages/shared/BaoCao_TongHopKienTap_Khoa';
+import BaoCao_DSDoanThamQuan_Khoa from './pages/shared/BaoCao_DSDoanThamQuan_Khoa';
 
 import ProtectedRoute from './components/ProtectedRoute';
 import { getValidSession, getDashboardPathForRole } from './utils/auth';
@@ -165,6 +167,8 @@ export default function App() {
             <Route path="khoa/eligible-students" element={<BaoCao_SVDuDieuKien_Khoa />} />
             <Route path="khoa/retake-students" element={<BaoCao_SVKhongThucHien_Khoa />} />
             <Route path="khoa/final-results" element={<BaoCao_SVDatKhongDat_Khoa />} />
+            <Route path="khoa/review-progress" element={<BaoCao_TongHopKienTap_Khoa />} />
+            <Route path="khoa/trip-roster" element={<BaoCao_DSDoanThamQuan_Khoa />} />
           </Route>
 
           {/* CLB Portal Routes */}
@@ -183,6 +187,8 @@ export default function App() {
             <Route path="clb/reports" element={<BaoCaoThongKe_Khoa />} />
             <Route path="clb/visited-students" element={<BaoCao_SVThamQuan_Khoa />} />
             <Route path="clb/not-visited-students" element={<BaoCao_SVChuaThamQuan_Khoa />} />
+            <Route path="clb/review-progress" element={<BaoCao_TongHopKienTap_Khoa />} />
+            <Route path="clb/trip-roster" element={<BaoCao_DSDoanThamQuan_Khoa />} />
           </Route>
 
           {/* QTV Portal Routes */}

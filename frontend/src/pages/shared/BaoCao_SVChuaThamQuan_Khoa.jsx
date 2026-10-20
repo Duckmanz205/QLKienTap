@@ -4,12 +4,13 @@ import { ArrowLeft, Search, UserX, CheckCircle, Clock, FileSpreadsheet, ChevronL
 import { useNavigate, useLocation } from 'react-router-dom';
 import { khoaApi } from '../../services/api';
 import SearchableDropdown from '../../components/SearchableDropdown';
+import { exportDanhSachChuaThamQuan } from '../../utils/exportExcel';
 
 export default function BaoCao_SVChuaThamQuan_Khoa() {
   const navigate = useNavigate();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
-  const lichKienTapId = searchParams.get('lichKienTapId');
+  const dotOrLichId = searchParams.get('dotKienTapId') || searchParams.get('lichKienTapId');
 
   const [loading, setLoading] = useState(true);
   const [students, setStudents] = useState([]);
@@ -35,31 +36,41 @@ export default function BaoCao_SVChuaThamQuan_Khoa() {
   const [limit, setLimit] = useState(15);
 
   useEffect(() => {
-    if (lichKienTapId) {
+    if (dotOrLichId) {
       fetchData();
     } else {
       setLoading(false);
     }
-  }, [lichKienTapId]);
+  }, [dotOrLichId]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [schedulesRes, notVisitedRes, enrollmentsRes] = await Promise.all([
+      const [campaignsRes, schedulesRes, notVisitedRes, enrollmentsRes] = await Promise.all([
+        khoaApi.getCampaigns({ limit: 1000 }),
         khoaApi.getSchedules(),
-        khoaApi.getNotVisitedStudentsReport({ lichKienTapId }),
-        khoaApi.getEnrollments(1, 10000, '', lichKienTapId)
+        khoaApi.getNotVisitedStudentsReport({ dotKienTapId: dotOrLichId, lichKienTapId: dotOrLichId }),
+        khoaApi.getEnrollments({ dotKienTapId: dotOrLichId, limit: 10000 })
       ]);
 
-      const schedules = schedulesRes.data || [];
-      const currentSchedule = schedules.find(s => s.id === Number(lichKienTapId));
-      
+      const campaigns = campaignsRes.data?.data || campaignsRes.data || [];
+      const currentCampaign = campaigns.find(c => String(c.id) === String(dotOrLichId));
       let daysRemaining = null;
-      if (currentSchedule) {
-        setScheduleName(currentSchedule.ten_lich);
-        if (currentSchedule.ngay_ket_thuc) {
-          const diffTime = new Date(currentSchedule.ngay_ket_thuc) - new Date();
+      if (currentCampaign) {
+        setScheduleName(currentCampaign.ten_dot);
+        if (currentCampaign.ngay_ket_thuc) {
+          const diffTime = new Date(currentCampaign.ngay_ket_thuc) - new Date();
           daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        }
+      } else {
+        const schedules = schedulesRes.data || [];
+        const currentSchedule = schedules.find(s => String(s.id) === String(dotOrLichId));
+        if (currentSchedule) {
+          setScheduleName(currentSchedule.ten_lich);
+          if (currentSchedule.ngay_ket_thuc) {
+            const diffTime = new Date(currentSchedule.ngay_ket_thuc) - new Date();
+            daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          }
         }
       }
 
@@ -125,19 +136,7 @@ export default function BaoCao_SVChuaThamQuan_Khoa() {
   };
 
   const exportExcel = () => {
-    let csvContent = '\uFEFF';
-    csvContent += 'STT,MSSV,Họ và tên,Lớp,Khóa,Trạng thái\n';
-    filteredStudents.forEach((s, idx) => {
-      csvContent += `"${idx + 1}","${s.mssv}","${s.ho_ten}","${s.lop || s.ten_lop || ''}","${s.khoaHoc?.ten_khoa_hoc || ''}","Chưa tham quan"\n`;
-    });
-    
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a'); 
-    link.href = url; 
-    link.download = `DanhSachSV_ChuaThamQuan_${scheduleName || 'Report'}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+    exportDanhSachChuaThamQuan(filteredStudents, scheduleName);
   };
 
   const handleBack = () => {

@@ -741,7 +741,7 @@ export default function QuanLyLePhi_Khoa() {
                   </div>
                   <div className="flex flex-col col-span-2">
                     <span className="text-xs font-bold text-slate-500 uppercase">Mã / Nội dung chuyển khoản</span>
-                    <span className="text-sm font-mono font-bold text-slate-700 bg-slate-100 px-3 py-1.5 rounded mt-1 inline-block w-max">
+                    <span className="text-sm font-mono font-bold text-slate-700 bg-slate-100 px-3 py-1.5 rounded mt-1 inline-block max-w-full break-all">
                       {viewingDetail.hoaDon?.noi_dung_chuyen_khoan || '--'}
                     </span>
                   </div>

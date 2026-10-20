@@ -98,7 +98,7 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
         await khoaApi.createCourse({
           ma_khoa_hoc: maKhoa,
           ten_khoa_hoc: tenKhoa,
-          nam_nhap_hoc: namNhapHoc ? parseInt(namNhapHoc) : null
+          nam_nhap_hoc: namNhapHoc ? parseInt(namNhapHoc) : new Date().getFullYear()
         });
         setToast({ show: true, message: 'Thêm mới khóa thành công!', type: 'success' });
       }
@@ -562,7 +562,7 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
                       type="number"
                       value={namNhapHoc}
                       onChange={(e) => setNamNhapHoc(e.target.value)}
-                      placeholder="VD: 2023"
+                      placeholder={`VD: ${new Date().getFullYear()} (Mặc định năm hiện tại)`}
                       className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all"
                     />
                   </div>

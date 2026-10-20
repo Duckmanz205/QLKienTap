@@ -3,12 +3,13 @@ import { ArrowLeft, Search, Users, CheckCircle, BarChart2, FileSpreadsheet, Chev
 import { useNavigate, useLocation } from 'react-router-dom';
 import { khoaApi } from '../../services/api';
 import SearchableDropdown from '../../components/SearchableDropdown';
+import * as XLSX from 'xlsx';
 
 export default function BaoCao_SVThamQuan_Khoa() {
   const navigate = useNavigate();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
-  const lichKienTapId = searchParams.get('lichKienTapId');
+  const dotOrLichId = searchParams.get('dotKienTapId') || searchParams.get('lichKienTapId');
 
   const [loading, setLoading] = useState(true);
   const [students, setStudents] = useState([]);
@@ -31,25 +32,32 @@ export default function BaoCao_SVThamQuan_Khoa() {
   const [limit, setLimit] = useState(15);
 
   useEffect(() => {
-    if (lichKienTapId) {
+    if (dotOrLichId) {
       fetchData();
     } else {
       setLoading(false);
     }
-  }, [lichKienTapId]);
+  }, [dotOrLichId]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [schedulesRes, visitedRes, enrollmentsRes] = await Promise.all([
+      const [campaignsRes, schedulesRes, visitedRes, enrollmentsRes] = await Promise.all([
+        khoaApi.getCampaigns({ limit: 1000 }),
         khoaApi.getSchedules(),
-        khoaApi.getVisitedStudentsReport({ lichKienTapId }),
-        khoaApi.getEnrollments(1, 10000, '', lichKienTapId)
+        khoaApi.getVisitedStudentsReport({ dotKienTapId: dotOrLichId, lichKienTapId: dotOrLichId }),
+        khoaApi.getEnrollments({ dotKienTapId: dotOrLichId, limit: 10000 })
       ]);
 
-      const schedules = schedulesRes.data || [];
-      const currentSchedule = schedules.find(s => s.id === Number(lichKienTapId));
-      if (currentSchedule) setScheduleName(currentSchedule.ten_lich);
+      const campaigns = campaignsRes.data?.data || campaignsRes.data || [];
+      const currentCampaign = campaigns.find(c => String(c.id) === String(dotOrLichId));
+      if (currentCampaign) {
+        setScheduleName(currentCampaign.ten_dot);
+      } else {
+        const schedules = schedulesRes.data || [];
+        const currentSchedule = schedules.find(s => String(s.id) === String(dotOrLichId));
+        if (currentSchedule) setScheduleName(currentSchedule.ten_lich);
+      }
 
       const visitedData = visitedRes.data || [];
       setStudents(visitedData);
@@ -86,19 +94,19 @@ export default function BaoCao_SVThamQuan_Khoa() {
   const paginatedData = filteredStudents.slice((currentPage - 1) * limit, currentPage * limit);
 
   const exportExcel = () => {
-    let csvContent = '\uFEFF';
-    csvContent += 'STT,MSSV,Họ và tên,Lớp,Khóa,Số lần tham quan\n';
-    filteredStudents.forEach((s, idx) => {
-      csvContent += `"${idx + 1}","${s.mssv}","${s.ho_ten}","${s.lop || s.ten_lop || ''}","${s.khoaHoc?.ten_khoa_hoc || ''}","${s.visitsCount || 1}"\n`;
-    });
-    
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a'); 
-    link.href = url; 
-    link.download = `DanhSachSVThamQuan_${scheduleName || 'Report'}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+    const formatted = filteredStudents.map((s, idx) => ({
+      'STT': idx + 1,
+      'MSSV': s.mssv,
+      'Họ và tên': s.ho_ten,
+      'Lớp': s.lop || s.ten_lop || '',
+      'Khóa học': s.khoaHoc?.ten_khoa_hoc || '',
+      'Số lần tham quan': s.visitsCount || 1
+    }));
+    const ws = XLSX.utils.json_to_sheet(formatted);
+    ws['!cols'] = [{ wch: 6 }, { wch: 14 }, { wch: 24 }, { wch: 14 }, { wch: 16 }, { wch: 18 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'SV_DaThamQuan');
+    XLSX.writeFile(wb, `DanhSachSV_ThamQuan_${scheduleName || 'Report'}.xlsx`);
   };
 
   const handleBack = () => {

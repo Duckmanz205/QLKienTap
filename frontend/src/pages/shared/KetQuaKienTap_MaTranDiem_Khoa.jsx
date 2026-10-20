@@ -96,9 +96,25 @@ export default function KetQuaKienTap_Khoa() {
   const fetchSchedules = async () => {
     try {
       const res = await khoaApi.getSchedules();
-      setSchedules(res.data);
-      if (res.data.length > 0) {
-        setSelectedLich(res.data[0].id);
+      const list = res.data || [];
+      setSchedules(list);
+      if (list.length > 0) {
+        const params = new URLSearchParams(window.location.search);
+        const urlDotId = params.get('dotKienTapId');
+        const urlLichId = params.get('lichKienTapId');
+        
+        let target = null;
+        if (urlDotId) {
+          target = list.find(s => String(s.dot_kien_tap_id) === String(urlDotId));
+        } else if (urlLichId) {
+          target = list.find(s => String(s.id) === String(urlLichId));
+        }
+
+        if (target) {
+          setSelectedLich(target.id);
+        } else {
+          setSelectedLich(list[0].id);
+        }
       }
     } catch (err) {
       console.error(err);

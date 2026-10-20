@@ -3,12 +3,13 @@ import { ArrowLeft, Search, FileCheck, CheckCircle, XCircle, Clock, FileSpreadsh
 import { useNavigate, useLocation } from 'react-router-dom';
 import { khoaApi } from '../../services/api';
 import SearchableDropdown from '../../components/SearchableDropdown';
+import { exportDanhSachDatKhongDat } from '../../utils/exportExcel';
 
 export default function BaoCao_SVDatKhongDat_Khoa() {
   const navigate = useNavigate();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
-  const lichKienTapId = searchParams.get('lichKienTapId');
+  const dotOrLichId = searchParams.get('dotKienTapId') || searchParams.get('lichKienTapId');
 
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState([]);
@@ -28,25 +29,32 @@ export default function BaoCao_SVDatKhongDat_Khoa() {
   const [limit, setLimit] = useState(15);
 
   useEffect(() => {
-    if (lichKienTapId) {
+    if (dotOrLichId) {
       fetchData();
     } else {
       setLoading(false);
     }
-  }, [lichKienTapId]);
+  }, [dotOrLichId]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [schedulesRes, reportRes] = await Promise.all([
+      const [campaignsRes, schedulesRes, reportRes] = await Promise.all([
+        khoaApi.getCampaigns({ limit: 1000 }),
         khoaApi.getSchedules(),
-        khoaApi.getFinalResultsReport(lichKienTapId)
+        khoaApi.getFinalResultsReport(dotOrLichId)
       ]);
 
-      const schedules = schedulesRes.data || [];
-      const currentSchedule = schedules.find(s => String(s.id) === String(lichKienTapId));
-      if (currentSchedule) {
-        setScheduleName(currentSchedule.ten_lich);
+      const campaigns = campaignsRes.data?.data || campaignsRes.data || [];
+      const currentCampaign = campaigns.find(c => String(c.id) === String(dotOrLichId));
+      if (currentCampaign) {
+        setScheduleName(currentCampaign.ten_dot);
+      } else {
+        const schedules = schedulesRes.data || [];
+        const currentSchedule = schedules.find(s => String(s.id) === String(dotOrLichId));
+        if (currentSchedule) {
+          setScheduleName(currentSchedule.ten_lich);
+        }
       }
 
       const rawData = reportRes.data || [];
@@ -55,21 +63,32 @@ export default function BaoCao_SVDatKhongDat_Khoa() {
         const sv = r.sinhVien || {};
         let resultLabel = 'Đang học';
         let resultValue = 'DangHoc';
-        if (r.ket_qua === 'Dat') {
+        if (r.ket_qua === 'Dat' || r.trang_thai === 'Dat' || r.ket_qua === 'Đạt') {
           resultLabel = 'Đạt';
           resultValue = 'Dat';
-        } else if (r.ket_qua === 'KhongDat') {
+        } else if (r.ket_qua === 'KhongDat' || r.trang_thai === 'KhongDat' || r.ket_qua === 'Không đạt') {
           resultLabel = 'Không Đạt';
           resultValue = 'KhongDat';
         }
+
+        const diemTongKet = r.diem_tong_ket !== null && r.diem_tong_ket !== undefined ? Number(r.diem_tong_ket) : null;
+        // Quy chuẩn 2: Điểm số thực tế, nếu Không Đạt và chưa có điểm thì quy đổi 0đ
+        const diemVal = diemTongKet !== null ? diemTongKet : (resultValue === 'KhongDat' ? 0 : null);
         
         return {
           id: r.id || sv.id || Math.random(),
+          sinhVien: sv,
           mssv: sv.mssv,
           ho_ten: sv.ho_ten,
           lop: sv.lop || sv.ten_lop,
           khoa: sv.khoaHoc?.ten_khoa_hoc,
-          diem: r.diem_tong_ket !== null ? Number(r.diem_tong_ket) : null,
+          diem_chuan_bi: r.diem_chuan_bi,
+          diem_thu_hoach: r.diem_thu_hoach,
+          diem_hoi_dong: r.diem_hoi_dong_final ?? r.diem_hoi_dong,
+          diem_tong_ket: diemTongKet,
+          diem: diemVal,
+          ket_qua: r.ket_qua,
+          trang_thai: r.trang_thai,
           resultLabel,
           resultValue
         };
@@ -92,11 +111,13 @@ export default function BaoCao_SVDatKhongDat_Khoa() {
       else if (d.resultValue === 'KhongDat') khongDat++;
       else dangHoc++;
 
-      if (d.diem !== null) {
-        if (d.diem < 4) ranges['0-4']++;
-        else if (d.diem < 5) ranges['4-5']++;
-        else if (d.diem < 6.5) ranges['5-6.5']++;
-        else if (d.diem < 8) ranges['6.5-8']++;
+      // Quy chuẩn 2: Tính cả sinh viên đã có điểm và sinh viên Không Đạt (0đ)
+      const score = d.diem !== null ? d.diem : (d.resultValue === 'KhongDat' ? 0 : null);
+      if (score !== null) {
+        if (score < 4) ranges['0-4']++;
+        else if (score < 5) ranges['4-5']++;
+        else if (score < 6.5) ranges['5-6.5']++;
+        else if (score < 8) ranges['6.5-8']++;
         else ranges['8-10']++;
       }
     });
@@ -164,20 +185,7 @@ export default function BaoCao_SVDatKhongDat_Khoa() {
   };
 
   const exportExcel = () => {
-    let csvContent = '\uFEFF';
-    csvContent += 'STT,MSSV,Họ và tên,Lớp,Điểm tổng kết,Kết quả\n';
-    filteredAndSorted.forEach((s, idx) => {
-      const d = s.diem !== null ? s.diem.toFixed(2) : 'Chưa chốt';
-      csvContent += `"${idx + 1}","${s.mssv}","${s.ho_ten}","${s.lop || ''}","${d}","${s.resultLabel}"\n`;
-    });
-    
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a'); 
-    link.href = url; 
-    link.download = `DanhSachSV_Diem_KetQua.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+    exportDanhSachDatKhongDat(filteredAndSorted, scheduleName);
   };
 
   const handleBack = () => {
@@ -217,9 +225,9 @@ export default function BaoCao_SVDatKhongDat_Khoa() {
             </div>
           </div>
         </div>
-        <button onClick={exportExcel} className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-sm transition-colors">
+        <button onClick={exportExcel} className="flex items-center gap-2 px-5 py-2.5 bg-[#407F3E] hover:bg-[#346632] text-white rounded-xl text-sm font-bold shadow-sm transition-all cursor-pointer hover:shadow-md">
           <FileSpreadsheet className="w-4 h-4" />
-          <span>Xuất Excel / PDF</span>
+          <span>Xuất Excel</span>
         </button>
       </div>
 
@@ -273,26 +281,45 @@ export default function BaoCao_SVDatKhongDat_Khoa() {
           </div>
 
           {/* Histogram (Col span 5) */}
-          <div className="lg:col-span-5 bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col">
-            <div className="flex items-center gap-2 mb-4">
-              <BarChart2 className="w-5 h-5 text-indigo-600" />
-              <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider">Phổ điểm</h3>
+          <div className="lg:col-span-5 bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div className="flex items-center justify-between gap-2 mb-4">
+              <div className="flex items-center gap-2">
+                <BarChart2 className="w-5 h-5 text-[#407F3E]" />
+                <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider">Phổ điểm</h3>
+              </div>
+              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                {stats.total} sinh viên
+              </span>
             </div>
-            <div className="flex-1 flex items-end gap-2 h-32 mt-auto">
+            
+            <div className="flex items-end gap-3 h-36 w-full pt-4 pb-1">
               {histogram.data.map((h, i) => {
                 const heightPct = (h.count / histogram.max) * 100;
+                
+                let barColor = 'from-emerald-500 to-teal-600'; // 8-10
+                if (h.label === '0-4') barColor = 'from-rose-500 to-red-500';
+                else if (h.label === '4-5') barColor = 'from-orange-400 to-amber-500';
+                else if (h.label === '5-6.5') barColor = 'from-amber-400 to-yellow-500';
+                else if (h.label === '6.5-8') barColor = 'from-blue-500 to-indigo-600';
+
                 return (
-                  <div key={i} className="flex-1 flex flex-col items-center justify-end gap-2 group relative">
-                    <div className="text-[10px] font-bold text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity absolute -top-5">
+                  <div key={i} className="flex-1 h-full flex flex-col items-center justify-end group relative">
+                    <span className={`text-[11px] font-bold mb-1 transition-all ${
+                      h.count > 0 ? 'text-slate-800 font-extrabold' : 'text-slate-300'
+                    }`}>
                       {h.count}
+                    </span>
+                    <div className="w-full bg-slate-100/80 rounded-t-md h-full flex items-end justify-center overflow-hidden max-w-[42px] border border-slate-200/50">
+                      <div 
+                        className={`w-full rounded-t-sm transition-all duration-700 ease-out bg-gradient-to-t ${barColor} ${
+                          h.count > 0 ? 'shadow-sm opacity-95 group-hover:opacity-100 group-hover:scale-y-105 origin-bottom' : 'opacity-0'
+                        }`}
+                        style={{ height: `${h.count > 0 ? Math.max(heightPct, 6) : 0}%` }}
+                      />
                     </div>
-                    <div 
-                      className="w-full bg-indigo-100 hover:bg-indigo-400 rounded-t-sm transition-all duration-500 max-w-[40px]"
-                      style={{ height: `${Math.max(heightPct, 4)}%` }}
-                    ></div>
-                    <div className="text-[10px] font-semibold text-slate-500 truncate w-full text-center">
+                    <span className="text-[11px] font-semibold text-slate-500 mt-2 truncate w-full text-center">
                       {h.label}
-                    </div>
+                    </span>
                   </div>
                 );
               })}
@@ -438,7 +465,7 @@ export default function BaoCao_SVDatKhongDat_Khoa() {
                 <th className="p-4">Lớp</th>
                 <th className="p-4 text-right cursor-pointer hover:bg-black/5 transition-colors group" onClick={toggleSort}>
                   <div className="flex items-center justify-end gap-1">
-                    <span>Điểm tổng kết</span>
+                    <span>Điểm trung bình</span>
                     {sortOrder === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-[#407F3E]" /> : 
                      sortOrder === 'desc' ? <ArrowDown className="w-3.5 h-3.5 text-[#407F3E]" /> : 
                      <ArrowDownUp className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600" />}
