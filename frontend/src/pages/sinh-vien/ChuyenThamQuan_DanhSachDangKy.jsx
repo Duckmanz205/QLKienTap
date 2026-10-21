@@ -270,6 +270,7 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
       setGioBatDau('');
       setShowFactorySuggestions(false);
       fetchData(student.id);
+      setActiveTab('lichSuDeXuat');
     } catch (err) {
       showPopup(err.response?.data?.message || 'Có lỗi xảy ra khi gửi đề xuất', 'error');
     }
@@ -534,6 +535,24 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
         >
           Đề xuất chuyến đi tự do
           {activeTab === 'deXuatTuDo' && (
+            <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[#89B449] animate-in slide-in-from-right-4"></div>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('lichSuDeXuat')}
+          className={`px-6 py-3 font-bold text-sm transition-colors relative cursor-pointer whitespace-nowrap flex items-center gap-2 ${
+            activeTab === 'lichSuDeXuat' ? 'text-[#89B449]' : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <span>Lịch sử đề xuất</span>
+          {proposals.length > 0 && (
+            <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+              activeTab === 'lichSuDeXuat' ? 'bg-[#89B449] text-white shadow-xs' : 'bg-[#E7E0C4]/60 text-slate-700'
+            }`}>
+              {proposals.length}
+            </span>
+          )}
+          {activeTab === 'lichSuDeXuat' && (
             <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[#89B449] animate-in slide-in-from-right-4"></div>
           )}
         </button>
@@ -1309,72 +1328,101 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                 </button>
               </div>
             </form>
+          </div>
+        )}
 
-            {/* Lịch sử đề xuất */}
-            <div className="mt-12">
-              <h2 className="text-xl font-bold text-slate-800 mb-6 border-b border-[#E7E0C4] pb-4">Lịch sử đề xuất của bạn</h2>
-              <div className="overflow-x-auto bg-white rounded-xl shadow-sm border border-[#E7E0C4]">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-[#E7E0C4] text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
-                      <th className="p-4 pl-6 min-w-[200px]">Tên nhà máy</th>
-                      <th className="p-4 min-w-[120px]">Ngày đề xuất đi</th>
-                      <th className="p-4 text-center">Hình thức</th>
-                      <th className="p-4 text-center min-w-[120px]">Trạng thái</th>
-                      <th className="p-4 text-right pr-6 min-w-[120px]">Hành động</th>
-                    </tr>
-                  </thead>
-                  <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
-                    {proposals.length === 0 ? (
-                      <tr>
-                        <td colSpan="5" className="p-8 text-center text-slate-500 italic">
-                          Bạn chưa có đề xuất nào.
-                        </td>
-                      </tr>
-                    ) : (
-                      proposals.map(p => {
-                        const isOnline = p.hinh_thuc === 'TrucTuyen';
-                        return (
-                          <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                            <td className="p-4 pl-6 font-bold text-slate-800">
-                              {p.nha_may_id ? p.nhaMay?.ten_nha_may : p.ten_nha_may_de_xuat}
-                            </td>
-                            <td className="p-4 font-medium text-slate-600">
-                              {p.ngay_tham_quan_de_xuat ? new Date(p.ngay_tham_quan_de_xuat).toLocaleDateString('vi-VN') : '--'}
-                            </td>
-                            <td className="p-4 text-center">
-                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shrink-0 ${
-                                isOnline ? 'bg-slate-100 text-slate-600' : 'bg-[#89B449]/10 text-[#407F3E]'
-                              }`}>
-                                {isOnline ? <Laptop className="w-3 h-3" /> : <MapPin className="w-3 h-3" />}
-                                {isOnline ? 'Trực tuyến' : 'Trực tiếp'}
-                              </span>
-                            </td>
-                            <td className="p-4 text-center">
-                              {getProposalStatusBadge(p.trang_thai_duyet)}
-                            </td>
-                            <td className="p-4 text-right pr-6">
-                              {['ChoDuyet', 'ChoKhoaDuyet'].includes(p.trang_thai_duyet) ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleCancelProposal(p.id)}
-                                  className="text-xs font-bold text-[#E68A8C] hover:text-[#E68A8C]/70 hover:underline transition-colors cursor-pointer"
-                                >
-                                  Hủy đề xuất
-                                </button>
-                              ) : (
-                                <span className="text-xs text-slate-400 italic">--</span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
+        {/* TAB 4: Lịch sử đề xuất */}
+        {activeTab === 'lichSuDeXuat' && (
+          <div className="bg-white rounded-2xl border border-[#E7E0C4] shadow-sm p-6 lg:p-8 max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#E7E0C4] pb-4 mb-6">
+              <div>
+                <h2 className="text-xl font-bold text-slate-800">Lịch sử đề xuất chuyến tham quan của bạn</h2>
+                <p className="text-xs text-slate-500 mt-1">
+                  Theo dõi trạng thái xét duyệt và tiến độ của các chuyến kiến tập tự do bạn đã đề xuất với Khoa/CLB.
+                </p>
               </div>
+              <button
+                type="button"
+                onClick={() => setActiveTab('deXuatTuDo')}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#407F3E] hover:bg-[#346A32] text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer self-start sm:self-auto"
+              >
+                + Tạo đề xuất mới
+              </button>
             </div>
 
+            <div className="overflow-x-auto bg-white rounded-xl border border-[#E7E0C4]">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-[#E7E0C4] text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
+                    <th className="p-4 pl-6 min-w-[200px]">Tên nhà máy</th>
+                    <th className="p-4 min-w-[120px]">Ngày đề xuất đi</th>
+                    <th className="p-4 text-center">Hình thức</th>
+                    <th className="p-4 text-center min-w-[120px]">Trạng thái</th>
+                    <th className="p-4 text-right pr-6 min-w-[120px]">Hành động</th>
+                  </tr>
+                </thead>
+                <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
+                  {proposals.length === 0 ? (
+                    <tr>
+                      <td colSpan="5" className="p-12 text-center">
+                        <div className="flex flex-col items-center justify-center gap-3 text-slate-400">
+                          <MapPin className="w-10 h-10 text-slate-300 stroke-[1.5]" />
+                          <p className="text-sm font-medium text-slate-600">Bạn chưa gửi đề xuất chuyến tham quan tự do nào.</p>
+                          <p className="text-xs text-slate-400 max-w-sm">
+                            Nếu bạn muốn đi kiến tập tại doanh nghiệp ngoài danh sách mở của Khoa, hãy tạo đề xuất ngay.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab('deXuatTuDo')}
+                            className="mt-2 px-5 py-2 rounded-xl bg-[#407F3E] text-white font-bold text-xs hover:bg-[#346A32] transition-colors cursor-pointer shadow-xs"
+                          >
+                            Tạo đề xuất chuyến tự do
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    proposals.map(p => {
+                      const isOnline = p.hinh_thuc === 'TrucTuyen';
+                      return (
+                        <tr key={p.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="p-4 pl-6 font-bold text-slate-800">
+                            {p.nha_may_id ? p.nhaMay?.ten_nha_may : p.ten_nha_may_de_xuat}
+                          </td>
+                          <td className="p-4 font-medium text-slate-600">
+                            {p.ngay_tham_quan_de_xuat ? new Date(p.ngay_tham_quan_de_xuat).toLocaleDateString('vi-VN') : '--'}
+                          </td>
+                          <td className="p-4 text-center">
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-bold uppercase tracking-wider shrink-0 ${
+                              isOnline ? 'bg-slate-100 text-slate-600' : 'bg-[#89B449]/10 text-[#407F3E]'
+                            }`}>
+                              {isOnline ? <Laptop className="w-3 h-3" /> : <MapPin className="w-3 h-3" />}
+                              {isOnline ? 'Trực tuyến' : 'Trực tiếp'}
+                            </span>
+                          </td>
+                          <td className="p-4 text-center">
+                            {getProposalStatusBadge(p.trang_thai_duyet)}
+                          </td>
+                          <td className="p-4 text-right pr-6">
+                            {['ChoDuyet', 'ChoKhoaDuyet'].includes(p.trang_thai_duyet) ? (
+                              <button
+                                type="button"
+                                onClick={() => handleCancelProposal(p.id)}
+                                className="text-xs font-bold text-[#E68A8C] hover:text-[#E68A8C]/70 hover:underline transition-colors cursor-pointer"
+                              >
+                                Hủy đề xuất
+                              </button>
+                            ) : (
+                              <span className="text-xs text-slate-400 italic">--</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 

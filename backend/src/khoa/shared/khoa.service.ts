@@ -4459,8 +4459,9 @@ export class KhoaService implements OnModuleInit {
 
   // Dashboard overview stats
   async getDashboardStats() {
-    const studentCount =
-      (await this.dksvRepo.count()) || (await this.svRepo.count());
+    try {
+      const studentCount =
+        (await this.dksvRepo.count()) || (await this.svRepo.count());
     const lecturerCount = await this.gvRepo.count();
     const factoryCount = await this.nhaMayRepo.count();
     const campaignCount = await this.dotRepo.count();
@@ -4556,6 +4557,138 @@ export class KhoaService implements OnModuleInit {
       }),
     );
 
+    // 1. Đợt kiến tập hiện tại & Trạng thái khóa cổng Bộ 3 chuyến
+    let activeDot = await this.dotRepo.findOne({
+      where: { trang_thai: In(['DangTrienKhai', 'DangDienRa', 'MoDangKy']) },
+      relations: { hocKy: { namHoc: true } },
+      order: { id: 'DESC' },
+    });
+
+    if (!activeDot) {
+      const dots = await this.dotRepo.find({
+        relations: { hocKy: { namHoc: true } },
+        order: { id: 'DESC' },
+        take: 1,
+      });
+      activeDot = dots[0] || null;
+    }
+
+    const dotId = activeDot ? activeDot.id : null;
+    const isBoChuyenLocked = dotId ? BoChuyenLockManager.isLocked(dotId) : false;
+
+    const currentCampaign = activeDot ? {
+      id: activeDot.id,
+      tenDot: activeDot.ten_dot || `Đợt #${activeDot.id}`,
+      hocKy: activeDot.hocKy?.ten_hoc_ky || 'Học kỳ 1',
+      namHoc: activeDot.hocKy?.namHoc?.ten_nam_hoc || '2026-2027',
+      ngayBatDau: activeDot.ngay_bat_dau,
+      ngayKetThuc: activeDot.ngay_ket_thuc,
+      isBoChuyenLocked,
+    } : null;
+
+    // 2. Thống kê tiến trình 4 giai đoạn học phần (Pipeline)
+    // GĐ 1: Số sinh viên đã đăng ký ít nhất 1 chuyến hợp lệ
+    let registeredStudentsCount = 0;
+    try {
+      const regRaw = await this.phieuRepo.createQueryBuilder('p')
+        .select('COUNT(DISTINCT p.sinh_vien_id)', 'cnt')
+        .where("p.trang_thai IN ('HopLe', 'DaThamGia', 'HoanThanh')")
+        .getRawOne();
+      registeredStudentsCount = Number(regRaw?.cnt || 0);
+    } catch (e) {
+      registeredStudentsCount = 0;
+    }
+
+    // GĐ 2: Số bài thu hoạch đã nộp
+    const submittedReportsCount = await this.baiRepo.count();
+
+    // GĐ 3: Số sinh viên đủ điều kiện (>= 2 trực tiếp + >= 1 trực tuyến tại >= 3 nhà máy)
+    let eligibleCount = 0;
+    try {
+      const eligibleRaw: any[] = await this.dataSource.query(`
+        SELECT p.sinh_vien_id
+        FROM PhieuDangKy p
+        JOIN PhieuThamQuan ptq ON ptq.phieu_dang_ky_id = p.id
+        JOIN ChuyenThamQuan c ON c.id = p.chuyen_tham_quan_id
+        JOIN BaiThuHoach b ON b.phieu_tham_quan_id = ptq.id
+        WHERE p.trang_thai IN ('HopLe', 'DaThamGia', 'HoanThanh')
+          AND ptq.trang_thai = 'HopLe'
+        GROUP BY p.sinh_vien_id
+        HAVING SUM(CASE WHEN c.hinh_thuc = 'TrucTiep' THEN 1 ELSE 0 END) >= 2
+           AND SUM(CASE WHEN c.hinh_thuc = 'TrucTuyen' THEN 1 ELSE 0 END) >= 1
+           AND COUNT(DISTINCT c.nha_may_id) >= 3
+      `);
+      eligibleCount = eligibleRaw?.length || 0;
+    } catch (e) {
+      eligibleCount = 0;
+    }
+
+    // Số sinh viên đã chọn đủ Bộ 3 chuyến báo cáo
+    const selectedBoChuyenCount = await this.boRepo.count();
+
+    // GĐ 4: Thống kê Hội đồng chấm & Khóa điểm
+    const totalBoardsCount = await this.hdRepo.count();
+    let lockedBoardsCount = 0;
+    try {
+      const lockedRaw: any[] = await this.dataSource.query(`
+        SELECT COUNT(DISTINCT hd.id) as cnt
+        FROM HoiDongChamBaoCao hd
+        JOIN BoChuyenBaoCao bo ON bo.hoi_dong_id = hd.id
+        JOIN PhieuThamQuan ptq ON ptq.bo_chuyen_bao_cao_id = bo.id
+        JOIN DiemPhieuThamQuan d ON d.phieu_tham_quan_id = ptq.id
+        WHERE d.da_khoa_hoi_dong = 1 OR d.da_khoa = 1
+      `);
+      lockedBoardsCount = Number(lockedRaw[0]?.cnt || 0);
+    } catch (e) {
+      lockedBoardsCount = 0;
+    }
+    
+    // Số sinh viên đã có điểm tổng kết / đã chấm xong
+    let gradedStudentsCount = 0;
+    try {
+      const gradedRaw: any[] = await this.dataSource.query(`
+        SELECT COUNT(DISTINCT bo.id) as cnt
+        FROM BoChuyenBaoCao bo
+        JOIN PhieuThamQuan ptq ON ptq.bo_chuyen_bao_cao_id = bo.id
+        JOIN DiemPhieuThamQuan d ON d.phieu_tham_quan_id = ptq.id
+        WHERE d.da_khoa_hoi_dong = 1 OR d.da_khoa = 1
+      `);
+      gradedStudentsCount = Number(gradedRaw[0]?.cnt || 0);
+    } catch (e) {
+      gradedStudentsCount = 0;
+    }
+
+    // 3. Trung tâm Cảnh báo việc cần xử lý gấp (Urgent Action Center)
+    const pendingProposalsCount = await this.deXuatRepo.count({
+      where: [
+        { trang_thai_duyet: 'ChoDuyet' },
+        { trang_thai_duyet: 'ChoKhoaDuyet' },
+      ],
+    });
+
+    const notEligibleCount = Math.max(0, studentCount - eligibleCount);
+
+    let unassignedCouncilCount = 0;
+    try {
+      unassignedCouncilCount = await this.boRepo.count({
+        where: { hoi_dong_id: IsNull() },
+      });
+    } catch (e) {
+      unassignedCouncilCount = 0;
+    }
+
+    let unassignedSupervisorCount = 0;
+    try {
+      const unassignedSvRaw = await this.dataSource.query(`
+        SELECT COUNT(sv.id) as cnt
+        FROM SinhVien sv
+        WHERE sv.id NOT IN (SELECT DISTINCT sinh_vien_id FROM PhanCongGVHD WHERE sinh_vien_id IS NOT NULL)
+      `);
+      unassignedSupervisorCount = Number(unassignedSvRaw[0]?.cnt || 0);
+    } catch (e) {
+      unassignedSupervisorCount = 0;
+    }
+
     return {
       studentCount,
       lecturerCount,
@@ -4565,11 +4698,64 @@ export class KhoaService implements OnModuleInit {
       tripCount,
       pendingCancelCount,
       pendingRefundCount,
-      pendingActionCount,
-      pendingProposalCount,
+      pendingActionCount: pendingCancelCount + pendingRefundCount + pendingProposalsCount,
+      pendingProposalCount: pendingProposalsCount,
       distributionData,
       timeline,
+      currentCampaign,
+      pipeline: {
+        registeredStudentsCount,
+        submittedReportsCount,
+        eligibleCount,
+        selectedBoChuyenCount,
+        totalBoardsCount,
+        lockedBoardsCount,
+        gradedStudentsCount,
+      },
+      urgentAlerts: {
+        pendingProposalsCount,
+        pendingCancelCount,
+        pendingRefundCount,
+        notEligibleCount,
+        unassignedCouncilCount,
+        unassignedSupervisorCount,
+      },
     };
+    } catch (err: any) {
+      console.error('LỖI GET DASHBOARD STATS:', err);
+      return {
+        studentCount: 0,
+        lecturerCount: 0,
+        factoryCount: 0,
+        campaignCount: 0,
+        scheduleCount: 0,
+        tripCount: 0,
+        pendingCancelCount: 0,
+        pendingRefundCount: 0,
+        pendingActionCount: 0,
+        pendingProposalCount: 0,
+        distributionData: [],
+        timeline: [],
+        currentCampaign: null,
+        pipeline: {
+          registeredStudentsCount: 0,
+          submittedReportsCount: 0,
+          eligibleCount: 0,
+          selectedBoChuyenCount: 0,
+          totalBoardsCount: 0,
+          lockedBoardsCount: 0,
+          gradedStudentsCount: 0,
+        },
+        urgentAlerts: {
+          pendingProposalsCount: 0,
+          pendingCancelCount: 0,
+          pendingRefundCount: 0,
+          notEligibleCount: 0,
+          unassignedCouncilCount: 0,
+          unassignedSupervisorCount: 0,
+        },
+      };
+    }
   }
 
   // List all student registrations with pagination and filters
