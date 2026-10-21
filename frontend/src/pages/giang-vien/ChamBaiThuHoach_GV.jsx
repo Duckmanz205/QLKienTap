@@ -1078,6 +1078,7 @@ TRANG 38
             }}
             searchPlaceholder="Tìm số lượng..."
             className="min-w-[80px]"
+            direction="up"
           />
           <span>/ {filteredReports.length} bài thu hoạch</span>
         </div>

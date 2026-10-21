@@ -212,12 +212,15 @@ export default function QuanLyLePhi_Khoa() {
 
   const fetchFees = async () => {
     try {
-      const params = {};
+      const params = { hasInvoice: 'true', limit: 1000 };
       if (selectedLich && selectedLich !== 'ALL') {
         params.lichKienTapId = selectedLich;
       }
       const res = await khoaApi.getRegistrations(params);
-      setFees(res.data.data || []);
+      const validFees = (res.data.data || []).filter(
+        f => f.hoaDon && f.hoaDon.id && f.trang_thai !== 'ChoDuyet'
+      );
+      setFees(validFees);
     } catch (err) {
       console.error(err);
     }
@@ -293,6 +296,9 @@ export default function QuanLyLePhi_Khoa() {
   };
 
   const filteredFees = fees.filter(f => {
+    if (!f.hoaDon || !f.hoaDon.id || f.trang_thai === 'ChoDuyet') {
+      return false;
+    }
     const sv = f.sinhVien || {};
     const chuyen = f.chuyenThamQuan?.nhaMay?.ten_nha_may || '';
     const hoaDon = f.hoaDon || {};
@@ -613,6 +619,7 @@ export default function QuanLyLePhi_Khoa() {
               }}
               searchPlaceholder="Tìm số lượng..."
               className="min-w-[80px]"
+              direction="up"
             />
             <span>/ {totalItems} sinh viên</span>
           </div>

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { CheckCircle2, XCircle, X } from 'lucide-react';
+import { CheckCircle2, XCircle, AlertCircle, X } from 'lucide-react';
 
 export default function Toast({ message, type = 'success', onClose }) {
   useEffect(() => {
@@ -12,8 +12,8 @@ export default function Toast({ message, type = 'success', onClose }) {
 
   if (!message) return null;
 
-  const bgColor = type === 'success' ? 'bg-[#407F3E]' : 'bg-red-500';
-  const Icon = type === 'success' ? CheckCircle2 : XCircle;
+  const bgColor = type === 'success' ? 'bg-[#407F3E]' : type === 'warning' ? 'bg-amber-600' : 'bg-red-600';
+  const Icon = type === 'success' ? CheckCircle2 : type === 'warning' ? AlertCircle : XCircle;
 
   return (
     <div className="fixed top-6 right-6 z-[9999] animate-in slide-in-from-right-8 fade-in duration-300">

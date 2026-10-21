@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   ChevronDown, Check, Search, MapPin, 
   UserCircle, UserPlus, Calendar, Clock, AlertCircle, Star,
-  Trash2, XCircle, CheckCircle2, Zap, Lock, Edit3
+  Trash2, X, XCircle, CheckCircle2, Zap, Lock, Edit3
 } from 'lucide-react';
 import { khoaApi } from '../../services/api';
 import SearchableDropdown from '../../components/SearchableDropdown';
@@ -43,6 +43,7 @@ export default function LeaderAssignment_Khoa() {
   const [searchLeaderFilterTerm, setSearchLeaderFilterTerm] = useState('');
 
   const [openDropdownId, setOpenDropdownId] = useState(null); 
+  const dropdownRef = useRef(null);
   const [selectedLecturerId, setSelectedLecturerId] = useState('');
   const [isTruongDoan, setIsTruongDoan] = useState(true);
   const [searchLecturer, setSearchLecturer] = useState('');
@@ -197,6 +198,12 @@ export default function LeaderAssignment_Khoa() {
       closeAllDropdowns();
       setOpenDropdownId(id);
       setSearchLecturer('');
+      const currentTrip = trips.find(t => t.id === id);
+      const currentGvId = currentTrip?.giaoVienDanDoan?.[0]?.giang_vien_id;
+      setSelectedLecturerId(currentGvId || '');
+      setTimeout(() => {
+        dropdownRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 50);
     }
   };
 
@@ -280,7 +287,7 @@ export default function LeaderAssignment_Khoa() {
   );
 
   return (
-    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300 relative" onClick={closeAllDropdowns}>
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 pb-28 animate-in fade-in duration-300 relative" onClick={closeAllDropdowns}>
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <h1 className="text-2xl font-bold text-slate-800">Phân công GV dẫn đoàn</h1>
@@ -647,11 +654,22 @@ export default function LeaderAssignment_Khoa() {
                       {/* Inline Dropdown */}
                       {openDropdownId === t.id && !(userRole === 'QuanLyCLB' && isTripLocked(t)) && (
                         <div 
-                          className="absolute top-full right-6 mt-1 w-[260px] bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-50 overflow-hidden animate-in zoom-in-95 origin-top-right text-left"
+                          ref={dropdownRef}
+                          className="absolute top-full right-6 mt-2 w-[290px] bg-white border-2 border-[#407F3E]/40 rounded-2xl shadow-2xl shadow-slate-900/40 ring-1 ring-slate-900/10 z-[60] overflow-hidden animate-in zoom-in-95 origin-top-right text-left"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <div className="p-3 border-b border-[#E7E0C4] bg-slate-50">
-                            <label className="block text-xs font-bold text-slate-700 mb-2">Chọn giảng viên (Trưởng đoàn):</label>
+                          <div className="p-3 bg-slate-100/90 border-b border-slate-200 flex items-center justify-between">
+                            <label className="block text-xs font-bold text-slate-800">Chọn giảng viên (Trưởng đoàn):</label>
+                            <button 
+                              type="button" 
+                              onClick={() => setOpenDropdownId(null)}
+                              className="p-1 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200 transition-colors cursor-pointer"
+                              title="Đóng"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                          <div className="p-3 pt-2.5 border-b border-slate-100 bg-white">
                             <div className="relative">
                               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                               <input 
@@ -663,7 +681,7 @@ export default function LeaderAssignment_Khoa() {
                               />
                             </div>
                           </div>
-                          <div className="max-h-[200px] overflow-y-auto py-1">
+                          <div className="max-h-[220px] overflow-y-auto py-1 divide-y divide-slate-100/60">
                             {lecturers.filter(gv => gv.ho_ten.toLowerCase().includes(searchLecturer.toLowerCase())).map(gv => {
                               const isBusy = isLecturerBusy(gv.id, t.ngay_tham_quan);
                               const workload = getLecturerWorkload(gv.id);
@@ -671,10 +689,13 @@ export default function LeaderAssignment_Khoa() {
                                 <div 
                                   key={gv.id}
                                   onClick={() => { if (!isBusy) setSelectedLecturerId(gv.id) }}
-                                  className={`px-4 py-2.5 text-sm flex items-center justify-between transition-colors ${isBusy ? 'opacity-50 cursor-not-allowed bg-slate-50' : 'cursor-pointer hover:bg-[#E7E0C4]/30'} ${selectedLecturerId === gv.id ? 'bg-[#E7E0C4]/50' : ''}`}
+                                  className={`px-4 py-2.5 text-sm flex items-center justify-between transition-colors ${
+                                    isBusy 
+                                      ? 'opacity-50 cursor-not-allowed bg-slate-50' 
+                                      : 'cursor-pointer hover:bg-[#407F3E]/10'
+                                  } ${selectedLecturerId === gv.id ? 'bg-[#407F3E]/15 font-bold text-[#407F3E]' : ''}`}
                                 >
                                   <div className="flex items-center gap-2 truncate">
-
                                     <div className="flex flex-col">
                                       <span className="font-bold text-slate-800">{gv.ho_ten}</span>
                                       <span className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
@@ -688,10 +709,10 @@ export default function LeaderAssignment_Khoa() {
                               );
                             })}
                           </div>
-                          <div className="p-2 border-t border-[#E7E0C4] bg-slate-50 flex justify-end">
+                          <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-end">
                             <button 
                               onClick={() => handleAssign(t.id)}
-                              className="px-3 py-1.5 bg-[#407F3E] text-white rounded text-xs font-bold w-full"
+                              className="px-4 py-2 bg-[#407F3E] hover:bg-[#346632] text-white rounded-xl text-xs font-bold w-full shadow-sm transition-all cursor-pointer"
                             >
                               Lưu phân công
                             </button>
@@ -731,6 +752,7 @@ export default function LeaderAssignment_Khoa() {
               }}
               searchPlaceholder="Tìm số lượng..."
               className="min-w-[80px]"
+              direction="up"
             />
             <span>/ {totalItems} chuyến tham quan</span>
           </div>
@@ -774,13 +796,15 @@ export default function LeaderAssignment_Khoa() {
       {/* Toast Popup */}
       {popup.show && createPortal(
         <div className="fixed top-6 right-6 z-[9999] animate-in slide-in-from-right-8 fade-in duration-300">
-          <div className={`flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg border text-sm font-bold ${
+          <div className={`flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-xl border text-sm font-semibold text-white ${
             popup.type === 'success' 
-              ? 'bg-white border-[#407F3E]/20 text-[#407F3E]' 
-              : 'bg-white border-[#E68A8C]/20 text-[#E68A8C]'
+              ? 'bg-[#407F3E] border-[#407F3E] shadow-[#407F3E]/20' 
+              : 'bg-red-600 border-red-600 shadow-red-600/20'
           }`}>
-            {popup.type === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
-            {popup.message}
+            <span className="p-1 bg-white/20 rounded-full flex items-center justify-center shrink-0">
+              {popup.type === 'success' ? <CheckCircle2 className="w-4 h-4 text-white" /> : <XCircle className="w-4 h-4 text-white" />}
+            </span>
+            <span>{popup.message}</span>
           </div>
         </div>,
         document.body

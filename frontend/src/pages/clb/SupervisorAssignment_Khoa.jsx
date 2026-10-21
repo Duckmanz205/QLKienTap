@@ -34,6 +34,7 @@ export default function SupervisorAssignment_Khoa() {
   
   // Specific inline dropdown state
   const [openDropdownId, setOpenDropdownId] = useState(null);
+  const [dropdownPosition, setDropdownPosition] = useState('down');
   const [searchLecturerTerm, setSearchLecturerTerm] = useState('');
 
   useEffect(() => {
@@ -66,7 +67,7 @@ export default function SupervisorAssignment_Khoa() {
   const fetchEnrollments = async () => {
     setLoading(true);
     try {
-      const res = await khoaApi.getEnrollments({ lichKienTapId: selectedCampaign });
+      const res = await khoaApi.getEnrollments({ dotKienTapId: selectedCampaign, limit: 10000 });
       // res.data is expected to be { data: [...], total: ... }
       const enrolls = res.data.data || res.data;
       // add checked property
@@ -125,6 +126,9 @@ export default function SupervisorAssignment_Khoa() {
       setOpenDropdownId(null);
     } else {
       closeAllDropdowns();
+      const rect = e.currentTarget.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      setDropdownPosition(spaceBelow < 330 ? 'up' : 'down');
       setOpenDropdownId(id);
       setSearchLecturerTerm('');
     }
@@ -134,7 +138,7 @@ export default function SupervisorAssignment_Khoa() {
 
   const filteredEnrollments = enrollments.filter(e => {
     const sv = e.sinhVien || {};
-    const currentAdvisor = sv.details?.giangVienHuongDan?.ho_ten;
+    const currentAdvisor = sv.details?.giangVienHuongDan?.ho_ten || e.giangVienHuongDan?.ho_ten || e.gvhd;
 
     if (selectedStatus === 'Đã phân công' && !currentAdvisor) return false;
     if (selectedStatus === 'Chưa phân công' && currentAdvisor) return false;
@@ -383,7 +387,7 @@ export default function SupervisorAssignment_Khoa() {
               </thead>
               <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
                 {paginatedEnrollments.map(sv => {
-                  const currentAdvisorName = sv.sinhVien?.details?.giangVienHuongDan?.ho_ten;
+                  const currentAdvisorName = sv.sinhVien?.details?.giangVienHuongDan?.ho_ten || sv.giangVienHuongDan?.ho_ten || sv.gvhd;
                   return (
                     <tr key={sv.id} className={`hover:bg-slate-50 transition-colors ${sv.checked ? 'bg-[#89B449]/5' : ''}`}>
                       <td className="p-4 pl-5">
@@ -425,7 +429,11 @@ export default function SupervisorAssignment_Khoa() {
                         {/* Inline Dropdown */}
                         {openDropdownId === sv.id && (
                           <div 
-                            className="absolute top-full right-6 mt-1 w-[260px] bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-50 overflow-hidden animate-in zoom-in-95 origin-top-right text-left"
+                            className={`absolute right-6 w-[260px] bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-50 overflow-hidden animate-in zoom-in-95 text-left ${
+                              dropdownPosition === 'up'
+                                ? 'bottom-full mb-2 origin-bottom-right'
+                                : 'top-full mt-2 origin-top-right'
+                            }`}
                             onClick={(e) => e.stopPropagation()}
                           >
                             <div className="p-2 border-b border-[#E7E0C4] bg-slate-50">
@@ -492,6 +500,7 @@ export default function SupervisorAssignment_Khoa() {
               }}
               searchPlaceholder="Tìm số lượng..."
               className="min-w-[80px]"
+              direction="up"
             />
             <span>/ {totalItems} sinh viên</span>
           </div>

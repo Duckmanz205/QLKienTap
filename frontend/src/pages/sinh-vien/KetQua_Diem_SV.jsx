@@ -60,7 +60,10 @@ export default function KetQua_Diem_SV() {
   }
   
   const isScoreLocked = termGrade?.diem_tong_ket !== null && termGrade?.diem_tong_ket !== undefined;
-  const isPassed = finalScore !== '-' && Number(finalScore) >= 5.0;
+  const isPassed =
+    termGrade?.trang_thai === 'Dat' ||
+    termGrade?.ket_qua === 'Dat' ||
+    (finalScore !== '-' && Number(finalScore) >= 4.0);
 
   const getTripResult = (trip) => {
     if (!trip) return 'ChoDiem';

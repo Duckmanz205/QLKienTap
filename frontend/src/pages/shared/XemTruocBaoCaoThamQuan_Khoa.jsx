@@ -421,6 +421,7 @@ export default function XemTruocBaoCaoThamQuan_Khoa() {
                 }}
                 searchPlaceholder="Tìm số lượng..."
                 className="min-w-[80px]"
+                direction="up"
               />
               <span>/ {tripsData.length} chuyến</span>
             </div>

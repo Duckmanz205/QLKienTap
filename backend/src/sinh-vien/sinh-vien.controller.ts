@@ -283,18 +283,17 @@ export class SinhVienController {
     try { return await this.svService.getStudentGrades(student.id); } catch (e) { console.error('API FATAL ERROR:', e); throw e; }
   }
 
-  @Get('dashboard-stats/:studentId')
-  async getDashboardStats(@Param('studentId') studentId: number) {
-    return this.svService.getDashboardStats(+studentId);
+  @Get('dashboard-stats')
+  async getMyDashboardStats(@CurrentUser() user: JwtPayloadUser) {
+    const student = await this.svService.getStudentByAccountId(user.sub);
+    return this.svService.getDashboardStats(student.id);
   }
 
-  @Get('test-grades')
-  async getTestGrades() {
-    try {
-      return await this.svService.getStudentGrades(808); // or 2, whatever
-    } catch (e) {
-      return { error: e.message, stack: e.stack };
-    }
+  @Get('dashboard-stats/:studentId')
+  async getDashboardStats(@CurrentUser() user: JwtPayloadUser) {
+    // Luon lay stats cua sinh vien dang dang nhap de chong IDOR
+    const student = await this.svService.getStudentByAccountId(user.sub);
+    return this.svService.getDashboardStats(student.id);
   }
 
 }

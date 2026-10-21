@@ -662,6 +662,7 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
                   }}
                   searchPlaceholder="Tìm số lượng..."
                   className="min-w-[80px]"
+                  direction="up"
                 />
                 <span>/ {filteredBoards.length} hội đồng</span>
               </div>

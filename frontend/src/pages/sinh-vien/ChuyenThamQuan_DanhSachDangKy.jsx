@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   MapPin, Laptop, Calendar, Clock, Image as ImageIcon, Users, ChevronDown, Check, Search, X, Banknote, Map,
-  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter
+  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter,
+  CheckCircle2, XCircle, RotateCcw
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { sinhVienApi } from '../../services/api';
@@ -270,6 +271,7 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
       setGioBatDau('');
       setShowFactorySuggestions(false);
       fetchData(student.id);
+      setActiveTab('lichSuDeXuat');
     } catch (err) {
       showPopup(err.response?.data?.message || 'Có lỗi xảy ra khi gửi đề xuất', 'error');
     }
@@ -323,11 +325,16 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
       {/* Custom Popup Toast */}
       {popup.show && (
         <div className="fixed top-6 right-6 z-[9999] pointer-events-none">
-          <div className={`relative z-10 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-4 animate-in slide-in-from-right-8 fade-in duration-300 pointer-events-auto ${popup.type === 'error' ? 'bg-[#E68A8C] text-white' : 'bg-[#407F3E] text-white'}`}>
-            <span className="font-bold text-sm">{popup.message}</span>
-            <button onClick={() => setPopup({ ...popup, show: false })} className="p-1 hover:bg-white/20 rounded-full transition-colors">
+          <div className={`relative z-10 px-5 py-3.5 rounded-xl shadow-xl border flex items-center gap-3 animate-in slide-in-from-right-8 fade-in duration-300 pointer-events-auto text-white font-semibold text-sm ${
+            popup.type === 'error' ? 'bg-red-600 border-red-600 shadow-red-600/20' : 'bg-[#407F3E] border-[#407F3E] shadow-[#407F3E]/20'
+          }`}>
+            <span className="p-1 bg-white/20 rounded-full flex items-center justify-center shrink-0">
+              {popup.type === 'error' ? <XCircle className="w-4 h-4 text-white" /> : <CheckCircle2 className="w-4 h-4 text-white" />}
+            </span>
+            <span className="flex-1">{popup.message}</span>
+            <button onClick={() => setPopup({ ...popup, show: false })} className="p-1 hover:bg-white/20 rounded-lg transition-colors cursor-pointer">
               <span className="sr-only">Close</span>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              <X className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -537,6 +544,24 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
             <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[#89B449] animate-in slide-in-from-right-4"></div>
           )}
         </button>
+        <button
+          onClick={() => setActiveTab('lichSuDeXuat')}
+          className={`px-6 py-3 font-bold text-sm transition-colors relative cursor-pointer whitespace-nowrap flex items-center gap-2 ${
+            activeTab === 'lichSuDeXuat' ? 'text-[#89B449]' : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <span>Lịch sử đề xuất</span>
+          {proposals.length > 0 && (
+            <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+              activeTab === 'lichSuDeXuat' ? 'bg-[#89B449] text-white shadow-xs' : 'bg-[#E7E0C4]/60 text-slate-700'
+            }`}>
+              {proposals.length}
+            </span>
+          )}
+          {activeTab === 'lichSuDeXuat' && (
+            <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[#89B449] animate-in slide-in-from-right-4"></div>
+          )}
+        </button>
       </div>
 
       {/* Tab Content */}
@@ -673,12 +698,19 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                               <h3 className="text-lg font-black text-slate-800 line-clamp-2 leading-tight group-hover:text-[#407F3E] transition-colors flex-1">
                                 {trip.nhaMay?.ten_nha_may}
                               </h3>
-                              <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider shrink-0 ${
-                                isOnline ? 'bg-slate-800 text-white' : 'bg-[#E7E0C4]/50 text-slate-800'
-                              }`}>
-                                {isOnline ? <Laptop className="w-3.5 h-3.5" /> : <MapPin className="w-3.5 h-3.5" />}
-                                {isOnline ? 'Trực tuyến' : 'Trực tiếp'}
-                              </span>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                {trip.da_tung_dang_ky && (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[10px] font-bold uppercase tracking-wider bg-orange-100 text-orange-700 border border-orange-200">
+                                    <RotateCcw className="w-3 h-3" /> Đợt bổ sung
+                                  </span>
+                                )}
+                                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider shrink-0 ${
+                                  isOnline ? 'bg-slate-800 text-white' : 'bg-[#E7E0C4]/50 text-slate-800'
+                                }`}>
+                                  {isOnline ? <Laptop className="w-3.5 h-3.5" /> : <MapPin className="w-3.5 h-3.5" />}
+                                  {isOnline ? 'Trực tuyến' : 'Trực tiếp'}
+                                </span>
+                              </div>
                             </div>
                             
                             {/* Info list */}
@@ -716,9 +748,14 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                                 e.stopPropagation();
                                 handleRegister(trip.id);
                               }}
-                              className="w-full py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl text-sm font-bold uppercase tracking-wider transition-colors shadow-sm cursor-pointer mt-4"
+                              className={`w-full py-2.5 rounded-xl text-sm font-bold uppercase tracking-wider transition-colors shadow-sm cursor-pointer mt-4 flex items-center justify-center gap-2 ${
+                                trip.da_tung_dang_ky
+                                  ? 'bg-orange-600 hover:bg-orange-700 text-white'
+                                  : 'bg-[#407F3E] text-white hover:bg-[#407F3E]/90'
+                              }`}
                             >
-                              Đăng ký
+                              {trip.da_tung_dang_ky && <RotateCcw className="w-4 h-4" />}
+                              {trip.da_tung_dang_ky ? 'Đăng ký lại' : 'Đăng ký'}
                             </button>
                           </div>
                         );
@@ -744,6 +781,7 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                         ]}
                         className="min-w-[120px]"
                         searchPlaceholder="Tìm..."
+                        direction="up"
                       />
                       <span>/ tổng số <strong className="text-slate-800">{totalAvailable}</strong> chuyến mở</span>
                     </div>
@@ -995,6 +1033,14 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                                       >
                                         Hủy đăng ký
                                       </button>
+                                    ) : (reg.trang_thai === 'BiLoai' || reg.trang_thai === 'DaHuy') && trip?.trang_thai === 'MoDangKy' && !isPastTrip ? (
+                                      <button
+                                        onClick={() => handleRegister(trip.id)}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200 transition-colors cursor-pointer shadow-xs"
+                                        title="Chuyến đi đang mở đợt bổ sung, nhấn để đăng ký lại"
+                                      >
+                                        <RotateCcw className="w-3.5 h-3.5" /> Đăng ký lại
+                                      </button>
                                     ) : isPastTrip || trip?.trang_thai === 'DaDienRa' ? (
                                       <span className="text-xs font-medium text-slate-400 italic">Đã diễn ra</span>
                                     ) : (
@@ -1028,6 +1074,7 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                         ]}
                         className="min-w-[120px]"
                         searchPlaceholder="Tìm..."
+                        direction="up"
                       />
                       <span>/ tổng số <strong className="text-slate-800">{totalReg}</strong> đơn đăng ký</span>
                     </div>
@@ -1309,72 +1356,101 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                 </button>
               </div>
             </form>
+          </div>
+        )}
 
-            {/* Lịch sử đề xuất */}
-            <div className="mt-12">
-              <h2 className="text-xl font-bold text-slate-800 mb-6 border-b border-[#E7E0C4] pb-4">Lịch sử đề xuất của bạn</h2>
-              <div className="overflow-x-auto bg-white rounded-xl shadow-sm border border-[#E7E0C4]">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-[#E7E0C4] text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
-                      <th className="p-4 pl-6 min-w-[200px]">Tên nhà máy</th>
-                      <th className="p-4 min-w-[120px]">Ngày đề xuất đi</th>
-                      <th className="p-4 text-center">Hình thức</th>
-                      <th className="p-4 text-center min-w-[120px]">Trạng thái</th>
-                      <th className="p-4 text-right pr-6 min-w-[120px]">Hành động</th>
-                    </tr>
-                  </thead>
-                  <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
-                    {proposals.length === 0 ? (
-                      <tr>
-                        <td colSpan="5" className="p-8 text-center text-slate-500 italic">
-                          Bạn chưa có đề xuất nào.
-                        </td>
-                      </tr>
-                    ) : (
-                      proposals.map(p => {
-                        const isOnline = p.hinh_thuc === 'TrucTuyen';
-                        return (
-                          <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                            <td className="p-4 pl-6 font-bold text-slate-800">
-                              {p.nha_may_id ? p.nhaMay?.ten_nha_may : p.ten_nha_may_de_xuat}
-                            </td>
-                            <td className="p-4 font-medium text-slate-600">
-                              {p.ngay_tham_quan_de_xuat ? new Date(p.ngay_tham_quan_de_xuat).toLocaleDateString('vi-VN') : '--'}
-                            </td>
-                            <td className="p-4 text-center">
-                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shrink-0 ${
-                                isOnline ? 'bg-slate-100 text-slate-600' : 'bg-[#89B449]/10 text-[#407F3E]'
-                              }`}>
-                                {isOnline ? <Laptop className="w-3 h-3" /> : <MapPin className="w-3 h-3" />}
-                                {isOnline ? 'Trực tuyến' : 'Trực tiếp'}
-                              </span>
-                            </td>
-                            <td className="p-4 text-center">
-                              {getProposalStatusBadge(p.trang_thai_duyet)}
-                            </td>
-                            <td className="p-4 text-right pr-6">
-                              {['ChoDuyet', 'ChoKhoaDuyet'].includes(p.trang_thai_duyet) ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleCancelProposal(p.id)}
-                                  className="text-xs font-bold text-[#E68A8C] hover:text-[#E68A8C]/70 hover:underline transition-colors cursor-pointer"
-                                >
-                                  Hủy đề xuất
-                                </button>
-                              ) : (
-                                <span className="text-xs text-slate-400 italic">--</span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
+        {/* TAB 4: Lịch sử đề xuất */}
+        {activeTab === 'lichSuDeXuat' && (
+          <div className="bg-white rounded-2xl border border-[#E7E0C4] shadow-sm p-6 lg:p-8 max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#E7E0C4] pb-4 mb-6">
+              <div>
+                <h2 className="text-xl font-bold text-slate-800">Lịch sử đề xuất chuyến tham quan của bạn</h2>
+                <p className="text-xs text-slate-500 mt-1">
+                  Theo dõi trạng thái xét duyệt và tiến độ của các chuyến kiến tập tự do bạn đã đề xuất với Khoa/CLB.
+                </p>
               </div>
+              <button
+                type="button"
+                onClick={() => setActiveTab('deXuatTuDo')}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#407F3E] hover:bg-[#346A32] text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer self-start sm:self-auto"
+              >
+                + Tạo đề xuất mới
+              </button>
             </div>
 
+            <div className="overflow-x-auto bg-white rounded-xl border border-[#E7E0C4]">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-[#E7E0C4] text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
+                    <th className="p-4 pl-6 min-w-[200px]">Tên nhà máy</th>
+                    <th className="p-4 min-w-[120px]">Ngày đề xuất đi</th>
+                    <th className="p-4 text-center">Hình thức</th>
+                    <th className="p-4 text-center min-w-[120px]">Trạng thái</th>
+                    <th className="p-4 text-right pr-6 min-w-[120px]">Hành động</th>
+                  </tr>
+                </thead>
+                <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
+                  {proposals.length === 0 ? (
+                    <tr>
+                      <td colSpan="5" className="p-12 text-center">
+                        <div className="flex flex-col items-center justify-center gap-3 text-slate-400">
+                          <MapPin className="w-10 h-10 text-slate-300 stroke-[1.5]" />
+                          <p className="text-sm font-medium text-slate-600">Bạn chưa gửi đề xuất chuyến tham quan tự do nào.</p>
+                          <p className="text-xs text-slate-400 max-w-sm">
+                            Nếu bạn muốn đi kiến tập tại doanh nghiệp ngoài danh sách mở của Khoa, hãy tạo đề xuất ngay.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab('deXuatTuDo')}
+                            className="mt-2 px-5 py-2 rounded-xl bg-[#407F3E] text-white font-bold text-xs hover:bg-[#346A32] transition-colors cursor-pointer shadow-xs"
+                          >
+                            Tạo đề xuất chuyến tự do
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    proposals.map(p => {
+                      const isOnline = p.hinh_thuc === 'TrucTuyen';
+                      return (
+                        <tr key={p.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="p-4 pl-6 font-bold text-slate-800">
+                            {p.nha_may_id ? p.nhaMay?.ten_nha_may : p.ten_nha_may_de_xuat}
+                          </td>
+                          <td className="p-4 font-medium text-slate-600">
+                            {p.ngay_tham_quan_de_xuat ? new Date(p.ngay_tham_quan_de_xuat).toLocaleDateString('vi-VN') : '--'}
+                          </td>
+                          <td className="p-4 text-center">
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-bold uppercase tracking-wider shrink-0 ${
+                              isOnline ? 'bg-slate-100 text-slate-600' : 'bg-[#89B449]/10 text-[#407F3E]'
+                            }`}>
+                              {isOnline ? <Laptop className="w-3 h-3" /> : <MapPin className="w-3 h-3" />}
+                              {isOnline ? 'Trực tuyến' : 'Trực tiếp'}
+                            </span>
+                          </td>
+                          <td className="p-4 text-center">
+                            {getProposalStatusBadge(p.trang_thai_duyet)}
+                          </td>
+                          <td className="p-4 text-right pr-6">
+                            {['ChoDuyet', 'ChoKhoaDuyet'].includes(p.trang_thai_duyet) ? (
+                              <button
+                                type="button"
+                                onClick={() => handleCancelProposal(p.id)}
+                                className="text-xs font-bold text-[#E68A8C] hover:text-[#E68A8C]/70 hover:underline transition-colors cursor-pointer"
+                              >
+                                Hủy đề xuất
+                              </button>
+                            ) : (
+                              <span className="text-xs text-slate-400 italic">--</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 

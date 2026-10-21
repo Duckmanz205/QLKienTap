@@ -5,7 +5,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, IsNull, DataSource, EntityManager } from 'typeorm';
+import { Repository, In, IsNull, DataSource, EntityManager, Not } from 'typeorm';
 import {
   SinhVien,
   ChuyenThamQuan,
@@ -136,55 +136,23 @@ export class SinhVienService {
       where: { sinh_vien_id: studentId, con_hieu_luc: true },
     });
 
-    let bannedFromRegistration = false;
     let demotedPriority = false;
-    let remainingBannedTrips = 0;
     let remainingDemotedTrips = 0;
 
     for (const record of blacklistRecords) {
-      const occurredTripsCount = await this.chuyenRepo
-        .createQueryBuilder('chuyen')
-        .where('chuyen.cach_to_chuc = :type', { type: 'DoKhoaToChuc' })
-        .andWhere('chuyen.trang_thai = :status', { status: 'DaDienRa' })
-        .andWhere('chuyen.ngay_tham_quan >= :date', {
-          date: record.ngay_ghi_nhan,
-        })
-        .getCount();
-
-      if (record.ly_do === 'HuyKhongMinhChung') {
-        const limit = 3;
-        if (occurredTripsCount >= limit) {
-          record.con_hieu_luc = false;
-          await this.blackListRepo.save(record);
-        } else {
-          bannedFromRegistration = true;
-          remainingBannedTrips = Math.max(
-            remainingBannedTrips,
-            limit - occurredTripsCount,
-          );
-        }
-      } else if (
-        record.ly_do === 'KhongDongPhi' ||
-        record.ly_do === 'DangKyKhongThamGia'
-      ) {
-        const limit = 5;
-        if (occurredTripsCount >= limit) {
-          record.con_hieu_luc = false;
-          await this.blackListRepo.save(record);
-        } else {
-          demotedPriority = true;
-          remainingDemotedTrips = Math.max(
-            remainingDemotedTrips,
-            limit - occurredTripsCount,
-          );
-        }
+      if (record.so_chuyen_con_lai > 0) {
+        demotedPriority = true;
+        remainingDemotedTrips = Math.max(
+          remainingDemotedTrips,
+          record.so_chuyen_con_lai,
+        );
       }
     }
 
     return {
-      bannedFromRegistration,
+      bannedFromRegistration: false, // Theo Mục 5 đặc tả: không chặn đăng ký, chuyển sang Ưu tiên 6
       demotedPriority,
-      remainingBannedTrips,
+      remainingBannedTrips: 0,
       remainingDemotedTrips,
     };
   }
@@ -205,13 +173,8 @@ export class SinhVienService {
       return [];
     }
 
-    // 2. Kiểm tra xem sinh viên có bị khóa đăng ký không
-    const penalties = await this.checkAndUpdatePenalties(studentId);
-    if (penalties.bannedFromRegistration) {
-      throw new BadRequestException(
-        `Bạn đang bị cấm đăng ký do vi phạm quy chế kiến tập (còn lại ${penalties.remainingBannedTrips} chuyến).`,
-      );
-    }
+    // 2. Kiem tra danh sach den: khong chan tren UI, xep vao Uu tien 6 khi chot danh sach
+    await this.checkAndUpdatePenalties(studentId);
 
     // 3. Lấy danh sách TẤT CẢ chuyến đi của các lịch đang mở đăng ký
     const trips = await this.chuyenRepo.find({
@@ -227,30 +190,42 @@ export class SinhVienService {
       where: { sinh_vien_id: studentId },
       relations: { chuyenThamQuan: true },
     });
-    const registeredTripIds = new Set(studentPhieus.map(p => p.chuyen_tham_quan_id));
+    // Chi loai bo neu SV dang co phieu ChoDuyet, HopLe, DaThamGia, HoanThanh
+    const activeRegisteredTripIds = new Set(
+      studentPhieus
+        .filter(p => ['ChoDuyet', 'HopLe', 'DaThamGia', 'HoanThanh'].includes(p.trang_thai))
+        .map(p => p.chuyen_tham_quan_id)
+    );
+    const phieuMap = new Map<number, PhieuDangKy>();
+    studentPhieus.forEach(p => phieuMap.set(p.chuyen_tham_quan_id, p));
+
     const activeLichIds = new Set(
       studentPhieus
         .filter(p => ['ChoDuyet', 'HopLe'].includes(p.trang_thai))
-        .map(p => p.chuyenThamQuan.lich_kien_tap_id)
+        .map(p => p.chuyenThamQuan?.lich_kien_tap_id)
+        .filter(id => id != null)
     );
 
     // Dem so SV da dang ky tung chuyen va chi hien thi cac chuyen hop le
     const results: any[] = [];
     for (const trip of trips) {
-      // Bo qua neu da dang ky chuyen nay (bat ky trang thai nao)
-      if (registeredTripIds.has(trip.id)) continue;
+      // Bo qua neu dang co phieu hop le/cho duyet/da tham gia o chuyen nay
+      if (activeRegisteredTripIds.has(trip.id)) continue;
       // Bo qua neu da co 1 dang ky khac (dang cho duyet hoac hop le) trong cung lich
-      if (activeLichIds.has(trip.lich_kien_tap_id)) continue;
+      if (trip.lich_kien_tap_id && activeLichIds.has(trip.lich_kien_tap_id)) continue;
       const count = await this.phieuRepo.count({
         where: {
           chuyen_tham_quan_id: trip.id,
           trang_thai: In(['HopLe', 'ChoDuyet']),
         },
       });
+      const oldPhieu = phieuMap.get(trip.id);
       results.push({
         ...trip,
         so_cho_da_dang_ky: count,
         con_trong: trip.suc_chua - count,
+        da_tung_dang_ky: !!oldPhieu,
+        trang_thai_cu: oldPhieu ? oldPhieu.trang_thai : null,
       });
     }
 
@@ -337,13 +312,8 @@ export class SinhVienService {
   // Dang ky chuyen tham quan (Mo hinh Đang ky theo Khung gio & Xet duyet hang loat)
   async registerTrip(studentId: number, tripId: number) {
     return this.dataSource.transaction(async (manager: EntityManager) => {
-      // 1. Kiem tra danh sach den
-      const penalties = await this.checkAndUpdatePenalties(studentId);
-      if (penalties.bannedFromRegistration) {
-        throw new BadRequestException(
-          `Bạn đang bị cấm đăng ký do vi phạm quy chế kiến tập (còn lại ${penalties.remainingBannedTrips} chuyến).`,
-        );
-      }
+      // 1. Kiem tra danh sach den: khong chan dang ky de sinh vien tra an o Uu tien 6
+      await this.checkAndUpdatePenalties(studentId);
 
       const student = await manager.findOne(SinhVien, {
         where: { id: studentId },
@@ -375,7 +345,15 @@ export class SinhVienService {
         where: { sinh_vien_id: studentId, chuyen_tham_quan_id: tripId },
       });
       if (exist) {
-        throw new BadRequestException('Bạn đã đăng ký chuyến đi này rồi');
+        if (exist.trang_thai === 'HopLe') {
+          throw new BadRequestException('Bạn đã có tên trong danh sách chính thức của chuyến đi này.');
+        }
+        if (exist.trang_thai === 'ChoDuyet') {
+          throw new BadRequestException('Bạn đã nộp đơn đăng ký chuyến đi này và đang chờ xét duyệt.');
+        }
+        if (['DaThamGia', 'HoanThanh'].includes(exist.trang_thai)) {
+          throw new BadRequestException('Bạn đã hoàn thành chuyến đi này.');
+        }
       }
 
       // Kiem tra khong duoc dang ky qua 1 chuyen trong cung 1 lich kien tap
@@ -388,7 +366,8 @@ export class SinhVienService {
       });
       const hasSameLich = existingInLich.some(
         (p) =>
-          p.chuyenThamQuan.lich_kien_tap_id === trip.lich_kien_tap_id,
+          p.chuyen_tham_quan_id !== tripId &&
+          p.chuyenThamQuan?.lich_kien_tap_id === trip.lich_kien_tap_id,
       );
       if (hasSameLich) {
         throw new BadRequestException(
@@ -396,19 +375,33 @@ export class SinhVienService {
         );
       }
 
-      // Giai doan 1: Ghi nhan PhieuDangKy o trang thai ChoDuyet.
-      // Trong mo hinh nay, tat ca dang ky hop le trong khung gio deu duoc tiep nhan.
-      // Sau khi het gio, Khoa se loc top N (N = suc_chua) de chuyen sang HopLe va phat hanh hoa don.
-      const newPhieu = new PhieuDangKy();
-      newPhieu.sinh_vien_id = studentId;
-      newPhieu.chuyen_tham_quan_id = tripId;
-      newPhieu.trang_thai = 'ChoDuyet';
-      newPhieu.ngay_dang_ky = new Date();
-      const savedPhieu = await manager.save(PhieuDangKy, newPhieu);
+      // Ghi nhan PhieuDangKy o trang thai ChoDuyet.
+      // Neu da co phieu cu (BiLoai hoac DaHuy), tai su dung ban ghi cu de tranh vi pham UQ_PhieuDangKy
+      let savedPhieu: PhieuDangKy;
+      let isReRegister = false;
+      if (exist && (exist.trang_thai === 'BiLoai' || exist.trang_thai === 'DaHuy')) {
+        exist.trang_thai = 'ChoDuyet';
+        exist.ngay_dang_ky = new Date();
+        savedPhieu = await manager.save(PhieuDangKy, exist);
+        // Xóa hóa đơn chưa thanh toán cũ (nếu có) để tránh tồn đọng hóa đơn ảo khi đang chờ duyệt
+        await manager.delete(HoaDonLePhi, {
+          phieu_dang_ky_id: exist.id,
+          trang_thai: In(['ChuaDong', 'ViPham']),
+        });
+        isReRegister = true;
+      } else {
+        const newPhieu = new PhieuDangKy();
+        newPhieu.sinh_vien_id = studentId;
+        newPhieu.chuyen_tham_quan_id = tripId;
+        newPhieu.trang_thai = 'ChoDuyet';
+        newPhieu.ngay_dang_ky = new Date();
+        savedPhieu = await manager.save(PhieuDangKy, newPhieu);
+      }
 
       return {
-        message:
-          'Đã ghi nhận yêu cầu đăng ký thành công. Vui lòng chờ Khoa chốt danh sách sau khi kết thúc đợt đăng ký.',
+        message: isReRegister
+          ? 'Đã ghi nhận yêu cầu đăng ký lại thành công. Vui lòng chờ kết quả xét duyệt đợt bổ sung.'
+          : 'Đã ghi nhận yêu cầu đăng ký thành công. Vui lòng chờ Khoa chốt danh sách sau khi kết thúc đợt đăng ký.',
         phieu: savedPhieu,
       };
     });
@@ -653,7 +646,8 @@ export class SinhVienService {
       black.ly_do = 'HuyKhongMinhChung';
       black.phieu_dang_ky_id = registrationId;
       black.ngay_ghi_nhan = new Date();
-      black.con_hieu_luc = true;
+      black.so_chuyen_bi_cam = 3;
+      black.so_chuyen_con_lai = 3;
       await this.blackListRepo.save(black);
 
       return {
@@ -684,10 +678,13 @@ export class SinhVienService {
     };
   }
 
-  // Hoa don le phi cua SV
+  // Hoa don le phi cua SV (chi tra ve hoa don khi sinh vien da duoc duyet HopLe)
   async getInvoices(studentId: number) {
     const phieus = await this.phieuRepo.find({
-      where: { sinh_vien_id: studentId },
+      where: {
+        sinh_vien_id: studentId,
+        trang_thai: Not('ChoDuyet'),
+      },
     });
     const phieuIds = phieus.map((p) => p.id);
     if (phieuIds.length === 0) return [];
@@ -793,7 +790,7 @@ export class SinhVienService {
   ) {
     const hd = await this.hoaDonRepo.findOne({
       where: { id: invoiceId },
-      relations: { phieuDangKy: { sinhVien: true } },
+      relations: { phieuDangKy: { sinhVien: true, chuyenThamQuan: true } },
     });
     if (!hd) throw new NotFoundException('Không tìm thấy hóa đơn');
     if (hd.phieuDangKy.sinh_vien_id !== studentId) {
@@ -801,9 +798,20 @@ export class SinhVienService {
         'Bạn không có quyền yêu cầu hoàn phí cho hóa đơn của người khác',
       );
     }
-    if (hd.trang_thai !== 'ViPham') {
+    const isChuyenDaHuy =
+      hd.phieuDangKy?.chuyenThamQuan?.trang_thai === 'DaHuy';
+    if (hd.trang_thai !== 'ViPham' && !isChuyenDaHuy) {
       throw new BadRequestException(
-        'Xin hoàn phí chỉ áp dụng cho hóa đơn vi phạm (trễ hạn/sai nội dung)',
+        'Xin hoàn phí chỉ áp dụng cho hóa đơn vi phạm (trễ hạn/sai nội dung) hoặc chuyến đi đã bị hủy.',
+      );
+    }
+    if (
+      !nganHangNhan?.trim() ||
+      !soTaiKhoanNhan?.trim() ||
+      !tenChuTaiKhoanNhan?.trim()
+    ) {
+      throw new BadRequestException(
+        'Vui lòng nhập đầy đủ thông tin tài khoản ngân hàng nhận tiền hoàn (Ngân hàng, Số tài khoản, Tên chủ tài khoản).',
       );
     }
 
@@ -818,15 +826,12 @@ export class SinhVienService {
 
     const don = new DonHoanPhi();
     don.hoa_don_id = invoiceId;
-    don.file_don_da_duyet = fileScanUrl;
-    don.ngan_hang_nhan = 'Ngân hàng mặc định (Thiếu trên UI)';
-    don.so_tai_khoan_nhan = '000000000';
-    don.ten_chu_tai_khoan_nhan = hd.phieuDangKy?.sinhVien?.ho_ten ?? 'Sinh viên ẩn danh';
+    don.file_don_da_duyet = fileScanUrl || '';
+    don.ngan_hang_nhan = nganHangNhan.trim();
+    don.so_tai_khoan_nhan = soTaiKhoanNhan.trim();
+    don.ten_chu_tai_khoan_nhan = tenChuTaiKhoanNhan.trim().toUpperCase();
     don.ngay_nop = new Date();
     don.trang_thai = 'ChoXuLy';
-    don.ngan_hang_nhan = nganHangNhan;
-    don.so_tai_khoan_nhan = soTaiKhoanNhan;
-    don.ten_chu_tai_khoan_nhan = tenChuTaiKhoanNhan;
     await this.hoanPhiRepo.save(don);
 
     return { message: 'Nộp đơn xin hoàn lệ phí thành công' };
@@ -1290,12 +1295,18 @@ export class SinhVienService {
       );
     }
 
-    // 3. Kiem tra xem bo chuyen hien tai co chuyen nao da bi khoa diem chua
+    // 3. Kiem tra xem bo chuyen hien tai co chuyen nao da bi khoa diem chua hoac da duoc phan cong hoi dong chua
     const currentBo = await this.boChuyenRepo.findOne({
       where: { dot_kien_tap_sinh_vien_id: termStudentId },
       relations: { hoiDong: true },
     });
     if (currentBo) {
+      // Khoa tu dong khi da phan cong Hoi dong (Assignment Lock - Muc 18.2 Dac ta)
+      if (currentBo.hoi_dong_id) {
+        throw new BadRequestException(
+          'Bạn đã được Khoa phân công vào Hội đồng bảo vệ (đã lên lịch hội đồng), không thể thay đổi Bộ 3 chuyến báo cáo.',
+        );
+      }
       const currentPtqs = await this.phieuTQRepo.find({
         where: { bo_chuyen_bao_cao_id: currentBo.id },
         relations: { diemPhieuThamQuan: true },
@@ -1644,12 +1655,12 @@ export class SinhVienService {
         }
       }
 
-      // Xác định kết quả học phần chung của sinh viên:
+      // Xác định kết quả học phần chung của sinh viên (chuẩn HUIT >= 4.0 là Đạt):
       let termOutcome: 'Dat' | 'KhongDat' | 'DangThucHien' = 'DangThucHien';
       if (dksv.trang_thai === 'Dat' || dksv.trang_thai === 'KhongDat') {
         termOutcome = dksv.trang_thai as any;
       } else if (calculatedTermScore !== null) {
-        termOutcome = calculatedTermScore >= 5.0 ? 'Dat' : 'KhongDat';
+        termOutcome = calculatedTermScore >= 4.0 ? 'Dat' : 'KhongDat';
       }
 
       const pdks = await this.phieuRepo.find({
@@ -1890,8 +1901,10 @@ export class SinhVienService {
       }
     }
 
-    // Hóa đơn chưa thanh toán
-    const pdkIds = trips.map((t) => t.id);
+    // Hóa đơn chưa thanh toán (chỉ tính các phiếu đã được duyệt hợp lệ)
+    const pdkIds = trips
+      .filter((t) => t.trang_thai !== 'ChoDuyet')
+      .map((t) => t.id);
     const unpaidInvoices =
       pdkIds.length > 0
         ? await this.hoaDonRepo.find({

@@ -278,6 +278,7 @@ export default function DuyetHoanPhi_Khoa() {
               }}
               searchPlaceholder="Tìm số lượng..."
               className="min-w-[80px]"
+              direction="up"
             />
             <span>/ tổng số <strong className="text-slate-800">{totalItems}</strong> hồ sơ</span>
           </div>

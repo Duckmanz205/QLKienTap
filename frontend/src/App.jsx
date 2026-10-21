@@ -91,7 +91,7 @@ export default function App() {
       <Toaster position="top-right" toastOptions={{ duration: 3000 }}>
         {(t) => {
           const type = t.type === 'error' ? 'error' : 'success';
-          const bgColor = type === 'success' ? 'bg-[#407F3E]' : 'bg-red-500';
+          const bgColor = type === 'success' ? 'bg-[#407F3E]' : 'bg-red-600';
           const Icon = type === 'success' ? CheckCircle2 : XCircle;
 
           return (

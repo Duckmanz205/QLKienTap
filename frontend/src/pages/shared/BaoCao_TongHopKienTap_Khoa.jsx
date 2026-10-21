@@ -498,6 +498,7 @@ export default function BaoCao_TongHopKienTap_Khoa() {
               }}
               searchPlaceholder="Số lượng..."
               className="min-w-[80px]"
+              direction="up"
             />
             <span>/ {filteredData.length} sinh viên</span>
           </div>

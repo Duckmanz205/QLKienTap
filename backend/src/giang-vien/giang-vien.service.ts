@@ -333,7 +333,8 @@ export class GiangVienService {
             black.ly_do = 'DangKyKhongThamGia';
             black.phieu_dang_ky_id = phieu.id;
             black.ngay_ghi_nhan = new Date();
-            black.con_hieu_luc = true;
+            black.so_chuyen_bi_cam = 5;
+            black.so_chuyen_con_lai = 5;
             await manager.save(DanhSachDen, black);
 
             // Đánh dấu đã tồn tại blacklist trong bộ nhớ transaction

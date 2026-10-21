@@ -459,6 +459,7 @@ export default function BaoCao_SVKhongThucHien_Khoa() {
               value={limit}
               onChange={(val) => { setLimit(Number(val)); setCurrentPage(1); }}
               className="w-20"
+              direction="up"
             />
             <span>trên tổng số <strong className="text-slate-800">{filteredStudents.length}</strong> sinh viên nợ môn</span>
           </div>

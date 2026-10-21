@@ -379,6 +379,7 @@ export default function DiemChuanBi_DiemCong_GV() {
               }}
               searchPlaceholder="Tìm số lượng..."
               className="min-w-[80px]"
+              direction="up"
             />
             <span>/ {filteredStudents.length} sinh viên</span>
           </div>

@@ -10,6 +10,8 @@ import { ChevronDown, Check } from 'lucide-react';
  * @param {String} placeholder - Text hiển thị khi không có lựa chọn nào (VD: "Tất cả...")
  * @param {String} searchPlaceholder - Text trong ô tìm kiếm (VD: "Tìm kiếm...")
  * @param {String} className - Custom class cho wrapper container
+ * @param {String} direction - Hướng mở menu: 'down' | 'up' | 'auto' (mặc định: 'down')
+ * @param {Boolean} dropUp - Shorthand cho direction="up"
  */
 const SearchableDropdown = ({
   options = [],
@@ -17,11 +19,16 @@ const SearchableDropdown = ({
   onChange,
   placeholder = 'Chọn một mục',
   searchPlaceholder = 'Tìm kiếm...',
-  className = 'min-w-[160px]'
+  className = 'min-w-[160px]',
+  direction = 'down',
+  dropUp = false
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [openDirection, setOpenDirection] = useState(direction);
   const wrapperRef = useRef(null);
+
+  const isUp = dropUp || direction === 'up' || openDirection === 'up';
 
   // Chuẩn hóa options thành định dạng object {value, label} để dễ xử lý
   const normalizedOptions = options.map(opt => {
@@ -54,6 +61,27 @@ const SearchableDropdown = ({
     };
   }, []);
 
+  const handleToggle = () => {
+    if (!isOpen) {
+      if (dropUp || direction === 'up') {
+        setOpenDirection('up');
+      } else if (direction === 'auto') {
+        if (wrapperRef.current) {
+          const rect = wrapperRef.current.getBoundingClientRect();
+          const spaceBelow = window.innerHeight - rect.bottom;
+          if (spaceBelow < 250 && rect.top > spaceBelow) {
+            setOpenDirection('up');
+          } else {
+            setOpenDirection('down');
+          }
+        }
+      } else {
+        setOpenDirection('down');
+      }
+    }
+    setIsOpen(!isOpen);
+  };
+
   const handleSelect = (optValue) => {
     onChange(optValue);
     setIsOpen(false);
@@ -63,17 +91,29 @@ const SearchableDropdown = ({
   return (
     <div className={`relative ${className}`} ref={wrapperRef}>
       <div
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={handleToggle}
         className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${
           isOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'
         }`}
       >
         <span className="text-slate-700 font-medium truncate pr-2">{displayLabel}</span>
-        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown
+          className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
+            isUp
+              ? (isOpen ? 'rotate-0' : 'rotate-180')
+              : (isOpen ? 'rotate-180' : 'rotate-0')
+          }`}
+        />
       </div>
 
       {isOpen && (
-        <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-50 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[200px]">
+        <div
+          className={`absolute left-0 w-full bg-white border border-[#E7E0C4] rounded-lg shadow-xl z-50 py-1 overflow-hidden flex flex-col min-w-[200px] ${
+            isUp
+              ? 'bottom-full mb-1 animate-in slide-in-from-bottom-2 duration-150'
+              : 'top-full mt-1 animate-in slide-in-from-top-2 duration-150'
+          }`}
+        >
           <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
             <input
               type="text"

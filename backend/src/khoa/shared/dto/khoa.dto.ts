@@ -13,6 +13,7 @@ import {
   IsArray,
   ArrayNotEmpty,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
 
 export class CreateYearDto {
@@ -461,10 +462,27 @@ export class AddBoardMemberDto {
   role: string;
 }
 
+export class UpdateBoardMemberDto {
+  @IsInt()
+  @Min(1)
+  lecturerId: number;
+
+  @IsString()
+  @IsIn(['ChuTich', 'ThuKy', 'ThanhVien'], {
+    message: 'Vai trò phải là ChuTich, ThuKy hoặc ThanhVien',
+  })
+  role: string;
+}
+
 export class UpdateBoardDto {
   @IsOptional()
   @IsString()
   name?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  dotKienTapId?: number;
 
   @IsOptional()
   @Type(() => Date)
@@ -474,6 +492,12 @@ export class UpdateBoardDto {
   @IsOptional()
   @IsString()
   room?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => UpdateBoardMemberDto)
+  members?: UpdateBoardMemberDto[];
 }
 
 export class UnassignStudentsDto {
@@ -623,6 +647,10 @@ export class GetRegistrationsQueryDto {
   @IsOptional()
   @IsString()
   hasCancelRequest?: string;
+
+  @IsOptional()
+  @IsString()
+  hasInvoice?: string;
 }
 
 export class GetRefundRequestsQueryDto {

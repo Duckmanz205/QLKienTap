@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   Plus, ChevronRight, ChevronDown, Check, X, PlusCircle, Folder, Search,
-  Edit2, Trash2, Rocket, MoreVertical, Download
+  Edit2, Trash2, Rocket, MoreVertical, Download, Loader2
 } from 'lucide-react';
 import { khoaApi } from '../../services/api';
 import Toast from '../../components/Toast';
@@ -16,6 +16,7 @@ export default function PlanManagement_Khoa() {
   const [terms, setTerms] = useState([]);
   const [courses, setCourses] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [viewingDetail, setViewingDetail] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -260,11 +261,13 @@ export default function PlanManagement_Khoa() {
   };
 
   const handleSaveCampaign = async () => {
+    if (isSaving) return;
     if (!campaignName || !selectedTerm || !selectedCourse || !campaignBD || !campaignKT) {
       setToast({ show: true, message: 'Vui lòng điền đầy đủ thông tin', type: 'error' });
       return;
     }
     
+    setIsSaving(true);
     try {
       const payload = {
         ten_dot: campaignName,
@@ -309,6 +312,8 @@ export default function PlanManagement_Khoa() {
       }
 
       setToast({ show: true, message: errorMsg, type: 'error' });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -770,6 +775,7 @@ export default function PlanManagement_Khoa() {
                 }}
                 searchPlaceholder="Tìm số lượng..."
                 className="min-w-[80px]"
+                direction="up"
               />
               <span>/ {campaignTotal} đợt</span>
             </div>
@@ -817,7 +823,7 @@ export default function PlanManagement_Khoa() {
           {/* Dimmed Overlay */}
           <div 
             className="absolute inset-0 bg-slate-900/10 backdrop-blur-sm animate-in fade-in duration-200"
-            onClick={() => setIsModalOpen(false)}
+            onClick={() => { if (!isSaving) setIsModalOpen(false); }}
           ></div>
           
           {/* Modal Content */}
@@ -829,8 +835,10 @@ export default function PlanManagement_Khoa() {
                 {isEditMode ? 'Sửa đợt kiến tập' : 'Tạo đợt kiến tập'}
               </h2>
               <button 
-                onClick={resetForm}
-                className="p-1.5 text-slate-400 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg transition-colors cursor-pointer"
+                onClick={() => { if (!isSaving) resetForm(); }}
+                disabled={isSaving}
+                className="p-1.5 text-slate-400 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                title={isSaving ? 'Đang lưu dữ liệu, vui lòng không tắt' : 'Đóng'}
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1136,6 +1144,7 @@ export default function PlanManagement_Khoa() {
                               }}
                               searchPlaceholder="Tìm số lượng..."
                               className="min-w-[80px]"
+                              direction="up"
                             />
                             <span>/ {studentTotal} sinh viên</span>
                           </div>
@@ -1186,19 +1195,40 @@ export default function PlanManagement_Khoa() {
             )}
 
             {/* Modal Footer */}
-            <div className="px-6 py-4 border-t border-[#E7E0C4] bg-slate-50/50 flex items-center justify-end gap-3 rounded-b-2xl">
-              <button 
-                onClick={resetForm}
-                className="px-5 py-2.5 border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-bold transition-colors cursor-pointer"
-              >
-                Hủy
-              </button>
-              <button 
-                onClick={handleSaveCampaign}
-                className="px-5 py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl text-sm font-bold transition-colors shadow-sm cursor-pointer"
-              >
-                Lưu
-              </button>
+            <div className="px-6 py-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-3 rounded-b-2xl">
+              <div className="text-xs text-slate-500 font-medium">
+                {isSaving && (
+                  <span className="flex items-center gap-2 text-[#407F3E] font-semibold animate-pulse">
+                    <Loader2 className="w-4 h-4 animate-spin text-[#407F3E]" />
+                    {importData.length > 0
+                      ? `Hệ thống đang đồng bộ & ánh xạ ${importData.length} sinh viên, vui lòng chờ...`
+                      : 'Đang lưu đợt kiến tập, vui lòng chờ...'}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center justify-end gap-3 w-full sm:w-auto">
+                <button 
+                  onClick={() => { if (!isSaving) resetForm(); }}
+                  disabled={isSaving}
+                  className="px-5 py-2.5 border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-bold transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Hủy
+                </button>
+                <button 
+                  onClick={handleSaveCampaign}
+                  disabled={isSaving}
+                  className="px-5 py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl text-sm font-bold transition-all shadow-sm cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>{importData.length > 0 ? 'Đang ánh xạ dữ liệu...' : 'Đang lưu...'}</span>
+                    </>
+                  ) : (
+                    <span>Lưu</span>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1305,6 +1335,7 @@ export default function PlanManagement_Khoa() {
                             }}
                             searchPlaceholder="Tìm số lượng..."
                             className="min-w-[80px]"
+                            direction="up"
                           />
                           <span>/ {studentTotal} sinh viên</span>
                         </div>

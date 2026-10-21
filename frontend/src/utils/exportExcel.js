@@ -706,3 +706,216 @@ export const exportBaoCaoTongHopChuyenThamQuan = (trips = []) => {
   XLSX.utils.book_append_sheet(wb, ws, 'TongHopChuyen');
   XLSX.writeFile(wb, `BaoCaoTongHopChuyenThamQuan.xlsx`);
 };
+
+/**
+ * MẪU 10: Xuất Danh sách Hội đồng chấm báo cáo theo đợt (Chuẩn Phương án A: 2 Sheet)
+ * - Sheet 1: Tổng quan Hội đồng trong đợt (Tên, Ngày giờ, Phòng, Chủ tịch, Thư ký, Thành viên, Số lượng SV, Trạng thái khóa)
+ * - Sheet 2: Chi tiết Sinh viên báo cáo (MSSV, Họ tên, Lớp, Các chuyến đi, Điểm HĐ, Trạng thái khóa)
+ */
+export const exportDanhSachHoiDongTheoDot = (dotInfo, boardsData = []) => {
+  const tenDot = dotInfo?.ten_dot || dotInfo?.name || '';
+  const currentDate = new Date().toLocaleDateString('vi-VN');
+
+  // ===================== SHEET 1: TỔNG QUAN HỘI ĐỒNG =====================
+  const sheet1Rows = [
+    ['BỘ CÔNG THƯƠNG', '', '', '', 'TRƯỜNG ĐẠI HỌC CÔNG THƯƠNG TP. HỒ CHÍ MINH - KHOA CÔNG NGHỆ THÔNG TIN'],
+    ['', '', 'DANH SÁCH HỘI ĐỒNG CHẤM BÁO CÁO KIẾN TẬP DOANH NGHIỆP'],
+    ['', '', tenDot ? `Đợt kiến tập: ${tenDot}` : 'Tất cả các đợt kiến tập', '', `Ngày xuất: ${currentDate}`],
+    [],
+    [
+      'STT',
+      'TÊN HỘI ĐỒNG',
+      'ĐỢT KIẾN TẬP',
+      'NGÀY BÁO CÁO',
+      'GIỜ',
+      'ĐỊA ĐIỂM / PHÒNG',
+      'CHỦ TỊCH HỘI ĐỒNG',
+      'THƯ KÝ HỘI ĐỒNG',
+      'ỦY VIÊN / THÀNH VIÊN',
+      'SỐ LƯỢNG SV',
+      'TRẠNG THÁI KHÓA ĐIỂM'
+    ]
+  ];
+
+  boardsData.forEach((b, idx) => {
+    const rawDate = b.ngay_bao_cao || b.raw_ngay_bao_cao;
+    const ngay = rawDate ? formatDate(rawDate) : '';
+    const gio = rawDate ? new Date(rawDate).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '';
+    const members = b.members || [];
+    const chuTich = members.find(m => m.vai_tro === 'ChuTich');
+    const thuKy = members.find(m => m.vai_tro === 'ThuKy');
+    const uyViens = members.filter(m => m.vai_tro !== 'ChuTich' && m.vai_tro !== 'ThuKy');
+
+    const chuTichText = chuTich?.giangVien?.ho_ten
+      ? `${chuTich.giangVien.ho_ten} (${chuTich.giangVien.ma_gv || 'GV'})`
+      : '—';
+    const thuKyText = thuKy?.giangVien?.ho_ten
+      ? `${thuKy.giangVien.ho_ten} (${thuKy.giangVien.ma_gv || 'GV'})`
+      : '—';
+    const uyVienText = uyViens.length > 0
+      ? uyViens.map(u => `${u.giangVien?.ho_ten || 'GV'} (${u.giangVien?.ma_gv || 'GV'})`).join('; ')
+      : '—';
+
+    const svList = b.students || [];
+    const svCount = svList.length > 0 ? svList.length : (b.sv || 0);
+
+    const isLocked = svList.length > 0 && svList.every(s =>
+      s.trips && s.trips.length > 0 && s.trips.every(t => t.daKhoa)
+    );
+
+    sheet1Rows.push([
+      idx + 1,
+      b.ten_hoi_dong || b.ten || `Hội đồng #${b.id}`,
+      b.dotKienTap?.ten_dot || b.lich || tenDot || '—',
+      ngay,
+      gio,
+      b.dia_diem || b.diaDiem || '—',
+      chuTichText,
+      thuKyText,
+      uyVienText,
+      svCount,
+      isLocked ? 'Đã khóa điểm' : 'Chưa khóa điểm'
+    ]);
+  });
+
+  const ws1 = XLSX.utils.aoa_to_sheet(sheet1Rows);
+  ws1['!merges'] = [
+    { s: { r: 1, c: 2 }, e: { r: 1, c: 8 } },
+    { s: { r: 2, c: 2 }, e: { r: 2, c: 6 } }
+  ];
+  ws1['!cols'] = [
+    { wch: 6 },  // STT
+    { wch: 24 }, // Tên HĐ
+    { wch: 20 }, // Đợt
+    { wch: 15 }, // Ngày
+    { wch: 10 }, // Giờ
+    { wch: 18 }, // Phòng
+    { wch: 28 }, // Chủ tịch
+    { wch: 28 }, // Thư ký
+    { wch: 34 }, // Ủy viên
+    { wch: 14 }, // Số lượng SV
+    { wch: 18 }  // Trạng thái
+  ];
+
+  // ===================== SHEET 2: CHI TIẾT SINH VIÊN =====================
+  const sheet2Rows = [
+    ['BỘ CÔNG THƯƠNG', '', '', '', '', 'TRƯỜNG ĐẠI HỌC CÔNG THƯƠNG TP. HỒ CHÍ MINH - KHOA CÔNG NGHỆ THÔNG TIN'],
+    ['', '', '', 'DANH SÁCH CHI TIẾT SINH VIÊN BÁO CÁO THEO HỘI ĐỒNG'],
+    ['', '', '', tenDot ? `Đợt kiến tập: ${tenDot}` : 'Tất cả các đợt kiến tập', '', `Ngày xuất: ${currentDate}`],
+    [],
+    [
+      'STT',
+      'HỘI ĐỒNG',
+      'PHÒNG & THỜI GIAN',
+      'MSSV',
+      'HỌ VÀ TÊN LÓT',
+      'TÊN',
+      'LỚP',
+      'CHUYẾN ĐI 1',
+      'ĐIỂM HĐ 1',
+      'CHUYẾN ĐI 2',
+      'ĐIỂM HĐ 2',
+      'CHUYẾN ĐI 3',
+      'ĐIỂM HĐ 3',
+      'ĐIỂM TB HỘI ĐỒNG',
+      'TRẠNG THÁI KHÓA'
+    ]
+  ];
+
+  let sttCounter = 1;
+  boardsData.forEach((b) => {
+    const rawDate = b.ngay_bao_cao || b.raw_ngay_bao_cao;
+    const ngay = rawDate ? formatDate(rawDate) : '';
+    const gio = rawDate ? new Date(rawDate).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '';
+    const roomTimeText = `${b.dia_diem || b.diaDiem || 'Phòng —'} (${gio} ${ngay})`;
+    const boardName = b.ten_hoi_dong || b.ten || `Hội đồng #${b.id}`;
+
+    const students = b.students || [];
+
+    if (students.length === 0) {
+      sheet2Rows.push([
+        sttCounter++,
+        boardName,
+        roomTimeText,
+        '—',
+        '(Chưa có sinh viên phân công)',
+        '',
+        '—',
+        '—',
+        '',
+        '—',
+        '',
+        '—',
+        '',
+        '—',
+        '—'
+      ]);
+    } else {
+      students.forEach((item) => {
+        const sv = item.sinhVien || {};
+        const { hoDem, ten } = getHoDemAndTen(sv.ho_ten || '');
+        const trips = item.trips || [];
+        const t1 = trips[0];
+        const t2 = trips[1];
+        const t3 = trips[2];
+
+        const scoredTrips = trips.filter(t => t.diemHoiDong != null);
+        const avgScore = scoredTrips.length > 0
+          ? (scoredTrips.reduce((acc, t) => acc + Number(t.diemHoiDong), 0) / scoredTrips.length).toFixed(1)
+          : 'Chưa có';
+
+        const isLocked = trips.length > 0 && trips.every(t => t.daKhoa);
+
+        sheet2Rows.push([
+          sttCounter++,
+          boardName,
+          roomTimeText,
+          sv.mssv || sv.ma_sv || '—',
+          hoDem,
+          ten,
+          sv.ten_lop || sv.lop || '—',
+          t1?.nhaMay || '—',
+          t1?.diemHoiDong != null ? Number(t1.diemHoiDong).toFixed(1) : '',
+          t2?.nhaMay || '—',
+          t2?.diemHoiDong != null ? Number(t2.diemHoiDong).toFixed(1) : '',
+          t3?.nhaMay || '—',
+          t3?.diemHoiDong != null ? Number(t3.diemHoiDong).toFixed(1) : '',
+          avgScore,
+          isLocked ? 'Đã khóa' : 'Chưa khóa'
+        ]);
+      });
+    }
+  });
+
+  const ws2 = XLSX.utils.aoa_to_sheet(sheet2Rows);
+  ws2['!merges'] = [
+    { s: { r: 1, c: 3 }, e: { r: 1, c: 11 } },
+    { s: { r: 2, c: 3 }, e: { r: 2, c: 8 } }
+  ];
+  ws2['!cols'] = [
+    { wch: 6 },  // STT
+    { wch: 22 }, // Tên HĐ
+    { wch: 26 }, // Phòng & Thời gian
+    { wch: 14 }, // MSSV
+    { wch: 20 }, // Họ đệm
+    { wch: 10 }, // Tên
+    { wch: 14 }, // Lớp
+    { wch: 22 }, // Chuyến 1
+    { wch: 10 }, // Điểm 1
+    { wch: 22 }, // Chuyến 2
+    { wch: 10 }, // Điểm 2
+    { wch: 22 }, // Chuyến 3
+    { wch: 10 }, // Điểm 3
+    { wch: 16 }, // Điểm TB HĐ
+    { wch: 16 }  // Trạng thái khóa
+  ];
+
+  // ===================== TẠO WORKBOOK VÀ TẢI FILE =====================
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws1, 'TongQuanHoiDong');
+  XLSX.utils.book_append_sheet(wb, ws2, 'ChiTietSinhVien');
+
+  const cleanDotName = sanitizeFileName(tenDot || 'TatCaDot');
+  const dateStr = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `DanhSach_HoiDong_ChamBaoCao_${cleanDotName}_${dateStr}.xlsx`);
+};

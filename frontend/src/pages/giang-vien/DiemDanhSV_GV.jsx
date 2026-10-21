@@ -375,20 +375,31 @@ export default function DiemDanhSV_GV() {
       </div>
 
       {/* Quick Action Row */}
-      <div className="flex flex-col sm:flex-row justify-between items-center bg-white p-4 rounded-xl border border-[#E7E0C4] shadow-sm mb-6">
-        <button 
-          onClick={handleMarkAllPresent}
-          className="w-full sm:w-auto px-5 py-2 border-2 border-[#89B449] text-[#89B449] hover:bg-[#89B449] hover:text-white rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2 cursor-pointer"
-        >
-          <CheckCircle2 className="w-4 h-4" /> Đánh dấu tất cả Có mặt
-        </button>
-        <div className="mt-3 sm:mt-0 text-sm font-bold text-slate-600">
-          Đã điểm danh: <span className="text-[#407F3E] text-base">{attendedCount}/{totalCount}</span>
+      <div className="flex flex-col sm:flex-row justify-between items-center bg-white p-4 rounded-xl border border-[#E7E0C4] shadow-sm mb-6 gap-3">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          <button 
+            onClick={handleMarkAllPresent}
+            className="w-full sm:w-auto px-5 py-2 border-2 border-[#89B449] text-[#89B449] hover:bg-[#89B449] hover:text-white rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <CheckCircle2 className="w-4 h-4" /> Đánh dấu tất cả Có mặt
+          </button>
+          <div className="text-sm font-bold text-slate-600">
+            Đã điểm danh: <span className="text-[#407F3E] text-base">{attendedCount}/{totalCount}</span>
+          </div>
         </div>
+
+        <button 
+          onClick={handleSaveAttendance}
+          disabled={loading || students.length === 0}
+          className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl shadow-sm hover:shadow-md transition-all cursor-pointer font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <Save className="w-4 h-4" />
+          Lưu điểm danh
+        </button>
       </div>
 
       {/* Main Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-visible pb-20 md:pb-0">
+      <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-visible">
         <div className="overflow-x-auto min-h-[400px]">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -505,7 +516,7 @@ export default function DiemDanhSV_GV() {
         </div>
 
         {/* Pagination Footer */}
-        <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/50 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
             <span>Hiển thị</span>
             <SearchableDropdown 
@@ -522,9 +533,11 @@ export default function DiemDanhSV_GV() {
               }}
               searchPlaceholder="Tìm số lượng..."
               className="min-w-[80px]"
+              direction="up"
             />
             <span>/ {filteredStudents.length} sinh viên</span>
           </div>
+
           <div className="flex items-center gap-1.5">
             <button 
               disabled={currentPage <= 1}
@@ -558,19 +571,16 @@ export default function DiemDanhSV_GV() {
               Trang cuối
             </button>
           </div>
-        </div>
-      </div>
 
-      {/* Floating Save Button */}
-      <div className="fixed bottom-6 right-6 z-40 animate-in slide-in-from-bottom-6 duration-500 delay-300">
-        <button 
-          onClick={handleSaveAttendance}
-          disabled={loading || students.length === 0}
-          className="flex items-center gap-2 px-6 py-3.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-2xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all cursor-pointer font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Save className="w-5 h-5" />
-          Lưu điểm danh
-        </button>
+          <button 
+            onClick={handleSaveAttendance}
+            disabled={loading || students.length === 0}
+            className="w-full md:w-auto flex items-center justify-center gap-2 px-5 py-2 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl shadow-sm hover:shadow-md transition-all cursor-pointer font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+          >
+            <Save className="w-4 h-4" />
+            Lưu điểm danh
+          </button>
+        </div>
       </div>
 
       {/* Preview Confirmation Paper Modal */}

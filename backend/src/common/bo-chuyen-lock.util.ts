@@ -2,24 +2,38 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 const LOCK_FILE_PATH = path.resolve(process.cwd(), 'uploads', 'bo_chuyen_locks.json');
+let cachedLocks: Record<string, boolean> | null = null;
 
 function readLocks(): Record<string, boolean> {
+  if (cachedLocks !== null) {
+    return cachedLocks;
+  }
   try {
-    if (!fs.existsSync(LOCK_FILE_PATH)) return {};
+    if (!fs.existsSync(LOCK_FILE_PATH)) {
+      cachedLocks = {};
+      return cachedLocks;
+    }
     const content = fs.readFileSync(LOCK_FILE_PATH, 'utf8');
-    return JSON.parse(content) || {};
+    cachedLocks = JSON.parse(content) || {};
+    return cachedLocks!;
   } catch {
-    return {};
+    cachedLocks = {};
+    return cachedLocks;
   }
 }
 
 function writeLocks(locks: Record<string, boolean>) {
+  cachedLocks = { ...locks };
   try {
     const dir = path.dirname(LOCK_FILE_PATH);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(LOCK_FILE_PATH, JSON.stringify(locks, null, 2), 'utf8');
+    fs.writeFile(LOCK_FILE_PATH, JSON.stringify(locks, null, 2), 'utf8', (err) => {
+      if (err) {
+        console.error('Lỗi ghi file bo_chuyen_locks:', err);
+      }
+    });
   } catch (err) {
-    console.error('Lỗi ghi file bo_chuyen_locks:', err);
+    console.error('Lỗi chuẩn bị ghi file bo_chuyen_locks:', err);
   }
 }
 
@@ -31,7 +45,7 @@ export const BoChuyenLockManager = {
   },
   setLock(dotKienTapId: number, isLocked: boolean) {
     if (!dotKienTapId) return;
-    const locks = readLocks();
+    const locks = { ...readLocks() };
     if (isLocked) {
       locks[String(dotKienTapId)] = true;
     } else {

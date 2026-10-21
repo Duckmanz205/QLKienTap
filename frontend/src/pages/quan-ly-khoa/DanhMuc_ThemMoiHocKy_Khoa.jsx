@@ -355,6 +355,7 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
                 }}
                 searchPlaceholder="Tìm số lượng..."
                 className="min-w-[80px]"
+                direction="up"
               />
               <span>/ {totalItems} {activeTab === 'nam-hoc' ? 'năm học' : activeTab === 'hoc-ky' ? 'học kỳ' : 'khóa'}</span>
             </div>
