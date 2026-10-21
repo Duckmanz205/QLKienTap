@@ -128,7 +128,7 @@ export default function BaoCao_SVChuaThamQuan_Khoa() {
 
   const handleSendReminder = () => {
     if (selectedStudentIds.size === 0) {
-      toast.success("Vui lòng chọn ít nhất một sinh viên để nhắc nhở!");
+      toast.error("Vui lòng chọn ít nhất một sinh viên để nhắc nhở!");
       return;
     }
     toast.success(`Đã gửi thông báo nhắc nhở đến ${selectedStudentIds.size} sinh viên! (Tính năng mô phỏng)`);
@@ -384,6 +384,7 @@ export default function BaoCao_SVChuaThamQuan_Khoa() {
               }}
               searchPlaceholder="Tìm số lượng..."
               className="min-w-[80px]"
+              direction="up"
             />
             <span>/ {filteredStudents.length} sinh viên</span>
           </div>

@@ -710,6 +710,7 @@ export default function LichKienTap_Khoa() {
               ]}
               className="min-w-[80px]"
               searchPlaceholder="Tìm..."
+              direction="up"
             />
             <span>/ {displayData.length} lịch kiến tập</span>
           </div>
@@ -1016,6 +1017,7 @@ export default function LichKienTap_Khoa() {
                             ]}
                             className="min-w-[80px]"
                             searchPlaceholder="Tìm..."
+                            direction="up"
                           />
                           <span className="text-sm text-slate-600">chuyến</span>
                         </div>
@@ -1183,11 +1185,13 @@ export default function LichKienTap_Khoa() {
 
       {/* Toast Notification */}
       {toastMessage && (
-        <div className={`fixed top-6 right-6 z-[9999] px-6 py-4 rounded-xl shadow-2xl border animate-in slide-in-from-right-8 fade-in duration-300 font-semibold text-sm flex items-center gap-3 ${
-          toastMessage.type === 'error' ? 'bg-white text-red-600 border-red-100' : 'bg-[#407F3E] text-white border-[#407F3E]'
+        <div className={`fixed top-6 right-6 z-[9999] px-5 py-3.5 rounded-xl shadow-xl border animate-in slide-in-from-right-8 fade-in duration-300 font-semibold text-sm flex items-center gap-3 text-white ${
+          toastMessage.type === 'error' ? 'bg-red-600 border-red-600 shadow-red-600/20' : 'bg-[#407F3E] border-[#407F3E] shadow-[#407F3E]/20'
         }`}>
-          {toastMessage.type === 'error' ? <X className="w-5 h-5 p-1 bg-red-100 rounded-full" /> : <Check className="w-5 h-5 p-1 bg-white/20 text-white rounded-full" />}
-          {toastMessage.text}
+          <span className="p-1 bg-white/20 rounded-full flex items-center justify-center shrink-0">
+            {toastMessage.type === 'error' ? <X className="w-4 h-4 text-white" /> : <Check className="w-4 h-4 text-white" />}
+          </span>
+          <span>{toastMessage.text}</span>
         </div>
       )}
 

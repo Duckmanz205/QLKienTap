@@ -257,6 +257,7 @@ export default function ThongBao_GV() {
                 }}
                 searchPlaceholder="Số hàng..."
                 className="min-w-[80px]"
+                direction="up"
               />
               <span>/ {filteredNotifications.length} thông báo</span>
             </div>

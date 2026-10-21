@@ -321,6 +321,7 @@ export default function BaoCao_SVThamQuan_Khoa() {
               }}
               searchPlaceholder="Tìm số lượng..."
               className="min-w-[80px]"
+              direction="up"
             />
             <span>/ {filteredStudents.length} sinh viên</span>
           </div>

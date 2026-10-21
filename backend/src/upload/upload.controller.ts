@@ -119,7 +119,8 @@ export class UploadController {
       `SELECT TOP 1 1 
        FROM PhanCongGiangVienDanDoan pc 
        JOIN PhieuDangKy pdk ON pc.chuyen_tham_quan_id = pdk.chuyen_tham_quan_id 
-       WHERE pc.giang_vien_id = ${gv.id} AND pdk.sinh_vien_id = ${sv.id}`
+       WHERE pc.giang_vien_id = @0 AND pdk.sinh_vien_id = @1`,
+      [gv.id, sv.id],
     );
 
     if (isLead && isLead.length > 0) return true;

@@ -616,6 +616,7 @@ export default function LichDanDoan_GV() {
                     }}
                     searchPlaceholder="Tìm số lượng..."
                     className="min-w-[80px]"
+                    direction="up"
                   />
                   <span>/ {filteredTrips.length} chuyến</span>
                 </div>

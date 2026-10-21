@@ -67,6 +67,9 @@ export default function SupervisorAssignment_Khoa() {
       ]);
       const camps = campRes.data?.data || campRes.data;
       setCampaigns(camps);
+      if (camps && camps.length > 0 && !selectedCampaign) {
+        setSelectedCampaign(camps[0].id);
+      }
       setLecturers(lecRes.data);
     } catch (err) {
       console.error(err);
@@ -77,7 +80,7 @@ export default function SupervisorAssignment_Khoa() {
   const fetchEnrollments = async () => {
     setLoading(true);
     try {
-      const res = await khoaApi.getEnrollments({ lichKienTapId: selectedCampaign, limit: 10000 });
+      const res = await khoaApi.getEnrollments({ dotKienTapId: selectedCampaign, limit: 10000 });
       const enrolls = res.data?.data || res.data;
       setEnrollments(enrolls.map(e => ({ ...e, checked: false })));
       setSelectAll(false);
@@ -206,7 +209,7 @@ export default function SupervisorAssignment_Khoa() {
 
   const filteredEnrollments = enrollments.filter(e => {
     const sv = e.sinhVien || {};
-    const currentAdvisor = sv.details?.giangVienHuongDan?.ho_ten;
+    const currentAdvisor = sv.details?.giangVienHuongDan?.ho_ten || e.giangVienHuongDan?.ho_ten || e.gvhd;
 
     if (selectedStatus === 'Đã phân công' && !currentAdvisor) return false;
     if (selectedStatus === 'Chưa phân công' && currentAdvisor) return false;
@@ -232,7 +235,7 @@ export default function SupervisorAssignment_Khoa() {
 
   // Stats
   const rawTotalStudents = enrollments.length;
-  const rawAssignedStudents = enrollments.filter(e => e.sinhVien?.details?.giangVienHuongDan).length;
+  const rawAssignedStudents = enrollments.filter(e => e.sinhVien?.details?.giangVienHuongDan || e.giangVienHuongDan || e.gvhd).length;
   const rawUnassignedStudents = rawTotalStudents - rawAssignedStudents;
   const progressPercent = rawTotalStudents === 0 ? 0 : Math.round((rawAssignedStudents / rawTotalStudents) * 100);
 
@@ -449,7 +452,7 @@ export default function SupervisorAssignment_Khoa() {
               </thead>
               <tbody className="text-sm text-slate-700 divide-y divide-slate-100">
                 {paginatedEnrollments.map(sv => {
-                  const currentAdvisorName = sv.sinhVien?.details?.giangVienHuongDan?.ho_ten;
+                  const currentAdvisorName = sv.sinhVien?.details?.giangVienHuongDan?.ho_ten || sv.giangVienHuongDan?.ho_ten || sv.gvhd;
                   return (
                     <tr 
                       key={sv.id} 
@@ -519,6 +522,7 @@ export default function SupervisorAssignment_Khoa() {
                   }}
                   searchPlaceholder="Tìm số lượng..."
                   className="min-w-[80px]"
+                  direction="up"
                 />
                 <span>/ {totalItems} sinh viên</span>
               </div>
@@ -676,25 +680,20 @@ export default function SupervisorAssignment_Khoa() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-6 max-h-[60vh] overflow-y-auto">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="flex-1 bg-green-50 p-4 rounded-xl border border-green-200 shadow-sm">
-                  <div className="text-sm font-bold text-green-700 mb-1 uppercase tracking-wider">Dự kiến phân công</div>
-                  <div className="text-3xl font-black text-green-600">{autoAssignPreview.assignments.length} <span className="text-base font-bold">SV</span></div>
+            <div className="p-6 max-h-[65vh] overflow-y-auto">
+              {autoAssignPreview.unassigned?.length > 0 && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-semibold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                  <span>Có {autoAssignPreview.unassigned.length} sinh viên không thể phân công do tất cả giảng viên đã đủ định mức hướng dẫn.</span>
                 </div>
-                <div className="flex-1 bg-red-50 p-4 rounded-xl border border-red-200 shadow-sm">
-                  <div className="text-sm font-bold text-red-700 mb-1 uppercase tracking-wider">Không thể phân công</div>
-                  <div className="text-3xl font-black text-red-600">{autoAssignPreview.unassigned.length} <span className="text-base font-bold">SV</span></div>
-                  <div className="text-[10px] font-bold text-red-500 mt-1 uppercase">Do tất cả GV đã đầy</div>
-                </div>
-              </div>
+              )}
 
               {autoAssignPreview.assignments.length > 0 && (
                 <div className="mb-4">
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
                       <Check className="w-4 h-4 text-green-600" />
-                      Danh sách phân công dự kiến
+                      Danh sách phân công dự kiến ({autoAssignPreview.assignments.length} sinh viên)
                     </h4>
                     <div className="relative w-72">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
@@ -804,6 +803,7 @@ export default function SupervisorAssignment_Khoa() {
                           }}
                           searchPlaceholder="Tìm số lượng..."
                           className="min-w-[80px]"
+                          direction="up"
                         />
                         / {filteredAutoAssign.length} sinh viên
                       </div>

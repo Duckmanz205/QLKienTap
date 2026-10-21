@@ -302,6 +302,7 @@ export default function HoanPhi_SV() {
               }}
               searchPlaceholder="Tìm số lượng..."
               className="min-w-[80px]"
+              direction="up"
             />
             <span>/ {filteredRefunds.length} yêu cầu</span>
           </div>

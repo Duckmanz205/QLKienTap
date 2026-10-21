@@ -258,6 +258,7 @@ export default function ThanhToan_SV() {
               }}
               searchPlaceholder="Tìm số lượng..."
               className="min-w-[80px]"
+              direction="up"
             />
             <span>/ {filteredInvoices.length} hóa đơn</span>
           </div>

@@ -3,7 +3,9 @@ import { createPortal } from 'react-dom';
 import { 
   ChevronDown, Check, ChevronRight, Paperclip, 
   CheckCircle2, XCircle, Filter, Download, X,
-  MapPin, Calendar, Clock, Search, Eye, ArrowUp, ArrowDown
+  MapPin, Calendar, Clock, Search, Eye, ArrowUp, ArrowDown,
+  User, Building2, FileText, AlertCircle, Laptop, Banknote, Info,
+  AlertTriangle, CreditCard
 } from 'lucide-react';
 import { khoaApi } from '../../services/api';
 import * as XLSX from 'xlsx';
@@ -638,6 +640,7 @@ export default function RegistrationManagement_Khoa() {
                     ]}
                     className="min-w-[80px]"
                     searchPlaceholder="Tìm..."
+                    direction="up"
                   />
                   <span>/ {totalTrips} chuyến</span>
                 </div>
@@ -780,6 +783,7 @@ export default function RegistrationManagement_Khoa() {
                     ]}
                     className="min-w-[80px]"
                     searchPlaceholder="Tìm..."
+                    direction="up"
                   />
                   <span>/ {totalHuy} yêu cầu</span>
                 </div>
@@ -1084,6 +1088,7 @@ export default function RegistrationManagement_Khoa() {
                         }}
                         searchPlaceholder="Tìm số lượng..."
                         className="min-w-[80px]"
+                        direction="up"
                       />
                       <span>/ {totalRegs} sinh viên</span>
                     </div>
@@ -1330,6 +1335,7 @@ export default function RegistrationManagement_Khoa() {
                           ]}
                           className="min-w-[80px]"
                           searchPlaceholder="Tìm..."
+                          direction="up"
                         />
                         <span>/ {totalFinalized} sinh viên</span>
                       </div>
@@ -1376,67 +1382,221 @@ export default function RegistrationManagement_Khoa() {
           </div>
 
           {/* Modal - Xem chi tiết phiếu đăng ký (Nằm trên Detail Modal) */}
-          {viewingDetail && (
-            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-              <div 
-                className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200"
-                onClick={(e) => { e.stopPropagation(); setViewingDetail(null); }}
-              ></div>
-              
-              <div 
-                className="bg-white w-full max-w-2xl rounded-2xl shadow-xl relative z-10 animate-in zoom-in-95 duration-200 flex flex-col"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-                  <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                    Chi tiết phiếu đăng ký
-                  </h2>
-                  <button 
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setViewingDetail(null); }}
-                    className="p-1.5 text-slate-400 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg transition-colors cursor-pointer"
-                  >
-                    <X className="w-6 h-6" />
-                  </button>
-                </div>
+          {viewingDetail && (() => {
+            const student = viewingDetail.sinhVien || {};
+            const trip = viewingDetail.chuyenThamQuan || selectedTripForReg || {};
+            const cancelReq = viewingDetail.yeuCauHuy || null;
+            const isRejected = viewingDetail.trang_thai === 'BiLoai' || viewingDetail.trang_thai === 'REJECTED';
+            const displayStatus = statusMap[viewingDetail.trang_thai] || viewingDetail.trang_thai || 'Chờ duyệt';
+
+            return (
+              <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+                <div 
+                  className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200"
+                  onClick={(e) => { e.stopPropagation(); setViewingDetail(null); }}
+                ></div>
                 
-                <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-                  {Object.entries(viewingDetail).map(([key, value]) => {
-                    if (typeof value === 'object' && value !== null) return null;
-                    return (
-                      <div key={key} className="flex flex-col border-b border-slate-100 pb-2">
-                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{key}</span>
-                        <span className="text-sm font-medium text-slate-800 break-words">{String(value)}</span>
+                <div 
+                  className="bg-white w-full max-w-3xl rounded-2xl shadow-2xl relative z-10 animate-in zoom-in-95 duration-200 flex flex-col max-h-[88vh] overflow-hidden border border-slate-200"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Header */}
+                  <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-[#E7E0C4]/30 via-white to-transparent flex items-center justify-between shrink-0">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-[#407F3E]/10 border border-[#407F3E]/20 text-[#407F3E] flex items-center justify-center shrink-0">
+                        <FileText className="w-5 h-5" />
                       </div>
-                    );
-                  })}
-                </div>
-                
-                <div className="px-6 py-4 border-t border-slate-200 bg-slate-50/50 flex items-center justify-end rounded-b-2xl">
-                  <button 
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setViewingDetail(null); }}
-                    className="px-6 py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl text-sm font-bold transition-colors shadow-sm cursor-pointer"
-                  >
-                    Đóng
-                  </button>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h2 className="text-lg font-black text-slate-800">
+                            Chi tiết phiếu đăng ký
+                          </h2>
+                          <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                            #{viewingDetail.id}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2 font-medium">
+                          <span>Chuyến #{trip.id || viewingDetail.chuyen_tham_quan_id || '--'}</span>
+                          <span>&bull;</span>
+                          <span className="text-slate-700 font-semibold">{trip.nhaMay?.ten_nha_may || 'Đang cập nhật'}</span>
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
+                      <div>
+                        {getStatusBadge(displayStatus)}
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setViewingDetail(null); }}
+                        className="p-1.5 text-slate-400 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg transition-colors cursor-pointer"
+                        title="Đóng modal"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {/* Body */}
+                  <div className="p-6 space-y-4 overflow-y-auto bg-slate-50/50 flex-1">
+                    {/* Alert Box nếu bị loại */}
+                    {isRejected && (
+                      <div className="bg-rose-50/90 border border-rose-200 text-rose-900 rounded-xl p-4 flex items-start gap-3 shadow-xs">
+                        <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                        <div className="flex-1 text-sm">
+                          <p className="font-bold text-rose-900 mb-0.5">Sinh viên không đủ điều kiện / Bị loại</p>
+                          <p className="text-rose-700 text-xs font-medium leading-relaxed">
+                            <span className="font-semibold">Lý do: </span>
+                            {viewingDetail.ly_do_loai || 'Không nằm trong danh sách được chọn khi chốt danh sách do vượt quá số lượng tối đa hoặc tiêu chí ưu tiên.'}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Alert Box nếu có yêu cầu hủy */}
+                    {cancelReq && (
+                      <div className="bg-amber-50/90 border border-amber-200 text-amber-900 rounded-xl p-4 flex items-start gap-3 shadow-xs">
+                        <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                        <div className="flex-1 text-sm">
+                          <div className="flex items-center justify-between">
+                            <p className="font-bold text-amber-900 mb-0.5">Yêu cầu hủy phiếu đăng ký</p>
+                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
+                              {cancelReq.trang_thai === 'DaDuyet' ? 'Đã duyệt hủy' : cancelReq.trang_thai === 'TuChoi' ? 'Đã từ chối' : 'Chờ duyệt'}
+                            </span>
+                          </div>
+                          <p className="text-amber-800 text-xs font-medium mt-1 leading-relaxed">
+                            <span className="font-semibold">Lý do hủy: </span>
+                            {cancelReq.ly_do_huy || 'Sinh viên nộp minh chứng xin hủy chuyến.'}
+                          </p>
+                          {cancelReq.ngay_yeu_cau && (
+                            <p className="text-[11px] text-amber-600 mt-1">
+                              Ngày gửi yêu cầu: {new Date(cancelReq.ngay_yeu_cau).toLocaleString('vi-VN')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Card 1: Thông tin sinh viên */}
+                    <div className="bg-white rounded-xl border border-slate-200/80 p-4 shadow-sm space-y-3">
+                      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500 pb-2 border-b border-slate-100">
+                        <User className="w-4 h-4 text-[#407F3E]" />
+                        <span>Thông tin sinh viên</span>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                        <div className="bg-slate-50/70 p-2.5 rounded-lg border border-slate-100">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Họ và tên</span>
+                          <span className="text-sm font-bold text-slate-800 block mt-0.5 truncate">{student.ho_ten || '--'}</span>
+                        </div>
+                        
+                        <div className="bg-slate-50/70 p-2.5 rounded-lg border border-slate-100">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Mã số sinh viên (MSSV)</span>
+                          <span className="text-sm font-mono font-bold text-[#407F3E] block mt-0.5">{student.mssv || '--'}</span>
+                        </div>
+
+                        <div className="bg-slate-50/70 p-2.5 rounded-lg border border-slate-100">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Lớp / Khóa học</span>
+                          <span className="text-sm font-medium text-slate-700 block mt-0.5 truncate">
+                            {student.ten_lop || '--'} {student.khoaHoc?.ten_khoa_hoc ? `(${student.khoaHoc.ten_khoa_hoc})` : ''}
+                          </span>
+                        </div>
+
+                        <div className="bg-slate-50/70 p-2.5 rounded-lg border border-slate-100 sm:col-span-2">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Email</span>
+                          <span className="text-xs font-medium text-slate-700 block mt-1 truncate" title={student.email}>
+                            {student.email || '--'}
+                          </span>
+                        </div>
+
+                        <div className="bg-slate-50/70 p-2.5 rounded-lg border border-slate-100">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Số điện thoại</span>
+                          <span className="text-xs font-medium text-slate-700 block mt-1">
+                            {student.sdt || '--'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Card 2: Thông tin chuyến tham quan */}
+                    <div className="bg-white rounded-xl border border-slate-200/80 p-4 shadow-sm space-y-3">
+                      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500 pb-2 border-b border-slate-100">
+                        <Building2 className="w-4 h-4 text-[#89B449]" />
+                        <span>Thông tin chuyến tham quan</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="bg-slate-50/70 p-2.5 rounded-lg border border-slate-100 sm:col-span-2">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Nhà máy / Doanh nghiệp</span>
+                          <span className="text-sm font-bold text-slate-800 block mt-0.5">{trip.nhaMay?.ten_nha_may || 'Đang cập nhật'}</span>
+                        </div>
+
+                        <div className="bg-slate-50/70 p-2.5 rounded-lg border border-slate-100">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Thời gian diễn ra</span>
+                          <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mt-1">
+                            <Clock className="w-3.5 h-3.5 text-slate-400" />
+                            <span>{trip.gio_bat_dau ? trip.gio_bat_dau.slice(0, 5) : '--'}</span>
+                            <span>&bull;</span>
+                            <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                            <span>{trip.ngay_tham_quan ? new Date(trip.ngay_tham_quan).toLocaleDateString('vi-VN') : '--'}</span>
+                          </div>
+                        </div>
+
+                        <div className="bg-slate-50/70 p-2.5 rounded-lg border border-slate-100">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Hình thức & Cách tổ chức</span>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                              {trip.hinh_thuc === 'TrucTuyen' ? <Laptop className="w-3 h-3" /> : <MapPin className="w-3 h-3" />}
+                              {trip.hinh_thuc === 'TrucTuyen' ? 'Trực tuyến' : 'Trực tiếp'}
+                            </span>
+                            <span className="text-xs text-slate-600 font-medium">
+                              {trip.cach_to_chuc === 'LopTuToChuc' ? 'Lớp tự tổ chức' : 'Khoa tổ chức'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="bg-slate-50/70 p-2.5 rounded-lg border border-slate-100 sm:col-span-2">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Địa điểm tập trung / Tham quan</span>
+                          <p className="text-xs font-medium text-slate-700 mt-1 leading-relaxed">
+                            {trip.hinh_thuc === 'TrucTuyen' 
+                              ? 'Tham quan trực tuyến qua hệ thống hội thảo số của nhà trường/doanh nghiệp'
+                              : (trip.dia_diem_tap_trung || trip.nhaMay?.dia_chi || 'Theo thông báo của ban tổ chức')}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Footer */}
+                  <div className="px-6 py-3.5 border-t border-slate-200 bg-slate-50/70 flex items-center justify-end rounded-b-2xl shrink-0">
+                    <button 
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setViewingDetail(null); }}
+                      className="px-6 py-2 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl text-sm font-bold transition-all shadow-sm hover:shadow-md cursor-pointer"
+                    >
+                      Đóng
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       )}
 
       {/* Toast Popup */}
       {popup.show && createPortal(
         <div className="fixed top-6 right-6 z-[9999] animate-in slide-in-from-right-8 fade-in duration-300">
-          <div className={`flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg border text-sm font-bold ${
+          <div className={`flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-xl border text-sm font-semibold text-white ${
             popup.type === 'success' 
-              ? 'bg-white border-[#407F3E]/20 text-[#407F3E]' 
-              : 'bg-white border-[#E68A8C]/20 text-[#E68A8C]'
+              ? 'bg-[#407F3E] border-[#407F3E] shadow-[#407F3E]/20' 
+              : 'bg-red-600 border-red-600 shadow-red-600/20'
           }`}>
-            {popup.type === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
-            {popup.message}
+            <span className="p-1 bg-white/20 rounded-full flex items-center justify-center shrink-0">
+              {popup.type === 'success' ? <CheckCircle2 className="w-4 h-4 text-white" /> : <XCircle className="w-4 h-4 text-white" />}
+            </span>
+            <span>{popup.message}</span>
           </div>
         </div>,
         document.body

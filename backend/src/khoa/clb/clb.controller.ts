@@ -302,6 +302,7 @@ export class ClbController {
       query.lichKienTapId,
       query.chuyenThamQuanId,
       query.hasCancelRequest,
+      query.hasInvoice,
     );
   }
 

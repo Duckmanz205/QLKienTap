@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Upload, Plus, Search, ChevronDown, Check,
-  Edit2, Key, Trash2, X, CloudUpload, FileSpreadsheet, Download
+  Edit2, Key, Trash2, X, CloudUpload, FileSpreadsheet, Download,
+  CheckCircle2, XCircle
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { khoaApi } from '../../services/api';
@@ -212,11 +213,16 @@ export default function DanhMuc_GiangVien_Khoa() {
       {/* Custom Popup Toast */}
       {popup.show && (
         <div className="fixed top-6 right-6 z-[9999] pointer-events-none">
-          <div className={`relative z-10 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-4 animate-in slide-in-from-right-8 fade-in duration-300 pointer-events-auto ${popup.type === 'error' ? 'bg-[#E68A8C] text-white' : 'bg-[#407F3E] text-white'}`}>
-            <span className="font-bold text-sm">{popup.message}</span>
-            <button onClick={() => setPopup({ ...popup, show: false })} className="p-1 hover:bg-white/20 rounded-full transition-colors">
+          <div className={`relative z-10 px-5 py-3.5 rounded-xl shadow-xl border flex items-center gap-3 animate-in slide-in-from-right-8 fade-in duration-300 pointer-events-auto text-white font-semibold text-sm ${
+            popup.type === 'error' ? 'bg-red-600 border-red-600 shadow-red-600/20' : 'bg-[#407F3E] border-[#407F3E] shadow-[#407F3E]/20'
+          }`}>
+            <span className="p-1 bg-white/20 rounded-full flex items-center justify-center shrink-0">
+              {popup.type === 'error' ? <XCircle className="w-4 h-4 text-white" /> : <CheckCircle2 className="w-4 h-4 text-white" />}
+            </span>
+            <span className="flex-1">{popup.message}</span>
+            <button onClick={() => setPopup({ ...popup, show: false })} className="p-1 hover:bg-white/20 rounded-lg transition-colors cursor-pointer">
               <span className="sr-only">Close</span>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              <X className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -389,6 +395,7 @@ export default function DanhMuc_GiangVien_Khoa() {
               }}
               searchPlaceholder="Tìm số lượng..."
               className="min-w-[80px]"
+              direction="up"
             />
             <span>/ {totalLecturers} giảng viên</span>
           </div>

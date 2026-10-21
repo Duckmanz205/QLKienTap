@@ -367,6 +367,7 @@ export default function SinhVienHuongDan_GV() {
               }}
               searchPlaceholder="Tìm số lượng..."
               className="min-w-[80px]"
+              direction="up"
             />
             <span>/ {filteredStudents.length} sinh viên</span>
           </div>

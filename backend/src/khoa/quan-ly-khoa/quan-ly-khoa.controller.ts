@@ -404,6 +404,11 @@ export class KhoaController {
     return this.khoaService.cancelTrip(id, body.lyDoHuy);
   }
 
+  @Patch('trips/:id/reopen')
+  async reopenTripRegistration(@Param('id', ParseIntPipe) id: number) {
+    return this.khoaService.reopenTripRegistration(id);
+  }
+
   @Roles('QuanLyKhoa')
   @Put('trips/:id/approve-edit')
   async approveTripEdit(
@@ -515,8 +520,14 @@ export class KhoaController {
 
   @Roles('QuanLyKhoa', 'QuanLyCLB')
   @Get('boards')
-  async getBoards() {
-    return this.khoaService.getBoards();
+  async getBoards(@Query('dotKienTapId') dotKienTapId?: string) {
+    return this.khoaService.getBoards(dotKienTapId ? +dotKienTapId : undefined);
+  }
+
+  @Roles('QuanLyKhoa', 'QuanLyCLB')
+  @Get('boards/export-data')
+  async getBoardsExportData(@Query('dotKienTapId') dotKienTapId?: string) {
+    return this.khoaService.getBoardsExportData(dotKienTapId ? +dotKienTapId : undefined);
   }
 
   @Roles('QuanLyKhoa')
@@ -733,6 +744,7 @@ export class KhoaController {
       query.lichKienTapId,
       query.chuyenThamQuanId,
       query.hasCancelRequest,
+      query.hasInvoice,
     );
   }
 

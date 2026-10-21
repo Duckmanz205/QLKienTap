@@ -535,9 +535,14 @@ export default function ChuyenThamQuan_DSLoc() {
       {/* Custom Popup Toast */}
       {popup.show && (
         <div className="fixed top-6 right-6 z-[9999] pointer-events-none">
-          <div className={`relative z-10 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-4 animate-in slide-in-from-right-8 fade-in duration-300 pointer-events-auto ${popup.type === 'error' ? 'bg-[#E68A8C] text-white' : 'bg-[#407F3E] text-white'}`}>
-            <span className="font-bold text-sm">{popup.message}</span>
-            <button onClick={() => setPopup({ ...popup, show: false })} className="p-1 hover:bg-white/20 rounded-full transition-colors">
+          <div className={`relative z-10 px-5 py-3.5 rounded-xl shadow-xl border flex items-center gap-3 animate-in slide-in-from-right-8 fade-in duration-300 pointer-events-auto text-white font-semibold text-sm ${
+            popup.type === 'error' ? 'bg-red-600 border-red-600 shadow-red-600/20' : 'bg-[#407F3E] border-[#407F3E] shadow-[#407F3E]/20'
+          }`}>
+            <span className="p-1 bg-white/20 rounded-full flex items-center justify-center shrink-0">
+              {popup.type === 'error' ? <XCircle className="w-4 h-4 text-white" /> : <CheckCircle2 className="w-4 h-4 text-white" />}
+            </span>
+            <span className="flex-1">{popup.message}</span>
+            <button onClick={() => setPopup({ ...popup, show: false })} className="p-1 hover:bg-white/20 rounded-lg transition-colors cursor-pointer">
               <span className="sr-only">Close</span>
               <X className="w-4 h-4" />
             </button>
@@ -912,6 +917,7 @@ export default function ChuyenThamQuan_DSLoc() {
                       ]}
                       className="min-w-[80px]"
                       searchPlaceholder="Tìm..."
+                      direction="up"
                     />
                     <span>/ {totalKhoa} chuyến</span>
                   </div>
@@ -1111,11 +1117,7 @@ export default function ChuyenThamQuan_DSLoc() {
                                 {t.trang_thai_duyet}
                               </span>
                             )}
-                            {t.chuyen_tham_quan_id && (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-mono border border-slate-200 ml-1.5" title={`Thuộc chuyến tham quan #${t.chuyen_tham_quan_id}`}>
-                                #{t.chuyen_tham_quan_id}
-                              </span>
-                            )}
+
                           </td>
                           <td className="p-4 text-right pr-6">
                             <div className="flex items-center justify-end gap-2">
@@ -1181,6 +1183,7 @@ export default function ChuyenThamQuan_DSLoc() {
                       ]}
                       className="min-w-[80px]"
                       searchPlaceholder="Tìm..."
+                      direction="up"
                     />
                     <span>/ {totalTuDo} đề xuất</span>
                   </div>
@@ -2326,7 +2329,7 @@ export default function ChuyenThamQuan_DSLoc() {
                 >
                   <CheckCircle2 className="w-4 h-4" />
                   {approvalMode === 'merge_existing'
-                    ? `Xác nhận gộp vào chuyến #${selectedMergeTripId}`
+                    ? 'Xác nhận gộp vào chuyến tham quan đã chọn'
                     : selectedBatchProposalIds.length > 0
                     ? `Xác nhận duyệt gom ${1 + selectedBatchProposalIds.length} đề xuất`
                     : 'Xác nhận duyệt sơ bộ'}

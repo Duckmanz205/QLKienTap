@@ -346,6 +346,7 @@ export default function ThongBao_Khoa() {
               }}
               searchPlaceholder="Số hàng..."
               className="min-w-[80px]"
+              direction="up"
             />
             <span>/ {filteredNotifications.length} thông báo</span>
           </div>

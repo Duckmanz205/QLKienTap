@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   MapPin, Laptop, Calendar, Clock, Image as ImageIcon, Users, ChevronDown, Check, Search, X, Banknote, Map,
-  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter
+  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter,
+  CheckCircle2, XCircle, RotateCcw
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { sinhVienApi } from '../../services/api';
@@ -324,11 +325,16 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
       {/* Custom Popup Toast */}
       {popup.show && (
         <div className="fixed top-6 right-6 z-[9999] pointer-events-none">
-          <div className={`relative z-10 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-4 animate-in slide-in-from-right-8 fade-in duration-300 pointer-events-auto ${popup.type === 'error' ? 'bg-[#E68A8C] text-white' : 'bg-[#407F3E] text-white'}`}>
-            <span className="font-bold text-sm">{popup.message}</span>
-            <button onClick={() => setPopup({ ...popup, show: false })} className="p-1 hover:bg-white/20 rounded-full transition-colors">
+          <div className={`relative z-10 px-5 py-3.5 rounded-xl shadow-xl border flex items-center gap-3 animate-in slide-in-from-right-8 fade-in duration-300 pointer-events-auto text-white font-semibold text-sm ${
+            popup.type === 'error' ? 'bg-red-600 border-red-600 shadow-red-600/20' : 'bg-[#407F3E] border-[#407F3E] shadow-[#407F3E]/20'
+          }`}>
+            <span className="p-1 bg-white/20 rounded-full flex items-center justify-center shrink-0">
+              {popup.type === 'error' ? <XCircle className="w-4 h-4 text-white" /> : <CheckCircle2 className="w-4 h-4 text-white" />}
+            </span>
+            <span className="flex-1">{popup.message}</span>
+            <button onClick={() => setPopup({ ...popup, show: false })} className="p-1 hover:bg-white/20 rounded-lg transition-colors cursor-pointer">
               <span className="sr-only">Close</span>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              <X className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -692,12 +698,19 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                               <h3 className="text-lg font-black text-slate-800 line-clamp-2 leading-tight group-hover:text-[#407F3E] transition-colors flex-1">
                                 {trip.nhaMay?.ten_nha_may}
                               </h3>
-                              <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider shrink-0 ${
-                                isOnline ? 'bg-slate-800 text-white' : 'bg-[#E7E0C4]/50 text-slate-800'
-                              }`}>
-                                {isOnline ? <Laptop className="w-3.5 h-3.5" /> : <MapPin className="w-3.5 h-3.5" />}
-                                {isOnline ? 'Trực tuyến' : 'Trực tiếp'}
-                              </span>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                {trip.da_tung_dang_ky && (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[10px] font-bold uppercase tracking-wider bg-orange-100 text-orange-700 border border-orange-200">
+                                    <RotateCcw className="w-3 h-3" /> Đợt bổ sung
+                                  </span>
+                                )}
+                                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider shrink-0 ${
+                                  isOnline ? 'bg-slate-800 text-white' : 'bg-[#E7E0C4]/50 text-slate-800'
+                                }`}>
+                                  {isOnline ? <Laptop className="w-3.5 h-3.5" /> : <MapPin className="w-3.5 h-3.5" />}
+                                  {isOnline ? 'Trực tuyến' : 'Trực tiếp'}
+                                </span>
+                              </div>
                             </div>
                             
                             {/* Info list */}
@@ -735,9 +748,14 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                                 e.stopPropagation();
                                 handleRegister(trip.id);
                               }}
-                              className="w-full py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl text-sm font-bold uppercase tracking-wider transition-colors shadow-sm cursor-pointer mt-4"
+                              className={`w-full py-2.5 rounded-xl text-sm font-bold uppercase tracking-wider transition-colors shadow-sm cursor-pointer mt-4 flex items-center justify-center gap-2 ${
+                                trip.da_tung_dang_ky
+                                  ? 'bg-orange-600 hover:bg-orange-700 text-white'
+                                  : 'bg-[#407F3E] text-white hover:bg-[#407F3E]/90'
+                              }`}
                             >
-                              Đăng ký
+                              {trip.da_tung_dang_ky && <RotateCcw className="w-4 h-4" />}
+                              {trip.da_tung_dang_ky ? 'Đăng ký lại' : 'Đăng ký'}
                             </button>
                           </div>
                         );
@@ -763,6 +781,7 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                         ]}
                         className="min-w-[120px]"
                         searchPlaceholder="Tìm..."
+                        direction="up"
                       />
                       <span>/ tổng số <strong className="text-slate-800">{totalAvailable}</strong> chuyến mở</span>
                     </div>
@@ -1014,6 +1033,14 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                                       >
                                         Hủy đăng ký
                                       </button>
+                                    ) : (reg.trang_thai === 'BiLoai' || reg.trang_thai === 'DaHuy') && trip?.trang_thai === 'MoDangKy' && !isPastTrip ? (
+                                      <button
+                                        onClick={() => handleRegister(trip.id)}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200 transition-colors cursor-pointer shadow-xs"
+                                        title="Chuyến đi đang mở đợt bổ sung, nhấn để đăng ký lại"
+                                      >
+                                        <RotateCcw className="w-3.5 h-3.5" /> Đăng ký lại
+                                      </button>
                                     ) : isPastTrip || trip?.trang_thai === 'DaDienRa' ? (
                                       <span className="text-xs font-medium text-slate-400 italic">Đã diễn ra</span>
                                     ) : (
@@ -1047,6 +1074,7 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                         ]}
                         className="min-w-[120px]"
                         searchPlaceholder="Tìm..."
+                        direction="up"
                       />
                       <span>/ tổng số <strong className="text-slate-800">{totalReg}</strong> đơn đăng ký</span>
                     </div>

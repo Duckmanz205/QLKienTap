@@ -23,6 +23,7 @@ import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { khoaApi } from '../../services/api';
 import SearchableDropdown from '../../components/SearchableDropdown';
 import { exportDanhSachChuyenThamQuan, formatDate } from '../../utils/exportExcel';
+import toast from 'react-hot-toast';
 
 export default function BaoCao_DSDoanThamQuan_Khoa() {
   const navigate = useNavigate();
@@ -198,7 +199,7 @@ export default function BaoCao_DSDoanThamQuan_Khoa() {
   const handleExportExcel = () => {
     if (!selectedTrip) return;
     if (registrations.length === 0) {
-      alert('Chuyến tham quan này chưa có sinh viên đăng ký!');
+      toast.error('Chuyến tham quan này chưa có sinh viên đăng ký!');
       return;
     }
     exportDanhSachChuyenThamQuan(selectedTrip, filteredRegistrations);
@@ -715,6 +716,7 @@ export default function BaoCao_DSDoanThamQuan_Khoa() {
               value={limit}
               onChange={(val) => { setLimit(Number(val)); setCurrentPage(1); }}
               className="w-20"
+              direction="up"
             />
             <span>trên tổng số <strong className="text-slate-800">{filteredRegistrations.length}</strong> sinh viên đoàn</span>
           </div>

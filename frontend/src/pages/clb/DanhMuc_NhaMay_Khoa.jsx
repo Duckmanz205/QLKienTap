@@ -395,6 +395,7 @@ export default function DanhMuc_NhaMay_Khoa() {
               }}
               searchPlaceholder="Tìm số lượng..."
               className="min-w-[80px]"
+              direction="up"
             />
             <span>/ {totalFactories} nhà máy</span>
           </div>

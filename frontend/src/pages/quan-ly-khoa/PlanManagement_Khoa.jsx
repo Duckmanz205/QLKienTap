@@ -775,6 +775,7 @@ export default function PlanManagement_Khoa() {
                 }}
                 searchPlaceholder="Tìm số lượng..."
                 className="min-w-[80px]"
+                direction="up"
               />
               <span>/ {campaignTotal} đợt</span>
             </div>
@@ -1143,6 +1144,7 @@ export default function PlanManagement_Khoa() {
                               }}
                               searchPlaceholder="Tìm số lượng..."
                               className="min-w-[80px]"
+                              direction="up"
                             />
                             <span>/ {studentTotal} sinh viên</span>
                           </div>
@@ -1333,6 +1335,7 @@ export default function PlanManagement_Khoa() {
                             }}
                             searchPlaceholder="Tìm số lượng..."
                             className="min-w-[80px]"
+                            direction="up"
                           />
                           <span>/ {studentTotal} sinh viên</span>
                         </div>
