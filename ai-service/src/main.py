@@ -171,7 +171,7 @@ async def process_pdf_endpoint(file: UploadFile = File(...)):
 # ==========================================
 # MODULE 2: GRADING ENGINE (HỘI ĐỒNG CHẤM AI)
 # ==========================================
-EXPERT_MODEL = "qwen3.8-max-0902"  # Snapshot model của qwen3.8-max
+EXPERT_MODEL = "qwen3.7-flash"  # Model flash phục vụ test nhanh & demo nội bộ
 
 class GradingRequest(BaseModel):
     document_text: str
@@ -246,7 +246,10 @@ async def call_and_parse_json(system_prompt: str, document_text: str, pydantic_m
                 {"role": "user", "content": f"BÁO CÁO CỦA SINH VIÊN:\n\n{document_text}"}
             ],
             temperature=0.1,
-            response_format={"type": "json_object"}
+            response_format={"type": "json_object"},
+            extra_body={
+                "enable_thinking": False
+            }
         )
         raw_content = response.choices[0].message.content
         return pydantic_model.model_validate_json(raw_content)
