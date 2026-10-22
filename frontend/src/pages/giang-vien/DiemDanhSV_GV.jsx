@@ -673,14 +673,14 @@ export default function DiemDanhSV_GV() {
                 previewModal.isPdf ? (
                   <iframe
                     src={previewModal.fileUrl}
-                    title="Giấy xác nhận doanh nghiệp"
+                    title="Giấy xác nhận tham quan"
                     className="w-full h-[65vh] rounded-lg border border-slate-300 bg-white"
                   />
                 ) : (
                   <div className="overflow-auto max-w-full max-h-full flex items-center justify-center p-2">
                     <img
                       src={previewModal.fileUrl}
-                      alt="Giấy xác nhận doanh nghiệp"
+                      alt="Giấy xác nhận tham quan"
                       style={{
                         transform: `scale(${zoom / 100}) rotate(${rotation}deg)`,
                         transition: 'transform 0.2s ease',

@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Plus, ChevronDown, Check, X, Calendar, Clock, MapPin,
   ChevronRight, Users, CheckCircle2, XCircle, RefreshCw, Search,
   MoreVertical, Edit, PlayCircle, Trash2, CheckCircle, RotateCcw, Download, ArrowRight,
-  UserCheck, Building2, Phone, Mail, User
+  UserCheck, Building2, Phone, Mail, User, Info
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { khoaApi } from '../../services/api';
@@ -24,6 +24,7 @@ export default function ChuyenThamQuan_DSLoc() {
 
   const [tripsKhoa, setTripsKhoa] = useState([]);
   const [tripsTuDo, setTripsTuDo] = useState([]);
+  const [allSystemTrips, setAllSystemTrips] = useState([]);
   const [loading, setLoading] = useState(false);
 
   // Tab 1 filters & pagination
@@ -119,10 +120,33 @@ export default function ChuyenThamQuan_DSLoc() {
   const [selectedMergeTripId, setSelectedMergeTripId] = useState(null);
   const [selectedBatchProposalIds, setSelectedBatchProposalIds] = useState([]);
 
+  const isLecturerBusyOnDate = useCallback((lecturerId, dateStr) => {
+    if (!dateStr || !lecturerId) return false;
+    const targetDate = new Date(dateStr).toDateString();
+    return allSystemTrips.some(trip => {
+      if (!trip.ngay_tham_quan || trip.trang_thai === 'DaHuy') return false;
+      return new Date(trip.ngay_tham_quan).toDateString() === targetDate &&
+        trip.giaoVienDanDoan?.some(g => String(g.giang_vien_id) === String(lecturerId));
+    });
+  }, [allSystemTrips]);
+
+  const targetDateForModal = pendingApprovalTrip?.ngay_tham_quan_de_xuat;
+
+  const busyModalLecturersCount = useMemo(() => {
+    if (!targetDateForModal) return 0;
+    return lecturers.filter(gv => isLecturerBusyOnDate(gv.id, targetDateForModal)).length;
+  }, [lecturers, targetDateForModal, isLecturerBusyOnDate]);
+
   const filteredModalLecturers = useMemo(() => {
-    if (!lecturerSearchTerm.trim()) return lecturers;
+    // 1. Ẩn các giảng viên đã có lịch dẫn đoàn trong cùng ngày
+    let list = lecturers;
+    if (targetDateForModal) {
+      list = list.filter(gv => !isLecturerBusyOnDate(gv.id, targetDateForModal));
+    }
+    // 2. Tìm kiếm theo từ khóa
+    if (!lecturerSearchTerm.trim()) return list;
     const q = lecturerSearchTerm.toLowerCase();
-    return lecturers.filter(gv => 
+    return list.filter(gv => 
       gv.ho_ten?.toLowerCase().includes(q) ||
       gv.ma_gv?.toLowerCase().includes(q) ||
       gv.magv?.toLowerCase().includes(q) ||
@@ -130,7 +154,7 @@ export default function ChuyenThamQuan_DSLoc() {
       gv.bo_mon?.toLowerCase().includes(q) ||
       gv.email?.toLowerCase().includes(q)
     );
-  }, [lecturers, lecturerSearchTerm]);
+  }, [lecturers, lecturerSearchTerm, targetDateForModal, isLecturerBusyOnDate]);
 
 
   useEffect(() => {
@@ -160,7 +184,9 @@ export default function ChuyenThamQuan_DSLoc() {
         khoaApi.getTrips(),
         khoaApi.getProposals()
       ]);
-      let allTrips = tripsRes.data || [];
+      const rawTrips = tripsRes.data || [];
+      setAllSystemTrips(rawTrips);
+      let allTrips = rawTrips;
       if (isAdmin) {
         const approvedLich = ['DaDuyet', 'MoDangKy', 'DangDienRa', 'DaKetThuc', 'DaKhoa'];
         allTrips = allTrips.filter(t => t.lichKienTap && approvedLich.includes(t.lichKienTap.trang_thai));
@@ -388,7 +414,9 @@ export default function ChuyenThamQuan_DSLoc() {
       }
 
       // Nếu là CLB: Mở Modal chọn giảng viên / Gộp chuyến
-      setSelectedLecturerId(tripObj?.giang_vien_id || tripObj?.giangVien?.id ? String(tripObj?.giang_vien_id || tripObj?.giangVien?.id) : '');
+      const initialGvId = tripObj?.giang_vien_id || tripObj?.giangVien?.id;
+      const isInitialBusy = initialGvId && isLecturerBusyOnDate(initialGvId, tripObj?.ngay_tham_quan_de_xuat);
+      setSelectedLecturerId(isInitialBusy ? '' : (initialGvId ? String(initialGvId) : ''));
       setLecturerSearchTerm('');
       setApprovalMode('new');
       setSelectedMergeTripId(null);
@@ -459,6 +487,10 @@ export default function ChuyenThamQuan_DSLoc() {
     // Chế độ 'new'
     if (!selectedLecturerId) {
       showPopup('Vui lòng chọn giảng viên dẫn đoàn', 'error');
+      return;
+    }
+    if (isLecturerBusyOnDate(selectedLecturerId, pendingApprovalTrip?.ngay_tham_quan_de_xuat)) {
+      showPopup('Giảng viên đã chọn đã có lịch dẫn đoàn cho chuyến tham quan khác trong cùng ngày', 'error');
       return;
     }
     
@@ -2284,10 +2316,17 @@ export default function ChuyenThamQuan_DSLoc() {
                     <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                       Giảng viên dẫn đoàn <span className="text-red-500">*</span>
                     </label>
-                    <span className="text-[11px] text-slate-400">
-                      {filteredModalLecturers.length} giảng viên
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      {filteredModalLecturers.length}/{lecturers.length} khả dụng
                     </span>
                   </div>
+
+                  {busyModalLecturersCount > 0 && (
+                    <div className="mb-2 px-2.5 py-1.5 bg-amber-50 border border-amber-200/80 rounded-lg text-[11px] text-amber-800 flex items-center gap-1.5">
+                      <Info className="w-3.5 h-3.5 shrink-0 text-amber-600" />
+                      <span>Đã ẩn <strong>{busyModalLecturersCount}</strong> giảng viên do có lịch dẫn đoàn ở chuyến khác cùng ngày.</span>
+                    </div>
+                  )}
 
                   {/* Input tìm kiếm nhanh */}
                   <div className="relative mb-2">

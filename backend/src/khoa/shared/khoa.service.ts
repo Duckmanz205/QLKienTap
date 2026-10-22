@@ -1195,7 +1195,7 @@ export class KhoaService implements OnModuleInit {
           .from(PhieuDangKy, 'phieu')
           .where('phieu.chuyen_tham_quan_id = chuyen.id')
           .andWhere('phieu.trang_thai IN (:...statuses)', {
-            statuses: ['HopLe', 'ChoDuyet'],
+            statuses: ['HopLe', 'ChoDuyet', 'DaThamGia', 'HoanThanh'],
           });
       }, 'dang_ky_count');
 
@@ -1733,6 +1733,31 @@ export class KhoaService implements OnModuleInit {
             'Đã tồn tại chuyến tham quan trùng khung giờ',
           );
         }
+
+        // Kiểm tra xem giảng viên dẫn đoàn hiện tại có bị trùng lịch dẫn đoàn ở chuyến khác trong ngày mới không
+        const currentLeader = await this.danDoanRepo.findOne({
+          where: { chuyen_tham_quan_id: id },
+        });
+        if (currentLeader) {
+          const targetDateStr = parsedNgayThamQuan.toDateString();
+          const otherAssignments = await this.danDoanRepo.find({
+            where: { giang_vien_id: currentLeader.giang_vien_id },
+            relations: { chuyenThamQuan: true },
+          });
+          const hasConflict = otherAssignments.some(
+            (a) =>
+              a.chuyen_tham_quan_id !== id &&
+              a.chuyenThamQuan &&
+              a.chuyenThamQuan.trang_thai !== 'DaHuy' &&
+              a.chuyenThamQuan.ngay_tham_quan &&
+              new Date(a.chuyenThamQuan.ngay_tham_quan).toDateString() === targetDateStr,
+          );
+          if (hasConflict) {
+            throw new BadRequestException(
+              'Không thể đổi ngày vì giảng viên dẫn đoàn của chuyến này đã có lịch dẫn đoàn ở chuyến khác trong ngày được chọn.',
+            );
+          }
+        }
       }
 
       if (trip.lich_kien_tap_id && data.lich_kien_tap_id !== undefined) {
@@ -2215,6 +2240,27 @@ export class KhoaService implements OnModuleInit {
 
       const totalStudents =
         targetProposals.length > 0 ? targetProposals.length : 1;
+
+      // 3.5. Kiểm tra trùng lịch giảng viên dẫn đoàn trong cùng ngày
+      if (giangVienId && dexuat.ngay_tham_quan_de_xuat) {
+        const targetDate = new Date(dexuat.ngay_tham_quan_de_xuat).toDateString();
+        const sameDayAssignments = await this.danDoanRepo.find({
+          where: { giang_vien_id: giangVienId },
+          relations: { chuyenThamQuan: true },
+        });
+        const isConflict = sameDayAssignments.some(
+          (a) =>
+            a.chuyenThamQuan &&
+            a.chuyenThamQuan.trang_thai !== 'DaHuy' &&
+            a.chuyenThamQuan.ngay_tham_quan &&
+            new Date(a.chuyenThamQuan.ngay_tham_quan).toDateString() === targetDate,
+        );
+        if (isConflict) {
+          throw new BadRequestException(
+            'Giảng viên đã được phân công dẫn đoàn cho một chuyến tham quan khác trong cùng ngày',
+          );
+        }
+      }
 
       // 4. Tạo Chuyến Tham Quan (Trạng thái: ChoDuyet)
       const trip = new ChuyenThamQuan();
@@ -2783,6 +2829,12 @@ export class KhoaService implements OnModuleInit {
     });
     if (!trip) throw new NotFoundException('Không tìm thấy chuyến đi');
 
+    if (['DaDienRa', 'DaHuy'].includes(trip.trang_thai)) {
+      throw new BadRequestException(
+        'Không thể chốt danh sách cho chuyến tham quan đã diễn ra hoặc đã bị hủy!',
+      );
+    }
+
     // 0. Kiểm tra xem Lịch kiến tập đã được gắn tài khoản thụ hưởng chưa
     if (!trip.lichKienTap || !trip.lichKienTap.tai_khoan_thu_huong_id) {
       throw new BadRequestException(
@@ -3208,8 +3260,11 @@ export class KhoaService implements OnModuleInit {
     const overlap = sameDayLedTrips.some(
       (m) =>
         m.chuyen_tham_quan_id !== tripId &&
+        m.chuyenThamQuan &&
+        m.chuyenThamQuan.trang_thai !== 'DaHuy' &&
+        m.chuyenThamQuan.ngay_tham_quan &&
         new Date(m.chuyenThamQuan.ngay_tham_quan).toDateString() ===
-        new Date(trip.ngay_tham_quan).toDateString(),
+          new Date(trip.ngay_tham_quan).toDateString(),
     );
     if (overlap) {
       throw new BadRequestException(
@@ -3276,6 +3331,7 @@ export class KhoaService implements OnModuleInit {
 
     const assignedTripIds = new Set<number>();
     for (const a of currentAssignments) {
+      if (a.chuyenThamQuan?.trang_thai === 'DaHuy') continue;
       if (a.chuyen_tham_quan_id) {
         assignedTripIds.add(a.chuyen_tham_quan_id);
       }
@@ -5314,7 +5370,13 @@ export class KhoaService implements OnModuleInit {
     }
 
     if (status && status !== 'All') {
-      queryBuilder.andWhere('phieu.trang_thai = :status', { status });
+      if (status === 'HopLe') {
+        queryBuilder.andWhere('phieu.trang_thai IN (:...finalizedStatuses)', {
+          finalizedStatuses: ['HopLe', 'DaThamGia', 'HoanThanh'],
+        });
+      } else {
+        queryBuilder.andWhere('phieu.trang_thai = :status', { status });
+      }
     }
 
     if (lichKienTapId) {

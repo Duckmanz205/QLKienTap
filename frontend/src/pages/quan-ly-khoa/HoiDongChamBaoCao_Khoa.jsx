@@ -630,68 +630,78 @@ export default function HoiDongChamBaoCao_Khoa() {
         setIsStatusDropdownOpen(false);
       }}
     >
-      {/* Header section: Tiêu đề bên trái, nhóm hành động cùng một hàng bên phải */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Hội đồng chấm báo cáo</h1>
-          <p className="text-sm text-slate-500 font-normal mt-1">Quản lý các buổi hội đồng báo cáo chuyên đề và phân công chấm điểm khóa luận/kiến tập</p>
-        </div>
+      {/* Hàng 1: Tiêu đề trang độc lập */}
+      <div>
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight">
+          Hội đồng chấm báo cáo
+        </h1>
+      </div>
 
-        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 shrink-0">
-          {/* Selector Đợt tích hợp nút Khóa cổng thành 1 khối pill tinh gọn */}
+      {/* Hàng 2: Cụm điều khiển nằm thấp hơn Header, phân bổ 2 nhóm cân đối */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        {/* Nhóm trái: Dropdown Đợt chuẩn SearchableDropdown + Nút Khóa/Mở khóa cổng bộ chuyến */}
+        <div className="flex flex-wrap items-center gap-2.5">
           {campaigns.length > 0 && (
-            <div className="inline-flex items-center bg-white rounded-xl border border-slate-200 shadow-2xs p-1">
-              <div className="flex items-center gap-1.5 px-2.5 py-1 text-xs text-slate-600">
-                <span className="text-slate-400 font-semibold">Đợt:</span>
-                <select
-                  value={selectedDotForLock || ''}
-                  onChange={(e) => {
-                    const val = e.target.value ? Number(e.target.value) : '';
-                    setSelectedDotForLock(val || null);
-                    if (val) {
-                      checkBoChuyenLock(val);
-                    } else {
-                      setIsBoChuyenLocked(false);
-                    }
-                    setCurrentPage(1);
-                  }}
-                  className="text-xs font-bold text-slate-800 bg-transparent focus:outline-none cursor-pointer pr-1"
-                >
-                  <option value="">Tất cả các đợt</option>
-                  {campaigns.map(c => (
-                    <option key={c.id} value={c.id}>{c.ten_dot || `Đợt #${c.id}`}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="h-4 w-px bg-slate-200"></div>
-
-              <button
-                type="button"
-                onClick={handleToggleLockBoChuyen}
-                disabled={isTogglingLock}
-                className={`ml-1 px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${isBoChuyenLocked
-                  ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700'
-                  : 'bg-amber-50 hover:bg-amber-100 text-amber-700'
-                  } active:scale-[0.98] disabled:opacity-50`}
-                title={isBoChuyenLocked ? 'Nhấn để mở khóa cho sinh viên chọn bộ chuyến' : 'Nhấn để khóa không cho sinh viên chọn bộ chuyến'}
-              >
-                {isBoChuyenLocked ? (
-                  <>
-                    <Unlock className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Mở khóa bộ chuyến</span>
-                  </>
-                ) : (
-                  <>
-                    <Lock className="w-3.5 h-3.5 text-amber-600" />
-                    <span>Khóa chọn bộ chuyến</span>
-                  </>
-                )}
-              </button>
-            </div>
+            <SearchableDropdown
+              options={[
+                { value: '', label: 'Tất cả các đợt' },
+                ...campaigns.map(c => ({
+                  value: c.id,
+                  label: c.ten_dot || `Đợt #${c.id}`
+                }))
+              ]}
+              value={selectedDotForLock || ''}
+              onChange={(val) => {
+                const numVal = val ? Number(val) : null;
+                setSelectedDotForLock(numVal);
+                if (numVal) {
+                  checkBoChuyenLock(numVal);
+                } else {
+                  setIsBoChuyenLocked(false);
+                }
+                setCurrentPage(1);
+              }}
+              placeholder="Tất cả các đợt"
+              searchPlaceholder="Tìm đợt..."
+              className="w-52 sm:w-60"
+            />
           )}
 
-          {/* Nút Xuất danh sách Excel (Phương án A: 2 Sheet) */}
+          <button
+            type="button"
+            onClick={handleToggleLockBoChuyen}
+            disabled={isTogglingLock || !selectedDotForLock}
+            className={`px-3 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 transition-all cursor-pointer border shadow-2xs ${
+              !selectedDotForLock
+                ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-60'
+                : isBoChuyenLocked
+                ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
+                : 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200'
+            } active:scale-[0.98]`}
+            title={
+              !selectedDotForLock
+                ? 'Vui lòng chọn một đợt kiến tập cụ thể để khóa/mở khóa cổng bộ chuyến'
+                : isBoChuyenLocked
+                ? 'Nhấn để mở khóa cho sinh viên chọn bộ chuyến'
+                : 'Nhấn để khóa không cho sinh viên chọn bộ chuyến'
+            }
+          >
+            {isBoChuyenLocked ? (
+              <>
+                <Unlock className="w-4 h-4 text-emerald-600" />
+                <span>Mở khóa bộ chuyến</span>
+              </>
+            ) : (
+              <>
+                <Lock className="w-4 h-4 text-amber-600" />
+                <span>Khóa chọn bộ chuyến</span>
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Nhóm phải: Nút Xuất danh sách & Tạo buổi hội đồng */}
+        <div className="flex items-center gap-2.5">
           <button
             type="button"
             onClick={handleExportExcel}
@@ -707,7 +717,6 @@ export default function HoiDongChamBaoCao_Khoa() {
             <span>{isExporting ? 'Đang xuất file...' : 'Xuất danh sách'}</span>
           </button>
 
-          {/* Nút chính: Tạo buổi hội đồng */}
           <button
             onClick={() => { setIsModalOpen(true); }}
             className="px-4 py-2 bg-[#407F3E] hover:bg-[#326631] text-white rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 shadow-sm hover:shadow transition-all cursor-pointer active:scale-[0.98]"
@@ -946,23 +955,39 @@ export default function HoiDongChamBaoCao_Khoa() {
 
             <div className="flex items-center gap-1.5">
               <button
+                type="button"
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage(1)}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm font-semibold transition-all cursor-pointer shadow-2xs"
+              >
+                Trang đầu
+              </button>
+              <button
+                type="button"
                 disabled={currentPage <= 1}
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm font-semibold transition-all cursor-pointer shadow-2xs"
-                aria-label="Trang trước"
               >
                 Trước
               </button>
-              <span className="px-3 py-1.5 rounded-lg bg-[#407F3E] text-white text-xs sm:text-sm font-bold shadow-xs cursor-default">
-                {currentPage} / {totalPages}
+              <span className="px-3.5 py-1.5 rounded-lg bg-[#407F3E] text-white text-xs sm:text-sm font-bold shadow-xs cursor-default mx-0.5">
+                Trang {currentPage} / {totalPages}
               </span>
               <button
+                type="button"
                 disabled={currentPage >= totalPages}
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm font-semibold transition-all cursor-pointer shadow-2xs"
-                aria-label="Trang sau"
               >
                 Sau
+              </button>
+              <button
+                type="button"
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage(totalPages)}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm font-semibold transition-all cursor-pointer shadow-2xs"
+              >
+                Trang cuối
               </button>
             </div>
           </div>
@@ -1760,8 +1785,8 @@ export default function HoiDongChamBaoCao_Khoa() {
                           <tr>
                             <th className="p-3.5 pl-4 whitespace-nowrap">Sinh viên</th>
                             <th className="p-3.5 whitespace-nowrap">Lớp</th>
-                            <th className="p-3.5 whitespace-nowrap">Chuyến đi đại diện</th>
-                            <th className="p-3.5 text-center whitespace-nowrap">Điểm HĐ</th>
+                            <th className="p-3.5 whitespace-nowrap">Chuyến đi báo cáo</th>
+                            <th className="p-3.5 text-center whitespace-nowrap">Điểm TB từng chuyến</th>
                             <th className="p-3.5 text-center whitespace-nowrap">Trạng thái khóa</th>
                             <th className="p-3.5 text-right pr-4 whitespace-nowrap">Hủy phân công</th>
                           </tr>
@@ -1770,10 +1795,6 @@ export default function HoiDongChamBaoCao_Khoa() {
                           {boardStudents.map((item) => {
                             const sv = item.sinhVien;
                             const trips = item.trips || [];
-                            const scoredTrips = trips.filter(t => t.diemHoiDong != null);
-                            const avgCouncilGrade = scoredTrips.length > 0
-                              ? (scoredTrips.reduce((acc, t) => acc + Number(t.diemHoiDong), 0) / scoredTrips.length)
-                              : null;
                             const isStudentCouncilLocked = item.isCouncilLocked || (trips.length > 0 && trips.every(t => t.daKhoaHoiDong));
                             const isStudentKhoaLocked = item.isKhoaLocked || (trips.length > 0 && trips.every(t => t.daKhoaKhoa));
                             const isLocked = isStudentCouncilLocked || isStudentKhoaLocked;
@@ -1788,37 +1809,27 @@ export default function HoiDongChamBaoCao_Khoa() {
                                 <td className="p-3">
                                   <div className="space-y-1.5">
                                     {trips.map((t, idx) => (
-                                      <div key={idx} className="text-xs text-slate-700 flex items-center justify-between gap-3 max-w-md">
-                                        <div className="flex items-center gap-1.5 truncate">
-                                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${t.hinhThuc === 'TrucTiep' ? 'bg-[#407F3E]' : 'bg-blue-500'}`}></span>
-                                          <span className="font-medium truncate" title={t.nhaMay}>{t.nhaMay}</span>
-                                        </div>
-                                        {t.diemHoiDong != null ? (
-                                          <span className="font-mono font-bold text-slate-800 text-[11px] shrink-0">
-                                            {Number(t.diemHoiDong).toFixed(1)}đ
-                                          </span>
-                                        ) : (
-                                          <span className="text-[10px] text-slate-400 italic shrink-0">Chưa chấm</span>
-                                        )}
+                                      <div key={idx} className="text-xs text-slate-700 flex items-center gap-1.5 h-6">
+                                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${t.hinhThuc === 'TrucTiep' ? 'bg-[#407F3E]' : 'bg-blue-500'}`}></span>
+                                        <span className="font-medium truncate max-w-sm" title={t.nhaMay}>{t.nhaMay}</span>
                                       </div>
                                     ))}
                                   </div>
                                 </td>
                                 <td className="p-3 text-center">
-                                  {avgCouncilGrade != null ? (
-                                    <div>
-                                      <span className="font-mono text-sm font-bold text-[#407F3E]">
-                                        {Number(avgCouncilGrade).toFixed(1)}
-                                      </span>
-                                      <div className="text-[10px] text-slate-400 font-medium">
-                                        TB ({scoredTrips.length}/{trips.length})
+                                  <div className="space-y-1.5">
+                                    {trips.map((t, idx) => (
+                                      <div key={idx} className="h-6 flex items-center justify-center">
+                                        {t.diemHoiDong != null ? (
+                                          <span className="font-mono font-bold text-slate-800 text-xs bg-slate-100 px-2.5 py-0.5 rounded-md border border-slate-200 shadow-2xs">
+                                            {Number(t.diemHoiDong).toFixed(1)}đ
+                                          </span>
+                                        ) : (
+                                          <span className="text-[10px] text-slate-400 italic">Chưa chấm</span>
+                                        )}
                                       </div>
-                                    </div>
-                                  ) : (
-                                    <span className="text-xs text-slate-400 italic">
-                                      Chưa chấm
-                                    </span>
-                                  )}
+                                    ))}
+                                  </div>
                                 </td>
                                 <td className="p-3 text-center whitespace-nowrap">
                                   {isStudentKhoaLocked ? (
@@ -2108,13 +2119,21 @@ export default function HoiDongChamBaoCao_Khoa() {
                           <button
                             type="button"
                             disabled={availableCurrentPage <= 1}
+                            onClick={() => setAvailableCurrentPage(1)}
+                            className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold transition-all cursor-pointer shadow-2xs"
+                          >
+                            Trang đầu
+                          </button>
+                          <button
+                            type="button"
+                            disabled={availableCurrentPage <= 1}
                             onClick={() => setAvailableCurrentPage(p => Math.max(1, p - 1))}
                             className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold transition-all cursor-pointer shadow-2xs"
                           >
                             Trước
                           </button>
-                          <span className="px-2.5 py-1 rounded-lg bg-[#407F3E] text-white text-xs font-bold shadow-xs cursor-default">
-                            {availableCurrentPage} / {totalAvailablePages}
+                          <span className="px-3 py-1 rounded-lg bg-[#407F3E] text-white text-xs font-bold shadow-xs cursor-default mx-0.5">
+                            Trang {availableCurrentPage} / {totalAvailablePages}
                           </span>
                           <button
                             type="button"
@@ -2123,6 +2142,14 @@ export default function HoiDongChamBaoCao_Khoa() {
                             className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold transition-all cursor-pointer shadow-2xs"
                           >
                             Sau
+                          </button>
+                          <button
+                            type="button"
+                            disabled={availableCurrentPage >= totalAvailablePages}
+                            onClick={() => setAvailableCurrentPage(totalAvailablePages)}
+                            className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold transition-all cursor-pointer shadow-2xs"
+                          >
+                            Trang cuối
                           </button>
                         </div>
                       </div>

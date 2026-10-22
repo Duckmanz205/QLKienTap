@@ -718,26 +718,44 @@ export default function BaoCao_DSDoanThamQuan_Khoa() {
               className="w-20"
               direction="up"
             />
-            <span>trên tổng số <strong className="text-slate-800">{filteredRegistrations.length}</strong> sinh viên đoàn</span>
+            <span>/ tổng <strong className="text-slate-800">{filteredRegistrations.length}</strong> sinh viên đoàn</span>
           </div>
 
           <div className="flex items-center gap-1.5">
             <button
+              type="button"
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+              className="px-3 py-1.5 border border-[#E7E0C4] rounded-lg text-xs font-bold text-slate-600 hover:bg-[#E7E0C4]/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+            >
+              Trang đầu
+            </button>
+            <button
+              type="button"
               onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
               disabled={currentPage === 1}
               className="px-3 py-1.5 border border-[#E7E0C4] rounded-lg text-xs font-bold text-slate-600 hover:bg-[#E7E0C4]/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
             >
-              Trang trước
+              Trước
             </button>
-            <div className="px-3 py-1.5 bg-[#407F3E] text-white rounded-lg text-xs font-bold">
-              {currentPage} / {totalPages}
+            <div className="px-3.5 py-1.5 bg-[#407F3E] text-white rounded-lg text-xs font-bold shadow-xs mx-0.5">
+              Trang {currentPage} / {totalPages}
             </div>
             <button
+              type="button"
               onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
               disabled={currentPage === totalPages || totalPages === 0}
               className="px-3 py-1.5 border border-[#E7E0C4] rounded-lg text-xs font-bold text-slate-600 hover:bg-[#E7E0C4]/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
             >
-              Trang sau
+              Sau
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={currentPage === totalPages || totalPages === 0}
+              className="px-3 py-1.5 border border-[#E7E0C4] rounded-lg text-xs font-bold text-slate-600 hover:bg-[#E7E0C4]/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+            >
+              Trang cuối
             </button>
           </div>
         </div>

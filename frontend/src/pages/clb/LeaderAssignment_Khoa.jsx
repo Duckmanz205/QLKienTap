@@ -207,11 +207,11 @@ export default function LeaderAssignment_Khoa() {
     }
   };
 
-  const isLecturerBusy = (lecturerId, dateStr) => {
-    if (!dateStr) return false;
+  const isLecturerBusy = (lecturerId, dateStr, currentTripId) => {
+    if (!dateStr || !lecturerId) return false;
     const dateToCompare = new Date(dateStr).toDateString();
     return trips.some(trip => {
-      if (!trip.ngay_tham_quan) return false;
+      if (!trip.ngay_tham_quan || trip.trang_thai === 'DaHuy' || (currentTripId && trip.id === currentTripId)) return false;
       return new Date(trip.ngay_tham_quan).toDateString() === dateToCompare
         && trip.giaoVienDanDoan?.some(g => g.giang_vien_id === lecturerId);
     });
@@ -683,7 +683,7 @@ export default function LeaderAssignment_Khoa() {
                           </div>
                           <div className="max-h-[220px] overflow-y-auto py-1 divide-y divide-slate-100/60">
                             {lecturers.filter(gv => gv.ho_ten.toLowerCase().includes(searchLecturer.toLowerCase())).map(gv => {
-                              const isBusy = isLecturerBusy(gv.id, t.ngay_tham_quan);
+                              const isBusy = isLecturerBusy(gv.id, t.ngay_tham_quan, t.id);
                               const workload = getLecturerWorkload(gv.id);
                               return (
                                 <div 

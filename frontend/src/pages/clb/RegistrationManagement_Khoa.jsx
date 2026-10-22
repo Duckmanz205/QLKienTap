@@ -48,7 +48,7 @@ export default function RegistrationManagement_Khoa() {
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState('');
   const [searchStatusDropdown, setSearchStatusDropdown] = useState('');
-  const statusOptions = ["Tất cả", "Chờ duyệt", "Hợp lệ", "Bị loại", "Đã hủy"];
+  const statusOptions = ["Tất cả", "Chờ duyệt", "Hợp lệ", "Đã tham gia", "Hoàn thành", "Vắng mặt", "Bị loại", "Đã hủy"];
   const [currentPageRegs, setCurrentPageRegs] = useState(1);
   const [limitRegs, setLimitRegs] = useState(15);
 
@@ -189,6 +189,10 @@ export default function RegistrationManagement_Khoa() {
 
   const handleConfirmAssignStudents = async () => {
     if (!selectedTripForReg) return;
+    if (selectedTripForReg.trang_thai === 'DaDienRa' || selectedTripForReg.trang_thai === 'DaHuy') {
+      showPopup('Chuyến đi đã diễn ra hoặc đã bị hủy, không thể chốt lại danh sách', 'error');
+      return;
+    }
     
     showConfirm("Chốt danh sách", `Bạn có chắc chắn muốn chốt danh sách với ${selectedStudentIds.size} sinh viên được chọn? Những sinh viên không được chọn sẽ bị loại.`, async () => {
       try {
@@ -271,9 +275,15 @@ export default function RegistrationManagement_Khoa() {
     switch(statusStr) {
       case 'Chờ duyệt': return <span className="bg-[#DBD468] text-slate-800 text-xs px-2.5 py-1 rounded-full font-bold shadow-sm inline-flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-slate-800 animate-pulse"></span>Chờ duyệt</span>;
       case 'Hợp lệ': return <span className="bg-[#407F3E] text-white text-xs px-2.5 py-1 rounded-full font-bold shadow-sm inline-flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" />Hợp lệ</span>;
+      case 'Đã tham gia':
+      case 'DaThamGia': return <span className="bg-emerald-600 text-white text-xs px-2.5 py-1 rounded-full font-bold shadow-sm inline-flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" />Đã tham gia</span>;
+      case 'Hoàn thành':
+      case 'HoanThanh': return <span className="bg-blue-600 text-white text-xs px-2.5 py-1 rounded-full font-bold shadow-sm inline-flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" />Hoàn thành</span>;
+      case 'Vắng mặt':
+      case 'VangMat': return <span className="bg-amber-600 text-white text-xs px-2.5 py-1 rounded-full font-bold shadow-sm inline-flex items-center gap-1">Vắng mặt</span>;
       case 'Bị loại': return <span className="bg-[#E68A8C] text-white text-xs px-2.5 py-1 rounded-full font-bold shadow-sm inline-flex items-center gap-1"><XCircle className="w-3.5 h-3.5" />Bị loại</span>;
       case 'Đã hủy': return <span className="bg-slate-200 text-slate-600 text-xs px-2.5 py-1 rounded-full font-bold shadow-sm inline-flex items-center gap-1">Đã hủy</span>;
-      default: return <span className="bg-slate-100 text-slate-500 text-xs px-2.5 py-1 rounded-full font-bold shadow-sm">{statusStr || 'Không rõ'}</span>;
+      default: return <span className="bg-slate-100 text-slate-600 text-xs px-2.5 py-1 rounded-full font-bold shadow-sm">{statusStr || 'Không rõ'}</span>;
     }
   };
 
@@ -282,6 +292,12 @@ export default function RegistrationManagement_Khoa() {
     'ChoDuyet': 'Chờ duyệt',
     'APPROVED': 'Hợp lệ',
     'HopLe': 'Hợp lệ',
+    'DaThamGia': 'Đã tham gia',
+    'ATTENDED': 'Đã tham gia',
+    'HoanThanh': 'Hoàn thành',
+    'COMPLETED': 'Hoàn thành',
+    'VangMat': 'Vắng mặt',
+    'ABSENT': 'Vắng mặt',
     'REJECTED': 'Bị loại',
     'BiLoai': 'Bị loại',
     'CANCELLED': 'Đã hủy',
@@ -320,7 +336,7 @@ export default function RegistrationManagement_Khoa() {
 
   // 3. Trip Registrations filtering & pagination
   const filteredRegistrations = registrations.filter(r => {
-    const currentStatus = statusMap[r.trang_thai] || 'Chờ duyệt';
+    const currentStatus = statusMap[r.trang_thai] || r.trang_thai || 'Chờ duyệt';
     if (selectedStatus && selectedStatus !== 'Tất cả' && currentStatus !== selectedStatus) return false;
     if (searchRegStudent) {
       const s = searchRegStudent.toLowerCase();
@@ -571,7 +587,15 @@ export default function RegistrationManagement_Khoa() {
                         const percent = max > 0 ? (used / max) * 100 : 0;
                         
                         return (
-                          <tr key={trip.id} onClick={() => { setSelectedTripForReg(trip); setActiveTab('chot'); }} className="hover:bg-slate-50 transition-colors cursor-pointer group">
+                          <tr 
+                            key={trip.id} 
+                            onClick={() => { 
+                              setSelectedTripForReg(trip); 
+                              const defaultTab = ['DaChotDanhSach', 'DaDienRa'].includes(trip.trang_thai) ? 'dachot' : 'danhsach';
+                              setActiveTab(defaultTab); 
+                            }} 
+                            className="hover:bg-slate-50 transition-colors cursor-pointer group"
+                          >
                             <td className="p-4 pl-6">
                               <div className="font-bold text-slate-800 mb-0.5">{trip.lichKienTap?.dotKienTap?.ten_dot || 'Chưa xếp đợt'}</div>
                               <div className="text-xs text-slate-500 font-medium">{trip.lichKienTap?.ten_lich || 'Chưa xếp lịch'}</div>
@@ -604,7 +628,12 @@ export default function RegistrationManagement_Khoa() {
                             </td>
                             <td className="p-4 text-right pr-6">
                               <button 
-                                onClick={(e) => { e.stopPropagation(); setSelectedTripForReg(trip); setActiveTab('chot'); }}
+                                onClick={(e) => { 
+                                  e.stopPropagation(); 
+                                  setSelectedTripForReg(trip); 
+                                  const defaultTab = ['DaChotDanhSach', 'DaDienRa'].includes(trip.trang_thai) ? 'dachot' : 'danhsach';
+                                  setActiveTab(defaultTab); 
+                                }}
                                 className="px-3 py-1.5 bg-slate-100 text-slate-600 group-hover:bg-[#407F3E] group-hover:text-white rounded-lg text-xs font-bold transition-all shadow-sm inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
                               >
                                 <Eye className="w-3.5 h-3.5" /> Quản lý
@@ -936,7 +965,7 @@ export default function RegistrationManagement_Khoa() {
                     <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[#89B449] rounded-t-full"></div>
                   )}
                 </button>
-                {selectedTripForReg.trang_thai === 'DaChotDanhSach' && (
+                {['DaChotDanhSach', 'DaDienRa'].includes(selectedTripForReg.trang_thai) && (
                   <button 
                     onClick={() => setActiveTab('dachot')}
                     className={`pb-3 text-sm font-bold transition-all relative cursor-pointer ${
@@ -1052,7 +1081,7 @@ export default function RegistrationManagement_Khoa() {
                               <td className="p-4 font-bold text-slate-800">{r.sinhVien?.ho_ten}</td>
                               <td className="p-4 font-medium text-slate-500">{new Date(r.ngay_dang_ky).toLocaleDateString('vi-VN')}</td>
                               <td className="p-4 text-center">
-                                {getStatusBadge(statusMap[r.trang_thai])}
+                                {getStatusBadge(statusMap[r.trang_thai] || r.trang_thai)}
                               </td>
                               <td className="p-4 text-right pr-6">
                                 <button 
@@ -1140,15 +1169,31 @@ export default function RegistrationManagement_Khoa() {
                     </h4>
                     <div className="flex items-center gap-3">
                       <span className="text-sm font-bold text-slate-600">Tổng: {registrations.length} đăng ký</span>
-                      <button 
-                        onClick={handleConfirmAssignStudents}
-                        className="px-5 py-2 bg-[#407F3E] hover:bg-[#407F3E]/90 text-white rounded-xl text-sm font-bold transition-colors shadow-sm flex items-center gap-2 cursor-pointer"
-                      >
-                        <CheckCircle2 className="w-4 h-4" />
-                        Chốt danh sách chính thức
-                      </button>
+                      {selectedTripForReg?.trang_thai === 'DaDienRa' ? (
+                        <span className="px-4 py-2 bg-slate-100 text-slate-500 rounded-xl text-xs sm:text-sm font-bold border border-slate-200 flex items-center gap-2 cursor-not-allowed">
+                          <CheckCircle2 className="w-4 h-4 text-slate-400" />
+                          Chuyến đã diễn ra (Đã khóa danh sách)
+                        </span>
+                      ) : (
+                        <button 
+                          onClick={handleConfirmAssignStudents}
+                          className="px-5 py-2 bg-[#407F3E] hover:bg-[#407F3E]/90 text-white rounded-xl text-sm font-bold transition-colors shadow-sm flex items-center gap-2 cursor-pointer"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                          Chốt danh sách chính thức
+                        </button>
+                      )}
                     </div>
                   </div>
+
+                  {selectedTripForReg?.trang_thai === 'DaDienRa' && (
+                    <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-xl p-3.5 text-xs sm:text-sm flex items-center gap-2.5">
+                      <Info className="w-4 h-4 text-blue-600 shrink-0" />
+                      <span>
+                        Chuyến tham quan này <strong>đã diễn ra</strong>. Danh sách sinh viên đã được chốt và khóa cố định, không thể thay đổi. Vui lòng chuyển sang tab <strong>"Danh sách sinh viên đã chốt"</strong> để xem hoặc xuất Excel danh sách sinh viên chính thức.
+                      </span>
+                    </div>
+                  )}
 
                   {/* Bảng 1: Hợp lệ */}
                   <div className="space-y-3">
@@ -1178,16 +1223,18 @@ export default function RegistrationManagement_Khoa() {
                                 <tr key={r.id} className="hover:bg-slate-50 transition-colors">
                                   <td className="p-4 pl-6 font-mono font-bold text-[#407F3E]">{r.sinhVien?.mssv}</td>
                                   <td className="p-4 font-bold text-slate-800">{r.sinhVien?.ho_ten}</td>
-                                  <td className="p-4">{getStatusBadge(statusMap[r.trang_thai])}</td>
+                                  <td className="p-4">{getStatusBadge(statusMap[r.trang_thai] || r.trang_thai)}</td>
                                   <td className="p-4 font-medium text-slate-500 text-center">{new Date(r.ngay_dang_ky).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })}</td>
                                   <td className="p-4 text-right pr-6">
-                                    <button 
-                                      onClick={() => moveStudent(r.sinhVien?.id || r.sinh_vien_id, false)}
-                                      className="px-3 py-1.5 bg-[#E68A8C]/10 text-[#E68A8C] hover:bg-[#E68A8C]/20 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1 ml-auto cursor-pointer"
-                                      title="Chuyển xuống danh sách bị loại"
-                                    >
-                                      Loại <ArrowDown className="w-3.5 h-3.5" />
-                                    </button>
+                                    {selectedTripForReg?.trang_thai !== 'DaDienRa' && (
+                                      <button 
+                                        onClick={() => moveStudent(r.sinhVien?.id || r.sinh_vien_id, false)}
+                                        className="px-3 py-1.5 bg-[#E68A8C]/10 text-[#E68A8C] hover:bg-[#E68A8C]/20 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1 ml-auto cursor-pointer"
+                                        title="Chuyển xuống danh sách bị loại"
+                                      >
+                                        Loại <ArrowDown className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
                                   </td>
                                 </tr>
                               ))
@@ -1228,13 +1275,15 @@ export default function RegistrationManagement_Khoa() {
                                   <td className="p-4 font-medium text-[#E68A8C] max-w-[200px] truncate" title={r.ly_do_loai || 'Loại thủ công'}>{r.ly_do_loai || 'Loại thủ công'}</td>
                                   <td className="p-4 font-medium text-slate-500 text-center">{new Date(r.ngay_dang_ky).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })}</td>
                                   <td className="p-4 text-right pr-6">
-                                    <button 
-                                      onClick={() => moveStudent(r.sinhVien?.id || r.sinh_vien_id, true)}
-                                      className="px-3 py-1.5 bg-[#407F3E]/10 text-[#407F3E] hover:bg-[#407F3E]/20 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1 ml-auto cursor-pointer"
-                                      title="Thêm vào danh sách hợp lệ"
-                                    >
-                                      <ArrowUp className="w-3.5 h-3.5" /> Hợp lệ
-                                    </button>
+                                    {selectedTripForReg?.trang_thai !== 'DaDienRa' && (
+                                      <button 
+                                        onClick={() => moveStudent(r.sinhVien?.id || r.sinh_vien_id, true)}
+                                        className="px-3 py-1.5 bg-[#407F3E]/10 text-[#407F3E] hover:bg-[#407F3E]/20 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1 ml-auto cursor-pointer"
+                                        title="Thêm vào danh sách hợp lệ"
+                                      >
+                                        <ArrowUp className="w-3.5 h-3.5" /> Hợp lệ
+                                      </button>
+                                    )}
                                   </td>
                                 </tr>
                               ))

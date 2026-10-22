@@ -1163,7 +1163,7 @@ export class SinhVienService {
     await this.baiThuRepo.save(report);
 
     return {
-      message: 'Tải lên giấy xác nhận doanh nghiệp thành công. Đang chờ Giảng viên duyệt điểm danh.',
+      message: 'Tải lên giấy xác nhận tham quan thành công. Đang chờ Giảng viên duyệt điểm danh.',
       fileXacNhan: validXacNhanRef,
     };
   }

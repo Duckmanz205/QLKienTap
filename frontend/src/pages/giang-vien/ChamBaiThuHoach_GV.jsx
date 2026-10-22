@@ -1170,7 +1170,7 @@ TRANG 38
                 }`}
               >
                 <Award className="w-3.5 h-3.5 text-indigo-600" />
-                <span>Giấy xác nhận DN (Mộc đỏ)</span>
+                <span>Giấy xác nhận tham quan (Mộc đỏ)</span>
               </button>
             </div>
           )}
@@ -1224,13 +1224,13 @@ TRANG 38
                     <iframe
                       src={confirmationFile.url}
                       className="w-full h-full border-0"
-                      title="Giấy xác nhận doanh nghiệp"
+                      title="Giấy xác nhận tham quan"
                     />
                   )
                 ) : (
                   <div className="flex flex-col items-center justify-center w-full h-full text-slate-400 gap-2">
                     <Building2 className="w-10 h-10 text-slate-300" />
-                    <span>Không tìm thấy file giấy xác nhận doanh nghiệp.</span>
+                    <span>Không tìm thấy file giấy xác nhận tham quan.</span>
                   </div>
                 )
               )}

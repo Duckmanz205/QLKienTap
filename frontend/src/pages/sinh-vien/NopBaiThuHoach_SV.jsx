@@ -192,7 +192,7 @@ export default function NopBaiThuHoach_SV() {
         isPdf,
         rawFile: file
       });
-      showPopup('Đã tải lên giấy xác nhận doanh nghiệp!', 'success');
+      showPopup('Đã tải lên giấy xác nhận tham quan!', 'success');
     } catch (err) {
       console.error(err);
       showPopup(err.response?.data?.message || 'Lỗi tải tệp giấy xác nhận lên. Xin thử lại.', 'error');
@@ -204,7 +204,7 @@ export default function NopBaiThuHoach_SV() {
 
   const handleSaveConfirmationOnly = async () => {
     if (!uploadedConfirmationFile) {
-      showPopup('Vui lòng tải lên Giấy xác nhận tham quan doanh nghiệp', 'error');
+      showPopup('Vui lòng tải lên Giấy xác nhận tham quan', 'error');
       return;
     }
     try {
@@ -308,7 +308,7 @@ export default function NopBaiThuHoach_SV() {
                         {isTuDo && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-indigo-200 bg-indigo-50 text-indigo-700 text-[10px] uppercase tracking-wider font-bold">
                             <Building2 className="w-3 h-3 text-indigo-600" />
-                            Chuyến tự do • Kèm giấy xác nhận DN
+                            Chuyến tự do • Kèm giấy xác nhận tham quan
                           </span>
                         )}
                         {repStatus?.selectedRegistrationIds?.includes(trip.id) && (
@@ -975,7 +975,7 @@ export default function NopBaiThuHoach_SV() {
                 }`}
               >
                 <Award className="w-3.5 h-3.5" />
-                <span>Giấy xác nhận DN</span>
+                <span>Giấy xác nhận tham quan</span>
                 {uploadedConfirmationFile && <Check className="w-3 h-3 text-indigo-600" />}
               </button>
             </div>
@@ -1088,13 +1088,13 @@ export default function NopBaiThuHoach_SV() {
                       <iframe 
                         src={uploadedConfirmationFile.previewUrl} 
                         className="w-full h-full border-0" 
-                        title="Bản xem trước Giấy xác nhận doanh nghiệp" 
+                        title="Bản xem trước Giấy xác nhận tham quan" 
                       />
                     )
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 text-sm gap-2">
                       <Building2 className="w-10 h-10 text-slate-300" />
-                      <span>Không tìm thấy giấy xác nhận doanh nghiệp đính kèm</span>
+                      <span>Không tìm thấy giấy xác nhận tham quan đính kèm</span>
                     </div>
                   )
                 )}
@@ -1203,7 +1203,7 @@ export default function NopBaiThuHoach_SV() {
                           <Building2 className="w-5 h-5" />
                         </div>
                         <div>
-                          <h4 className="text-sm font-black text-slate-800">2. Giấy xác nhận doanh nghiệp</h4>
+                          <h4 className="text-sm font-black text-slate-800">2. Giấy xác nhận tham quan</h4>
                           <span className="text-[11px] font-semibold text-slate-500">Minh chứng có mộc đỏ DN</span>
                         </div>
                       </div>
@@ -1259,7 +1259,7 @@ export default function NopBaiThuHoach_SV() {
                         className="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2"
                       >
                         <UploadCloud className="w-4 h-4" />
-                        {uploadingConfirmation ? 'Đang tải lên...' : 'Chọn Giấy xác nhận doanh nghiệp'}
+                        {uploadingConfirmation ? 'Đang tải lên...' : 'Chọn Giấy xác nhận tham quan'}
                       </button>
                     )}
                   </div>
@@ -1272,7 +1272,7 @@ export default function NopBaiThuHoach_SV() {
                       className="w-full mt-3 py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2"
                     >
                       <Send className="w-3.5 h-3.5" />
-                      {uploadingConfirmation ? 'Đang gửi...' : 'Gửi riêng giấy XN trước để GV duyệt điểm danh'}
+                      {uploadingConfirmation ? 'Đang gửi...' : 'Gửi riêng giấy xác nhận tham quan trước để GV duyệt điểm danh'}
                     </button>
                   )}
                 </div>
@@ -1290,7 +1290,7 @@ export default function NopBaiThuHoach_SV() {
                         </>
                       ) : (
                         <>
-                          <Award className="w-4 h-4 text-indigo-600" /> Bản xem trước Giấy xác nhận doanh nghiệp
+                          <Award className="w-4 h-4 text-indigo-600" /> Bản xem trước Giấy xác nhận tham quan
                         </>
                       )}
                     </span>
@@ -1333,7 +1333,7 @@ export default function NopBaiThuHoach_SV() {
                       ) : (
                         <div className="text-center text-slate-400 py-12">
                           <Building2 className="w-10 h-10 mx-auto text-slate-300 mb-2" />
-                          <p className="text-xs">Chưa chọn giấy xác nhận doanh nghiệp để xem trước</p>
+                          <p className="text-xs">Chưa chọn giấy xác nhận tham quan để xem trước</p>
                         </div>
                       )
                     )}
