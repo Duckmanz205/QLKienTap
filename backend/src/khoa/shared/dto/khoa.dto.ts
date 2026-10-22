@@ -507,9 +507,15 @@ export class UnassignStudentsDto {
 }
 
 export class LockGradesDto {
+  @IsOptional()
   @IsInt()
   @Min(1)
-  lichKienTapId: number;
+  lichKienTapId?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  dotKienTapId?: number;
 }
 
 export class UnlockTripPrepGradesDto {

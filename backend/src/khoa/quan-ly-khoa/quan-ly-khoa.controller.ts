@@ -627,7 +627,11 @@ export class KhoaController {
   @Roles('QuanLyKhoa')
   @Post('lock-grades')
   async lockGrades(@Body() body: LockGradesDto) {
-    return this.khoaService.lockAndFinalizeGrades(body.lichKienTapId);
+    const targetId = body.dotKienTapId || body.lichKienTapId;
+    if (!targetId) {
+      throw new BadRequestException('Vui lòng cung cấp dotKienTapId hoặc lichKienTapId');
+    }
+    return this.khoaService.lockAndFinalizeGrades(targetId);
   }
 
   @Roles('QuanLyKhoa')

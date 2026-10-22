@@ -27,7 +27,7 @@ export class ChangePasswordDto {
 
   @IsString()
   @IsNotEmpty({ message: 'Mật khẩu mới không được để trống' })
-  @Length(6, 100, { message: 'Mật khẩu mới phải từ 6 ký tự trở lên' })
+  @Length(8, 100, { message: 'Mật khẩu mới phải từ 8 ký tự trở lên' })
   newPass: string;
 }
 
