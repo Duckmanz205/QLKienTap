@@ -17,11 +17,11 @@ export default function KetQuaKienTap_Khoa() {
   // Tab state
   const [activeTab, setActiveTab] = useState('students'); // 'students' | 'gvdd' | 'gvhd'
 
-  // Schedule & Student Results states
-  const [schedules, setSchedules] = useState([]);
-  const [selectedLich, setSelectedLich] = useState('');
-  const [isLichDropdownOpen, setIsLichDropdownOpen] = useState(false);
-  const [searchLich, setSearchLich] = useState('');
+  // Campaign & Student Results states
+  const [campaigns, setCampaigns] = useState([]);
+  const [selectedDot, setSelectedDot] = useState('');
+  const [isDotDropdownOpen, setIsDotDropdownOpen] = useState(false);
+  const [searchDot, setSearchDot] = useState('');
   const [results, setResults] = useState([]);
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
 
@@ -57,32 +57,25 @@ export default function KetQuaKienTap_Khoa() {
 
   // Kiểm tra lịch/đợt hiện tại đã khóa sổ toàn diện hay chưa
   const isScheduleLocked = useMemo(() => {
-    if (!selectedLich) return false;
-    const current = schedules.find(s => s.id === Number(selectedLich));
+    if (!selectedDot) return false;
+    const current = campaigns.find(c => c.id === Number(selectedDot));
     if (!current) return false;
-    if (current.trang_thai === 'DaKhoa' || current.dotKienTap?.trang_thai === 'DaKhoa') {
+    if (current.trang_thai === 'DaKhoa') {
       return true;
-    }
-    // Nếu bất kỳ lịch nào cùng đợt đã khóa
-    if (current.dot_kien_tap_id) {
-      const anyLockedInDot = schedules.some(
-        s => s.dot_kien_tap_id === current.dot_kien_tap_id && s.trang_thai === 'DaKhoa'
-      );
-      if (anyLockedInDot) return true;
     }
     // Dự phòng qua kết quả enrollments nếu có
     if (results.length > 0 && results[0]?.dotKienTap?.trang_thai === 'DaKhoa') {
       return true;
     }
     return false;
-  }, [schedules, selectedLich, results]);
+  }, [campaigns, selectedDot, results]);
 
   useEffect(() => {
-    fetchSchedules();
+    fetchCampaigns();
   }, []);
 
   useEffect(() => {
-    if (selectedLich) {
+    if (selectedDot) {
       if (activeTab === 'students') {
         fetchEnrollments();
       } else if (activeTab === 'gvdd') {
@@ -91,13 +84,13 @@ export default function KetQuaKienTap_Khoa() {
         fetchSupervisorGradingStatuses();
       }
     }
-  }, [selectedLich, activeTab]);
+  }, [selectedDot, activeTab]);
 
-  const fetchSchedules = async () => {
+  const fetchCampaigns = async () => {
     try {
-      const res = await khoaApi.getSchedules();
-      const list = res.data || [];
-      setSchedules(list);
+      const res = await khoaApi.getCampaigns({ limit: 1000 });
+      const list = res.data?.data || res.data || [];
+      setCampaigns(list);
       if (list.length > 0) {
         const params = new URLSearchParams(window.location.search);
         const urlDotId = params.get('dotKienTapId');
@@ -105,15 +98,15 @@ export default function KetQuaKienTap_Khoa() {
         
         let target = null;
         if (urlDotId) {
-          target = list.find(s => String(s.dot_kien_tap_id) === String(urlDotId));
+          target = list.find(c => String(c.id) === String(urlDotId));
         } else if (urlLichId) {
-          target = list.find(s => String(s.id) === String(urlLichId));
+          target = list.find(c => String(c.id) === String(urlLichId));
         }
 
         if (target) {
-          setSelectedLich(target.id);
+          setSelectedDot(target.id);
         } else {
-          setSelectedLich(list[0].id);
+          setSelectedDot(list[0].id);
         }
       }
     } catch (err) {
@@ -123,7 +116,7 @@ export default function KetQuaKienTap_Khoa() {
 
   const fetchEnrollments = async () => {
     try {
-      const res = await khoaApi.getEnrollments({ lichKienTapId: selectedLich, limit: 1000 });
+      const res = await khoaApi.getEnrollments({ dotKienTapId: selectedDot, limit: 1000 });
       setResults(res.data?.data || []);
     } catch (err) {
       console.error(err);
@@ -131,10 +124,10 @@ export default function KetQuaKienTap_Khoa() {
   };
 
   const fetchTripGradingStatuses = async () => {
-    if (!selectedLich) return;
+    if (!selectedDot) return;
     setLoadingTrips(true);
     try {
-      const res = await khoaApi.getTripGradingStatuses(selectedLich);
+      const res = await khoaApi.getTripGradingStatuses(selectedDot);
       setTripStatuses(res.data || []);
     } catch (err) {
       console.error(err);
@@ -145,10 +138,10 @@ export default function KetQuaKienTap_Khoa() {
   };
 
   const fetchSupervisorGradingStatuses = async () => {
-    if (!selectedLich) return;
+    if (!selectedDot) return;
     setLoadingSupervisors(true);
     try {
-      const res = await khoaApi.getSupervisorGradingStatuses(selectedLich);
+      const res = await khoaApi.getSupervisorGradingStatuses(selectedDot);
       setSupervisorStatuses(res.data || []);
     } catch (err) {
       console.error(err);
@@ -160,14 +153,15 @@ export default function KetQuaKienTap_Khoa() {
 
   const handleOpenLockModal = async (e) => {
     e.stopPropagation();
-    if (!selectedLich) {
-      toast.error('Vui lòng chọn lịch kiến tập!');
+    if (!selectedDot) {
+      toast.error('Vui lòng chọn đợt kiến tập!');
       return;
     }
     setLoadingCheckLock(true);
     try {
-      const res = await khoaApi.getUnsubmittedLecturers(selectedLich);
-      setUnsubmittedLecturers(res.data?.chua_nop || []);
+      const res = await khoaApi.getUnsubmittedLecturers(selectedDot);
+      const list = Array.isArray(res.data) ? res.data : (res.data?.chua_nop || []);
+      setUnsubmittedLecturers(list);
       setIsConfirmModalOpen(true);
     } catch (err) {
       console.error(err);
@@ -181,24 +175,22 @@ export default function KetQuaKienTap_Khoa() {
     e.stopPropagation();
     setIsLocking(true);
     try {
-      await khoaApi.lockGrades({ lichKienTapId: selectedLich });
+      await khoaApi.lockGrades({ dotKienTapId: selectedDot });
       toast.success('Đã khóa điểm đợt này thành công! Sinh viên chưa có điểm đã được tự động tính 0đ.');
       setIsConfirmModalOpen(false);
 
-      // Đồng bộ trạng thái ngay lập tức cho toàn bộ các lịch thuộc đợt trong state
-      const currentDotId = schedules.find(s => s.id === Number(selectedLich))?.dot_kien_tap_id;
-      setSchedules(prev => prev.map(s => {
-        if (s.id === Number(selectedLich) || (currentDotId && s.dot_kien_tap_id === currentDotId)) {
+      // Đồng bộ trạng thái ngay lập tức cho đợt trong state
+      setCampaigns(prev => prev.map(c => {
+        if (c.id === Number(selectedDot)) {
           return {
-            ...s,
+            ...c,
             trang_thai: 'DaKhoa',
-            dotKienTap: { ...(s.dotKienTap || {}), trang_thai: 'DaKhoa' }
           };
         }
-        return s;
+        return c;
       }));
 
-      fetchSchedules();
+      fetchCampaigns();
       fetchEnrollments();
       if (activeTab === 'gvdd') fetchTripGradingStatuses();
       if (activeTab === 'gvhd') fetchSupervisorGradingStatuses();
@@ -251,7 +243,7 @@ export default function KetQuaKienTap_Khoa() {
 
   // Close all dropdowns
   const closeAllDropdowns = () => {
-    setIsLichDropdownOpen(false);
+    setIsDotDropdownOpen(false);
     setIsClassDropdownOpen(false);
     setIsExportDropdownOpen(false);
   };
@@ -382,47 +374,47 @@ export default function KetQuaKienTap_Khoa() {
     }
   };
 
-  // Shared Lịch Dropdown renderer
-  const renderLichDropdown = () => (
+  // Shared Đợt Dropdown renderer
+  const renderDotDropdown = () => (
     <div className="relative min-w-[280px] flex-1">
-      <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Lịch kiến tập</label>
+      <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Đợt kiến tập</label>
       <div 
-        onClick={(e) => handleDropdownClick(e, setIsLichDropdownOpen, isLichDropdownOpen)}
-        className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isLichDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
+        onClick={(e) => handleDropdownClick(e, setIsDotDropdownOpen, isDotDropdownOpen)}
+        className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isDotDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
       >
-        <span className={`truncate pr-2 font-medium ${selectedLich ? 'text-slate-700' : 'text-slate-400'}`}>
-          {schedules.find(s => s.id === selectedLich)?.ten_lich || 'Chọn lịch kiến tập'}
+        <span className={`truncate pr-2 font-medium ${selectedDot ? 'text-slate-700' : 'text-slate-400'}`}>
+          {campaigns.find(c => c.id === selectedDot)?.ten_dot || 'Chọn đợt kiến tập'}
         </span>
         <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
       </div>
-      {isLichDropdownOpen && (
+      {isDotDropdownOpen && (
         <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col">
           <div className="px-2 pb-1 border-b border-[#E7E0C4]/50">
             <input
               type="text"
-              placeholder="Tìm kiếm lịch..."
+              placeholder="Tìm kiếm đợt..."
               className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-md text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E]"
-              value={searchLich}
-              onChange={(e) => setSearchLich(e.target.value)}
+              value={searchDot}
+              onChange={(e) => setSearchDot(e.target.value)}
               onClick={(e) => e.stopPropagation()}
             />
           </div>
           <div className="overflow-y-auto max-h-48">
-            {schedules.filter(opt => opt.ten_lich?.toLowerCase().includes(searchLich.toLowerCase())).length > 0 ? (
-              schedules.filter(opt => opt.ten_lich?.toLowerCase().includes(searchLich.toLowerCase())).map(opt => (
+            {campaigns.filter(opt => opt.ten_dot?.toLowerCase().includes(searchDot.toLowerCase())).length > 0 ? (
+              campaigns.filter(opt => opt.ten_dot?.toLowerCase().includes(searchDot.toLowerCase())).map(opt => (
                 <div 
                   key={opt.id}
-                  onClick={() => { setSelectedLich(opt.id); setIsLichDropdownOpen(false); setSearchLich(''); setCurrentPage(1); }}
+                  onClick={() => { setSelectedDot(opt.id); setIsDotDropdownOpen(false); setSearchDot(''); setCurrentPage(1); }}
                   className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                    selectedLich === opt.id ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
+                    selectedDot === opt.id ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
                   }`}
                 >
-                  <span className="truncate pr-2">{opt.ten_lich}</span>
-                  {selectedLich === opt.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
+                  <span className="truncate pr-2">{opt.ten_dot}</span>
+                  {selectedDot === opt.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
                 </div>
               ))
             ) : (
-              <div className="px-4 py-3 text-sm text-slate-400 italic text-center">Không tìm thấy lịch kiến tập</div>
+              <div className="px-4 py-3 text-sm text-slate-400 italic text-center">Không tìm thấy đợt kiến tập</div>
             )}
           </div>
         </div>
@@ -455,8 +447,8 @@ export default function KetQuaKienTap_Khoa() {
                 </div>
                 <button
                   onClick={() => {
-                    const tenLich = schedules.find(s => s.id === selectedLich)?.ten_lich || 'TongHop';
-                    exportDiemQuaTrinh(results, tenLich);
+                    const tenDot = campaigns.find(c => c.id === selectedDot)?.ten_dot || 'TongHop';
+                    exportDiemQuaTrinh(results, tenDot);
                     setIsExportDropdownOpen(false);
                   }}
                   className="w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 flex items-center gap-2"
@@ -466,8 +458,8 @@ export default function KetQuaKienTap_Khoa() {
                 </button>
                 <button
                   onClick={() => {
-                    const tenLich = schedules.find(s => s.id === selectedLich)?.ten_lich || 'TongHop';
-                    exportDanhSachPhang(results, tenLich);
+                    const tenDot = campaigns.find(c => c.id === selectedDot)?.ten_dot || 'TongHop';
+                    exportDanhSachPhang(results, tenDot);
                     setIsExportDropdownOpen(false);
                   }}
                   className="w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 flex items-center gap-2"
@@ -477,8 +469,8 @@ export default function KetQuaKienTap_Khoa() {
                 </button>
                 <button
                   onClick={() => {
-                    const tenLich = schedules.find(s => s.id === selectedLich)?.ten_lich || 'TongHop';
-                    exportTongHopKienTap(results, tenLich);
+                    const tenDot = campaigns.find(c => c.id === selectedDot)?.ten_dot || 'TongHop';
+                    exportTongHopKienTap(results, tenDot);
                     setIsExportDropdownOpen(false);
                   }}
                   className="w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 flex items-center gap-2"
@@ -581,7 +573,7 @@ export default function KetQuaKienTap_Khoa() {
         <div className="animate-in fade-in duration-200">
           {/* Filter Bar */}
           <div className="bg-white p-4 rounded-xl shadow-sm border border-[#E7E0C4] flex flex-wrap items-end gap-4 relative z-20 mb-6">
-            {renderLichDropdown()}
+            {renderDotDropdown()}
 
             {/* Lớp Dropdown */}
             <div className="relative w-64">
@@ -944,7 +936,7 @@ export default function KetQuaKienTap_Khoa() {
         <div className="animate-in fade-in duration-200 space-y-6">
           {/* Tab 2 Toolbar */}
           <div className="bg-white p-4 rounded-xl shadow-sm border border-[#E7E0C4] flex flex-wrap items-end gap-4 relative z-20">
-            {renderLichDropdown()}
+            {renderDotDropdown()}
             
             {/* Search Chuyến / GVDĐ */}
             <div className="relative min-w-[280px] flex-1">
@@ -1146,7 +1138,7 @@ export default function KetQuaKienTap_Khoa() {
         <div className="animate-in fade-in duration-200 space-y-6">
           {/* Tab 3 Toolbar */}
           <div className="bg-white p-4 rounded-xl shadow-sm border border-[#E7E0C4] flex flex-wrap items-end gap-4 relative z-20">
-            {renderLichDropdown()}
+            {renderDotDropdown()}
             
             {/* Search GVHD */}
             <div className="relative min-w-[280px] flex-1">
@@ -1271,8 +1263,14 @@ export default function KetQuaKienTap_Khoa() {
                           <span className="font-medium text-slate-700">{sup.bo_mon || sup.giangVien?.bo_mon || 'Khoa CNTT'}</span>
                         </td>
                         <td className="p-3 text-center border-r border-[#E7E0C4]/40">
-                          <div className="font-bold text-slate-700">
-                            {sup.so_sv_da_cham ?? sup.so_bai_da_cham ?? 0} / {sup.so_luong_sv ?? sup.so_sv_huong_dan ?? 0}
+                          <div className={`font-bold ${
+                            (sup.so_sv_da_cham ?? 0) === (sup.so_luong_sv ?? sup.so_sv_huong_dan ?? 0) && (sup.so_luong_sv ?? sup.so_sv_huong_dan ?? 0) > 0
+                              ? 'text-emerald-700'
+                              : (sup.so_sv_da_cham ?? 0) > 0
+                              ? 'text-[#407F3E]'
+                              : 'text-slate-700'
+                          }`}>
+                            {sup.so_sv_da_cham ?? 0} / {sup.so_luong_sv ?? sup.so_sv_huong_dan ?? 0}
                           </div>
                           <div className="text-[11px] text-slate-400">sinh viên đã chấm</div>
                         </td>
@@ -1446,7 +1444,7 @@ export default function KetQuaKienTap_Khoa() {
                   {unsubmittedLecturers.map((gv, idx) => (
                     <div key={idx} className="py-2 first:pt-0 last:pb-0 flex items-center justify-between text-xs">
                       <div>
-                        <span className="font-bold text-slate-800">{gv.ten_giang_vien}</span>
+                        <span className="font-bold text-slate-800">{gv.ten_giang_vien || gv.ten}</span>
                         <span className="text-slate-500 ml-1.5 font-medium">({gv.vai_tro})</span>
                       </div>
                       <span className="text-[10px] font-bold text-amber-700 bg-amber-200/60 px-2 py-0.5 rounded">Chưa nộp</span>

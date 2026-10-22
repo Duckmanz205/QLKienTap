@@ -28,7 +28,7 @@ export const exportDiemQuaTrinh = (results, tenLich = '') => {
   // Tiêu đề trường viện
   const row0 = ['BỘ CÔNG THƯƠNG', '', '', '', '', '', 'TRƯỜNG ĐẠI HỌC CÔNG THƯƠNG TP. HỒ CHÍ MINH - KHOA CÔNG NGHỆ THỰC PHẨM'];
   const row1 = [' ', ' ', 'TỔNG HỢP TÌNH HÌNH SINH VIÊN THAM QUAN NHÀ MÁY'];
-  const row2 = [' ', ' ', tenLich ? `Lịch kiến tập / Đợt: ${tenLich}` : ''];
+  const row2 = [' ', ' ', tenLich ? `Đợt kiến tập: ${tenLich}` : ''];
 
   // Hàng tiêu đề 1 (Row index 3)
   const header1 = ['STT', 'MSSV', 'HỌ VÀ TÊN', '', 'LỚP', 'SỐ LƯỢNG'];
@@ -126,7 +126,7 @@ export const exportDiemQuaTrinh = (results, tenLich = '') => {
 export const exportDanhSachPhang = (results, tenLich = '') => {
   const data = [];
   data.push(['DANH SÁCH SINH VIÊN THAM QUAN NHÀ MÁY']);
-  data.push([tenLich ? `Lịch kiến tập: ${tenLich}` : '']);
+  data.push([tenLich ? `Đợt kiến tập: ${tenLich}` : '']);
   data.push([
     'STT', 'MSSV', 'Họ và tên', 'Lớp', 'Chữ kí', 'Mã nhà máy', 'Ngày TQNM', 
     'Mã chuyến', 'Tên NM', 'Khoá chính (MASV+MANM)', 'Điểm chuẩn bị', 'Điểm thu hoạch', 'Điểm BC hội đồng', 

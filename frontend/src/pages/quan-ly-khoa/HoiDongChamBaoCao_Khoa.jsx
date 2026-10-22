@@ -39,6 +39,10 @@ export default function HoiDongChamBaoCao_Khoa() {
   const [boardStudents, setBoardStudents] = useState([]);
   const [isFetchingStudentsDetail, setIsFetchingStudentsDetail] = useState(false);
   const [isLockingBoard, setIsLockingBoard] = useState(false);
+  const [unlockTarget, setUnlockTarget] = useState(null); // { boardId, boardName, boChuyenId?, studentName? }
+  const [unlockReason, setUnlockReason] = useState('');
+  const [isUnlockModalOpen, setIsUnlockModalOpen] = useState(false);
+  const [isSubmittingUnlock, setIsSubmittingUnlock] = useState(false);
   const [detailActiveTab, setDetailActiveTab] = useState('list'); // 'list' | 'assign'
 
   // Assign Students States (Tab 2: Bảng Thêm sinh viên)
@@ -226,6 +230,8 @@ export default function HoiDongChamBaoCao_Khoa() {
         diaDiem: b.dia_diem,
         members: b.members || [],
         sv: b.sv || 0,
+        isCouncilLocked: Boolean(b.isCouncilLocked),
+        isKhoaLocked: Boolean(b.isKhoaLocked),
       }));
       setCommittees(formattedBoards);
     } catch (err) {
@@ -420,65 +426,58 @@ export default function HoiDongChamBaoCao_Khoa() {
     });
   };
 
-  const handleLockBoard = () => {
-    setConfirmModal({
-      isOpen: true,
-      title: 'Khóa điểm hội đồng',
-      message: `Xác nhận khóa điểm hội đồng "${viewingDetail.ten}"? Điểm hội đồng của các sinh viên sẽ được chốt và đồng bộ.`,
-      type: 'warning',
-      confirmText: 'Khóa điểm',
-      cancelText: 'Hủy',
-      onConfirm: async () => {
-        try {
-          setIsLockingBoard(true);
-          const res = await khoaApi.lockBoard(viewingDetail.id);
-          toast.success(res.data?.message || 'Khóa điểm hội đồng thành công!');
-          const updatedStudents = await khoaApi.getBoardStudents(viewingDetail.id);
-          setBoardStudents(updatedStudents.data || []);
-          fetchData();
-          setConfirmModal(prev => ({ ...prev, isOpen: false }));
-        } catch (err) {
-          console.error(err);
-          toast.error(err.response?.data?.message || 'Lỗi khóa điểm hội đồng');
-        } finally {
-          setIsLockingBoard(false);
-        }
-      }
+  const handleOpenUnlockModal = (boardId, boardName, boChuyenId = null, studentName = null) => {
+    setUnlockTarget({
+      boardId,
+      boardName,
+      boChuyenId,
+      studentName,
     });
+    setUnlockReason('');
+    setIsUnlockModalOpen(true);
   };
 
-  const handleUnlockBoard = () => {
-    setConfirmModal({
-      isOpen: true,
-      title: 'Mở khóa điểm hội đồng',
-      message: `Xác nhận mở khóa điểm hội đồng "${viewingDetail.ten}"? Giảng viên trong hội đồng sẽ có thể tiếp tục chỉnh sửa điểm.`,
-      type: 'warning',
-      confirmText: 'Mở khóa điểm',
-      cancelText: 'Hủy',
-      onConfirm: async () => {
-        try {
-          setIsLockingBoard(true);
-          const res = await khoaApi.unlockBoard(viewingDetail.id);
-          toast.success(res.data?.message || 'Mở khóa điểm hội đồng thành công!');
-          const updatedStudents = await khoaApi.getBoardStudents(viewingDetail.id);
-          setBoardStudents(updatedStudents.data || []);
-          fetchData();
-          setConfirmModal(prev => ({ ...prev, isOpen: false }));
-        } catch (err) {
-          console.error(err);
-          toast.error(err.response?.data?.message || 'Lỗi mở khóa điểm hội đồng');
-        } finally {
-          setIsLockingBoard(false);
-        }
+  const handleConfirmUnlockCouncil = async () => {
+    if (!unlockReason.trim()) {
+      toast.error('Vui lòng nhập lý do mở khóa điểm hội đồng!');
+      return;
+    }
+    setIsSubmittingUnlock(true);
+    try {
+      const res = await khoaApi.unlockBoard(unlockTarget.boardId, {
+        boChuyenId: unlockTarget.boChuyenId || undefined,
+        lyDo: unlockReason.trim(),
+      });
+      toast.success(res.data?.message || 'Mở khóa điểm hội đồng thành công!');
+      setIsUnlockModalOpen(false);
+      if (viewingDetail?.id) {
+        const updatedStudents = await khoaApi.getBoardStudents(viewingDetail.id);
+        setBoardStudents(updatedStudents.data || []);
       }
-    });
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.message || 'Lỗi mở khóa điểm hội đồng');
+    } finally {
+      setIsSubmittingUnlock(false);
+    }
   };
 
-  const isBoardLocked = useMemo(() => {
+  const isBoardCouncilLocked = useMemo(() => {
     return boardStudents.length > 0 && boardStudents.every(s =>
-      s.trips && s.trips.length > 0 && s.trips.every(t => t.daKhoa)
+      s.isCouncilLocked || (s.trips && s.trips.length > 0 && s.trips.every(t => t.daKhoaHoiDong))
     );
   }, [boardStudents]);
+
+  const isBoardKhoaLocked = useMemo(() => {
+    return boardStudents.length > 0 && boardStudents.every(s =>
+      s.isKhoaLocked || (s.trips && s.trips.length > 0 && s.trips.every(t => t.daKhoaKhoa))
+    );
+  }, [boardStudents]);
+
+  const isBoardLocked = useMemo(() => {
+    return isBoardCouncilLocked || isBoardKhoaLocked;
+  }, [isBoardCouncilLocked, isBoardKhoaLocked]);
 
   // Close all modal dropdowns
   const closeAllModalDropdowns = () => {
@@ -811,6 +810,7 @@ export default function HoiDongChamBaoCao_Khoa() {
                   <th className="py-3.5 px-4 font-bold">Địa điểm</th>
                   <th className="py-3.5 px-4 font-bold">Thành viên</th>
                   <th className="py-3.5 px-3 text-center font-bold whitespace-nowrap">Số SV</th>
+                  <th className="py-3.5 px-3 text-center font-bold whitespace-nowrap">Trạng thái HĐ</th>
                   <th className="py-3.5 px-4 pr-6 text-right font-bold w-14 whitespace-nowrap">Thao tác</th>
                 </tr>
               </thead>
@@ -864,6 +864,21 @@ export default function HoiDongChamBaoCao_Khoa() {
                         <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#407F3E]/10 text-[#407F3E]">
                           {c.sv}
                         </span>
+                      </td>
+                      <td className="py-3 px-3 text-center whitespace-nowrap">
+                        {c.isKhoaLocked ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-300">
+                            <Lock className="w-3 h-3" /> Đã khóa sổ
+                          </span>
+                        ) : c.isCouncilLocked ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <Check className="w-3 h-3" /> Đã chốt điểm HĐ
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                            <AlertCircle className="w-3 h-3" /> Chờ Chủ tịch chốt
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 px-4 pr-6 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end">
@@ -976,7 +991,7 @@ export default function HoiDongChamBaoCao_Khoa() {
             className="w-full px-3.5 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 transition-colors cursor-pointer"
           >
             <Users className="w-3.5 h-3.5 text-[#407F3E]" />
-            <span>Quản lý sinh viên và khóa điểm</span>
+            <span>Quản lý sinh viên & điểm hội đồng</span>
           </button>
           <button
             type="button"
@@ -1759,7 +1774,9 @@ export default function HoiDongChamBaoCao_Khoa() {
                             const avgCouncilGrade = scoredTrips.length > 0
                               ? (scoredTrips.reduce((acc, t) => acc + Number(t.diemHoiDong), 0) / scoredTrips.length)
                               : null;
-                            const isLocked = trips.some(t => t.daKhoa);
+                            const isStudentCouncilLocked = item.isCouncilLocked || (trips.length > 0 && trips.every(t => t.daKhoaHoiDong));
+                            const isStudentKhoaLocked = item.isKhoaLocked || (trips.length > 0 && trips.every(t => t.daKhoaKhoa));
+                            const isLocked = isStudentCouncilLocked || isStudentKhoaLocked;
 
                             return (
                               <tr key={item.boChuyenId} className="hover:bg-slate-50/80 transition-colors">
@@ -1803,14 +1820,28 @@ export default function HoiDongChamBaoCao_Khoa() {
                                     </span>
                                   )}
                                 </td>
-                                <td className="p-3 text-center">
-                                  {isLocked ? (
-                                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700">
-                                      <Lock className="w-3.5 h-3.5 text-slate-500" /> Đã khóa
+                                <td className="p-3 text-center whitespace-nowrap">
+                                  {isStudentKhoaLocked ? (
+                                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700 bg-slate-100 border border-slate-300 px-2.5 py-0.5 rounded-full">
+                                      <Lock className="w-3 h-3 text-slate-500" /> Đã khóa sổ
                                     </span>
+                                  ) : isStudentCouncilLocked ? (
+                                    <div className="inline-flex items-center gap-1.5">
+                                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                                        <Check className="w-3 h-3" /> Đã chốt HĐ
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOpenUnlockModal(viewingDetail.id, viewingDetail.ten, item.boChuyenId, sv?.ho_ten)}
+                                        className="p-1 text-amber-600 hover:text-amber-800 hover:bg-amber-50 rounded-md transition-colors cursor-pointer"
+                                        title={`Mở khóa điểm hội đồng cho sinh viên ${sv?.ho_ten || ''}`}
+                                      >
+                                        <Unlock className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
                                   ) : (
-                                    <span className="text-xs text-slate-400">
-                                      Chưa khóa
+                                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full">
+                                      <AlertCircle className="w-3 h-3" /> Chờ chốt
                                     </span>
                                   )}
                                 </td>
@@ -2105,34 +2136,41 @@ export default function HoiDongChamBaoCao_Khoa() {
             <div className="px-6 py-4 border-t border-slate-200 bg-white flex items-center justify-between rounded-b-2xl">
               {detailActiveTab === 'list' ? (
                 <>
-                  <div className="flex items-center gap-2">
-                    {isBoardLocked ? (
-                      <button
-                        type="button"
-                        disabled={isLockingBoard || boardStudents.length === 0}
-                        onClick={handleUnlockBoard}
-                        className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
-                        title="Mở khóa điểm hội đồng để giảng viên có thể tiếp tục chấm"
-                      >
-                        <Unlock className="w-3.5 h-3.5" />
-                        <span>{isLockingBoard ? 'Đang mở khóa...' : 'Mở khóa điểm Hội đồng'}</span>
-                      </button>
+                  <div className="flex items-center gap-3">
+                    {isBoardKhoaLocked ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 border border-slate-300">
+                        <Lock className="w-3.5 h-3.5 text-slate-500" />
+                        <span>Đã khóa sổ cấp Khoa</span>
+                      </span>
+                    ) : isBoardCouncilLocked ? (
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Đã chốt điểm HĐ</span>
+                        </span>
+                        <button
+                          type="button"
+                          disabled={boardStudents.length === 0}
+                          onClick={() => handleOpenUnlockModal(viewingDetail.id, viewingDetail.ten)}
+                          className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+                          title="Mở khóa điểm hội đồng để Hội đồng có thể chỉnh sửa điểm"
+                        >
+                          <Unlock className="w-3.5 h-3.5" />
+                          <span>Mở khóa điểm Hội đồng</span>
+                        </button>
+                      </div>
                     ) : (
-                      <button
-                        type="button"
-                        disabled={isLockingBoard || boardStudents.length === 0}
-                        onClick={handleLockBoard}
-                        className="px-4 py-2 bg-[#407F3E] hover:bg-[#326631] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
-                        title="Chốt điểm hội đồng cho toàn bộ sinh viên đã được phân công"
-                      >
-                        <Lock className="w-3.5 h-3.5" />
-                        <span>{isLockingBoard ? 'Đang khóa điểm...' : 'Khóa điểm Hội đồng'}</span>
-                      </button>
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                        <AlertCircle className="w-3.5 h-3.5" />
+                        <span>Chờ Chủ tịch chốt điểm</span>
+                      </span>
                     )}
                     <span className="text-[11px] text-slate-400 italic hidden sm:inline">
-                      {isBoardLocked
-                        ? '* Điểm hội đồng hiện đang bị khóa. Sinh viên đã xem được điểm.'
-                        : '* Khóa điểm sẽ tính trung bình điểm các GV chấm và lưu vào điểm chính thức của phiếu'}
+                      {isBoardKhoaLocked
+                        ? '* Đợt kiến tập đã được khóa sổ toàn diện, điểm số không thể thay đổi.'
+                        : isBoardCouncilLocked
+                        ? '* Điểm hội đồng đã được Chủ tịch chốt. Bấm "Mở khóa" nếu cần sửa điểm.'
+                        : '* Điểm do Chủ tịch Hội đồng chốt sau khi tất cả thành viên hoàn thành chấm điểm.'}
                     </span>
                   </div>
 
@@ -2255,6 +2293,81 @@ export default function HoiDongChamBaoCao_Khoa() {
                 >
                   {(isTogglingLock || isLockingBoard) && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
                   <span>{confirmModal.confirmText || 'Xác nhận'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Mở khóa điểm Hội đồng (kèm nhập lý do) */}
+      {isUnlockModalOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-slate-900/30 backdrop-blur-xs transition-opacity"
+            onClick={() => !isSubmittingUnlock && setIsUnlockModalOpen(false)}
+          ></div>
+
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6">
+              <div className="flex items-start gap-3.5 mb-4">
+                <div className="w-11 h-11 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center shrink-0">
+                  <Unlock className="w-5 h-5 stroke-[2]" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-800">
+                    Mở khóa điểm Hội đồng chấm báo cáo
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {unlockTarget?.studentName
+                      ? `Mở khóa điểm cho sinh viên: ${unlockTarget.studentName} (Hội đồng "${unlockTarget.boardName}")`
+                      : `Mở khóa điểm toàn bộ sinh viên thuộc Hội đồng "${unlockTarget?.boardName}"`}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 space-y-1">
+                  <p className="font-semibold flex items-center gap-1.5">
+                    <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                    <span>Lưu ý nghiệp vụ:</span>
+                  </p>
+                  <p className="leading-relaxed text-[11px] text-amber-700">
+                    Sau khi mở khóa, trạng thái điểm sẽ chuyển về <strong>Chưa chốt</strong>. Chủ tịch và Thư ký hội đồng sẽ nhận được thông báo để vào kiểm tra, sửa điểm và chốt lại.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    Lý do mở khóa điểm <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={unlockReason}
+                    onChange={(e) => setUnlockReason(e.target.value)}
+                    placeholder="Nhập lý do mở khóa theo đơn đề nghị của Hội đồng hoặc quy chế..."
+                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-amber-500 focus:bg-white transition-all resize-none font-medium"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-5 flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  disabled={isSubmittingUnlock}
+                  onClick={() => setIsUnlockModalOpen(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs font-semibold transition-all cursor-pointer shadow-2xs"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="button"
+                  disabled={isSubmittingUnlock || !unlockReason.trim()}
+                  onClick={handleConfirmUnlockCouncil}
+                  className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+                >
+                  {isSubmittingUnlock && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                  <span>{isSubmittingUnlock ? 'Đang mở khóa...' : 'Xác nhận mở khóa'}</span>
                 </button>
               </div>
             </div>

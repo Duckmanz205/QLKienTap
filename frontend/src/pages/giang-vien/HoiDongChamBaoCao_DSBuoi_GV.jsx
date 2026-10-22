@@ -20,7 +20,11 @@ import {
   List,
   ArrowRight,
   MapPin,
-  Lock
+  Lock,
+  Unlock,
+  AlertCircle,
+  RotateCw,
+  X
 } from 'lucide-react';
 import { giangVienApi } from '../../services/api';
 import SearchableDropdown from '../../components/SearchableDropdown';
@@ -46,6 +50,13 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
   const [selectedReg, setSelectedReg] = useState(null);
   // Map of tripId -> string score value (e.g. { 12: '8.5', 13: '' })
   const [tripScores, setTripScores] = useState({});
+
+  // Council Locking state (President)
+  const [isLockingCouncil, setIsLockingCouncil] = useState(false);
+  const [uncompletedModalData, setUncompletedModalData] = useState(null); // array or null
+
+  // Progress Matrix modal state
+  const [isMatrixModalOpen, setIsMatrixModalOpen] = useState(false);
 
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -116,6 +127,69 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
       ...prev,
       [tripId]: value
     }));
+  };
+
+  // Chốt điểm Hội đồng cho 1 sinh viên (Chủ tịch)
+  const handleLockStudentCouncilGrade = async (student = selectedReg) => {
+    if (!activeBoard || !student?.boChuyenId) return;
+    setIsLockingCouncil(true);
+    try {
+      const res = await giangVienApi.lockCouncilGrade({
+        boardId: activeBoard.session.id,
+        boChuyenId: student.boChuyenId,
+      });
+      toast.success(res.data?.message || 'Đã chốt điểm hội đồng cho sinh viên!');
+      const refreshedBoards = await fetchBoards(lecturer.id);
+      const currentBoard = refreshedBoards.find(b => b.session?.id === activeBoard.session?.id);
+      if (currentBoard) {
+        setActiveBoard(currentBoard);
+        const freshStudent = currentBoard.students?.find(st => st.boChuyenId === student.boChuyenId);
+        if (freshStudent) {
+          setSelectedReg(freshStudent);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      const errData = err.response?.data;
+      if (errData?.uncompleted && errData.uncompleted.length > 0) {
+        setUncompletedModalData(errData.uncompleted);
+      } else {
+        toast.error(errData?.message || 'Chốt điểm hội đồng thất bại.');
+      }
+    } finally {
+      setIsLockingCouncil(false);
+    }
+  };
+
+  // Chốt điểm toàn bộ Hội đồng (Chủ tịch)
+  const handleLockEntireCouncilGrade = async () => {
+    if (!activeBoard) return;
+    setIsLockingCouncil(true);
+    try {
+      const res = await giangVienApi.lockCouncilGrade({
+        boardId: activeBoard.session.id,
+      });
+      toast.success(res.data?.message || 'Đã chốt điểm toàn bộ hội đồng thành công!');
+      const refreshedBoards = await fetchBoards(lecturer.id);
+      const currentBoard = refreshedBoards.find(b => b.session?.id === activeBoard.session?.id);
+      if (currentBoard) {
+        setActiveBoard(currentBoard);
+        const freshStudent = currentBoard.students?.find(st => st.boChuyenId === selectedReg?.boChuyenId) || currentBoard.students?.[0];
+        if (freshStudent) {
+          setSelectedReg(freshStudent);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      const errData = err.response?.data;
+      if (errData?.uncompleted && errData.uncompleted.length > 0) {
+        setUncompletedModalData(errData.uncompleted);
+      } else {
+        toast.error(errData?.message || 'Chốt điểm hội đồng thất bại.');
+      }
+    } finally {
+      setIsLockingCouncil(false);
+    }
   };
 
   const handleSaveAllCouncilGrades = async (e) => {
@@ -704,9 +778,101 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
         </div>
       ) : (
         /* Workspace Tab View */
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 relative z-10">
-          {/* Left panel: Students List inside Council */}
-          <div className="lg:col-span-4 bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden flex flex-col h-[580px]">
+        <div className="space-y-4 relative z-10">
+          {/* Workspace Navigation & Info Header Bar */}
+          <div className="bg-white p-4 rounded-2xl shadow-xs border border-slate-200 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setActiveTab('list')}
+                className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <ArrowRight className="w-3.5 h-3.5 rotate-180" />
+                <span>Quay lại danh sách</span>
+              </button>
+
+              <div className="h-4 w-px bg-slate-200 hidden sm:block"></div>
+
+              <div>
+                <h2 className="text-base font-bold text-slate-800 leading-tight">
+                  {activeBoard?.session?.ten_hoi_dong}
+                </h2>
+                <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5 flex-wrap">
+                  <span className="flex items-center gap-1">
+                    <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                    Phòng: <strong className="text-slate-700">{activeBoard?.session?.dia_diem || 'Chưa xếp'}</strong>
+                  </span>
+                  <span>•</span>
+                  <span>
+                    Đợt: <strong className="text-slate-700">{activeBoard?.session?.dotKienTap?.ten_dot || '—'}</strong>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2.5 flex-wrap">
+              {/* Role Badge */}
+              <div className="flex items-center">
+                {activeBoard?.vai_tro === 'ChuTich' ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 text-[#407F3E] border border-emerald-200 shadow-2xs">
+                    <Gavel className="w-3.5 h-3.5" />
+                    <span>Chủ tịch Hội đồng</span>
+                  </span>
+                ) : activeBoard?.vai_tro === 'ThuKy' ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs">
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>Thư ký Hội đồng</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs">
+                    <Users className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Thành viên Hội đồng</span>
+                  </span>
+                )}
+              </div>
+
+              {/* Progress Matrix Button (For ChuTich and ThuKy only) */}
+              {(activeBoard?.vai_tro === 'ChuTich' || activeBoard?.vai_tro === 'ThuKy') && (
+                <button
+                  type="button"
+                  onClick={() => setIsMatrixModalOpen(true)}
+                  className="px-3.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                  title="Xem bảng tiến độ chấm điểm chi tiết của tất cả thành viên trong hội đồng"
+                >
+                  <LayoutGrid className="w-3.5 h-3.5 text-[#407F3E]" />
+                  <span>Tiến độ chấm thành viên</span>
+                </button>
+              )}
+
+              {/* President Lock Entire Council Button */}
+              {activeBoard?.vai_tro === 'ChuTich' && (
+                <button
+                  type="button"
+                  disabled={isLockingCouncil || activeBoard?.isBoardCouncilLocked}
+                  onClick={handleLockEntireCouncilGrade}
+                  className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer ${
+                    activeBoard?.isBoardCouncilLocked
+                      ? 'bg-slate-100 text-slate-500 border border-slate-200 cursor-not-allowed'
+                      : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                  }`}
+                  title="Chốt điểm hội đồng cho toàn bộ sinh viên khi tất cả thành viên đã chấm xong"
+                >
+                  <Gavel className="w-3.5 h-3.5" />
+                  <span>
+                    {activeBoard?.isBoardCouncilLocked
+                      ? 'Toàn bộ HĐ đã chốt điểm'
+                      : isLockingCouncil
+                      ? 'Đang chốt...'
+                      : 'Chốt điểm cả Hội đồng'}
+                  </span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 relative z-10">
+            {/* Left panel: Students List inside Council */}
+            <div className="lg:col-span-4 bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden flex flex-col h-[640px]">
             <div className="p-3.5 bg-slate-50 border-b border-slate-200 space-y-2.5">
               <div className="flex items-center justify-between">
                 <h3 className="font-bold text-xs text-slate-700 uppercase tracking-wider truncate max-w-[200px]" title={activeBoard?.session?.ten_hoi_dong}>
@@ -843,19 +1009,20 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
           </div>
 
           {/* Right panel: Evaluation form */}
-          <div className="lg:col-span-8 bg-white rounded-2xl shadow-xs border border-slate-200 p-6 flex flex-col h-[580px] justify-between">
+          <div className="lg:col-span-8 bg-white rounded-2xl shadow-xs border border-slate-200 p-6 flex flex-col min-h-[640px] justify-between">
             {selectedReg ? (() => {
               const trips = selectedReg.trips || [];
               const totalTrips = selectedReg.totalTrips || trips.length || 3;
               const scoredCount = selectedReg.scoredCount ?? trips.filter(t => t.myScore != null).length;
               const isCurrentStudentLocked = Boolean(
                 selectedReg.isLocked ||
+                selectedReg.isCouncilLocked ||
                 (trips.length > 0 && trips.every(t => t.daKhoa || t.daKhoaHoiDong))
               );
 
               return (
                 <form onSubmit={handleSaveAllCouncilGrades} className="flex flex-col h-full justify-between">
-                  <div className="space-y-4">
+                  <div className="space-y-3.5">
                     {/* Header info */}
                     <div className="border-b border-slate-100 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div>
@@ -865,7 +1032,7 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-end">
                         <div className="text-right bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 shrink-0">
                           <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Tiến độ chấm</p>
                           <p className="text-sm font-bold text-slate-800 font-mono">
@@ -878,6 +1045,25 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
                             {selectedReg.overallMyAvg != null ? `${Number(selectedReg.overallMyAvg).toFixed(1)}đ` : (projectedAvg ? `${projectedAvg}đ` : '—')}
                           </p>
                         </div>
+
+                        {/* President Lock Student Action or Locked Badge */}
+                        {isCurrentStudentLocked ? (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                            <span>Đã chốt điểm HĐ</span>
+                          </span>
+                        ) : activeBoard?.vai_tro === 'ChuTich' && (
+                          <button
+                            type="button"
+                            disabled={isLockingCouncil}
+                            onClick={() => handleLockStudentCouncilGrade(selectedReg)}
+                            className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs shrink-0 cursor-pointer"
+                            title="Chốt điểm hội đồng cho sinh viên này"
+                          >
+                            <CheckCircle2 className="w-4 h-4" />
+                            <span>{isLockingCouncil ? 'Đang chốt...' : 'Chốt điểm SV này'}</span>
+                          </button>
+                        )}
                       </div>
                     </div>
 
@@ -908,7 +1094,7 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
                     </div>
 
                     {/* All 3 trips list on the same screen */}
-                    <div className="space-y-3 overflow-y-auto max-h-[340px] pr-1">
+                    <div className="space-y-2.5 overflow-y-auto max-h-[250px] pr-1">
                       {trips.length === 0 ? (
                         <p className="text-xs text-slate-400 italic py-4 text-center">Sinh viên chưa có chuyến tham quan nào.</p>
                       ) : (
@@ -925,11 +1111,11 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
                           return (
                             <div
                               key={tripId || idx}
-                              className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-slate-50 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                              className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-slate-50 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                             >
                               {/* Left: Info */}
                               <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                                <div className="flex items-center gap-2 mb-1 flex-wrap">
                                   <span className="w-5 h-5 rounded-md bg-slate-200/80 text-slate-700 font-mono font-bold text-[11px] flex items-center justify-center shrink-0">
                                     #{idx + 1}
                                   </span>
@@ -1045,6 +1231,257 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
                 <span>Vui lòng chọn sinh viên cần chấm điểm từ danh sách hội đồng bên trái.</span>
               </div>
             )}
+          </div>
+        </div>
+      </div>
+    )}
+
+      {/* Modal: Bảng tiến độ chấm điểm các thành viên trong hội đồng */}
+      {isMatrixModalOpen && activeBoard && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-slate-900/30 backdrop-blur-xs transition-opacity"
+            onClick={() => setIsMatrixModalOpen(false)}
+          ></div>
+
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-[95vw] max-w-5xl h-[85vh] relative z-10 overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
+            {/* Modal Header */}
+            <div className="p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
+              <div>
+                <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                  <LayoutGrid className="w-5 h-5 text-[#407F3E]" />
+                  <span>Ma trận tiến độ chấm điểm thành viên Hội đồng</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Hội đồng: <strong>{activeBoard.session?.ten_hoi_dong}</strong> | Phòng: <strong>{activeBoard.session?.dia_diem || 'Chưa xếp'}</strong> | Tổng số SV: <strong>{activeCouncilStudents.length}</strong>
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsMatrixModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body: Scrollable Table */}
+            <div className="flex-1 overflow-auto p-5">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-slate-100 text-slate-700 uppercase font-bold sticky top-0 z-10 border-b border-slate-200">
+                  <tr>
+                    <th className="p-3 pl-4">STT</th>
+                    <th className="p-3 min-w-[160px]">Sinh viên</th>
+                    <th className="p-3 min-w-[80px]">Lớp</th>
+                    {(activeBoard.committeeMembers || []).map((m, mIdx) => (
+                      <th key={m.id || mIdx} className="p-3 text-center min-w-[200px]">
+                        <div className="font-bold text-slate-800 truncate" title={m.giangVien?.ho_ten}>
+                          {m.giangVien?.ho_ten || 'Giảng viên'}
+                        </div>
+                        <span className={`inline-block px-2 py-0.5 rounded text-[10px] mt-0.5 font-bold uppercase ${
+                          m.vai_tro === 'ChuTich'
+                            ? 'bg-emerald-100 text-[#407F3E]'
+                            : m.vai_tro === 'ThuKy'
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-slate-200 text-slate-700'
+                        }`}>
+                          {m.vai_tro === 'ChuTich' ? 'Chủ tịch' : m.vai_tro === 'ThuKy' ? 'Thư ký' : 'Thành viên'}
+                        </span>
+                      </th>
+                    ))}
+                    <th className="p-3 text-center min-w-[110px]">Trạng thái HĐ</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {activeCouncilStudents.map((st, idx) => {
+                    const sv = st.sinhVien;
+                    const trips = st.trips || [];
+                    const isStudentLocked = st.isCouncilLocked || (trips.length > 0 && trips.every(t => t.daKhoaHoiDong));
+
+                    return (
+                      <tr key={st.boChuyenId || st.id || idx} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="p-3 pl-4 font-mono font-semibold text-slate-500 align-top">#{idx + 1}</td>
+                        <td className="p-3 align-top">
+                          <div className="font-bold text-slate-800">{sv?.ho_ten}</div>
+                          <div className="text-[11px] font-mono text-slate-500">{sv?.mssv || sv?.ma_sv || '—'}</div>
+                        </td>
+                        <td className="p-3 text-slate-600 font-medium align-top">{sv?.ten_lop || sv?.lop || '—'}</td>
+
+                        {(activeBoard.committeeMembers || []).map((m, mIdx) => {
+                          const memberScores = trips
+                            .map(t => {
+                              const comm = t.committee || [];
+                              const found = comm.find(c => c.id === m.id);
+                              return found ? found.score : null;
+                            })
+                            .filter(sc => sc !== null && sc !== undefined);
+
+                          const hasGradedAll = trips.length > 0 && memberScores.length === trips.length;
+                          const avgScore = memberScores.length > 0
+                            ? (memberScores.reduce((acc, curr) => acc + Number(curr), 0) / memberScores.length).toFixed(1)
+                            : null;
+
+                          return (
+                            <td key={m.id || mIdx} className="p-2.5 align-top min-w-[200px]">
+                              <div className="space-y-1.5 bg-slate-50/70 p-2 rounded-xl border border-slate-200/80">
+                                {trips.map((trip, tIdx) => {
+                                  const comm = trip.committee || [];
+                                  const found = comm.find(c => c.id === m.id);
+                                  const tripScore = found?.score;
+                                  const hasScore = tripScore !== null && tripScore !== undefined;
+
+                                  return (
+                                    <div
+                                      key={trip.phieuThamQuanId || tIdx}
+                                      className="flex items-center justify-between gap-1.5 text-[11px] bg-white px-2 py-1 rounded-lg border border-slate-200/60 shadow-2xs"
+                                    >
+                                      <span
+                                        className="truncate font-medium text-slate-700 max-w-[120px]"
+                                        title={trip.tenNhaMay}
+                                      >
+                                        <span className="font-bold text-slate-400 mr-1">#{tIdx + 1}</span>
+                                        {trip.tenNhaMay}
+                                      </span>
+                                      {hasScore ? (
+                                        <span className="font-mono font-bold text-[#407F3E] bg-emerald-50 px-1.5 py-0.5 rounded text-[11px] shrink-0 border border-emerald-200">
+                                          {Number(tripScore).toFixed(1)}đ
+                                        </span>
+                                      ) : (
+                                        <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded shrink-0 font-medium">
+                                          Chưa chấm
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+
+                                {/* ĐTB summary row */}
+                                <div className="pt-1.5 border-t border-slate-200/80 flex items-center justify-between text-xs px-1">
+                                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                                    ĐTB:
+                                  </span>
+                                  {hasGradedAll ? (
+                                    <span className="font-mono font-black text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded text-xs">
+                                      {avgScore}đ
+                                    </span>
+                                  ) : memberScores.length > 0 ? (
+                                    <span className="font-mono font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded text-xs border border-amber-200">
+                                      {avgScore}đ ({memberScores.length}/{trips.length})
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] text-slate-400 italic">Chưa chấm</span>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                          );
+                        })}
+
+                        <td className="p-3 text-center whitespace-nowrap align-top">
+                          {isStudentLocked ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
+                              <Check className="w-3.5 h-3.5 text-emerald-600" /> Đã chốt
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200 shadow-2xs">
+                              Chờ chốt
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
+              <span className="text-xs text-slate-500 italic">
+                * Chủ tịch hội đồng chỉ có thể chốt điểm khi 100% các cột thành viên đều hiển thị điểm số.
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsMatrixModalOpen(false)}
+                className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold transition-all cursor-pointer"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Cảnh báo: Còn thành viên chưa chấm điểm */}
+      {uncompletedModalData && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity"
+            onClick={() => setUncompletedModalData(null)}
+          ></div>
+
+          <div className="bg-white rounded-2xl shadow-2xl border border-rose-100 w-full max-w-2xl relative z-10 overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]">
+            <div className="p-5 border-b border-rose-100 bg-rose-50/70 flex items-start gap-3.5 shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-rose-100 border border-rose-200 text-rose-600 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5 stroke-[2]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base font-bold text-slate-800">
+                  Chưa thể chốt điểm Hội đồng
+                </h3>
+                <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                  Theo quy chế, Chủ tịch chỉ có thể chốt điểm khi <strong>tất cả thành viên hội đồng</strong> đã hoàn tất chấm điểm cho mọi chuyến tham quan. Dưới đây là danh sách chi tiết các chuyến còn thiếu điểm:
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setUncompletedModalData(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 overflow-y-auto flex-1 space-y-3">
+              {uncompletedModalData.map((item, idx) => (
+                <div
+                  key={idx}
+                  className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-slate-800 text-sm">
+                      {item.hoTen} <span className="font-mono text-xs text-slate-500 font-normal">({item.mssv})</span>
+                    </p>
+                    <p className="text-slate-600 text-xs mt-0.5 truncate" title={item.tenChuyen}>
+                      Chuyến: <strong className="font-medium text-slate-700">{item.tenChuyen}</strong>
+                    </p>
+                  </div>
+
+                  <div className="shrink-0 flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[11px] font-semibold text-rose-600">Thiếu điểm của:</span>
+                    {(item.giangVienChuaCham || []).map((gv, gIdx) => (
+                      <span
+                        key={gIdx}
+                        className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-rose-100 text-rose-700 border border-rose-200"
+                      >
+                        {gv}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end shrink-0">
+              <button
+                type="button"
+                onClick={() => setUncompletedModalData(null)}
+                className="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs"
+              >
+                Đã hiểu & Đóng
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -3386,14 +3386,31 @@ export class KhoaService implements OnModuleInit {
           relations: { giangVien: true },
         });
 
-        const studentCount = await this.boRepo.count({
+        const boChuyens = await this.boRepo.find({
           where: { hoi_dong_id: b.id },
         });
+        const boIds = boChuyens.map((bo) => bo.id);
+        let isCouncilLocked = false;
+        let isKhoaLocked = false;
+        if (boIds.length > 0) {
+          const phieuTQs = await this.phieuTQRepo.find({
+            where: { bo_chuyen_bao_cao_id: In(boIds) },
+            relations: { diemPhieuThamQuan: true },
+          });
+          isCouncilLocked = phieuTQs.length > 0 && phieuTQs.every(
+            (p) => Boolean(p.diemPhieuThamQuan?.da_khoa_hoi_dong),
+          );
+          isKhoaLocked = phieuTQs.length > 0 && phieuTQs.every(
+            (p) => Boolean(p.diemPhieuThamQuan?.da_khoa),
+          );
+        }
 
         return {
           ...b,
           members: thanhViens,
-          sv: studentCount,
+          sv: boIds.length,
+          isCouncilLocked,
+          isKhoaLocked,
         };
       }),
     );
@@ -3591,16 +3608,29 @@ export class KhoaService implements OnModuleInit {
           },
         });
 
+        const isCouncilLocked = phieuTQs.length > 0 && phieuTQs.every(
+          (p) => Boolean(p.diemPhieuThamQuan?.da_khoa_hoi_dong),
+        );
+        const isKhoaLocked = phieuTQs.length > 0 && phieuTQs.every(
+          (p) => Boolean(p.diemPhieuThamQuan?.da_khoa),
+        );
+
         return {
           boChuyenId: bo.id,
           dotKienTapSinhVienId: bo.dot_kien_tap_sinh_vien_id,
           sinhVien: bo.dotKienTapSinhVien?.sinhVien,
+          ghiChu: bo.ghi_chu || '',
+          isCouncilLocked,
+          isKhoaLocked,
+          isLocked: isCouncilLocked || isKhoaLocked,
           trips: phieuTQs.map((ptq) => ({
             id: ptq.id,
             phieuDangKyId: ptq.phieu_dang_ky_id,
             nhaMay: ptq.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Chuyến đi',
             hinhThuc: ptq.phieuDangKy?.chuyenThamQuan?.hinh_thuc,
             diemHoiDong: ptq.diemPhieuThamQuan?.diem_hoi_dong_final ?? null,
+            daKhoaHoiDong: Boolean(ptq.diemPhieuThamQuan?.da_khoa_hoi_dong),
+            daKhoaKhoa: Boolean(ptq.diemPhieuThamQuan?.da_khoa),
             daKhoa:
               (ptq.diemPhieuThamQuan?.da_khoa_hoi_dong ||
                 ptq.diemPhieuThamQuan?.da_khoa) ??
@@ -3733,25 +3763,66 @@ export class KhoaService implements OnModuleInit {
     };
   }
 
-  async unlockBoard(boardId: number) {
-    const board = await this.hdRepo.findOne({ where: { id: boardId } });
+  async unlockBoardCouncilGrades(
+    dto: { boardId: number; boChuyenId?: number; lyDo?: string },
+    userAccountId?: number,
+  ) {
+    const board = await this.hdRepo.findOne({
+      where: { id: dto.boardId },
+      relations: { dotKienTap: true },
+    });
     if (!board) throw new NotFoundException('Không tìm thấy hội đồng');
 
-    const boChuyens = await this.boRepo.find({ where: { hoi_dong_id: boardId } });
-    const boIds = boChuyens.map((b) => b.id);
-    if (boIds.length === 0) {
+    // Kiểm tra nếu đợt kiến tập đã được Khoa khóa sổ toàn diện
+    if (board.dotKienTap?.trang_thai === 'DaKhoa') {
+      throw new BadRequestException(
+        'Đợt kiến tập đã được khóa sổ toàn diện (da_khoa = 1), không thể mở khóa điểm hội đồng.',
+      );
+    }
+
+    let targetBoIds: number[] = [];
+    if (dto.boChuyenId) {
+      const bo = await this.boRepo.findOne({
+        where: { id: dto.boChuyenId, hoi_dong_id: dto.boardId },
+      });
+      if (!bo) {
+        throw new NotFoundException(
+          'Không tìm thấy bộ chuyến báo cáo của sinh viên trong hội đồng này',
+        );
+      }
+      targetBoIds = [bo.id];
+    } else {
+      const boChuyens = await this.boRepo.find({
+        where: { hoi_dong_id: dto.boardId },
+      });
+      targetBoIds = boChuyens.map((b) => b.id);
+    }
+
+    if (targetBoIds.length === 0) {
       return { message: 'Hội đồng chưa có sinh viên nào để mở khóa điểm' };
     }
 
     const phieuTQs = await this.phieuTQRepo.find({
-      where: { bo_chuyen_bao_cao_id: In(boIds) },
+      where: { bo_chuyen_bao_cao_id: In(targetBoIds) },
+      relations: { diemPhieuThamQuan: true },
     });
+
+    // Kiểm tra xem có phiếu nào đã bị khóa sổ cấp Khoa chưa
+    const alreadyKhoaLocked = phieuTQs.find((p) => p.diemPhieuThamQuan?.da_khoa);
+    if (alreadyKhoaLocked) {
+      throw new BadRequestException(
+        'Đợt kiến tập đã được khóa sổ toàn diện, không thể mở khóa điểm hội đồng.',
+      );
+    }
 
     let updatedCount = 0;
     for (const ptq of phieuTQs) {
-      const diemPhieu = await this.diemPhieuRepo.findOne({
-        where: { phieu_tham_quan_id: ptq.id },
-      });
+      let diemPhieu = ptq.diemPhieuThamQuan;
+      if (!diemPhieu) {
+        diemPhieu = await this.diemPhieuRepo.findOne({
+          where: { phieu_tham_quan_id: ptq.id },
+        });
+      }
       if (diemPhieu) {
         diemPhieu.da_khoa_hoi_dong = false;
         diemPhieu.ngay_khoa_hoi_dong = null;
@@ -3760,9 +3831,30 @@ export class KhoaService implements OnModuleInit {
       }
     }
 
+    // Gửi thông báo đến Chủ tịch và Thư ký hội đồng
+    try {
+      const notif = new ThongBao();
+      notif.tieu_de = `[Khoa] Mở khóa điểm Hội đồng: ${board.ten_hoi_dong}`;
+      notif.noi_dung = `Khoa đã phê duyệt mở khóa điểm cho Hội đồng "${board.ten_hoi_dong}"${dto.boChuyenId ? ' (cho sinh viên được chỉ định)' : ''}. Lý do: "${dto.lyDo || 'Mở khóa điểm hội đồng'}". Thầy/Cô Chủ tịch & Thư ký vui lòng kiểm tra, chấm lại và thực hiện chốt điểm khi hoàn tất.`;
+      notif.nguoi_gui_id = userAccountId || 1;
+      notif.doi_tuong_nhan = 'LECTURER';
+      notif.loai_thong_bao = 'NhacNho';
+      await this.thongBaoRepo.save(notif);
+    } catch (e) {
+      console.warn('Lỗi gửi thông báo mở khóa Hội đồng:', e);
+    }
+
     return {
-      message: `Đã mở khóa điểm hội đồng thành công cho ${boChuyens.length} sinh viên (${updatedCount} phiếu tham quan).`,
+      message: `Đã mở khóa điểm hội đồng thành công cho ${targetBoIds.length} sinh viên (${updatedCount} phiếu tham quan).`,
+      updatedCount,
     };
+  }
+
+  async unlockBoard(boardId: number, lyDo?: string, userAccountId?: number) {
+    return this.unlockBoardCouncilGrades(
+      { boardId, lyDo: lyDo || 'Mở khóa toàn bộ hội đồng' },
+      userAccountId,
+    );
   }
 
   async autoSelectRepresentativeTrips(dksvId: number) {
@@ -3867,17 +3959,28 @@ export class KhoaService implements OnModuleInit {
     }
   }
 
-  async lockAndFinalizeGrades(lichKienTapId: number) {
-    const lich = await this.lichRepo.findOne({
-      where: { id: lichKienTapId },
-    });
-    if (!lich) throw new NotFoundException('Không tìm thấy lịch kiến tập');
+  private async resolveDotKienTapId(lichOrDotId: number): Promise<number> {
+    const dot = await this.dotRepo.findOne({ where: { id: lichOrDotId } });
+    if (dot) return dot.id;
 
-    if (lich.trang_thai === 'DaKhoa') {
-      throw new BadRequestException('Đợt/lịch kiến tập này đã được khóa điểm trước đó.');
+    const lich = await this.lichRepo.findOne({ where: { id: lichOrDotId } });
+    if (lich) return lich.dot_kien_tap_id;
+
+    throw new NotFoundException('Không tìm thấy đợt hoặc lịch kiến tập');
+  }
+
+  async lockAndFinalizeGrades(lichOrDotId: number) {
+    const dotKienTapId = await this.resolveDotKienTapId(lichOrDotId);
+
+    const dot = await this.dotRepo.findOne({ where: { id: dotKienTapId } });
+    if (dot?.trang_thai === 'DaKhoa') {
+      throw new BadRequestException('Đợt kiến tập này đã được khóa điểm trước đó.');
     }
 
-    const dotKienTapId = lich.dot_kien_tap_id;
+    const lich = await this.lichRepo.findOne({ where: { id: lichOrDotId } });
+    if (lich?.trang_thai === 'DaKhoa') {
+      throw new BadRequestException('Đợt/lịch kiến tập này đã được khóa điểm trước đó.');
+    }
 
     // Lấy toàn bộ danh sách đăng ký sinh viên thuộc đợt kiến tập
     const enrollments = await this.dksvRepo.find({
@@ -4075,6 +4178,10 @@ export class KhoaService implements OnModuleInit {
     }
 
     // Cập nhật trạng thái DotKienTap cha
+    if (dot) {
+      dot.trang_thai = 'DaKhoa';
+      await this.dotRepo.save(dot);
+    }
     await this.updateDotKienTapStatus(dotKienTapId);
 
     return {
@@ -4083,25 +4190,26 @@ export class KhoaService implements OnModuleInit {
   }
 
   // Lấy trạng thái nộp điểm chuẩn bị của các chuyến tham quan thuộc đợt/lịch kiến tập (cho Tab GVDĐ)
-  async getTripGradingStatuses(lichKienTapId: number) {
-    const lich = await this.lichRepo.findOne({ where: { id: lichKienTapId } });
-    if (!lich) throw new NotFoundException('Không tìm thấy lịch kiến tập');
-    const dotKienTapId = lich.dot_kien_tap_id;
+  async getTripGradingStatuses(lichOrDotId: number) {
+    const dotKienTapId = await this.resolveDotKienTapId(lichOrDotId);
 
     // Lấy tất cả các lịch thuộc cùng đợt kiến tập để bao quát toàn bộ các chuyến đi trong đợt
     const liches = await this.lichRepo.find({
       where: { dot_kien_tap_id: dotKienTapId },
     });
-    const lichIds = liches.length > 0 ? liches.map((l) => l.id) : [lichKienTapId];
+    const lichIds = liches.length > 0 ? liches.map((l) => l.id) : [];
 
-    const trips = await this.chuyenRepo.find({
-      where: { lich_kien_tap_id: In(lichIds) },
-      relations: {
-        nhaMay: true,
-        lichKienTap: true,
-      },
-      order: { ngay_tham_quan: 'ASC' },
-    });
+    const trips =
+      lichIds.length > 0
+        ? await this.chuyenRepo.find({
+            where: { lich_kien_tap_id: In(lichIds) },
+            relations: {
+              nhaMay: true,
+              lichKienTap: true,
+            },
+            order: { ngay_tham_quan: 'ASC' },
+          })
+        : [];
 
     return Promise.all(
       trips.map(async (t) => {
@@ -4170,10 +4278,8 @@ export class KhoaService implements OnModuleInit {
   }
 
   // Lấy trạng thái nộp điểm bài thu hoạch của các GVHD thuộc đợt (cho Tab GVHD)
-  async getSupervisorGradingStatuses(lichKienTapId: number) {
-    const lich = await this.lichRepo.findOne({ where: { id: lichKienTapId } });
-    if (!lich) throw new NotFoundException('Không tìm thấy lịch kiến tập');
-    const dotKienTapId = lich.dot_kien_tap_id;
+  async getSupervisorGradingStatuses(lichOrDotId: number) {
+    const dotKienTapId = await this.resolveDotKienTapId(lichOrDotId);
 
     const assignments = await this.pcGvhdRepo.find({
       where: {
@@ -4231,17 +4337,25 @@ export class KhoaService implements OnModuleInit {
       const { giangVien, studentIds } = data;
       let totalReports = 0;
       let gradedReports = 0;
+      let fullyGradedStudentsCount = 0;
       let daKhoaThuHoach = false;
       let ngayKhoaThuHoach: Date | null = null;
 
       if (studentIds.length > 0) {
-        const reports = await this.baiRepo
+        const qb = this.baiRepo
           .createQueryBuilder('baiThu')
           .leftJoinAndSelect('baiThu.phieuThamQuan', 'phieuTQ')
           .leftJoinAndSelect('phieuTQ.phieuDangKy', 'phieu')
+          .leftJoinAndSelect('phieu.chuyenThamQuan', 'chuyen')
+          .leftJoinAndSelect('chuyen.lichKienTap', 'lich')
           .leftJoinAndSelect('phieuTQ.diemPhieuThamQuan', 'diem')
-          .where('phieu.sinh_vien_id IN (:...studentIds)', { studentIds })
-          .getMany();
+          .where('phieu.sinh_vien_id IN (:...studentIds)', { studentIds });
+
+        if (dotKienTapId) {
+          qb.andWhere('lich.dot_kien_tap_id = :dotKienTapId', { dotKienTapId });
+        }
+
+        const reports = await qb.getMany();
 
         totalReports = reports.length;
         const graded = reports.filter(
@@ -4251,6 +4365,32 @@ export class KhoaService implements OnModuleInit {
             r.phieuThamQuan.diemPhieuThamQuan.diem_thu_hoach !== undefined,
         );
         gradedReports = graded.length;
+
+        // Nhóm bài nộp theo sinh viên để tính số sinh viên đã được chấm đủ điểm
+        const studentReportsMap = new Map<number, any[]>();
+        for (const r of reports) {
+          const svId = r.phieuThamQuan?.phieuDangKy?.sinh_vien_id;
+          if (svId) {
+            if (!studentReportsMap.has(svId)) {
+              studentReportsMap.set(svId, []);
+            }
+            studentReportsMap.get(svId)!.push(r);
+          }
+        }
+
+        for (const [svId, sReports] of studentReportsMap.entries()) {
+          if (
+            sReports.length > 0 &&
+            sReports.every(
+              (r) =>
+                r.phieuThamQuan?.diemPhieuThamQuan &&
+                r.phieuThamQuan.diemPhieuThamQuan.diem_thu_hoach !== null &&
+                r.phieuThamQuan.diemPhieuThamQuan.diem_thu_hoach !== undefined,
+            )
+          ) {
+            fullyGradedStudentsCount++;
+          }
+        }
 
         if (totalReports > 0 && reports.every((r) => r.phieuThamQuan?.diemPhieuThamQuan?.da_khoa_thu_hoach)) {
           daKhoaThuHoach = true;
@@ -4273,7 +4413,7 @@ export class KhoaService implements OnModuleInit {
         so_sv_huong_dan: studentIds.length,
         so_luong_sv: studentIds.length,
         so_bai_da_cham: gradedReports,
-        so_sv_da_cham: gradedReports,
+        so_sv_da_cham: fullyGradedStudentsCount,
         tong_so_bai: totalReports,
         da_khoa_thu_hoach: daKhoaThuHoach,
         ngay_khoa_thu_hoach: ngayKhoaThuHoach,
@@ -4299,6 +4439,16 @@ export class KhoaService implements OnModuleInit {
       throw new BadRequestException(
         'Đợt kiến tập đã được khóa sổ toàn diện, không thể mở khóa điểm nữa.',
       );
+    }
+    if (trip.lichKienTap?.dot_kien_tap_id) {
+      const dot = await this.dotRepo.findOne({
+        where: { id: trip.lichKienTap.dot_kien_tap_id },
+      });
+      if (dot?.trang_thai === 'DaKhoa') {
+        throw new BadRequestException(
+          'Đợt kiến tập đã được khóa sổ toàn diện, không thể mở khóa điểm nữa.',
+        );
+      }
     }
 
     const regs = await this.phieuRepo.find({
@@ -4343,6 +4493,15 @@ export class KhoaService implements OnModuleInit {
     lyDo: string,
     userAccountId?: number,
   ) {
+    const dot = await this.dotRepo.findOne({
+      where: { id: dotKienTapId },
+    });
+    if (dot?.trang_thai === 'DaKhoa') {
+      throw new BadRequestException(
+        'Đợt kiến tập đã được khóa sổ toàn diện, không thể mở khóa điểm nữa.',
+      );
+    }
+
     const liches = await this.lichRepo.find({
       where: { dot_kien_tap_id: dotKienTapId },
     });
@@ -4398,15 +4557,21 @@ export class KhoaService implements OnModuleInit {
   }
 
   // Lấy danh sách giảng viên chưa nộp điểm (để cảnh báo khi khóa đợt)
-  async getUnsubmittedLecturers(lichKienTapId: number) {
-    const unsubmitted: { ten: string; vai_tro: string; chi_tiet: string }[] = [];
+  async getUnsubmittedLecturers(lichOrDotId: number) {
+    const unsubmitted: {
+      ten: string;
+      ten_giang_vien: string;
+      vai_tro: string;
+      chi_tiet: string;
+    }[] = [];
 
     // 1. Kiểm tra GVDĐ
-    const tripStatuses = await this.getTripGradingStatuses(lichKienTapId);
+    const tripStatuses = await this.getTripGradingStatuses(lichOrDotId);
     for (const t of tripStatuses) {
       if (!t.da_khoa_chuan_bi && t.gvdd) {
         unsubmitted.push({
           ten: t.gvdd.ho_ten,
+          ten_giang_vien: t.gvdd.ho_ten,
           vai_tro: 'Giảng viên dẫn đoàn',
           chi_tiet: `Chuyến ${t.ten_nha_may} (${t.ma_chuyen})`,
         });
@@ -4414,18 +4579,69 @@ export class KhoaService implements OnModuleInit {
     }
 
     // 2. Kiểm tra GVHD
-    const supervisorStatuses = await this.getSupervisorGradingStatuses(lichKienTapId);
+    const supervisorStatuses = await this.getSupervisorGradingStatuses(lichOrDotId);
     for (const s of supervisorStatuses) {
       if (!s.da_khoa_thu_hoach) {
+        if (s.tong_so_bai === 0) continue; // Nếu sinh viên chưa nộp bài nào thì GVHD không bị tính là nợ điểm
+        const hoTen = s.giangVien?.ho_ten || s.ho_ten || '';
         unsubmitted.push({
-          ten: s.giangVien.ho_ten,
+          ten: hoTen,
+          ten_giang_vien: hoTen,
           vai_tro: 'Giảng viên hướng dẫn',
-          chi_tiet: `Phụ trách ${s.so_sv_huong_dan} SV (${s.so_bai_da_cham}/${s.tong_so_bai} bài đã chấm)`,
+          chi_tiet: `Phụ trách ${s.so_sv_huong_dan} SV (${s.so_sv_da_cham}/${s.so_sv_huong_dan} SV đã chấm xong)`,
+        });
+      }
+    }
+
+    // 3. Kiểm tra Hội đồng chấm báo cáo
+    // Quy tắc: Chỉ kiểm tra da_khoa_hoi_dong = true đối với các PhieuThamQuan nằm trong bộ chuyến báo cáo (bo_chuyen_bao_cao_id IS NOT NULL và gắn với BoChuyenBaoCao)
+    const dotKienTapId = await this.resolveDotKienTapId(lichOrDotId);
+    const boards = await this.hdRepo.find({
+      where: { dot_kien_tap_id: dotKienTapId },
+    });
+
+    for (const b of boards) {
+      const boChuyens = await this.boRepo.find({
+        where: { hoi_dong_id: b.id },
+      });
+      if (boChuyens.length === 0) continue;
+
+      const boIds = boChuyens.map((bo) => bo.id);
+      const phieuTQs = await this.phieuTQRepo.find({
+        where: { bo_chuyen_bao_cao_id: In(boIds) },
+        relations: { diemPhieuThamQuan: true },
+      });
+
+      const unsubmittedPhieus = phieuTQs.filter(
+        (p) => !p.diemPhieuThamQuan?.da_khoa_hoi_dong,
+      );
+
+      if (unsubmittedPhieus.length > 0) {
+        const chuTich = await this.hdTvRepo.findOne({
+          where: { hoi_dong_id: b.id, vai_tro: 'ChuTich' },
+          relations: { giangVien: true },
+        });
+
+        const chuTichName = chuTich?.giangVien?.ho_ten || 'Chưa phân công Chủ tịch';
+        unsubmitted.push({
+          ten: chuTichName,
+          ten_giang_vien: chuTichName,
+          vai_tro: 'Chủ tịch Hội đồng',
+          chi_tiet: `Hội đồng "${b.ten_hoi_dong}" còn ${unsubmittedPhieus.length}/${phieuTQs.length} phiếu báo cáo chưa chốt điểm`,
         });
       }
     }
 
     return unsubmitted;
+  }
+
+  // Kiểm tra điều kiện có thể khóa sổ toàn diện đợt/lịch kiến tập
+  async checkCanLockSchedule(lichOrDotId: number) {
+    const unsubmitted = await this.getUnsubmittedLecturers(lichOrDotId);
+    return {
+      canLock: unsubmitted.length === 0,
+      unsubmitted,
+    };
   }
 
   private getBlacklistReasonLabel(reason?: string): string {

@@ -48,6 +48,7 @@ import {
   LockGradesDto,
   UnlockTripPrepGradesDto,
   UnlockLecturerReportGradesDto,
+  UnlockBoardCouncilGradesDto,
   ApproveRefundDto,
   CreateKhoaNotificationDto,
   ExportStudentListDto,
@@ -605,8 +606,28 @@ export class KhoaController {
 
   @Roles('QuanLyKhoa')
   @Post('boards/:id/unlock-board')
-  async unlockBoard(@Param('id', ParseIntPipe) id: number) {
-    return this.khoaService.unlockBoard(id);
+  async unlockBoard(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: JwtPayloadUser,
+    @Body() body?: { boChuyenId?: number; lyDo?: string },
+  ) {
+    return this.khoaService.unlockBoardCouncilGrades(
+      {
+        boardId: id,
+        boChuyenId: body?.boChuyenId,
+        lyDo: body?.lyDo || 'Khoa mở khóa điểm hội đồng',
+      },
+      user?.sub,
+    );
+  }
+
+  @Roles('QuanLyKhoa')
+  @Post('unlock-board-council-grades')
+  async unlockBoardCouncilGrades(
+    @CurrentUser() user: JwtPayloadUser,
+    @Body() body: UnlockBoardCouncilGradesDto,
+  ) {
+    return this.khoaService.unlockBoardCouncilGrades(body, user?.sub);
   }
 
   @Roles('QuanLyKhoa')
@@ -627,7 +648,11 @@ export class KhoaController {
   @Roles('QuanLyKhoa')
   @Post('lock-grades')
   async lockGrades(@Body() body: LockGradesDto) {
-    return this.khoaService.lockAndFinalizeGrades(body.lichKienTapId);
+    const targetId = body.dotKienTapId || body.lichKienTapId;
+    if (!targetId) {
+      throw new BadRequestException('Vui lòng cung cấp dotKienTapId hoặc lichKienTapId');
+    }
+    return this.khoaService.lockAndFinalizeGrades(targetId);
   }
 
   @Roles('QuanLyKhoa')

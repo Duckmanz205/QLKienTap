@@ -4,7 +4,7 @@ import {
   Plus, ChevronDown, Check, X, Calendar, Clock, MapPin,
   ChevronRight, Users, CheckCircle2, XCircle, RefreshCw, Search,
   MoreVertical, Edit, PlayCircle, Trash2, CheckCircle, RotateCcw, Download, ArrowRight,
-  UserCheck, Building2, Phone, Mail
+  UserCheck, Building2, Phone, Mail, User
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { khoaApi } from '../../services/api';
@@ -1614,6 +1614,53 @@ export default function ChuyenThamQuan_DSLoc() {
                   </div>
                 )}
 
+                {/* Người liên hệ doanh nghiệp / cơ sở đề xuất */}
+                {(viewingDetail.trang_thai_duyet || viewingDetail.nguoi_lien_he_de_xuat || viewingDetail.nhaMay?.nguoi_lien_he) && (
+                  <div className="flex gap-3">
+                    <div className="w-8 h-8 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                      <User className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Người liên hệ</label>
+                      <p className="text-sm font-bold text-slate-800 mt-0.5">
+                        {viewingDetail.nguoi_lien_he_de_xuat || viewingDetail.nhaMay?.nguoi_lien_he || 'Chưa cập nhật'}
+                      </p>
+                      <span className="text-xs text-slate-500 block">Đại diện doanh nghiệp / điểm đến</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Số điện thoại liên hệ doanh nghiệp */}
+                {(viewingDetail.trang_thai_duyet || viewingDetail.sdt_lien_he_de_xuat || viewingDetail.nhaMay?.sdt_lien_he) && (
+                  <div className="flex gap-3">
+                    <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                      <Phone className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Số điện thoại liên hệ</label>
+                      <p className="text-sm font-bold text-slate-800 mt-0.5 font-mono">
+                        {viewingDetail.sdt_lien_he_de_xuat || viewingDetail.nhaMay?.sdt_lien_he || 'Chưa cập nhật'}
+                      </p>
+                      <span className="text-xs text-slate-500 block">SĐT liên hệ doanh nghiệp</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Địa chỉ nơi tham quan */}
+                {(viewingDetail.dia_chi_de_xuat || viewingDetail.nhaMay?.dia_chi) && (
+                  <div className="flex gap-3 md:col-span-2 bg-slate-50/80 p-3 rounded-xl border border-slate-100">
+                    <div className="w-8 h-8 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center shrink-0">
+                      <MapPin className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Địa chỉ nơi tham quan</label>
+                      <p className="text-sm font-medium text-slate-700 mt-0.5 leading-relaxed">
+                        {viewingDetail.dia_chi_de_xuat || viewingDetail.nhaMay?.dia_chi || (viewingDetail.hinh_thuc === 'TrucTuyen' ? 'Tham quan trực tuyến' : 'Chưa cập nhật')}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {viewingDetail.trang_thai_duyet && viewingDetail.sinhVien && (
                   <div className="flex gap-3">
                     <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
@@ -1626,6 +1673,8 @@ export default function ChuyenThamQuan_DSLoc() {
                       </p>
                       <span className="text-xs text-slate-500 block">
                         Lớp: {viewingDetail.sinhVien.ten_lop || viewingDetail.sinhVien.lop || '--'}
+                        {viewingDetail.sinhVien.sdt && ` • SĐT SV: ${viewingDetail.sinhVien.sdt}`}
+                        {viewingDetail.sinhVien.email && ` • ${viewingDetail.sinhVien.email}`}
                       </span>
                     </div>
                   </div>

@@ -507,9 +507,15 @@ export class UnassignStudentsDto {
 }
 
 export class LockGradesDto {
+  @IsOptional()
   @IsInt()
   @Min(1)
-  lichKienTapId: number;
+  lichKienTapId?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  dotKienTapId?: number;
 }
 
 export class UnlockTripPrepGradesDto {
@@ -530,6 +536,21 @@ export class UnlockLecturerReportGradesDto {
   @IsInt()
   @Min(1)
   giangVienId: number;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Lý do mở khóa không được để trống' })
+  lyDo: string;
+}
+
+export class UnlockBoardCouncilGradesDto {
+  @IsInt()
+  @Min(1)
+  boardId: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  boChuyenId?: number;
 
   @IsString()
   @IsNotEmpty({ message: 'Lý do mở khóa không được để trống' })
