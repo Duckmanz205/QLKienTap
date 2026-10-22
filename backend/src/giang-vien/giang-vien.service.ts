@@ -20,9 +20,14 @@ import {
   HoiDong_ThanhVien,
   DiemHoiDong_ChiTiet,
   HoiDongChamBaoCao,
+  BoChuyenBaoCao,
   DanhSachDen,
   ThongBao,
 } from '../entities/qlkt.entity';
+import {
+  LockCouncilGradeDto,
+  UpdateCouncilStudentNoteDto,
+} from './dto/giang-vien.dto';
 
 import { R2StorageService } from '../upload/r2-storage.service';
 import * as fs from 'fs';
@@ -51,6 +56,8 @@ export class GiangVienService {
     private diemHoiDongRepo: Repository<DiemHoiDong_ChiTiet>,
     @InjectRepository(HoiDongChamBaoCao)
     private hoiDongRepo: Repository<HoiDongChamBaoCao>,
+    @InjectRepository(BoChuyenBaoCao)
+    private boChuyenRepo: Repository<BoChuyenBaoCao>,
     @InjectRepository(DanhSachDen)
     private blacklistRepo: Repository<DanhSachDen>,
     @InjectRepository(ThongBao) private thongBaoRepo: Repository<ThongBao>,
@@ -757,6 +764,7 @@ export class GiangVienService {
         .leftJoinAndSelect('pdk.sinhVien', 'sv')
         .leftJoinAndSelect('ptq.diemPhieuThamQuan', 'dptq')
         .leftJoinAndSelect('ptq.baiThuHoach', 'bth')
+        .leftJoinAndSelect('ptq.boChuyenBaoCao', 'boChuyen')
         .getMany();
 
       // Giữ nguyên cấu trúc mảng phieus cho logic bên dưới (loại bỏ tham chiếu vòng lặp)
@@ -774,6 +782,7 @@ export class GiangVienService {
             ...phieuDangKy,
             phieuThamQuan: cleanPtq,
             boChuyenBaoCaoId: ptq.bo_chuyen_bao_cao_id,
+            ghiChu: ptq.boChuyenBaoCao?.ghi_chu || '',
           };
         })
         .filter((p): p is NonNullable<typeof p> => Boolean(p));
@@ -798,19 +807,23 @@ export class GiangVienService {
               s.phieu_tham_quan_id === pTqId &&
               s.hoi_dong_thanhvien_id === cm.id,
           );
+          const isCaller = cm.id === map.id;
+          const isManager = map.vai_tro === 'ChuTich' || map.vai_tro === 'ThuKy';
+          const canViewScore = isCaller || isManager;
+
           return {
             id: cm.id,
             name: cm.giangVien?.ho_ten || 'Giảng viên',
             ma_gv: cm.giangVien?.ma_gv || '',
             vai_tro: cm.vai_tro,
-            score: scoreRecord ? scoreRecord.diem : null,
-            status: scoreRecord ? 'Đã chấm' : 'Chưa chấm',
+            score: canViewScore && scoreRecord && scoreRecord.diem !== null ? Number(scoreRecord.diem) : null,
+            status: canViewScore && scoreRecord && scoreRecord.diem !== null ? 'Đã chấm' : (canViewScore ? 'Chưa chấm' : undefined),
           };
         });
 
         return {
           ...phieu,
-          committee, // Attach committee array to each registration
+          committee,
         };
       });
 
@@ -823,6 +836,7 @@ export class GiangVienService {
           studentMap.set(sv.id, {
             sinhVien: sv,
             boChuyenId: reg.boChuyenBaoCaoId,
+            ghiChu: reg.ghiChu || '',
             reports: [],
           });
         }
@@ -834,6 +848,9 @@ export class GiangVienService {
           const myScoreRecord = reg.committee?.find((c: any) => c.id === map.id);
           const ptq = reg.phieuThamQuan;
           const ctq = reg.chuyenThamQuan;
+          const daKhoa = Boolean(ptq?.diemPhieuThamQuan?.da_khoa);
+          const daKhoaHoiDong = Boolean(ptq?.diemPhieuThamQuan?.da_khoa_hoi_dong);
+
           return {
             phieuThamQuanId: ptq?.id,
             phieuDangKyId: reg.id,
@@ -844,14 +861,9 @@ export class GiangVienService {
             ngayThamQuan: ctq?.ngay_tham_quan || null,
             gioBatDau: ctq?.gio_bat_dau || null,
             baiThuHoach: ptq?.baiThuHoach || null,
-            daKhoa: Boolean(
-              ptq?.diemPhieuThamQuan?.da_khoa ||
-              ptq?.diemPhieuThamQuan?.da_khoa_hoi_dong
-            ),
-            daKhoaHoiDong: Boolean(
-              ptq?.diemPhieuThamQuan?.da_khoa_hoi_dong ||
-              ptq?.diemPhieuThamQuan?.da_khoa
-            ),
+            daKhoa: daKhoa || daKhoaHoiDong,
+            daKhoaKhoa: daKhoa,
+            daKhoaHoiDong: daKhoaHoiDong,
             diemHoiDongFinal: ptq?.diemPhieuThamQuan?.diem_hoi_dong_final ?? null,
             myScore: myScoreRecord?.score != null ? Number(myScoreRecord.score) : null,
             status: myScoreRecord?.score != null ? 'Đã chấm' : 'Chưa chấm',
@@ -862,32 +874,62 @@ export class GiangVienService {
         const scoredTrips = trips.filter((t: any) => t.myScore != null);
         const totalTrips = trips.length;
         const isFullyScored = totalTrips > 0 && scoredTrips.length === totalTrips;
-        const isLocked = trips.length > 0 && trips.every((t: any) => t.daKhoa);
+        const isCouncilLocked = trips.length > 0 && trips.every((t: any) => t.daKhoaHoiDong || t.daKhoaKhoa);
+        const isKhoaLocked = trips.length > 0 && trips.every((t: any) => t.daKhoaKhoa);
+        const isLocked = isCouncilLocked || isKhoaLocked;
+
+        // Kiểm tra xem tất cả thành viên trong hội đồng đã chấm điểm cho mọi chuyến của SV này chưa
+        const isFullyGradedByAllMembers =
+          trips.length > 0 &&
+          trips.every((t: any) => {
+            return (
+              committeeMembers.length > 0 &&
+              committeeMembers.every((cm: any) => {
+                const sRec = allScores.find(
+                  (s) =>
+                    s.phieu_tham_quan_id === t.phieuThamQuanId &&
+                    s.hoi_dong_thanhvien_id === cm.id,
+                );
+                return sRec && sRec.diem !== null && sRec.diem !== undefined;
+              })
+            );
+          });
+
         const overallMyAvg = scoredTrips.length > 0
           ? Number((scoredTrips.reduce((acc: number, curr: any) => acc + curr.myScore, 0) / scoredTrips.length).toFixed(2))
           : null;
 
         return {
           ...st,
+          ghiChu: st.ghiChu || '',
           trips,
           totalTrips,
           scoredCount: scoredTrips.length,
           isFullyScored,
           isLocked,
+          isCouncilLocked,
+          isKhoaLocked,
+          isFullyGradedByAllMembers,
           overallMyAvg,
           myScore: overallMyAvg, // For backward compatibility
           committee: trips[0]?.committee || [],
         };
       });
 
-      const isBoardLocked = students.length > 0 && students.every((st: any) => st.isLocked);
+      const isBoardCouncilLocked = students.length > 0 && students.every((st: any) => st.isCouncilLocked);
+      const isBoardKhoaLocked = students.length > 0 && students.every((st: any) => st.isKhoaLocked);
+      const isBoardLocked = isBoardCouncilLocked || isBoardKhoaLocked;
 
       results.push({
         session: {
           ...map.hoiDong,
           isBoardLocked,
+          isBoardCouncilLocked,
+          isBoardKhoaLocked,
         },
         isBoardLocked,
+        isBoardCouncilLocked,
+        isBoardKhoaLocked,
         vai_tro: map.vai_tro,
         memberId: map.id,
         committeeMembers: committeeMembers,
@@ -1034,6 +1076,208 @@ export class GiangVienService {
       message: `Đã chấm điểm hội đồng thành công cho ${phieuIds.length} chuyến tham quan`,
       count: phieuIds.length,
       results,
+    };
+  }
+
+  // Chốt điểm cấp Hội đồng (Chỉ dành cho Chủ tịch hội đồng)
+  async lockCouncilGrade(lecturerId: number, dto: LockCouncilGradeDto) {
+    const member = await this.hoiDongThanhVienRepo.findOne({
+      where: { hoi_dong_id: dto.boardId, giang_vien_id: lecturerId },
+      relations: { hoiDong: true },
+    });
+    if (!member) {
+      throw new ForbiddenException('Bạn không phải thành viên của hội đồng này');
+    }
+    if (member.vai_tro !== 'ChuTich') {
+      throw new ForbiddenException(
+        'Chỉ có Chủ tịch hội đồng mới có quyền chốt điểm hội đồng',
+      );
+    }
+
+    // Lấy tất cả thành viên của hội đồng này
+    const allMembers = await this.hoiDongThanhVienRepo.find({
+      where: { hoi_dong_id: dto.boardId },
+      relations: { giangVien: true },
+    });
+    if (allMembers.length === 0) {
+      throw new BadRequestException('Hội đồng chưa có thành viên nào');
+    }
+    const memberIds = allMembers.map((m) => m.id);
+
+    // Xác định danh sách PhieuThamQuan cần chốt
+    const qb = this.phieuTQRepo
+      .createQueryBuilder('ptq')
+      .innerJoinAndSelect('ptq.boChuyenBaoCao', 'bo')
+      .innerJoinAndSelect('ptq.phieuDangKy', 'pdk')
+      .innerJoinAndSelect('pdk.sinhVien', 'sv')
+      .innerJoinAndSelect('pdk.chuyenThamQuan', 'ctq')
+      .leftJoinAndSelect('ctq.nhaMay', 'nm')
+      .leftJoinAndSelect('ptq.diemPhieuThamQuan', 'dptq')
+      .where('bo.hoi_dong_id = :boardId', { boardId: dto.boardId });
+
+    if (dto.phieuThamQuanId) {
+      qb.andWhere('ptq.id = :phieuId', { phieuId: dto.phieuThamQuanId });
+    } else if (dto.boChuyenId) {
+      qb.andWhere('bo.id = :boChuyenId', { boChuyenId: dto.boChuyenId });
+    }
+
+    const phieuTQs = await qb.getMany();
+    if (phieuTQs.length === 0) {
+      throw new NotFoundException('Không tìm thấy phiếu tham quan nào thuộc phạm vi chốt điểm');
+    }
+
+    // Kiểm tra nếu bất kỳ phiếu nào đã bị Khoa khóa sổ toàn diện
+    const alreadyLockedByKhoa = phieuTQs.find((p) => p.diemPhieuThamQuan?.da_khoa);
+    if (alreadyLockedByKhoa) {
+      throw new BadRequestException(
+        'Đợt kiến tập đã được Khoa khóa sổ toàn diện (da_khoa = 1), không thể thay đổi điểm hội đồng nữa.',
+      );
+    }
+
+    // Lấy tất cả điểm chi tiết của các phiếu này
+    const phieuIds = phieuTQs.map((p) => p.id);
+    const allChiTiets = await this.diemHoiDongRepo
+      .createQueryBuilder('d')
+      .where('d.phieu_tham_quan_id IN (:...phieuIds)', { phieuIds })
+      .andWhere('d.hoi_dong_thanhvien_id IN (:...memberIds)', { memberIds })
+      .getMany();
+
+    // Validation bắt buộc: Kiểm tra TẤT CẢ thành viên đã chấm điểm cho TẤT CẢ các phiếu cần chốt chưa
+    const uncompletedList: {
+      mssv: string;
+      hoTen: string;
+      tenChuyen: string;
+      giangVienChuaCham: string[];
+    }[] = [];
+
+    for (const ptq of phieuTQs) {
+      const sv = ptq.phieuDangKy?.sinhVien;
+      const tenChuyen = ptq.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Chuyến tham quan';
+      const missingMembers: string[] = [];
+
+      for (const m of allMembers) {
+        const hasScore = allChiTiets.some(
+          (d) =>
+            d.phieu_tham_quan_id === ptq.id &&
+            d.hoi_dong_thanhvien_id === m.id &&
+            d.diem !== null &&
+            d.diem !== undefined,
+        );
+        if (!hasScore) {
+          missingMembers.push(m.giangVien?.ho_ten || `Giảng viên ID ${m.giang_vien_id}`);
+        }
+      }
+
+      if (missingMembers.length > 0) {
+        uncompletedList.push({
+          mssv: sv?.mssv || '',
+          hoTen: sv?.ho_ten || '',
+          tenChuyen,
+          giangVienChuaCham: missingMembers,
+        });
+      }
+    }
+
+    if (uncompletedList.length > 0) {
+      const summaryMsg = uncompletedList
+        .map(
+          (u) =>
+            `Sinh viên ${u.hoTen} (${u.mssv}) - ${u.tenChuyen}: Thiếu điểm của [${u.giangVienChuaCham.join(', ')}]`,
+        )
+        .join('; ');
+
+      throw new BadRequestException({
+        message: `Chưa thể chốt điểm vì còn thành viên hội đồng chưa hoàn thành chấm điểm.`,
+        uncompleted: uncompletedList,
+        detail: summaryMsg,
+      });
+    }
+
+    // Thực hiện chốt điểm cấp Hội đồng
+    const now = new Date();
+    const diemPhieusToSave: DiemPhieuThamQuan[] = [];
+
+    for (const ptq of phieuTQs) {
+      let diemPhieu = ptq.diemPhieuThamQuan;
+      if (!diemPhieu) {
+        diemPhieu = await this.diemPhieuRepo.findOne({
+          where: { phieu_tham_quan_id: ptq.id },
+        });
+      }
+      if (!diemPhieu) {
+        diemPhieu = new DiemPhieuThamQuan();
+        diemPhieu.phieu_tham_quan_id = ptq.id;
+      }
+
+      const chiTiets = allChiTiets.filter((d) => d.phieu_tham_quan_id === ptq.id);
+      const sum = chiTiets.reduce((acc, curr) => acc + Number(curr.diem), 0);
+      const avg = chiTiets.length > 0 ? sum / chiTiets.length : 0;
+
+      diemPhieu.diem_hoi_dong_final = Number(avg.toFixed(2));
+      diemPhieu.da_khoa_hoi_dong = true;
+      diemPhieu.ngay_khoa_hoi_dong = now;
+
+      diemPhieusToSave.push(diemPhieu);
+    }
+
+    await this.diemPhieuRepo.save(diemPhieusToSave);
+
+    return {
+      message: `Đã chốt điểm Hội đồng thành công cho ${phieuTQs.length} phiếu tham quan.`,
+      updatedCount: phieuTQs.length,
+      ngay_khoa_hoi_dong: now,
+    };
+  }
+
+  // Cập nhật ghi chú biên bản hội đồng (Dành cho Thư ký và Chủ tịch hội đồng)
+  async updateCouncilStudentNote(
+    lecturerId: number,
+    dto: UpdateCouncilStudentNoteDto,
+  ) {
+    const bo = await this.boChuyenRepo.findOne({
+      where: { id: dto.boChuyenId },
+      relations: { hoiDong: true },
+    });
+    if (!bo) {
+      throw new NotFoundException('Không tìm thấy bộ chuyến báo cáo của sinh viên');
+    }
+
+    if (!bo.hoi_dong_id) {
+      throw new BadRequestException('Sinh viên này chưa được phân công vào hội đồng nào');
+    }
+
+    const member = await this.hoiDongThanhVienRepo.findOne({
+      where: { hoi_dong_id: bo.hoi_dong_id, giang_vien_id: lecturerId },
+    });
+    if (!member) {
+      throw new ForbiddenException('Bạn không phải thành viên của hội đồng này');
+    }
+    if (member.vai_tro !== 'ThuKy' && member.vai_tro !== 'ChuTich') {
+      throw new ForbiddenException(
+        'Chỉ có Thư ký hoặc Chủ tịch hội đồng mới có quyền cập nhật ghi chú biên bản',
+      );
+    }
+
+    // Kiểm tra nếu các phiếu thuộc bộ chuyến này đã bị khóa điểm hội đồng hoặc khóa sổ cấp Khoa
+    const phieuTQs = await this.phieuTQRepo.find({
+      where: { bo_chuyen_bao_cao_id: bo.id },
+      relations: { diemPhieuThamQuan: true },
+    });
+    const isLocked = phieuTQs.some(
+      (p) => p.diemPhieuThamQuan?.da_khoa_hoi_dong || p.diemPhieuThamQuan?.da_khoa,
+    );
+    if (isLocked) {
+      throw new BadRequestException(
+        'Điểm hội đồng của sinh viên này đã được chốt, không thể chỉnh sửa ghi chú biên bản nữa.',
+      );
+    }
+
+    bo.ghi_chu = dto.ghiChu ? dto.ghiChu.trim() : (null as any);
+    await this.boChuyenRepo.save(bo);
+
+    return {
+      message: 'Cập nhật ghi chú biên bản hội đồng thành công',
+      ghiChu: bo.ghi_chu,
     };
   }
 

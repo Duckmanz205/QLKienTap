@@ -3386,14 +3386,31 @@ export class KhoaService implements OnModuleInit {
           relations: { giangVien: true },
         });
 
-        const studentCount = await this.boRepo.count({
+        const boChuyens = await this.boRepo.find({
           where: { hoi_dong_id: b.id },
         });
+        const boIds = boChuyens.map((bo) => bo.id);
+        let isCouncilLocked = false;
+        let isKhoaLocked = false;
+        if (boIds.length > 0) {
+          const phieuTQs = await this.phieuTQRepo.find({
+            where: { bo_chuyen_bao_cao_id: In(boIds) },
+            relations: { diemPhieuThamQuan: true },
+          });
+          isCouncilLocked = phieuTQs.length > 0 && phieuTQs.every(
+            (p) => Boolean(p.diemPhieuThamQuan?.da_khoa_hoi_dong),
+          );
+          isKhoaLocked = phieuTQs.length > 0 && phieuTQs.every(
+            (p) => Boolean(p.diemPhieuThamQuan?.da_khoa),
+          );
+        }
 
         return {
           ...b,
           members: thanhViens,
-          sv: studentCount,
+          sv: boIds.length,
+          isCouncilLocked,
+          isKhoaLocked,
         };
       }),
     );
@@ -3591,16 +3608,29 @@ export class KhoaService implements OnModuleInit {
           },
         });
 
+        const isCouncilLocked = phieuTQs.length > 0 && phieuTQs.every(
+          (p) => Boolean(p.diemPhieuThamQuan?.da_khoa_hoi_dong),
+        );
+        const isKhoaLocked = phieuTQs.length > 0 && phieuTQs.every(
+          (p) => Boolean(p.diemPhieuThamQuan?.da_khoa),
+        );
+
         return {
           boChuyenId: bo.id,
           dotKienTapSinhVienId: bo.dot_kien_tap_sinh_vien_id,
           sinhVien: bo.dotKienTapSinhVien?.sinhVien,
+          ghiChu: bo.ghi_chu || '',
+          isCouncilLocked,
+          isKhoaLocked,
+          isLocked: isCouncilLocked || isKhoaLocked,
           trips: phieuTQs.map((ptq) => ({
             id: ptq.id,
             phieuDangKyId: ptq.phieu_dang_ky_id,
             nhaMay: ptq.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Chuyến đi',
             hinhThuc: ptq.phieuDangKy?.chuyenThamQuan?.hinh_thuc,
             diemHoiDong: ptq.diemPhieuThamQuan?.diem_hoi_dong_final ?? null,
+            daKhoaHoiDong: Boolean(ptq.diemPhieuThamQuan?.da_khoa_hoi_dong),
+            daKhoaKhoa: Boolean(ptq.diemPhieuThamQuan?.da_khoa),
             daKhoa:
               (ptq.diemPhieuThamQuan?.da_khoa_hoi_dong ||
                 ptq.diemPhieuThamQuan?.da_khoa) ??
@@ -3733,25 +3763,66 @@ export class KhoaService implements OnModuleInit {
     };
   }
 
-  async unlockBoard(boardId: number) {
-    const board = await this.hdRepo.findOne({ where: { id: boardId } });
+  async unlockBoardCouncilGrades(
+    dto: { boardId: number; boChuyenId?: number; lyDo?: string },
+    userAccountId?: number,
+  ) {
+    const board = await this.hdRepo.findOne({
+      where: { id: dto.boardId },
+      relations: { dotKienTap: true },
+    });
     if (!board) throw new NotFoundException('Không tìm thấy hội đồng');
 
-    const boChuyens = await this.boRepo.find({ where: { hoi_dong_id: boardId } });
-    const boIds = boChuyens.map((b) => b.id);
-    if (boIds.length === 0) {
+    // Kiểm tra nếu đợt kiến tập đã được Khoa khóa sổ toàn diện
+    if (board.dotKienTap?.trang_thai === 'DaKhoa') {
+      throw new BadRequestException(
+        'Đợt kiến tập đã được khóa sổ toàn diện (da_khoa = 1), không thể mở khóa điểm hội đồng.',
+      );
+    }
+
+    let targetBoIds: number[] = [];
+    if (dto.boChuyenId) {
+      const bo = await this.boRepo.findOne({
+        where: { id: dto.boChuyenId, hoi_dong_id: dto.boardId },
+      });
+      if (!bo) {
+        throw new NotFoundException(
+          'Không tìm thấy bộ chuyến báo cáo của sinh viên trong hội đồng này',
+        );
+      }
+      targetBoIds = [bo.id];
+    } else {
+      const boChuyens = await this.boRepo.find({
+        where: { hoi_dong_id: dto.boardId },
+      });
+      targetBoIds = boChuyens.map((b) => b.id);
+    }
+
+    if (targetBoIds.length === 0) {
       return { message: 'Hội đồng chưa có sinh viên nào để mở khóa điểm' };
     }
 
     const phieuTQs = await this.phieuTQRepo.find({
-      where: { bo_chuyen_bao_cao_id: In(boIds) },
+      where: { bo_chuyen_bao_cao_id: In(targetBoIds) },
+      relations: { diemPhieuThamQuan: true },
     });
+
+    // Kiểm tra xem có phiếu nào đã bị khóa sổ cấp Khoa chưa
+    const alreadyKhoaLocked = phieuTQs.find((p) => p.diemPhieuThamQuan?.da_khoa);
+    if (alreadyKhoaLocked) {
+      throw new BadRequestException(
+        'Đợt kiến tập đã được khóa sổ toàn diện, không thể mở khóa điểm hội đồng.',
+      );
+    }
 
     let updatedCount = 0;
     for (const ptq of phieuTQs) {
-      const diemPhieu = await this.diemPhieuRepo.findOne({
-        where: { phieu_tham_quan_id: ptq.id },
-      });
+      let diemPhieu = ptq.diemPhieuThamQuan;
+      if (!diemPhieu) {
+        diemPhieu = await this.diemPhieuRepo.findOne({
+          where: { phieu_tham_quan_id: ptq.id },
+        });
+      }
       if (diemPhieu) {
         diemPhieu.da_khoa_hoi_dong = false;
         diemPhieu.ngay_khoa_hoi_dong = null;
@@ -3760,9 +3831,30 @@ export class KhoaService implements OnModuleInit {
       }
     }
 
+    // Gửi thông báo đến Chủ tịch và Thư ký hội đồng
+    try {
+      const notif = new ThongBao();
+      notif.tieu_de = `[Khoa] Mở khóa điểm Hội đồng: ${board.ten_hoi_dong}`;
+      notif.noi_dung = `Khoa đã phê duyệt mở khóa điểm cho Hội đồng "${board.ten_hoi_dong}"${dto.boChuyenId ? ' (cho sinh viên được chỉ định)' : ''}. Lý do: "${dto.lyDo || 'Mở khóa điểm hội đồng'}". Thầy/Cô Chủ tịch & Thư ký vui lòng kiểm tra, chấm lại và thực hiện chốt điểm khi hoàn tất.`;
+      notif.nguoi_gui_id = userAccountId || 1;
+      notif.doi_tuong_nhan = 'LECTURER';
+      notif.loai_thong_bao = 'NhacNho';
+      await this.thongBaoRepo.save(notif);
+    } catch (e) {
+      console.warn('Lỗi gửi thông báo mở khóa Hội đồng:', e);
+    }
+
     return {
-      message: `Đã mở khóa điểm hội đồng thành công cho ${boChuyens.length} sinh viên (${updatedCount} phiếu tham quan).`,
+      message: `Đã mở khóa điểm hội đồng thành công cho ${targetBoIds.length} sinh viên (${updatedCount} phiếu tham quan).`,
+      updatedCount,
     };
+  }
+
+  async unlockBoard(boardId: number, lyDo?: string, userAccountId?: number) {
+    return this.unlockBoardCouncilGrades(
+      { boardId, lyDo: lyDo || 'Mở khóa toàn bộ hội đồng' },
+      userAccountId,
+    );
   }
 
   async autoSelectRepresentativeTrips(dksvId: number) {
@@ -4501,7 +4593,55 @@ export class KhoaService implements OnModuleInit {
       }
     }
 
+    // 3. Kiểm tra Hội đồng chấm báo cáo
+    // Quy tắc: Chỉ kiểm tra da_khoa_hoi_dong = true đối với các PhieuThamQuan nằm trong bộ chuyến báo cáo (bo_chuyen_bao_cao_id IS NOT NULL và gắn với BoChuyenBaoCao)
+    const dotKienTapId = await this.resolveDotKienTapId(lichOrDotId);
+    const boards = await this.hdRepo.find({
+      where: { dot_kien_tap_id: dotKienTapId },
+    });
+
+    for (const b of boards) {
+      const boChuyens = await this.boRepo.find({
+        where: { hoi_dong_id: b.id },
+      });
+      if (boChuyens.length === 0) continue;
+
+      const boIds = boChuyens.map((bo) => bo.id);
+      const phieuTQs = await this.phieuTQRepo.find({
+        where: { bo_chuyen_bao_cao_id: In(boIds) },
+        relations: { diemPhieuThamQuan: true },
+      });
+
+      const unsubmittedPhieus = phieuTQs.filter(
+        (p) => !p.diemPhieuThamQuan?.da_khoa_hoi_dong,
+      );
+
+      if (unsubmittedPhieus.length > 0) {
+        const chuTich = await this.hdTvRepo.findOne({
+          where: { hoi_dong_id: b.id, vai_tro: 'ChuTich' },
+          relations: { giangVien: true },
+        });
+
+        const chuTichName = chuTich?.giangVien?.ho_ten || 'Chưa phân công Chủ tịch';
+        unsubmitted.push({
+          ten: chuTichName,
+          ten_giang_vien: chuTichName,
+          vai_tro: 'Chủ tịch Hội đồng',
+          chi_tiet: `Hội đồng "${b.ten_hoi_dong}" còn ${unsubmittedPhieus.length}/${phieuTQs.length} phiếu báo cáo chưa chốt điểm`,
+        });
+      }
+    }
+
     return unsubmitted;
+  }
+
+  // Kiểm tra điều kiện có thể khóa sổ toàn diện đợt/lịch kiến tập
+  async checkCanLockSchedule(lichOrDotId: number) {
+    const unsubmitted = await this.getUnsubmittedLecturers(lichOrDotId);
+    return {
+      canLock: unsubmitted.length === 0,
+      unsubmitted,
+    };
   }
 
   private getBlacklistReasonLabel(reason?: string): string {

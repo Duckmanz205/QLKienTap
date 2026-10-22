@@ -14,6 +14,8 @@ export const giangVienApi = {
   getBoardSessions: (lecturerId) => api.get(`/giang-vien/board-sessions/${lecturerId}`),
   submitBoardScore: (data) => api.post('/giang-vien/submit-board-score', data),
   submitBoardScoresBatch: (data) => api.post('/giang-vien/submit-board-scores-batch', data),
+  lockCouncilGrade: (data) => api.post('/giang-vien/lock-council-grade', data),
+  updateCouncilStudentNote: (data) => api.put('/giang-vien/council-student-note', data),
   getNotifications: (lecturerId) => api.get(`/giang-vien/notifications/${lecturerId}`),
   getDashboardStats: (lecturerId) => api.get(`/giang-vien/dashboard-stats/${lecturerId}`),
 };

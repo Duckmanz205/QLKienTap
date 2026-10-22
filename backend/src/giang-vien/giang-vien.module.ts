@@ -18,6 +18,7 @@ import {
   HoiDong_ThanhVien,
   DiemHoiDong_ChiTiet,
   HoiDongChamBaoCao,
+  BoChuyenBaoCao,
   DanhSachDen,
   ThongBao,
 } from '../entities/qlkt.entity';
@@ -38,6 +39,7 @@ import {
       HoiDong_ThanhVien,
       DiemHoiDong_ChiTiet,
       HoiDongChamBaoCao,
+      BoChuyenBaoCao,
       DanhSachDen,
       ThongBao,
     ]),

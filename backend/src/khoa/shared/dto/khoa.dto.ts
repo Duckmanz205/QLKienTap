@@ -542,6 +542,21 @@ export class UnlockLecturerReportGradesDto {
   lyDo: string;
 }
 
+export class UnlockBoardCouncilGradesDto {
+  @IsInt()
+  @Min(1)
+  boardId: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  boChuyenId?: number;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Lý do mở khóa không được để trống' })
+  lyDo: string;
+}
+
 export class ApproveRefundDto {
   @IsInt()
   @Min(1)

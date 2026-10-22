@@ -138,3 +138,31 @@ export class LockGuidedReportsGradesDto {
   dotKienTapId?: number;
 }
 
+export class LockCouncilGradeDto {
+  @IsInt()
+  @Min(1)
+  boardId: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  phieuThamQuanId?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  boChuyenId?: number;
+}
+
+export class UpdateCouncilStudentNoteDto {
+  @IsInt()
+  @Min(1)
+  boChuyenId: number;
+
+  @IsString()
+  ghiChu: string;
+}
+
+

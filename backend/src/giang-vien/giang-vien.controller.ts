@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Put,
   Body,
   Param,
   ParseIntPipe,
@@ -23,6 +24,8 @@ import {
   GuidedReportsQueryDto,
   LockTripPrepGradesDto,
   LockGuidedReportsGradesDto,
+  LockCouncilGradeDto,
+  UpdateCouncilStudentNoteDto,
 } from './dto/giang-vien.dto';
 
 @Controller('giang-vien')
@@ -227,6 +230,24 @@ export class GiangVienController {
       body.phieuIds,
       body.score,
     );
+  }
+
+  @Post('lock-council-grade')
+  async lockCouncilGrade(
+    @CurrentUser() user: JwtPayloadUser,
+    @Body() body: LockCouncilGradeDto,
+  ) {
+    const gv = await this.gvService.getLecturerByAccountId(user.sub);
+    return this.gvService.lockCouncilGrade(gv.id, body);
+  }
+
+  @Put('council-student-note')
+  async updateCouncilStudentNote(
+    @CurrentUser() user: JwtPayloadUser,
+    @Body() body: UpdateCouncilStudentNoteDto,
+  ) {
+    const gv = await this.gvService.getLecturerByAccountId(user.sub);
+    return this.gvService.updateCouncilStudentNote(gv.id, body);
   }
 
   @Get('notifications/:lecturerId')
