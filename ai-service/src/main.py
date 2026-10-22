@@ -171,7 +171,7 @@ async def process_pdf_endpoint(file: UploadFile = File(...)):
 # ==========================================
 # MODULE 2: GRADING ENGINE (HỘI ĐỒNG CHẤM AI)
 # ==========================================
-EXPERT_MODEL = "qwen3.8-max"  # Khôi phục đúng model của dự án
+EXPERT_MODEL = "qwen3.8-max-0902"  # Snapshot model của qwen3.8-max
 
 class GradingRequest(BaseModel):
     document_text: str
