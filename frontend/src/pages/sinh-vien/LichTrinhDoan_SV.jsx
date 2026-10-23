@@ -303,7 +303,7 @@ export default function LichTrinhDoan_SV() {
             {/* Left Side: Trip Info */}
             <div className="flex-1">
               <div className="flex flex-wrap items-center gap-2.5 mb-3">
-                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-bold uppercase tracking-wider text-white shadow-sm ${ctq?.hinh_thuc === 'TrucTuyen' ? 'bg-sky-600' : 'bg-[#407F3E]'}`}>
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-bold uppercase tracking-wider ${ctq?.hinh_thuc === 'TrucTuyen' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-[#407F3E] text-white shadow-sm'}`}>
                   {ctq?.hinh_thuc === 'TrucTuyen' ? <Laptop className="w-3.5 h-3.5" /> : <MapPin className="w-3.5 h-3.5" />}
                   {ctq?.hinh_thuc === 'TrucTuyen' ? 'Trực tuyến' : 'Trực tiếp'}
                 </span>

@@ -470,35 +470,18 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
                     />
                   </div>
 
-                  <div className="relative">
+                  <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">
                       Năm học <span className="text-[#E68A8C]">*</span>
                     </label>
-                    <div
-                      onClick={(e) => { e.stopPropagation(); setIsDropdownOpen(!isDropdownOpen); }}
-                      className={`w-full px-4 py-2.5 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-                    >
-                      <span className={selectedNamHoc ? 'text-slate-800 font-medium' : 'text-slate-500'}>
-                        {years.find(y => y.id === selectedNamHoc)?.ten_nam_hoc || 'Chọn năm học'}
-                      </span>
-                      <ChevronDown className="w-4 h-4 text-slate-400" />
-                    </div>
-
-                    {isDropdownOpen && (
-                      <div className="absolute top-[72px] left-0 w-full bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-10 py-1 overflow-hidden max-h-48 overflow-y-auto">
-                        {years.map(y => (
-                          <div
-                            key={y.id}
-                            onClick={() => { setSelectedNamHoc(y.id); setIsDropdownOpen(false); }}
-                            className={`px-4 py-2 text-sm flex justify-between items-center cursor-pointer transition-colors ${selectedNamHoc === y.id ? 'bg-[#E7E0C4] text-slate-800 font-medium' : 'text-slate-700 hover:bg-[#E7E0C4]/50'
-                              }`}
-                          >
-                            {y.ten_nam_hoc}
-                            {selectedNamHoc === y.id && <Check className="w-4 h-4 text-[#407F3E]" />}
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    <SearchableDropdown
+                      options={years.map(y => ({ value: y.id, label: y.ten_nam_hoc }))}
+                      value={selectedNamHoc}
+                      onChange={(val) => setSelectedNamHoc(val)}
+                      placeholder="Chọn năm học"
+                      searchPlaceholder="Tìm năm học..."
+                      className="w-full"
+                    />
                   </div>
 
                   <div>
@@ -647,31 +630,16 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
                       className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:border-[#407F3E]"
                     />
                   </div>
-                  <div className="relative">
+                  <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">Năm học <span className="text-[#E68A8C]">*</span></label>
-                    <div
-                      onClick={(e) => { e.stopPropagation(); setIsDropdownOpen(!isDropdownOpen); }}
-                      className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm flex justify-between items-center cursor-pointer"
-                    >
-                      <span className="text-slate-800 font-medium">
-                        {years.find(y => y.id === editFormData.nam_hoc_id)?.ten_nam_hoc || 'Chọn năm học'}
-                      </span>
-                      <ChevronDown className="w-4 h-4 text-slate-400" />
-                    </div>
-                    {isDropdownOpen && (
-                      <div className="absolute top-[72px] left-0 w-full bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-10 py-1 overflow-hidden max-h-48 overflow-y-auto">
-                        {years.map(y => (
-                          <div
-                            key={y.id}
-                            onClick={() => { setEditFormData({ ...editFormData, nam_hoc_id: y.id }); setIsDropdownOpen(false); }}
-                            className="px-4 py-2 text-sm flex justify-between items-center cursor-pointer hover:bg-[#E7E0C4]/50"
-                          >
-                            {y.ten_nam_hoc}
-                            {editFormData.nam_hoc_id === y.id && <Check className="w-4 h-4 text-[#407F3E]" />}
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    <SearchableDropdown
+                      options={years.map(y => ({ value: y.id, label: y.ten_nam_hoc }))}
+                      value={editFormData.nam_hoc_id}
+                      onChange={(val) => setEditFormData({ ...editFormData, nam_hoc_id: val })}
+                      placeholder="Chọn năm học"
+                      searchPlaceholder="Tìm năm học..."
+                      className="w-full"
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">Ngày bắt đầu</label>

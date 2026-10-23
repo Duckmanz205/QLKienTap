@@ -207,11 +207,11 @@ export default function LeaderAssignment_Khoa() {
     }
   };
 
-  const isLecturerBusy = (lecturerId, dateStr) => {
-    if (!dateStr) return false;
+  const isLecturerBusy = (lecturerId, dateStr, currentTripId) => {
+    if (!dateStr || !lecturerId) return false;
     const dateToCompare = new Date(dateStr).toDateString();
     return trips.some(trip => {
-      if (!trip.ngay_tham_quan) return false;
+      if (!trip.ngay_tham_quan || trip.trang_thai === 'DaHuy' || (currentTripId && trip.id === currentTripId)) return false;
       return new Date(trip.ngay_tham_quan).toDateString() === dateToCompare
         && trip.giaoVienDanDoan?.some(g => g.giang_vien_id === lecturerId);
     });
@@ -419,32 +419,22 @@ export default function LeaderAssignment_Khoa() {
         </div>
 
         {/* Hình thức Dropdown */}
-        <div className="relative flex-1 min-w-[130px]">
-          <div 
-            onClick={(e) => handleDropdownClick(e, setIsTypeDropdownOpen)}
-            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isTypeDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-          >
-            <span className={`truncate pr-2 font-medium ${selectedType ? 'text-slate-700' : 'text-slate-400'}`}>{selectedType || 'Hình thức'}</span>
-            <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isTypeDropdownOpen ? 'rotate-180 text-[#407F3E]' : ''}`} />
-          </div>
-          {isTypeDropdownOpen && (
-            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[180px]">
-              <div className="max-h-60 overflow-y-auto">
-                {typeOptions.map(opt => (
-                  <div 
-                    key={opt}
-                    onClick={() => { setSelectedType(opt === 'Tất cả' ? '' : opt); setIsTypeDropdownOpen(false); setCurrentPage(1); }}
-                    className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                      selectedType === opt || (selectedType === '' && opt === 'Tất cả') ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/30 font-medium'
-                    }`}
-                  >
-                    <span className="truncate pr-2">{opt}</span>
-                    {(selectedType === opt || (selectedType === '' && opt === 'Tất cả')) && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+        <div className="flex-1 min-w-[150px]">
+          <SearchableDropdown
+            options={[
+              { value: '', label: 'Tất cả hình thức' },
+              { value: 'Trường tổ chức', label: 'Trường tổ chức' },
+              { value: 'Sinh viên đề xuất', label: 'Sinh viên đề xuất' }
+            ]}
+            value={selectedType}
+            onChange={(val) => {
+              setSelectedType(val);
+              setCurrentPage(1);
+            }}
+            placeholder="Tất cả hình thức"
+            searchPlaceholder="Tìm hình thức..."
+            className="w-full"
+          />
         </div>
 
         {/* Nhà máy Dropdown */}
@@ -683,7 +673,7 @@ export default function LeaderAssignment_Khoa() {
                           </div>
                           <div className="max-h-[220px] overflow-y-auto py-1 divide-y divide-slate-100/60">
                             {lecturers.filter(gv => gv.ho_ten.toLowerCase().includes(searchLecturer.toLowerCase())).map(gv => {
-                              const isBusy = isLecturerBusy(gv.id, t.ngay_tham_quan);
+                              const isBusy = isLecturerBusy(gv.id, t.ngay_tham_quan, t.id);
                               const workload = getLecturerWorkload(gv.id);
                               return (
                                 <div 

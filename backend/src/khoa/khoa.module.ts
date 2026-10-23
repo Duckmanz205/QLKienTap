@@ -5,6 +5,7 @@ import { KhoaController } from './quan-ly-khoa/quan-ly-khoa.controller';
 import { ClbController } from './clb/clb.controller';
 import { QtvController } from './qtv/qtv.controller';
 import { KhoaService } from './shared/khoa.service';
+import { BackupService } from './shared/backup.service';
 import {
   NamHoc,
   HocKy,
@@ -81,7 +82,7 @@ import {
     AuthModule,
   ],
   controllers: [KhoaController, ClbController, QtvController],
-  providers: [KhoaService],
-  exports: [KhoaService],
+  providers: [KhoaService, BackupService],
+  exports: [KhoaService, BackupService],
 })
 export class KhoaModule {}

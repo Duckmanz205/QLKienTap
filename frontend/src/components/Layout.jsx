@@ -26,11 +26,17 @@ import {
   Eye,
   EyeOff,
   Key,
+  Database,
   Menu,
   PanelLeftClose,
-  PanelLeftOpen
+  PanelLeftOpen,
+  Download,
+  AlertCircle,
+  RefreshCw,
+  X
 } from 'lucide-react';
-import { sinhVienApi, authApi } from '../services/api';
+import toast from 'react-hot-toast';
+import { sinhVienApi, authApi, qtvApi } from '../services/api';
 
 import { getValidSession, clearSession } from '../utils/auth';
 import ChangePasswordModal from './ChangePasswordModal';
@@ -172,6 +178,7 @@ export default function Layout() {
   if (isAdmin) {
     khoaMenuItems = [
       { to: '/qtv/accounts', label: 'Tài khoản người dùng', icon: Key, category: 'DANH MỤC HỆ THỐNG' },
+      { to: '/qtv/backup', label: 'Sao lưu & Phục hồi', icon: Database, category: 'DANH MỤC HỆ THỐNG' },
     ];
   } else if (isKhoa) {
     khoaMenuItems = [
@@ -291,6 +298,7 @@ export default function Layout() {
     if (path === '/khoa/notifications') return 'Thông báo';
     if (path === '/khoa/reports') return 'Báo cáo thống kê';
     if (path === '/qtv/accounts') return 'Tài khoản người dùng';
+    if (path === '/qtv/backup') return 'Sao lưu & Phục hồi cơ sở dữ liệu';
     if (path === '/khoa/fees') return 'Quản lý lệ phí';
     if (path === '/khoa/results') return 'Kết quả kiến tập';
     if (path === '/khoa/refund-approval') return 'Duyệt hoàn phí';
@@ -438,6 +446,21 @@ export default function Layout() {
                 <div className="pl-1.5 space-y-1 transition-all duration-300">
                   {items.map((item) => {
                     const Icon = item.icon;
+                    if (item.isAction) {
+                      return (
+                        <button
+                          key={item.id || item.label}
+                          type="button"
+                          onClick={() => setShowBackupModal(true)}
+                          className="w-full flex items-center justify-between px-3.5 py-2 rounded-xl text-sm transition-all duration-200 cursor-pointer text-white/80 hover:bg-white/10 hover:text-white font-medium"
+                        >
+                          <div className="flex items-center gap-3">
+                            <Icon className="w-5 h-5 shrink-0 stroke-[1.8]" />
+                            {!isSidebarCollapsed && <span className="text-[13.5px] truncate">{item.label}</span>}
+                          </div>
+                        </button>
+                      );
+                    }
                     const isActive = location.pathname === item.to;
                     return (
                       <Link

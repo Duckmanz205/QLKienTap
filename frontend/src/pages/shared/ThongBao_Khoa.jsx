@@ -431,63 +431,29 @@ export default function ThongBao_Khoa() {
                 {/* Đối tượng & Loại */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-30">
                   {/* Đối tượng nhận */}
-                  <div className="relative">
+                  <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Đối tượng nhận *</label>
-                    <div 
-                      onClick={(e) => { e.stopPropagation(); setIsDoiTuongDropdownOpen(!isDoiTuongDropdownOpen); setIsLoaiDropdownOpen(false); }}
-                      className={`w-full px-4 py-2 bg-slate-50 border rounded-xl text-sm flex justify-between items-center cursor-pointer transition-all ${isDoiTuongDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4] hover:border-[#407F3E]'}`}
-                    >
-                      <span className="font-semibold text-slate-800">
-                        {doiTuongOptions.find(o => o.value === selectedDoiTuong)?.label || 'Chọn đối tượng'}
-                      </span>
-                      <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-                    </div>
-                    {isDoiTuongDropdownOpen && (
-                      <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-50 py-1 overflow-hidden animate-in slide-in-from-top-1">
-                        {doiTuongOptions.map(opt => (
-                          <div 
-                            key={opt.value}
-                            onClick={() => { setSelectedDoiTuong(opt.value); setIsDoiTuongDropdownOpen(false); }}
-                            className={`px-4 py-2 text-sm cursor-pointer font-medium transition-colors flex justify-between items-center ${
-                              selectedDoiTuong === opt.value ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/40'
-                            }`}
-                          >
-                            {opt.label}
-                            {selectedDoiTuong === opt.value && <Check className="w-4 h-4 text-[#407F3E]" />}
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    <SearchableDropdown
+                      options={doiTuongOptions}
+                      value={selectedDoiTuong}
+                      onChange={(val) => setSelectedDoiTuong(val)}
+                      placeholder="Chọn đối tượng"
+                      searchPlaceholder="Tìm đối tượng..."
+                      className="w-full"
+                    />
                   </div>
 
                   {/* Loại thông báo */}
-                  <div className="relative">
+                  <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Loại thông báo *</label>
-                    <div 
-                      onClick={(e) => { e.stopPropagation(); setIsLoaiDropdownOpen(!isLoaiDropdownOpen); setIsDoiTuongDropdownOpen(false); }}
-                      className={`w-full px-4 py-2 bg-slate-50 border rounded-xl text-sm flex justify-between items-center cursor-pointer transition-all ${isLoaiDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4] hover:border-[#407F3E]'}`}
-                    >
-                      <span className="font-semibold text-slate-800">
-                        {loaiThongBaoOptions.find(o => o.value === selectedLoaiThongBao)?.label || 'Chọn loại'}
-                      </span>
-                      <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-                    </div>
-                    {isLoaiDropdownOpen && (
-                      <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-50 py-1 overflow-hidden animate-in slide-in-from-top-1">
-                        {loaiThongBaoOptions.map(opt => (
-                          <div 
-                            key={opt.value}
-                            onClick={() => { setSelectedLoaiThongBao(opt.value); setIsLoaiDropdownOpen(false); }}
-                            className={`px-4 py-2 text-sm cursor-pointer font-medium transition-colors flex justify-between items-center ${
-                              selectedLoaiThongBao === opt.value ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/40'
-                            }`}
-                          >
-                            {opt.label}
-                            {selectedLoaiThongBao === opt.value && <Check className="w-4 h-4 text-[#407F3E]" />}
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    <SearchableDropdown
+                      options={loaiThongBaoOptions}
+                      value={selectedLoaiThongBao}
+                      onChange={(val) => setSelectedLoaiThongBao(val)}
+                      placeholder="Chọn loại"
+                      searchPlaceholder="Tìm loại thông báo..."
+                      className="w-full"
+                    />
                   </div>
                 </div>
 
