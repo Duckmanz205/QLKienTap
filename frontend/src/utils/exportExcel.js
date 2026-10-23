@@ -718,7 +718,7 @@ export const exportDanhSachHoiDongTheoDot = (dotInfo, boardsData = []) => {
 
   // ===================== SHEET 1: TỔNG QUAN HỘI ĐỒNG =====================
   const sheet1Rows = [
-    ['BỘ CÔNG THƯƠNG', '', '', '', 'TRƯỜNG ĐẠI HỌC CÔNG THƯƠNG TP. HỒ CHÍ MINH - KHOA CÔNG NGHỆ THÔNG TIN'],
+    ['BỘ CÔNG THƯƠNG', '', '', '', 'TRƯỜNG ĐẠI HỌC CÔNG THƯƠNG TP. HỒ CHÍ MINH - KHOA CÔNG NGHỆ THỰC PHẨM'],
     ['', '', 'DANH SÁCH HỘI ĐỒNG CHẤM BÁO CÁO KIẾN TẬP DOANH NGHIỆP'],
     ['', '', tenDot ? `Đợt kiến tập: ${tenDot}` : 'Tất cả các đợt kiến tập', '', `Ngày xuất: ${currentDate}`],
     [],
@@ -799,7 +799,7 @@ export const exportDanhSachHoiDongTheoDot = (dotInfo, boardsData = []) => {
 
   // ===================== SHEET 2: CHI TIẾT SINH VIÊN =====================
   const sheet2Rows = [
-    ['BỘ CÔNG THƯƠNG', '', '', '', '', 'TRƯỜNG ĐẠI HỌC CÔNG THƯƠNG TP. HỒ CHÍ MINH - KHOA CÔNG NGHỆ THÔNG TIN'],
+    ['BỘ CÔNG THƯƠNG', '', '', '', '', 'TRƯỜNG ĐẠI HỌC CÔNG THƯƠNG TP. HỒ CHÍ MINH - KHOA CÔNG NGHỆ THỰC PHẨM'],
     ['', '', '', 'DANH SÁCH CHI TIẾT SINH VIÊN BÁO CÁO THEO HỘI ĐỒNG'],
     ['', '', '', tenDot ? `Đợt kiến tập: ${tenDot}` : 'Tất cả các đợt kiến tập', '', `Ngày xuất: ${currentDate}`],
     [],

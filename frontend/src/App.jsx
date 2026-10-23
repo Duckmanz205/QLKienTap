@@ -42,6 +42,7 @@ import LeaderAssignment_Khoa from './pages/clb/LeaderAssignment_Khoa';
 import ThongBao_Khoa from './pages/shared/ThongBao_Khoa';
 import BaoCaoThongKe_Khoa from './pages/shared/BaoCaoThongKe_Khoa';
 import TaiKhoanNguoiDung_Khoa from './pages/qtv/TaiKhoanNguoiDung_Khoa';
+import SaoLuuPhucHoi_QTV from './pages/qtv/SaoLuuPhucHoi_QTV';
 import QuanLyLePhi_Khoa from './pages/clb/QuanLyLePhi_Khoa';
 import KetQuaKienTap_MaTranDiem_Khoa from './pages/shared/KetQuaKienTap_MaTranDiem_Khoa';
 import DuyetHoanPhi_Khoa from './pages/clb/DuyetHoanPhi_Khoa';
@@ -194,6 +195,7 @@ export default function App() {
           {/* QTV Portal Routes */}
           <Route element={<ProtectedRoute allowedRoles={['QuanTriVienHeThong']} />}>
             <Route path="qtv/accounts" element={<TaiKhoanNguoiDung_Khoa />} />
+            <Route path="qtv/backup" element={<SaoLuuPhucHoi_QTV />} />
           </Route>
         </Route>
 

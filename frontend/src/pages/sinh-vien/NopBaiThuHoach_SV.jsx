@@ -633,7 +633,11 @@ export default function NopBaiThuHoach_SV() {
                           <Lock className="w-4 h-4 shrink-0 text-slate-500 mt-0.5" />
                           <div>
                             <strong className="block font-semibold text-slate-800">Cổng chọn bộ chuyến đã khóa</strong>
-                            Quản lý Khoa đã khóa cổng đăng ký cho đợt này. Bạn không thể thực hiện chọn hoặc thay đổi bộ chuyến.
+                            {repStatus?.lockReason === 'COUNCIL_ASSIGNED'
+                              ? 'Bạn đã được Khoa phân công vào Hội đồng bảo vệ. Danh sách Bộ 3 chuyến báo cáo đã được cố định chính thức.'
+                              : repStatus?.lockReason === 'GRADES_LOCKED'
+                              ? 'Điểm báo cáo của bộ chuyến đã được chốt/khóa sổ. Không thể thay đổi.'
+                              : 'Quản lý Khoa đã khóa cổng đăng ký cho đợt này. Bạn không thể thực hiện chọn hoặc thay đổi bộ chuyến.'}
                           </div>
                         </div>
                       ) : (

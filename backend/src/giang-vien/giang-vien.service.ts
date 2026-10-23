@@ -3,9 +3,10 @@ import {
   BadRequestException,
   NotFoundException,
   ForbiddenException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, DataSource, IsNull } from 'typeorm';
+import { Repository, In, DataSource, IsNull, EntityManager } from 'typeorm';
 import {
   GiangVien,
   DotKienTap_SinhVien,
@@ -30,11 +31,12 @@ import {
 } from './dto/giang-vien.dto';
 
 import { R2StorageService } from '../upload/r2-storage.service';
+import { RoleDataSourceService } from '../common/role-datasource.service';
 import * as fs from 'fs';
 import * as path from 'path';
 
 @Injectable()
-export class GiangVienService {
+export class GiangVienService implements OnModuleInit {
   constructor(
     @InjectRepository(GiangVien) private gvRepo: Repository<GiangVien>,
     @InjectRepository(PhanCongGVHD)
@@ -63,7 +65,27 @@ export class GiangVienService {
     @InjectRepository(ThongBao) private thongBaoRepo: Repository<ThongBao>,
     private dataSource: DataSource,
     private r2Storage: R2StorageService,
+    private readonly roleDataSourceService: RoleDataSourceService,
   ) {}
+
+  async onModuleInit() {
+    this.dataSource = this.roleDataSourceService.createDataSourceProxy(this.dataSource);
+    this.gvRepo = this.roleDataSourceService.createRepositoryProxy(GiangVien, this.gvRepo);
+    this.phanCongRepo = this.roleDataSourceService.createRepositoryProxy(PhanCongGVHD, this.phanCongRepo);
+    this.danDoanRepo = this.roleDataSourceService.createRepositoryProxy(PhanCongGiangVienDanDoan, this.danDoanRepo);
+    this.chuyenRepo = this.roleDataSourceService.createRepositoryProxy(ChuyenThamQuan, this.chuyenRepo);
+    this.phieuRepo = this.roleDataSourceService.createRepositoryProxy(PhieuDangKy, this.phieuRepo);
+    this.diemDanhRepo = this.roleDataSourceService.createRepositoryProxy(DiemDanh, this.diemDanhRepo);
+    this.diemPhieuRepo = this.roleDataSourceService.createRepositoryProxy(DiemPhieuThamQuan, this.diemPhieuRepo);
+    this.phieuTQRepo = this.roleDataSourceService.createRepositoryProxy(PhieuThamQuan, this.phieuTQRepo);
+    this.baiThuRepo = this.roleDataSourceService.createRepositoryProxy(BaiThuHoach, this.baiThuRepo);
+    this.hoiDongThanhVienRepo = this.roleDataSourceService.createRepositoryProxy(HoiDong_ThanhVien, this.hoiDongThanhVienRepo);
+    this.diemHoiDongRepo = this.roleDataSourceService.createRepositoryProxy(DiemHoiDong_ChiTiet, this.diemHoiDongRepo);
+    this.hoiDongRepo = this.roleDataSourceService.createRepositoryProxy(HoiDongChamBaoCao, this.hoiDongRepo);
+    this.boChuyenRepo = this.roleDataSourceService.createRepositoryProxy(BoChuyenBaoCao, this.boChuyenRepo);
+    this.blacklistRepo = this.roleDataSourceService.createRepositoryProxy(DanhSachDen, this.blacklistRepo);
+    this.thongBaoRepo = this.roleDataSourceService.createRepositoryProxy(ThongBao, this.thongBaoRepo);
+  }
 
   // Lay thong tin GV bang TaiKhoan ID
   async getLecturerByAccountId(accountId: number) {
@@ -577,33 +599,39 @@ export class GiangVienService {
       );
     }
 
-    const phieuTQ = await this.phieuTQRepo.findOne({
-      where: { phieu_dang_ky_id: phieuId },
+    return this.dataSource.transaction(async (manager: EntityManager) => {
+      const phieuTQRepo = manager.getRepository(PhieuThamQuan);
+      const diemPhieuRepo = manager.getRepository(DiemPhieuThamQuan);
+
+      const phieuTQ = await phieuTQRepo.findOne({
+        where: { phieu_dang_ky_id: phieuId },
+      });
+      if (!phieuTQ) {
+        throw new NotFoundException('Không tìm thấy phiếu tham quan');
+      }
+
+      let diem = await diemPhieuRepo.findOne({
+        where: { phieu_tham_quan_id: phieuTQ.id },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (diem && (diem.da_khoa || diem.da_khoa_thu_hoach)) {
+        throw new BadRequestException(
+          'Điểm bài thu hoạch này đã được nộp/khóa lên Khoa, không thể chỉnh sửa',
+        );
+      }
+      if (!diem) {
+        diem = new DiemPhieuThamQuan();
+        diem.phieu_tham_quan_id = phieuTQ.id;
+      }
+
+      diem.diem_thu_hoach = score;
+      diem.giang_vien_hd_id = lecturerId;
+      diem.ngay_cham_thu_hoach = new Date();
+      diem.nhan_xet_thu_hoach = comment;
+      await diemPhieuRepo.save(diem);
+
+      return { message: 'Chấm điểm bài thu hoạch thành công', diem };
     });
-    if (!phieuTQ) {
-      throw new NotFoundException('Không tìm thấy phiếu tham quan');
-    }
-
-    let diem = await this.diemPhieuRepo.findOne({
-      where: { phieu_tham_quan_id: phieuTQ.id },
-    });
-    if (diem && (diem.da_khoa || diem.da_khoa_thu_hoach)) {
-      throw new BadRequestException(
-        'Điểm bài thu hoạch này đã được nộp/khóa lên Khoa, không thể chỉnh sửa',
-      );
-    }
-    if (!diem) {
-      diem = new DiemPhieuThamQuan();
-      diem.phieu_tham_quan_id = phieuTQ.id;
-    }
-
-    diem.diem_thu_hoach = score;
-    diem.giang_vien_hd_id = lecturerId;
-    diem.ngay_cham_thu_hoach = new Date();
-    diem.nhan_xet_thu_hoach = comment;
-    await this.diemPhieuRepo.save(diem);
-
-    return { message: 'Chấm điểm bài thu hoạch thành công', diem };
   }
 
   // Luu diem de xuat cua AI
@@ -975,84 +1003,89 @@ export class GiangVienService {
       );
     }
 
-    // Ưu tiên tìm chính xác theo id của PhieuThamQuan (ID do giao diện chấm điểm gửi lên)
-    let phieuTQ = await this.phieuTQRepo.findOne({
-      where: { id: phieuId },
-      relations: { boChuyenBaoCao: true },
-    });
+    return this.dataSource.transaction(async (manager: EntityManager) => {
+      const phieuTQRepo = manager.getRepository(PhieuThamQuan);
+      const diemPhieuRepo = manager.getRepository(DiemPhieuThamQuan);
+      const diemHoiDongRepo = manager.getRepository(DiemHoiDong_ChiTiet);
 
-    // Fallback: Nếu không tìm thấy hoặc phiếu không thuộc hội đồng, kiểm tra xem phieuId có phải là phieu_dang_ky_id không
-    if (!phieuTQ || phieuTQ.boChuyenBaoCao?.hoi_dong_id !== member.hoi_dong_id) {
-      const altPhieuTQ = await this.phieuTQRepo.findOne({
-        where: { phieu_dang_ky_id: phieuId },
+      // Ưu tiên tìm chính xác theo id của PhieuThamQuan (ID do giao diện chấm điểm gửi lên)
+      let phieuTQ = await phieuTQRepo.findOne({
+        where: { id: phieuId },
         relations: { boChuyenBaoCao: true },
       });
-      if (altPhieuTQ && altPhieuTQ.boChuyenBaoCao?.hoi_dong_id === member.hoi_dong_id) {
-        phieuTQ = altPhieuTQ;
+
+      // Fallback: Nếu không tìm thấy hoặc phiếu không thuộc hội đồng, kiểm tra xem phieuId có phải là phieu_dang_ky_id không
+      if (!phieuTQ || phieuTQ.boChuyenBaoCao?.hoi_dong_id !== member.hoi_dong_id) {
+        const altPhieuTQ = await phieuTQRepo.findOne({
+          where: { phieu_dang_ky_id: phieuId },
+          relations: { boChuyenBaoCao: true },
+        });
+        if (altPhieuTQ && altPhieuTQ.boChuyenBaoCao?.hoi_dong_id === member.hoi_dong_id) {
+          phieuTQ = altPhieuTQ;
+        }
       }
-    }
 
-    if (!phieuTQ) {
-      throw new NotFoundException('Không tìm thấy phiếu tham quan');
-    }
+      if (!phieuTQ) {
+        throw new NotFoundException('Không tìm thấy phiếu tham quan');
+      }
 
-    if (
-      !phieuTQ.bo_chuyen_bao_cao_id ||
-      phieuTQ.boChuyenBaoCao?.hoi_dong_id !== member.hoi_dong_id
-    ) {
-      throw new ForbiddenException(
-        'Phiếu tham quan không thuộc sinh viên được phân công cho hội đồng này',
-      );
-    }
+      if (
+        !phieuTQ.bo_chuyen_bao_cao_id ||
+        phieuTQ.boChuyenBaoCao?.hoi_dong_id !== member.hoi_dong_id
+      ) {
+        throw new ForbiddenException(
+          'Phiếu tham quan không thuộc sinh viên được phân công cho hội đồng này',
+        );
+      }
 
-    const diemPhieuCheck = await this.diemPhieuRepo.findOne({
-      where: { phieu_tham_quan_id: phieuTQ.id },
-    });
-    if (diemPhieuCheck && (diemPhieuCheck.da_khoa || diemPhieuCheck.da_khoa_hoi_dong)) {
-      throw new BadRequestException(
-        'Điểm hội đồng của phiếu tham quan này đã được khóa, không thể chỉnh sửa',
-      );
-    }
+      // Khóa bi quan DiemPhieuThamQuan để ngăn chặn tính toán sai điểm trung bình khi nhiều thành viên chấm đồng thời
+      let diemPhieu = await diemPhieuRepo.findOne({
+        where: { phieu_tham_quan_id: phieuTQ.id },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (diemPhieu && (diemPhieu.da_khoa || diemPhieu.da_khoa_hoi_dong)) {
+        throw new BadRequestException(
+          'Điểm hội đồng của phiếu tham quan này đã được khóa, không thể chỉnh sửa',
+        );
+      }
 
-    // Lưu điểm hội đồng chi tiết cho riêng chuyến tham quan / nhà máy này
-    let item = await this.diemHoiDongRepo.findOne({
-      where: {
-        phieu_tham_quan_id: phieuTQ.id,
-        hoi_dong_thanhvien_id: memberId,
-      },
-    });
+      // Lưu điểm hội đồng chi tiết cho riêng chuyến tham quan / nhà máy này
+      let item = await diemHoiDongRepo.findOne({
+        where: {
+          phieu_tham_quan_id: phieuTQ.id,
+          hoi_dong_thanhvien_id: memberId,
+        },
+      });
 
-    if (!item) {
-      item = new DiemHoiDong_ChiTiet();
-      item.phieu_tham_quan_id = phieuTQ.id;
-      item.hoi_dong_thanhvien_id = memberId;
-    }
+      if (!item) {
+        item = new DiemHoiDong_ChiTiet();
+        item.phieu_tham_quan_id = phieuTQ.id;
+        item.hoi_dong_thanhvien_id = memberId;
+      }
 
-    item.diem = score;
-    item.ngay_cham = new Date();
-    await this.diemHoiDongRepo.save(item);
+      item.diem = score;
+      item.ngay_cham = new Date();
+      await diemHoiDongRepo.save(item);
 
-    // Tính điểm trung bình của tất cả thành viên trong hội đồng cho riêng chuyến tham quan này
-    const allScores = await this.diemHoiDongRepo.find({
-      where: { phieu_tham_quan_id: phieuTQ.id },
-    });
-
-    if (allScores.length > 0) {
-      const sum = allScores.reduce((acc, curr) => acc + Number(curr.diem), 0);
-      const avg = sum / allScores.length;
-
-      let diemPhieu = await this.diemPhieuRepo.findOne({
+      // Tính điểm trung bình của tất cả thành viên trong hội đồng cho riêng chuyến tham quan này
+      const allScores = await diemHoiDongRepo.find({
         where: { phieu_tham_quan_id: phieuTQ.id },
       });
-      if (!diemPhieu) {
-        diemPhieu = new DiemPhieuThamQuan();
-        diemPhieu.phieu_tham_quan_id = phieuTQ.id;
-      }
-      diemPhieu.diem_hoi_dong_final = Number(avg.toFixed(2));
-      await this.diemPhieuRepo.save(diemPhieu);
-    }
 
-    return { message: 'Ghi nhận điểm hội đồng thành công', score: item };
+      if (allScores.length > 0) {
+        const sum = allScores.reduce((acc, curr) => acc + Number(curr.diem), 0);
+        const avg = sum / allScores.length;
+
+        if (!diemPhieu) {
+          diemPhieu = new DiemPhieuThamQuan();
+          diemPhieu.phieu_tham_quan_id = phieuTQ.id;
+        }
+        diemPhieu.diem_hoi_dong_final = Number(avg.toFixed(2));
+        await diemPhieuRepo.save(diemPhieu);
+      }
+
+      return { message: 'Ghi nhận điểm hội đồng thành công', score: item };
+    });
   }
 
   // Nhap diem hoi dong chi tiet hang loat (ap dung cho nhieu chuyen / ca 3 chuyen)
@@ -1193,40 +1226,42 @@ export class GiangVienService {
       });
     }
 
-    // Thực hiện chốt điểm cấp Hội đồng
+    // Thực hiện chốt điểm cấp Hội đồng trong Transaction với Pessimistic Lock
     const now = new Date();
-    const diemPhieusToSave: DiemPhieuThamQuan[] = [];
 
-    for (const ptq of phieuTQs) {
-      let diemPhieu = ptq.diemPhieuThamQuan;
-      if (!diemPhieu) {
-        diemPhieu = await this.diemPhieuRepo.findOne({
+    return this.dataSource.transaction(async (manager: EntityManager) => {
+      const diemPhieuRepo = manager.getRepository(DiemPhieuThamQuan);
+      const diemPhieusToSave: DiemPhieuThamQuan[] = [];
+
+      for (const ptq of phieuTQs) {
+        let diemPhieu = await diemPhieuRepo.findOne({
           where: { phieu_tham_quan_id: ptq.id },
+          lock: { mode: 'pessimistic_write' },
         });
+        if (!diemPhieu) {
+          diemPhieu = new DiemPhieuThamQuan();
+          diemPhieu.phieu_tham_quan_id = ptq.id;
+        }
+
+        const chiTiets = allChiTiets.filter((d) => d.phieu_tham_quan_id === ptq.id);
+        const sum = chiTiets.reduce((acc, curr) => acc + Number(curr.diem), 0);
+        const avg = chiTiets.length > 0 ? sum / chiTiets.length : 0;
+
+        diemPhieu.diem_hoi_dong_final = Number(avg.toFixed(2));
+        diemPhieu.da_khoa_hoi_dong = true;
+        diemPhieu.ngay_khoa_hoi_dong = now;
+
+        diemPhieusToSave.push(diemPhieu);
       }
-      if (!diemPhieu) {
-        diemPhieu = new DiemPhieuThamQuan();
-        diemPhieu.phieu_tham_quan_id = ptq.id;
-      }
 
-      const chiTiets = allChiTiets.filter((d) => d.phieu_tham_quan_id === ptq.id);
-      const sum = chiTiets.reduce((acc, curr) => acc + Number(curr.diem), 0);
-      const avg = chiTiets.length > 0 ? sum / chiTiets.length : 0;
+      await diemPhieuRepo.save(diemPhieusToSave);
 
-      diemPhieu.diem_hoi_dong_final = Number(avg.toFixed(2));
-      diemPhieu.da_khoa_hoi_dong = true;
-      diemPhieu.ngay_khoa_hoi_dong = now;
-
-      diemPhieusToSave.push(diemPhieu);
-    }
-
-    await this.diemPhieuRepo.save(diemPhieusToSave);
-
-    return {
-      message: `Đã chốt điểm Hội đồng thành công cho ${phieuTQs.length} phiếu tham quan.`,
-      updatedCount: phieuTQs.length,
-      ngay_khoa_hoi_dong: now,
-    };
+      return {
+        message: `Đã chốt điểm Hội đồng thành công cho ${phieuTQs.length} phiếu tham quan.`,
+        updatedCount: phieuTQs.length,
+        ngay_khoa_hoi_dong: now,
+      };
+    });
   }
 
   // Cập nhật ghi chú biên bản hội đồng (Dành cho Thư ký và Chủ tịch hội đồng)
@@ -1272,12 +1307,12 @@ export class GiangVienService {
       );
     }
 
-    bo.ghi_chu = dto.ghiChu ? dto.ghiChu.trim() : (null as any);
-    await this.boChuyenRepo.save(bo);
+    const ghiChuVal = dto.ghiChu ? dto.ghiChu.trim() : (null as any);
+    await this.boChuyenRepo.update(bo.id, { ghi_chu: ghiChuVal });
 
     return {
       message: 'Cập nhật ghi chú biên bản hội đồng thành công',
-      ghiChu: bo.ghi_chu,
+      ghiChu: ghiChuVal,
     };
   }
 

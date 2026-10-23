@@ -374,6 +374,9 @@ export class DotKienTap {
 
   @Column({ default: 'Nhap' })
   trang_thai: string; // 'Nhap' | 'DangTrienKhai' | 'DaKetThuc' | 'DaKhoa' | 'DaHuy'
+
+  @Column({ default: false })
+  is_bo_chuyen_locked: boolean; // (BUG-06) Khóa cổng chọn Bộ 3 chuyến — thay file JSON
 }
 
 // (v12) Bỏ tg_dien_ra_tu/den, han_chot_nop_bao_cao, han_chot_diem
