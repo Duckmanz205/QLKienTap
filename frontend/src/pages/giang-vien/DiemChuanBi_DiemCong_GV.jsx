@@ -179,8 +179,41 @@ export default function DiemChuanBi_DiemCong_GV() {
   return (
     <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300 relative" onClick={() => setIsDropdownOpen(false)}>
 
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-800">Điểm chuẩn bị & điểm cộng</h1>
+      {/* Header with Title and Actions */}
+      <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">Điểm chuẩn bị & điểm cộng</h1>
+          <p className="text-xs text-slate-500 mt-1 font-medium">Quản lý và nhập điểm chuẩn bị, điểm cộng cho sinh viên tham gia chuyến đi</p>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          {isTripLocked ? (
+            <div className="px-4 py-2.5 bg-emerald-50 text-emerald-800 border border-emerald-300 rounded-xl shadow-xs flex items-center gap-2 text-xs font-bold">
+              <Lock className="w-4 h-4 text-emerald-600" />
+              <span>Đã nộp điểm lên Khoa {lockDate ? `ngày ${lockDate}` : ''}</span>
+            </div>
+          ) : (
+            <>
+              <button
+                onClick={handleSaveScores}
+                disabled={loading || students.length === 0}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-white text-slate-700 hover:bg-slate-50 border border-slate-300 rounded-xl shadow-xs hover:shadow-sm transition-all cursor-pointer font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Save className="w-4 h-4 text-slate-500" />
+                Lưu điểm
+              </button>
+              <button
+                onClick={handleLockScores}
+                disabled={loading || students.length === 0}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Lock className="w-4 h-4" />
+                Khóa & Nộp điểm chuyến đi
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Filter Bar */}
@@ -261,7 +294,7 @@ export default function DiemChuanBi_DiemCong_GV() {
       </div>
 
       {/* Main Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-visible pb-24 md:pb-0">
+      <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-visible">
         <div className="overflow-x-auto min-h-[400px]">
           <table className="w-full text-left border-collapse min-w-[700px]">
             <thead>
@@ -418,36 +451,6 @@ export default function DiemChuanBi_DiemCong_GV() {
           </div>
         </div>
       </div>
-
-      {/* Floating Action Bar */}
-      <div className="fixed bottom-6 right-6 z-40 flex items-center gap-3 animate-in slide-in-from-bottom-6 duration-500 delay-300">
-        {isTripLocked ? (
-          <div className="px-5 py-3 bg-emerald-50 text-emerald-800 border border-emerald-300 rounded-2xl shadow-lg flex items-center gap-2 text-sm font-bold">
-            <Lock className="w-4 h-4 text-emerald-600" />
-            <span>Đã nộp điểm lên Khoa {lockDate ? `ngày ${lockDate}` : ''}</span>
-          </div>
-        ) : (
-          <>
-            <button
-              onClick={handleSaveScores}
-              disabled={loading || students.length === 0}
-              className="flex items-center gap-2 px-6 py-3.5 bg-white text-slate-700 hover:bg-slate-50 border border-slate-300 rounded-2xl shadow-lg hover:shadow-xl transition-all cursor-pointer font-bold text-sm tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Save className="w-4 h-4 text-slate-500" />
-              Lưu điểm
-            </button>
-            <button
-              onClick={handleLockScores}
-              disabled={loading || students.length === 0}
-              className="flex items-center gap-2 px-7 py-3.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-2xl shadow-xl hover:shadow-2xl hover:-translate-y-0.5 transition-all cursor-pointer font-bold text-sm tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Lock className="w-4 h-4" />
-              Khóa & Nộp điểm chuyến đi
-            </button>
-          </>
-        )}
-      </div>
-
     </div>
   );
 }

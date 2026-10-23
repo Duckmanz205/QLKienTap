@@ -515,66 +515,43 @@ export default function BaoCao_DSDoanThamQuan_Khoa() {
           </div>
 
           {/* Dropdown Lọc Điểm danh */}
-          <div className="relative min-w-[150px]">
-            <div
-              onClick={(e) => { e.stopPropagation(); setIsAttendanceDropdownOpen(!isAttendanceDropdownOpen); setIsDotDropdownOpen(false); setIsTripDropdownOpen(false); setIsFeeDropdownOpen(false); }}
-              className={`w-full px-3.5 py-2 bg-slate-50 border rounded-xl text-sm flex justify-between items-center cursor-pointer transition-all ${isAttendanceDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]/30' : 'border-[#E7E0C4]'}`}
-            >
-              <span className={`truncate pr-2 font-medium ${filterAttendance !== 'All' ? 'text-slate-800 font-bold' : 'text-slate-500'}`}>
-                {filterAttendance === 'All' ? 'Điểm danh: Tất cả' : (filterAttendance === 'CoMat' ? 'Có mặt' : (filterAttendance === 'Vang' ? 'Vắng mặt' : 'Chưa điểm danh'))}
-              </span>
-              <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-            </div>
-            {isAttendanceDropdownOpen && (
-              <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[160px]">
-                {[
-                  { value: 'All', label: 'Tất cả điểm danh' },
-                  { value: 'CoMat', label: 'Có mặt' },
-                  { value: 'Vang', label: 'Vắng mặt' },
-                  { value: 'ChuaDiemDanh', label: 'Chưa điểm danh' }
-                ].map(opt => (
-                  <div
-                    key={opt.value}
-                    onClick={() => { setFilterAttendance(opt.value); setIsAttendanceDropdownOpen(false); setCurrentPage(1); }}
-                    className={`px-3.5 py-2 text-xs cursor-pointer flex justify-between items-center transition-colors ${filterAttendance === opt.value ? 'bg-[#E7E0C4]/50 text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/20'}`}
-                  >
-                    <span>{opt.label}</span>
-                    {filterAttendance === opt.value && <Check className="w-3.5 h-3.5 text-[#407F3E]" />}
-                  </div>
-                ))}
-              </div>
-            )}
+          {/* Dropdown Lọc Điểm danh */}
+          <div className="min-w-[160px]">
+            <SearchableDropdown
+              options={[
+                { value: 'All', label: 'Tất cả điểm danh' },
+                { value: 'CoMat', label: 'Có mặt' },
+                { value: 'Vang', label: 'Vắng mặt' },
+                { value: 'ChuaDiemDanh', label: 'Chưa điểm danh' }
+              ]}
+              value={filterAttendance}
+              onChange={(val) => {
+                setFilterAttendance(val);
+                setCurrentPage(1);
+              }}
+              placeholder="Tất cả điểm danh"
+              searchPlaceholder="Tìm điểm danh..."
+              className="w-full"
+            />
           </div>
 
           {/* Dropdown Lọc Lệ phí */}
-          <div className="relative min-w-[140px]">
-            <div
-              onClick={(e) => { e.stopPropagation(); setIsFeeDropdownOpen(!isFeeDropdownOpen); setIsDotDropdownOpen(false); setIsTripDropdownOpen(false); setIsAttendanceDropdownOpen(false); }}
-              className={`w-full px-3.5 py-2 bg-slate-50 border rounded-xl text-sm flex justify-between items-center cursor-pointer transition-all ${isFeeDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]/30' : 'border-[#E7E0C4]'}`}
-            >
-              <span className={`truncate pr-2 font-medium ${filterFee !== 'All' ? 'text-slate-800 font-bold' : 'text-slate-500'}`}>
-                {filterFee === 'All' ? 'Lệ phí: Tất cả' : (filterFee === 'DaDong' ? 'Đã đóng' : 'Chưa đóng')}
-              </span>
-              <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-            </div>
-            {isFeeDropdownOpen && (
-              <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[150px]">
-                {[
-                  { value: 'All', label: 'Tất cả lệ phí' },
-                  { value: 'DaDong', label: 'Đã đóng' },
-                  { value: 'ChuaDong', label: 'Chưa đóng' }
-                ].map(opt => (
-                  <div
-                    key={opt.value}
-                    onClick={() => { setFilterFee(opt.value); setIsFeeDropdownOpen(false); setCurrentPage(1); }}
-                    className={`px-3.5 py-2 text-xs cursor-pointer flex justify-between items-center transition-colors ${filterFee === opt.value ? 'bg-[#E7E0C4]/50 text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/20'}`}
-                  >
-                    <span>{opt.label}</span>
-                    {filterFee === opt.value && <Check className="w-3.5 h-3.5 text-[#407F3E]" />}
-                  </div>
-                ))}
-              </div>
-            )}
+          <div className="min-w-[150px]">
+            <SearchableDropdown
+              options={[
+                { value: 'All', label: 'Tất cả lệ phí' },
+                { value: 'DaDong', label: 'Đã đóng' },
+                { value: 'ChuaDong', label: 'Chưa đóng' }
+              ]}
+              value={filterFee}
+              onChange={(val) => {
+                setFilterFee(val);
+                setCurrentPage(1);
+              }}
+              placeholder="Tất cả lệ phí"
+              searchPlaceholder="Tìm lệ phí..."
+              className="w-full"
+            />
           </div>
         </div>
       </div>

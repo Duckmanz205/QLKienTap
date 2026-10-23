@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { 
   ChevronDown, Check, ChevronRight, Paperclip, 
   CheckCircle2, XCircle, Filter, Download, X,
-  MapPin, Calendar, Clock, Search, Eye, ArrowUp, ArrowDown,
+  MapPin, Calendar, Clock, Search, Eye, ArrowUp, ArrowDown, ArrowUpDown,
   User, Building2, FileText, AlertCircle, Laptop, Banknote, Info,
   AlertTriangle, CreditCard
 } from 'lucide-react';
@@ -52,6 +52,18 @@ export default function RegistrationManagement_Khoa() {
   const [currentPageRegs, setCurrentPageRegs] = useState(1);
   const [limitRegs, setLimitRegs] = useState(15);
 
+  // Search, Filter, Sort & Pagination for Detail Modal Tab 2 (chot)
+  const [searchChot, setSearchChot] = useState('');
+  const [filterChotStatus, setFilterChotStatus] = useState('ALL'); // 'ALL' | 'ACCEPTED' | 'REJECTED'
+  const [sortChotTime, setSortChotTime] = useState('ASC'); // 'ASC' (sớm nhất trước) | 'DESC' (mới nhất trước)
+  const [currentPageChot, setCurrentPageChot] = useState(1);
+  const [limitChot, setLimitChot] = useState(15);
+
+  const toggleSortChotTime = () => {
+    setSortChotTime(prev => (prev === 'ASC' ? 'DESC' : 'ASC'));
+    setCurrentPageChot(1);
+  };
+
   // Search & Filter for Detail Modal Tab 3 (dachot)
   const [searchFinalizedStudent, setSearchFinalizedStudent] = useState('');
   const [currentPageFinalized, setCurrentPageFinalized] = useState(1);
@@ -83,6 +95,10 @@ export default function RegistrationManagement_Khoa() {
       if (activeTab === 'danhsach') {
         fetchRegistrations(selectedTripForReg.id);
       } else if (activeTab === 'chot') {
+        setSearchChot('');
+        setFilterChotStatus('ALL');
+        setSortChotTime('ASC');
+        setCurrentPageChot(1);
         fetchRegistrationsAndPreview(selectedTripForReg.id);
       } else if (activeTab === 'dachot') {
         fetchFinalizedStudents(selectedTripForReg.id);
@@ -194,12 +210,21 @@ export default function RegistrationManagement_Khoa() {
       return;
     }
     
+    const maxCapacity = selectedTripForReg?.suc_chua || 0;
+    if (maxCapacity > 0 && selectedStudentIds.size > maxCapacity) {
+      showPopup(
+        `Số lượng sinh viên hợp lệ (${selectedStudentIds.size} SV) vượt quá sức chứa tối đa của chuyến (${maxCapacity} SV). Vui lòng loại bớt ${selectedStudentIds.size - maxCapacity} sinh viên trước khi chốt danh sách!`,
+        'error'
+      );
+      return;
+    }
+
     showConfirm("Chốt danh sách", `Bạn có chắc chắn muốn chốt danh sách với ${selectedStudentIds.size} sinh viên được chọn? Những sinh viên không được chọn sẽ bị loại.`, async () => {
       try {
         const acceptedStudentIds = Array.from(selectedStudentIds).filter(Boolean);
         await khoaApi.confirmAssignStudents({ 
           tripId: selectedTripForReg.id, 
-          acceptedStudentIds
+          acceptedStudentIds,
         });
         showPopup('Chốt danh sách thành công', 'success');
         fetchTrips();
@@ -262,11 +287,21 @@ export default function RegistrationManagement_Khoa() {
 
   const moveStudent = (studentId, toAccepted) => {
     if (toAccepted) {
+      const maxCapacity = selectedTripForReg?.suc_chua || 0;
+      if (maxCapacity > 0 && selectedStudentIds.size >= maxCapacity) {
+        showPopup(
+          `Không thể thêm sinh viên vào danh sách hợp lệ vì đã đạt sức chứa tối đa (${maxCapacity}/${maxCapacity} SV). Vui lòng loại bớt một sinh viên khác trước khi thêm!`,
+          'error'
+        );
+        return;
+      }
       setRejectedStudentIds(prev => { const s = new Set(prev); s.delete(studentId); return s; });
       setSelectedStudentIds(prev => { const s = new Set(prev); s.add(studentId); return s; });
+      showPopup('Đã thêm sinh viên vào danh sách Hợp lệ dự kiến', 'success');
     } else {
       setSelectedStudentIds(prev => { const s = new Set(prev); s.delete(studentId); return s; });
       setRejectedStudentIds(prev => { const s = new Set(prev); s.add(studentId); return s; });
+      showPopup('Đã chuyển sinh viên sang danh sách Bị loại dự kiến', 'success');
     }
   };
 
@@ -364,6 +399,42 @@ export default function RegistrationManagement_Khoa() {
   const totalPagesFinalized = Math.ceil(totalFinalized / limitFinalized) || 1;
   const validCurrentPageFinalized = Math.min(Math.max(1, currentPageFinalized), totalPagesFinalized);
   const paginatedFinalized = filteredFinalized.slice((validCurrentPageFinalized - 1) * limitFinalized, validCurrentPageFinalized * limitFinalized);
+
+  // 5. Chot (Filter & Finalize) students filtering, sorting & pagination
+  const filteredChotList = registrations.filter(r => {
+    const studentId = r.sinhVien?.id || r.sinh_vien_id;
+    const isAccepted = selectedStudentIds.has(studentId);
+    const isRejected = rejectedStudentIds.has(studentId);
+
+    // 1. Filter theo tab status
+    if (filterChotStatus === 'ACCEPTED' && !isAccepted) return false;
+    if (filterChotStatus === 'REJECTED' && !isRejected) return false;
+
+    // 2. Filter theo từ khóa tìm kiếm
+    if (searchChot) {
+      const s = searchChot.toLowerCase().trim();
+      const mssvMatch = (r.sinhVien?.mssv || '').toLowerCase().includes(s);
+      const tenMatch = (r.sinhVien?.ho_ten || '').toLowerCase().includes(s);
+      const lopMatch = (r.sinhVien?.ten_lop || '').toLowerCase().includes(s);
+      if (!mssvMatch && !tenMatch && !lopMatch) return false;
+    }
+    return true;
+  });
+
+  // Sắp xếp theo thời điểm đăng ký (ngay_dang_ky)
+  const sortedChotList = [...filteredChotList].sort((a, b) => {
+    const timeA = a.ngay_dang_ky ? new Date(a.ngay_dang_ky).getTime() : 0;
+    const timeB = b.ngay_dang_ky ? new Date(b.ngay_dang_ky).getTime() : 0;
+    return sortChotTime === 'ASC' ? timeA - timeB : timeB - timeA;
+  });
+
+  const totalChot = sortedChotList.length;
+  const totalPagesChot = Math.ceil(totalChot / limitChot) || 1;
+  const validCurrentPageChot = Math.min(Math.max(1, currentPageChot), totalPagesChot);
+  const paginatedChotList = sortedChotList.slice(
+    (validCurrentPageChot - 1) * limitChot,
+    validCurrentPageChot * limitChot
+  );
 
   return (
     <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300 relative" onClick={closeAllDropdowns}>
@@ -1161,14 +1232,32 @@ export default function RegistrationManagement_Khoa() {
 
               {/* Tab 2: Lọc & chốt danh sách */}
               {activeTab === 'chot' && (
-                <div className="space-y-6 relative z-20">
-                  <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-                    <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                      <Filter className="w-4 h-4 text-[#407F3E]" />
-                      Kết quả lọc dự kiến
-                    </h4>
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm font-bold text-slate-600">Tổng: {registrations.length} đăng ký</span>
+                <div className="space-y-4 relative z-20">
+                  {/* Header Top Summary & Action Button */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                        <Filter className="w-4 h-4 text-[#407F3E]" />
+                        Kết quả lọc dự kiến:
+                      </h4>
+                      <span className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg text-xs font-bold border border-slate-200">
+                        Tổng: {registrations.length} đăng ký
+                      </span>
+                      <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-colors ${
+                        selectedTripForReg?.suc_chua && selectedStudentIds.size > selectedTripForReg.suc_chua
+                          ? 'bg-red-100 text-red-700 border-red-300 font-extrabold animate-pulse'
+                          : selectedStudentIds.size === selectedTripForReg?.suc_chua
+                            ? 'bg-[#407F3E]/10 text-[#407F3E] border-[#407F3E]/20'
+                            : 'bg-amber-50 text-amber-700 border-amber-200'
+                      }`}>
+                        Hợp lệ: {selectedStudentIds.size} / {selectedTripForReg?.suc_chua || 0} SV (Sức chứa)
+                      </span>
+                      <span className="px-2.5 py-1 bg-[#E68A8C]/15 text-[#E68A8C] rounded-lg text-xs font-bold border border-[#E68A8C]/30">
+                        Bị loại: {rejectedStudentIds.size} SV
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0">
                       {selectedTripForReg?.trang_thai === 'DaDienRa' ? (
                         <span className="px-4 py-2 bg-slate-100 text-slate-500 rounded-xl text-xs sm:text-sm font-bold border border-slate-200 flex items-center gap-2 cursor-not-allowed">
                           <CheckCircle2 className="w-4 h-4 text-slate-400" />
@@ -1180,7 +1269,7 @@ export default function RegistrationManagement_Khoa() {
                           className="px-5 py-2 bg-[#407F3E] hover:bg-[#407F3E]/90 text-white rounded-xl text-sm font-bold transition-colors shadow-sm flex items-center gap-2 cursor-pointer"
                         >
                           <CheckCircle2 className="w-4 h-4" />
-                          Chốt danh sách chính thức
+                          Chốt danh sách chính thức ({selectedStudentIds.size} SV)
                         </button>
                       )}
                     </div>
@@ -1195,101 +1284,230 @@ export default function RegistrationManagement_Khoa() {
                     </div>
                   )}
 
-                  {/* Bảng 1: Hợp lệ */}
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center px-1">
-                      <h5 className="text-sm font-bold text-[#407F3E]">1. Danh sách Hợp lệ dự kiến ({selectedStudentIds.size} SV)</h5>
-                      <div className="text-xs font-semibold text-slate-500">Sức chứa: {selectedTripForReg?.suc_chua || 0}</div>
+                  {/* Filter Toolbar: Search + Filter Tabs (Đã loại bỏ nút sort thừa) */}
+                  <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-4">
+                    {/* Search Input */}
+                    <div className="relative flex-1 sm:w-72 min-w-[220px]">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input 
+                        type="text" 
+                        placeholder="Tìm kiếm MSSV, họ tên, lớp..." 
+                        value={searchChot}
+                        onChange={(e) => {
+                          setSearchChot(e.target.value);
+                          setCurrentPageChot(1);
+                        }}
+                        className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#407F3E] focus:border-[#407F3E] transition-shadow"
+                      />
+                      {searchChot && (
+                        <button 
+                          onClick={() => { setSearchChot(''); setCurrentPageChot(1); }}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 rounded-full cursor-pointer"
+                          title="Xóa tìm kiếm"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
-                    <div className="bg-white rounded-xl shadow-sm border border-[#407F3E]/20 overflow-hidden relative z-10">
-                      <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
-                        <table className="w-full text-left border-collapse min-w-[900px]">
-                          <thead className="sticky top-0 bg-[#407F3E]/5 z-10">
-                            <tr className="text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#407F3E]/10">
-                              <th className="p-4 pl-6">MSSV</th>
-                              <th className="p-4">Họ tên</th>
-                              <th className="p-4">Trạng thái hiện tại</th>
-                              <th className="p-4 text-center">Thời điểm đăng ký</th>
-                              <th className="p-4 text-right pr-6 w-32">Thao tác</th>
-                            </tr>
-                          </thead>
-                          <tbody className="text-sm text-slate-700 divide-y divide-slate-100">
-                            {isFiltering ? (
-                              <tr><td colSpan="5" className="text-center py-8 text-slate-500">Đang lọc...</td></tr>
-                            ) : registrations.filter(r => selectedStudentIds.has(r.sinhVien?.id || r.sinh_vien_id)).length === 0 ? (
-                              <tr><td colSpan="5" className="text-center py-8 text-slate-500 font-medium">Không có sinh viên hợp lệ.</td></tr>
-                            ) : (
-                              registrations.filter(r => selectedStudentIds.has(r.sinhVien?.id || r.sinh_vien_id)).map(r => (
-                                <tr key={r.id} className="hover:bg-slate-50 transition-colors">
-                                  <td className="p-4 pl-6 font-mono font-bold text-[#407F3E]">{r.sinhVien?.mssv}</td>
-                                  <td className="p-4 font-bold text-slate-800">{r.sinhVien?.ho_ten}</td>
-                                  <td className="p-4">{getStatusBadge(statusMap[r.trang_thai] || r.trang_thai)}</td>
-                                  <td className="p-4 font-medium text-slate-500 text-center">{new Date(r.ngay_dang_ky).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })}</td>
-                                  <td className="p-4 text-right pr-6">
-                                    {selectedTripForReg?.trang_thai !== 'DaDienRa' && (
-                                      <button 
-                                        onClick={() => moveStudent(r.sinhVien?.id || r.sinh_vien_id, false)}
-                                        className="px-3 py-1.5 bg-[#E68A8C]/10 text-[#E68A8C] hover:bg-[#E68A8C]/20 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1 ml-auto cursor-pointer"
-                                        title="Chuyển xuống danh sách bị loại"
-                                      >
-                                        Loại <ArrowDown className="w-3.5 h-3.5" />
-                                      </button>
-                                    )}
-                                  </td>
-                                </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
+
+                    {/* Filter Pills */}
+                    <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl">
+                      <button
+                        onClick={() => { setFilterChotStatus('ALL'); setCurrentPageChot(1); }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          filterChotStatus === 'ALL'
+                            ? 'bg-white text-slate-800 shadow-sm'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Tất cả ({registrations.length})
+                      </button>
+                      <button
+                        onClick={() => { setFilterChotStatus('ACCEPTED'); setCurrentPageChot(1); }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                          filterChotStatus === 'ACCEPTED'
+                            ? 'bg-white text-[#407F3E] shadow-sm'
+                            : 'text-slate-600 hover:text-[#407F3E]'
+                        }`}
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5 text-[#407F3E]" />
+                        Hợp lệ dự kiến ({selectedStudentIds.size})
+                      </button>
+                      <button
+                        onClick={() => { setFilterChotStatus('REJECTED'); setCurrentPageChot(1); }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                          filterChotStatus === 'REJECTED'
+                            ? 'bg-white text-[#E68A8C] shadow-sm'
+                            : 'text-slate-600 hover:text-[#E68A8C]'
+                        }`}
+                      >
+                        <XCircle className="w-3.5 h-3.5 text-[#E68A8C]" />
+                        Bị loại dự kiến ({rejectedStudentIds.size})
+                      </button>
                     </div>
                   </div>
 
-                  {/* Bảng 2: Bị loại */}
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center px-1">
-                      <h5 className="text-sm font-bold text-[#E68A8C]">2. Danh sách Bị loại dự kiến ({rejectedStudentIds.size} SV)</h5>
-                    </div>
-                    <div className="bg-white rounded-xl shadow-sm border border-[#E68A8C]/20 overflow-hidden relative z-10">
-                      <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
-                        <table className="w-full text-left border-collapse min-w-[900px]">
-                          <thead className="sticky top-0 bg-[#E68A8C]/5 z-10">
-                            <tr className="text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#E68A8C]/10">
-                              <th className="p-4 pl-6">MSSV</th>
-                              <th className="p-4">Họ tên</th>
-                              <th className="p-4">Lý do bị loại</th>
-                              <th className="p-4 text-center">Thời điểm đăng ký</th>
-                              <th className="p-4 text-right pr-6 w-32">Thao tác</th>
-                            </tr>
-                          </thead>
-                          <tbody className="text-sm text-slate-700 divide-y divide-slate-100">
-                            {isFiltering ? (
-                              <tr><td colSpan="5" className="text-center py-8 text-slate-500">Đang lọc...</td></tr>
-                            ) : registrations.filter(r => rejectedStudentIds.has(r.sinhVien?.id || r.sinh_vien_id)).length === 0 ? (
-                              <tr><td colSpan="5" className="text-center py-8 text-slate-500 font-medium">Không có sinh viên bị loại.</td></tr>
-                            ) : (
-                              registrations.filter(r => rejectedStudentIds.has(r.sinhVien?.id || r.sinh_vien_id)).map(r => (
-                                <tr key={r.id} className="hover:bg-slate-50 transition-colors opacity-75 hover:opacity-100">
-                                  <td className="p-4 pl-6 font-mono font-bold text-slate-500">{r.sinhVien?.mssv}</td>
-                                  <td className="p-4 font-bold text-slate-600">{r.sinhVien?.ho_ten}</td>
-                                  <td className="p-4 font-medium text-[#E68A8C] max-w-[200px] truncate" title={r.ly_do_loai || 'Loại thủ công'}>{r.ly_do_loai || 'Loại thủ công'}</td>
-                                  <td className="p-4 font-medium text-slate-500 text-center">{new Date(r.ngay_dang_ky).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })}</td>
-                                  <td className="p-4 text-right pr-6">
+                  {/* Main Unified Table */}
+                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden relative z-10">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse min-w-[950px]">
+                        <thead>
+                          <tr className="bg-slate-50 text-slate-700 text-[11px] font-bold uppercase tracking-wider border-b border-slate-200 select-none">
+                            <th className="py-3 pl-4 pr-2 text-center w-12 whitespace-nowrap">STT</th>
+                            <th className="py-3 px-3 whitespace-nowrap">MSSV</th>
+                            <th className="py-3 px-3 whitespace-nowrap">Họ tên</th>
+                            <th className="py-3 px-3 whitespace-nowrap">Lớp</th>
+                            <th className="py-3 px-3 text-center whitespace-nowrap">Trạng thái hiện tại</th>
+                            <th className="py-3 px-3 whitespace-nowrap">Kết quả lọc dự kiến</th>
+                            <th 
+                              onClick={toggleSortChotTime}
+                              className="py-3 px-3 text-center cursor-pointer select-none group hover:bg-slate-100 transition-colors whitespace-nowrap"
+                              title={`Nhấp để sắp xếp theo thời điểm đăng ký (${sortChotTime === 'ASC' ? 'Đang: Sớm nhất trước - Nhấp để đảo chiều' : 'Đang: Mới nhất trước - Nhấp để đảo chiều'})`}
+                            >
+                              <div className="inline-flex items-center justify-center gap-1">
+                                <span className="group-hover:text-[#407F3E] transition-colors">Thời điểm đăng ký</span>
+                                {sortChotTime === 'ASC' ? (
+                                  <ArrowUp className="w-3.5 h-3.5 text-[#407F3E] transition-transform group-hover:-translate-y-0.5" />
+                                ) : (
+                                  <ArrowDown className="w-3.5 h-3.5 text-[#407F3E] transition-transform group-hover:translate-y-0.5" />
+                                )}
+                              </div>
+                            </th>
+                            <th className="py-3 pr-6 pl-3 text-right w-28 whitespace-nowrap">Thao tác</th>
+                          </tr>
+                        </thead>
+                        <tbody className="text-sm text-slate-700 divide-y divide-slate-100">
+                          {isFiltering ? (
+                            <tr><td colSpan="8" className="text-center py-10 text-slate-500 italic">Đang lọc dự kiến...</td></tr>
+                          ) : paginatedChotList.length === 0 ? (
+                            <tr><td colSpan="8" className="text-center py-10 text-slate-500 font-medium">Không tìm thấy sinh viên nào phù hợp với bộ lọc.</td></tr>
+                          ) : (
+                            paginatedChotList.map((r, idx) => {
+                              const studentId = r.sinhVien?.id || r.sinh_vien_id;
+                              const isAccepted = selectedStudentIds.has(studentId);
+
+                              return (
+                                <tr key={r.id} className="hover:bg-slate-50/70 transition-colors">
+                                  <td className="py-3 pl-4 pr-2 text-center text-slate-500 font-medium">
+                                    {(validCurrentPageChot - 1) * limitChot + idx + 1}
+                                  </td>
+                                  <td className="py-3 px-3 font-mono font-bold text-[#407F3E] whitespace-nowrap">
+                                    {r.sinhVien?.mssv}
+                                  </td>
+                                  <td className="py-3 px-3 font-bold text-slate-800 whitespace-nowrap">
+                                    {r.sinhVien?.ho_ten}
+                                  </td>
+                                  <td className="py-3 px-3 font-medium text-slate-600 whitespace-nowrap">
+                                    {r.sinhVien?.ten_lop || '--'}
+                                  </td>
+                                  <td className="py-3 px-3 text-center whitespace-nowrap">
+                                    {getStatusBadge(statusMap[r.trang_thai] || r.trang_thai)}
+                                  </td>
+                                  <td className="py-3 px-3 whitespace-nowrap">
+                                    {isAccepted ? (
+                                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-[#407F3E]/10 text-[#407F3E] border border-[#407F3E]/20">
+                                        <CheckCircle2 className="w-3.5 h-3.5" /> Hợp lệ dự kiến
+                                      </span>
+                                    ) : (
+                                      <div className="flex flex-col gap-0.5">
+                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-[#E68A8C]/15 text-[#E68A8C] border border-[#E68A8C]/30 w-fit">
+                                          <XCircle className="w-3.5 h-3.5" /> Bị loại dự kiến
+                                        </span>
+                                        {r.ly_do_loai && (
+                                          <span className="text-[11px] text-slate-400 italic truncate max-w-[200px]" title={r.ly_do_loai}>
+                                            Lý do: {r.ly_do_loai}
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
+                                  </td>
+                                  <td className="py-3 px-3 font-medium text-slate-500 text-center text-xs whitespace-nowrap">
+                                    {r.ngay_dang_ky ? new Date(r.ngay_dang_ky).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }) : '--'}
+                                  </td>
+                                  <td className="py-3 pr-6 pl-3 text-right">
                                     {selectedTripForReg?.trang_thai !== 'DaDienRa' && (
-                                      <button 
-                                        onClick={() => moveStudent(r.sinhVien?.id || r.sinh_vien_id, true)}
-                                        className="px-3 py-1.5 bg-[#407F3E]/10 text-[#407F3E] hover:bg-[#407F3E]/20 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1 ml-auto cursor-pointer"
-                                        title="Thêm vào danh sách hợp lệ"
-                                      >
-                                        <ArrowUp className="w-3.5 h-3.5" /> Hợp lệ
-                                      </button>
+                                      isAccepted ? (
+                                        <button 
+                                          onClick={() => moveStudent(studentId, false)}
+                                          className="px-3 py-1.5 bg-[#E68A8C]/10 text-[#E68A8C] hover:bg-[#E68A8C]/20 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1 ml-auto cursor-pointer"
+                                          title="Chuyển sang danh sách bị loại"
+                                        >
+                                          Loại <ArrowDown className="w-3.5 h-3.5" />
+                                        </button>
+                                      ) : (
+                                        <button 
+                                          onClick={() => moveStudent(studentId, true)}
+                                          className="px-3 py-1.5 bg-[#407F3E]/10 text-[#407F3E] hover:bg-[#407F3E]/20 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1 ml-auto cursor-pointer"
+                                          title="Chuyển vào danh sách hợp lệ"
+                                        >
+                                          <ArrowUp className="w-3.5 h-3.5" /> Hợp lệ
+                                        </button>
+                                      )
                                     )}
                                   </td>
                                 </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </table>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Pagination Footer Tab Chot */}
+                    <div className="p-4 border-t border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+                      <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
+                        <span>Hiển thị</span>
+                        <SearchableDropdown 
+                          options={[
+                            { value: 15, label: '15' },
+                            { value: 30, label: '30' },
+                            { value: 50, label: '50' },
+                            { value: 100, label: '100' }
+                          ]}
+                          value={limitChot}
+                          onChange={(newLimit) => {
+                            setLimitChot(newLimit);
+                            setCurrentPageChot(1);
+                          }}
+                          searchPlaceholder="Tìm số lượng..."
+                          className="min-w-[80px]"
+                          direction="up"
+                        />
+                        <span>/ {totalChot} sinh viên</span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => setCurrentPageChot(1)}
+                          disabled={validCurrentPageChot <= 1}
+                          className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+                        >
+                          Trang đầu
+                        </button>
+                        <button
+                          onClick={() => setCurrentPageChot(prev => Math.max(prev - 1, 1))}
+                          disabled={validCurrentPageChot <= 1}
+                          className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+                        >
+                          Trước
+                        </button>
+                        <span className="px-4 py-1.5 rounded-lg bg-[#407F3E] text-white text-sm font-bold shadow-sm cursor-default mx-1">
+                          Trang {validCurrentPageChot} / {totalPagesChot}
+                        </span>
+                        <button
+                          onClick={() => setCurrentPageChot(prev => Math.min(prev + 1, totalPagesChot))}
+                          disabled={validCurrentPageChot >= totalPagesChot}
+                          className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+                        >
+                          Sau
+                        </button>
+                        <button
+                          onClick={() => setCurrentPageChot(totalPagesChot)}
+                          disabled={validCurrentPageChot >= totalPagesChot}
+                          className="px-3 py-1.5 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 text-sm font-semibold transition-colors cursor-pointer"
+                        >
+                          Trang cuối
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -1681,6 +1899,7 @@ export default function RegistrationManagement_Khoa() {
         </div>,
         document.body
       )}
+
     </div>
   );
 }

@@ -128,23 +128,52 @@ export default function LichKienTap_Khoa() {
 
   const fetchData = async () => {
     try {
-      const [schRes, campRes, tripRes, factoryRes, tkRes] = await Promise.all([
+      const [schResult, campResult, tripResult, factoryResult, tkResult] = await Promise.allSettled([
         khoaApi.getSchedules({ excludeInactive: false }),
         khoaApi.getCampaigns(),
         khoaApi.getTrips(),
         khoaApi.getFactories(),
-          khoaApi.getTaiKhoanThuHuong()
+        khoaApi.getTaiKhoanThuHuong()
       ]);
-      setSchedules(schRes.data?.data || schRes.data || []);
-      setCampaigns(campRes.data?.data || campRes.data || []);
-      setFactories(factoryRes.data?.data || factoryRes.data || []);
+
+      if (schResult.status === 'fulfilled') {
+        const schRes = schResult.value;
+        setSchedules(schRes.data?.data || schRes.data || []);
+      } else {
+        console.error('Lỗi tải danh sách lịch kiến tập:', schResult.reason);
+      }
+
+      if (campResult.status === 'fulfilled') {
+        const campRes = campResult.value;
+        setCampaigns(campRes.data?.data || campRes.data || []);
+      } else {
+        console.error('Lỗi tải danh sách đợt kiến tập:', campResult.reason);
+      }
+
+      if (factoryResult.status === 'fulfilled') {
+        const factoryRes = factoryResult.value;
+        setFactories(factoryRes.data?.data || factoryRes.data || []);
+      } else {
+        console.error('Lỗi tải danh sách nhà máy:', factoryResult.reason);
+      }
+
+      if (tkResult.status === 'fulfilled') {
+        const tkRes = tkResult.value;
         setTaiKhoanConfigs(tkRes.data?.data || tkRes.data || []);
-      
-      const allTripsData = tripRes.data?.data || tripRes.data || [];
-      setAllTrips(allTripsData);
-      setUnassignedTrips(allTripsData.filter(t => t.trang_thai === 'Nhap' && !t.lich_kien_tap_id));
+      } else {
+        console.error('Lỗi tải cấu hình tài khoản thụ hưởng:', tkResult.reason);
+      }
+
+      if (tripResult.status === 'fulfilled') {
+        const tripRes = tripResult.value;
+        const allTripsData = tripRes.data?.data || tripRes.data || [];
+        setAllTrips(allTripsData);
+        setUnassignedTrips(allTripsData.filter(t => t.trang_thai === 'Nhap' && !t.lich_kien_tap_id));
+      } else {
+        console.error('Lỗi tải danh sách chuyến kiến tập:', tripResult.reason);
+      }
     } catch (err) {
-      console.error(err);
+      console.error('Lỗi hệ thống khi tải dữ liệu trang:', err);
     }
   };
 

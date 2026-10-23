@@ -310,41 +310,22 @@ export default function BaoCao_SVDuDieuKien_Khoa() {
           </div>
 
           {/* Trạng thái Hội đồng Dropdown */}
-          <div className="relative min-w-[190px] w-full md:w-auto">
-            <div 
-              onClick={(e) => { e.stopPropagation(); setIsBoardDropdownOpen(!isBoardDropdownOpen); setIsClassDropdownOpen(false); }}
-              className={`w-full px-3.5 py-2 bg-slate-50 border rounded-xl text-sm flex justify-between items-center cursor-pointer transition-all ${isBoardDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-            >
-              <span className="text-slate-700 font-medium truncate pr-1">
-                {selectedBoardStatus === 'All' ? 'Tất cả Hội đồng' : (selectedBoardStatus === 'Assigned' ? 'Đã phân hội đồng' : 'Chưa phân công')}
-              </span>
-              <ChevronDown className="w-4 h-4 text-slate-400 ml-1 shrink-0" />
-            </div>
-            {isBoardDropdownOpen && (
-              <div 
-                onClick={(e) => e.stopPropagation()}
-                className="absolute top-full right-0 w-full md:w-56 mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col"
-              >
-                {[
-                  { value: 'All', label: 'Tất cả Hội đồng' },
-                  { value: 'Assigned', label: 'Đã phân hội đồng' },
-                  { value: 'Unassigned', label: 'Chưa phân công' }
-                ].map(opt => (
-                  <div 
-                    key={opt.value}
-                    onClick={() => { setSelectedBoardStatus(opt.value); setIsBoardDropdownOpen(false); setCurrentPage(1); }}
-                    className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                      selectedBoardStatus === opt.value 
-                        ? 'bg-[#E7E0C4] text-slate-800 font-bold' 
-                        : 'text-slate-700 hover:bg-[#E7E0C4]/50'
-                    }`}
-                  >
-                    <span>{opt.label}</span>
-                    {selectedBoardStatus === opt.value && <Check className="w-4 h-4 text-[#407F3E]" />}
-                  </div>
-                ))}
-              </div>
-            )}
+          <div className="min-w-[190px] w-full md:w-auto">
+            <SearchableDropdown
+              options={[
+                { value: 'All', label: 'Tất cả Hội đồng' },
+                { value: 'Assigned', label: 'Đã phân hội đồng' },
+                { value: 'Unassigned', label: 'Chưa phân công' }
+              ]}
+              value={selectedBoardStatus}
+              onChange={(val) => {
+                setSelectedBoardStatus(val);
+                setCurrentPage(1);
+              }}
+              placeholder="Tất cả Hội đồng"
+              searchPlaceholder="Tìm hội đồng..."
+              className="w-full"
+            />
           </div>
 
           <button 

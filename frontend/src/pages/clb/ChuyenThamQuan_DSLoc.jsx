@@ -1294,32 +1294,16 @@ export default function ChuyenThamQuan_DSLoc() {
               {/* Row 1: Nhà máy */}
               <div className="grid grid-cols-1 gap-5 relative">
                 {/* Nhà máy */}
-                <div className="relative">
+                <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Nhà máy</label>
-                  <div
-                    onClick={(e) => handleDropdownClick(e, setIsNhaMayDropdownOpen)}
-                    className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-sm flex justify-between items-center cursor-pointer transition-all ${isNhaMayDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-                  >
-                    <span className={`font-medium ${selectedNhaMay ? 'text-slate-800' : 'text-slate-400'}`}>
-                      {nhaMayOptions.find(o => o.id === selectedNhaMay)?.ten_nha_may || 'Chọn nhà máy'}
-                    </span>
-                    <ChevronDown className="w-4 h-4 text-slate-400" />
-                  </div>
-                  {isNhaMayDropdownOpen && (
-                    <div className="absolute top-[70px] left-0 w-full bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-50 py-1 overflow-hidden max-h-48 overflow-y-auto animate-in slide-in-from-top-1">
-                      {nhaMayOptions.map(opt => (
-                        <div
-                          key={opt.id}
-                          onClick={(e) => { e.stopPropagation(); setSelectedNhaMay(opt.id); setIsNhaMayDropdownOpen(false); }}
-                          className={`px-4 py-2.5 text-sm cursor-pointer flex justify-between items-center transition-colors ${selectedNhaMay === opt.id ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
-                            }`}
-                        >
-                          {opt.ten_nha_may}
-                          {selectedNhaMay === opt.id && <Check className="w-4 h-4 text-[#407F3E]" />}
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <SearchableDropdown
+                    options={nhaMayOptions.map(o => ({ value: o.id, label: o.ten_nha_may }))}
+                    value={selectedNhaMay}
+                    onChange={(val) => setSelectedNhaMay(val)}
+                    placeholder="Chọn nhà máy"
+                    searchPlaceholder="Tìm nhà máy..."
+                    className="w-full"
+                  />
                 </div>
               </div>
 

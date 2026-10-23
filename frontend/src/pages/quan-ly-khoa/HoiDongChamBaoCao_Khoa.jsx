@@ -85,11 +85,28 @@ export default function HoiDongChamBaoCao_Khoa() {
   const [selectedMembers, setSelectedMembers] = useState([]);
   const [isSubmittingBoard, setIsSubmittingBoard] = useState(false);
 
-  // Data
   const [campaigns, setCampaigns] = useState([]);
   const [lecturers, setLecturers] = useState([]);
   const [committees, setCommittees] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const campaignOptions = useMemo(() => {
+    return campaigns.map(camp => {
+      const hocKyText = camp.hocKy?.ten_hoc_ky || '';
+      const namHocText = camp.hocKy?.namHoc?.ten_nam_hoc ? ` (${camp.hocKy.namHoc.ten_nam_hoc})` : '';
+      const hocKyFull = hocKyText ? `${hocKyText}${namHocText}` : '';
+      const rawKhoa = camp.khoaHoc?.ten_khoa_hoc || camp.khoaHoc?.ma_khoa_hoc || '';
+      const khoaText = rawKhoa
+        ? (rawKhoa.toLowerCase().includes('khóa') ? rawKhoa : `Khóa ${rawKhoa}`)
+        : '';
+      const subLabel = [hocKyFull, khoaText].filter(Boolean).join(' • ');
+      return {
+        value: camp.id,
+        label: camp.ten_dot,
+        subLabel: subLabel
+      };
+    });
+  }, [campaigns]);
 
   // Lock Bo Chuyen & Export State
   const [selectedDotForLock, setSelectedDotForLock] = useState(null);
@@ -1104,52 +1121,14 @@ export default function HoiDongChamBaoCao_Khoa() {
 
                   <div className="relative z-50">
                     <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Đợt kiến tập *</label>
-                    <div
-                      onClick={(e) => handleModalDropdownClick(e, setIsLichDropdownOpen)}
-                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm flex justify-between items-center cursor-pointer hover:border-[#407F3E]"
-                    >
-                      <span className="text-slate-800 font-bold truncate pr-2">
-                        {selectedSchedule
-                          ? campaigns.find(c => c.id === selectedSchedule)?.ten_dot
-                          : 'Chọn đợt kiến tập'}
-                      </span>
-                      <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-                    </div>
-                    {isLichDropdownOpen && (
-                      <div
-                        className="absolute top-full left-0 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl py-2 max-h-48 overflow-y-auto animate-in slide-in-from-top-1 z-50"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {campaigns.map(camp => {
-                          const hocKyText = camp.hocKy?.ten_hoc_ky || '';
-                          const namHocText = camp.hocKy?.namHoc?.ten_nam_hoc ? ` (${camp.hocKy.namHoc.ten_nam_hoc})` : '';
-                          const hocKyFull = hocKyText ? `${hocKyText}${namHocText}` : '';
-
-                          const rawKhoa = camp.khoaHoc?.ten_khoa_hoc || camp.khoaHoc?.ma_khoa_hoc || '';
-                          const khoaText = rawKhoa
-                            ? (rawKhoa.toLowerCase().includes('khóa') ? rawKhoa : `Khóa ${rawKhoa}`)
-                            : '';
-
-                          const subLabel = [hocKyFull, khoaText].filter(Boolean).join(' • ');
-
-                          return (
-                            <div
-                              key={camp.id}
-                              onClick={() => {
-                                setSelectedSchedule(camp.id);
-                                setIsLichDropdownOpen(false);
-                              }}
-                              className="px-4 py-2.5 text-sm cursor-pointer hover:bg-slate-50 border-b border-slate-50 last:border-0"
-                            >
-                              <div className="font-bold text-slate-800">{camp.ten_dot}</div>
-                              {subLabel && (
-                                <div className="text-xs font-medium text-slate-500 mt-0.5">{subLabel}</div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
+                    <SearchableDropdown
+                      options={campaignOptions}
+                      value={selectedSchedule}
+                      onChange={(val) => setSelectedSchedule(val)}
+                      placeholder="Chọn đợt kiến tập"
+                      searchPlaceholder="Tìm đợt kiến tập..."
+                      className="w-full"
+                    />
                   </div>
                 </div>
 
@@ -1377,66 +1356,15 @@ export default function HoiDongChamBaoCao_Khoa() {
                         </span>
                       )}
                     </div>
-                    <div
-                      onClick={(e) => {
-                        if (editBoardStudentCount > 0) {
-                          toast('Hội đồng đã có sinh viên được phân công. Để đổi đợt kiến tập, vui lòng gỡ phân công các sinh viên trước.', { icon: 'ℹ️' });
-                          return;
-                        }
-                        handleModalDropdownClick(e, setIsEditLichDropdownOpen);
-                      }}
-                      className={`w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm flex justify-between items-center transition-all ${editBoardStudentCount > 0
-                        ? 'opacity-85 cursor-not-allowed bg-slate-100'
-                        : 'cursor-pointer hover:border-[#407F3E]'
-                        }`}
-                    >
-                      <span className="text-slate-800 font-bold truncate pr-2">
-                        {editSelectedSchedule
-                          ? campaigns.find(c => c.id === Number(editSelectedSchedule))?.ten_dot
-                          : 'Chọn đợt kiến tập'}
-                      </span>
-                      {editBoardStudentCount > 0 ? (
-                        <Lock className="w-4 h-4 text-slate-400 shrink-0" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-                      )}
-                    </div>
-                    {isEditLichDropdownOpen && editBoardStudentCount === 0 && (
-                      <div
-                        className="absolute top-full left-0 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl py-2 max-h-48 overflow-y-auto animate-in slide-in-from-top-1 z-50"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {campaigns.map(camp => {
-                          const hocKyText = camp.hocKy?.ten_hoc_ky || '';
-                          const namHocText = camp.hocKy?.namHoc?.ten_nam_hoc ? ` (${camp.hocKy.namHoc.ten_nam_hoc})` : '';
-                          const hocKyFull = hocKyText ? `${hocKyText}${namHocText}` : '';
-
-                          const rawKhoa = camp.khoaHoc?.ten_khoa_hoc || camp.khoaHoc?.ma_khoa_hoc || '';
-                          const khoaText = rawKhoa
-                            ? (rawKhoa.toLowerCase().includes('khóa') ? rawKhoa : `Khóa ${rawKhoa}`)
-                            : '';
-
-                          const subLabel = [hocKyFull, khoaText].filter(Boolean).join(' • ');
-
-                          return (
-                            <div
-                              key={camp.id}
-                              onClick={() => {
-                                setEditSelectedSchedule(camp.id);
-                                setIsEditLichDropdownOpen(false);
-                              }}
-                              className={`px-4 py-2.5 text-sm cursor-pointer hover:bg-slate-50 border-b border-slate-50 last:border-0 ${Number(editSelectedSchedule) === camp.id ? 'bg-[#407F3E]/5' : ''
-                                }`}
-                            >
-                              <div className="font-bold text-slate-800">{camp.ten_dot}</div>
-                              {subLabel && (
-                                <div className="text-xs font-medium text-slate-500 mt-0.5">{subLabel}</div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
+                    <SearchableDropdown
+                      options={campaignOptions}
+                      value={Number(editSelectedSchedule)}
+                      onChange={(val) => setEditSelectedSchedule(val)}
+                      placeholder="Chọn đợt kiến tập"
+                      searchPlaceholder="Tìm đợt kiến tập..."
+                      className="w-full"
+                      disabled={editBoardStudentCount > 0}
+                    />
                   </div>
                 </div>
 

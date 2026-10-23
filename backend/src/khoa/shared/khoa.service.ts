@@ -2699,16 +2699,18 @@ export class KhoaService implements OnModuleInit {
     const phieus = await this.phieuRepo.find({
       where: {
         chuyen_tham_quan_id: tripId,
-        trang_thai: In(['ChoDuyet', 'HopLe']),
+        trang_thai: In(['ChoDuyet', 'HopLe', 'BiLoai']),
       },
       relations: { sinhVien: { khoaHoc: true } },
     });
 
     if (phieus.length === 0) return { message: 'Không có đăng ký nào cần lọc' };
 
-    // Tách 2 tập: Các phiếu đã HopLe từ đợt trước và các phiếu ChoDuyet đang chờ xét duyệt
+    // Tách 2 tập: Các phiếu đã HopLe từ đợt trước và các phiếu cần xét duyệt (ChoDuyet hoặc BiLoai)
     const alreadyHopLePhieus = phieus.filter((p) => p.trang_thai === 'HopLe');
-    const pendingPhieus = phieus.filter((p) => p.trang_thai === 'ChoDuyet');
+    const pendingPhieus = phieus.filter((p) =>
+      ['ChoDuyet', 'BiLoai'].includes(p.trang_thai),
+    );
 
     // Bảo lưu 100% sinh viên đã HopLe từ đợt trước vào danh sách chấp nhận
     const suggestedAccepted: PhieuDangKy[] = [...alreadyHopLePhieus];
@@ -2924,18 +2926,43 @@ export class KhoaService implements OnModuleInit {
     const phieus = await this.phieuRepo.find({
       where: {
         chuyen_tham_quan_id: tripId,
-        trang_thai: In(['ChoDuyet', 'HopLe']),
+        trang_thai: In(['ChoDuyet', 'HopLe', 'BiLoai']),
       },
       relations: { sinhVien: true },
     });
+
+    // 1. Tính toán hạn nộp lệ phí an toàn (bắt buộc phải ở tương lai để không bị tự động phạt)
+    const now = new Date();
+    let safeDeadline = new Date();
+    if (
+      deadlineDate &&
+      !isNaN(new Date(deadlineDate).getTime()) &&
+      new Date(deadlineDate) > now
+    ) {
+      safeDeadline = new Date(deadlineDate);
+    } else if (trip.han_dong_le_phi && new Date(trip.han_dong_le_phi) > now) {
+      safeDeadline = new Date(trip.han_dong_le_phi);
+    } else {
+      safeDeadline.setDate(safeDeadline.getDate() + 3);
+      safeDeadline.setHours(23, 59, 59, 999);
+    }
+
+    const acceptedIdsSet = new Set(acceptedStudentIds.map((id) => Number(id)));
 
     const result = await this.dataSource.transaction(
       async (manager: EntityManager) => {
         let count = 0;
         for (const phieu of phieus) {
-          if (acceptedStudentIds.includes(phieu.sinh_vien_id)) {
+          if (acceptedIdsSet.has(Number(phieu.sinh_vien_id))) {
             phieu.trang_thai = 'HopLe';
             await manager.save(PhieuDangKy, phieu);
+
+            // Tự động gỡ sinh viên khỏi DanhSachDen nếu từng bị ghi nhận phạt quá hạn của phiếu này
+            await manager.delete(DanhSachDen, {
+              sinh_vien_id: phieu.sinh_vien_id,
+              phieu_dang_ky_id: phieu.id,
+              ly_do: 'KhongDongPhi',
+            });
 
             const isFreeTrip = (trip.le_phi || 0) <= 0;
 
@@ -3024,28 +3051,12 @@ export class KhoaService implements OnModuleInit {
 
                 hoaDon.noi_dung_chuyen_khoan = `${nhaMayStr}_${ngayStr}_${sttStr}_${mssvStr}_${hoTenStr}`;
 
-                let dateLimit = new Date();
-                if (deadlineDate) {
-                  dateLimit = new Date(deadlineDate);
-                } else if (trip.han_dong_le_phi) {
-                  dateLimit = new Date(trip.han_dong_le_phi);
-                } else {
-                  dateLimit.setDate(dateLimit.getDate() + 3);
-                }
-                hoaDon.han_dong = dateLimit;
+                hoaDon.han_dong = safeDeadline;
                 hoaDon.trang_thai = 'ChuaDong';
                 await manager.save(HoaDonLePhi, hoaDon);
-              } else if (existingInvoice.trang_thai === 'ViPham') {
-                // Neu hoa don cu bi vi pham (qua han o dot truoc), bay gio duoc duyet bo sung thi reset lai han nop
-                let dateLimit = new Date();
-                if (deadlineDate) {
-                  dateLimit = new Date(deadlineDate);
-                } else if (trip.han_dong_le_phi) {
-                  dateLimit = new Date(trip.han_dong_le_phi);
-                } else {
-                  dateLimit.setDate(dateLimit.getDate() + 3);
-                }
-                existingInvoice.han_dong = dateLimit;
+              } else {
+                // Đã có hóa đơn: cập nhật lại hạn nộp mới và chuyển trạng thái về ChuaDong
+                existingInvoice.han_dong = safeDeadline;
                 existingInvoice.trang_thai = 'ChuaDong';
                 await manager.save(HoaDonLePhi, existingInvoice);
               }
@@ -3058,6 +3069,7 @@ export class KhoaService implements OnModuleInit {
         }
 
         trip.trang_thai = 'DaChotDanhSach';
+        trip.han_dong_le_phi = safeDeadline;
         await manager.save(ChuyenThamQuan, trip);
 
         return {

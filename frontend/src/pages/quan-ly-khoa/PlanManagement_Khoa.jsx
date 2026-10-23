@@ -871,100 +871,46 @@ export default function PlanManagement_Khoa() {
               </div>
 
               <div className="grid grid-cols-3 gap-4">
-                {/* Năm học custom dropdown */}
-                <div className="relative">
+                {/* Năm học SearchableDropdown */}
+                <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Năm học</label>
-                  <div 
-                    onClick={() => { setIsYearDropdownOpen(!isYearDropdownOpen); setIsTermDropdownOpen(false); setIsCourseDropdownOpen(false); }}
-                    className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-sm flex justify-between items-center cursor-pointer transition-all ${isYearDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-                  >
-                    <span className={`font-medium truncate ${selectedYear ? 'text-slate-800' : 'text-slate-400'}`}>
-                      {years.find(y => y.id === selectedYear)?.ten_nam_hoc || 'Chọn năm học'}
-                    </span>
-                    <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0 ml-2" />
-                  </div>
-                  {isYearDropdownOpen && (
-                    <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1">
-                      {years.map(opt => (
-                        <div 
-                          key={opt.id}
-                          onClick={() => { setSelectedYear(opt.id); setIsYearDropdownOpen(false); }}
-                          className={`px-4 py-2.5 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                            (selectedYear === opt.id) 
-                              ? 'bg-[#E7E0C4] text-slate-800 font-bold' 
-                              : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
-                          }`}
-                        >
-                          {opt.ten_nam_hoc}
-                          {selectedYear === opt.id && <Check className="w-4 h-4 text-[#407F3E]" />}
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <SearchableDropdown
+                    options={years.map(y => ({ value: y.id, label: y.ten_nam_hoc }))}
+                    value={selectedYear}
+                    onChange={(val) => setSelectedYear(val)}
+                    placeholder="Chọn năm học"
+                    searchPlaceholder="Tìm năm học..."
+                    className="w-full"
+                    disabled={isSaving}
+                  />
                 </div>
 
-                {/* Học kỳ custom dropdown */}
-                <div className="relative">
+                {/* Học kỳ SearchableDropdown */}
+                <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Học kỳ</label>
-                  <div 
-                    onClick={() => { setIsTermDropdownOpen(!isTermDropdownOpen); setIsYearDropdownOpen(false); setIsCourseDropdownOpen(false); }}
-                    className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-sm flex justify-between items-center cursor-pointer transition-all ${isTermDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-                  >
-                    <span className={`font-medium truncate ${selectedTerm ? 'text-slate-800' : 'text-slate-400'}`}>
-                      {terms.find(t => t.id === selectedTerm)?.ten_hoc_ky || 'Chọn học kỳ'}
-                    </span>
-                    <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0 ml-2" />
-                  </div>
-                  {isTermDropdownOpen && (
-                    <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1">
-                      {terms.map(opt => (
-                        <div 
-                          key={opt.id}
-                          onClick={() => { setSelectedTerm(opt.id); setIsTermDropdownOpen(false); }}
-                          className={`px-4 py-2.5 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                            (selectedTerm === opt.id) 
-                              ? 'bg-[#E7E0C4] text-slate-800 font-bold' 
-                              : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
-                          }`}
-                        >
-                          {opt.ten_hoc_ky}
-                          {selectedTerm === opt.id && <Check className="w-4 h-4 text-[#407F3E]" />}
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <SearchableDropdown
+                    options={terms.map(t => ({ value: t.id, label: t.ten_hoc_ky }))}
+                    value={selectedTerm}
+                    onChange={(val) => setSelectedTerm(val)}
+                    placeholder="Chọn học kỳ"
+                    searchPlaceholder="Tìm học kỳ..."
+                    className="w-full"
+                    disabled={isSaving}
+                  />
                 </div>
 
-                {/* Khóa custom dropdown */}
-                <div className="relative">
+                {/* Khóa SearchableDropdown */}
+                <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Khóa</label>
-                  <div 
-                    onClick={() => { setIsCourseDropdownOpen(!isCourseDropdownOpen); setIsTermDropdownOpen(false); setIsYearDropdownOpen(false); }}
-                    className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-sm flex justify-between items-center cursor-pointer transition-all ${isCourseDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-                  >
-                    <span className={`font-medium truncate ${selectedCourse ? 'text-slate-800' : 'text-slate-400'}`}>
-                      {courses.find(c => c.id === selectedCourse)?.ten_khoa_hoc || 'Chọn khóa'}
-                    </span>
-                    <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0 ml-2" />
-                  </div>
-                  {isCourseDropdownOpen && (
-                    <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 max-h-60 overflow-y-auto">
-                      {courses.map(opt => (
-                        <div 
-                          key={opt.id}
-                          onClick={() => { setSelectedCourse(opt.id); setIsCourseDropdownOpen(false); }}
-                          className={`px-4 py-2.5 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                            (selectedCourse === opt.id) 
-                              ? 'bg-[#E7E0C4] text-slate-800 font-bold' 
-                              : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
-                          }`}
-                        >
-                          {opt.ten_khoa_hoc}
-                          {selectedCourse === opt.id && <Check className="w-4 h-4 text-[#407F3E]" />}
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <SearchableDropdown
+                    options={courses.map(c => ({ value: c.id, label: c.ten_khoa_hoc }))}
+                    value={selectedCourse}
+                    onChange={(val) => setSelectedCourse(val)}
+                    placeholder="Chọn khóa"
+                    searchPlaceholder="Tìm khóa..."
+                    className="w-full"
+                    disabled={isSaving}
+                  />
                 </div>
               </div>
 

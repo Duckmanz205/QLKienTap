@@ -175,17 +175,26 @@ export class GiangVienService implements OnModuleInit {
       phieuTQs.map((ptq) => [ptq.phieu_dang_ky_id, ptq]),
     );
 
-    const diemDanhs = await this.diemDanhRepo.find({
-      where: { phieu_tham_quan_id: In(phieuTQIds) },
-    });
+    const diemDanhs =
+      phieuTQIds.length > 0
+        ? await this.diemDanhRepo.find({
+            where: { phieu_tham_quan_id: In(phieuTQIds) },
+          })
+        : [];
 
-    const diems = await this.diemPhieuRepo.find({
-      where: { phieu_tham_quan_id: In(phieuTQIds) },
-    });
+    const diems =
+      phieuTQIds.length > 0
+        ? await this.diemPhieuRepo.find({
+            where: { phieu_tham_quan_id: In(phieuTQIds) },
+          })
+        : [];
 
-    const baiThuHoachs = await this.baiThuRepo.find({
-      where: { phieu_tham_quan_id: In(phieuTQIds) },
-    });
+    const baiThuHoachs =
+      phieuTQIds.length > 0
+        ? await this.baiThuRepo.find({
+            where: { phieu_tham_quan_id: In(phieuTQIds) },
+          })
+        : [];
     const baiThuMap = new Map(
       baiThuHoachs.map((b) => [b.phieu_tham_quan_id, b]),
     );
@@ -267,6 +276,9 @@ export class GiangVienService implements OnModuleInit {
         where: { id: tripId },
       });
       if (!trip) throw new NotFoundException('Không tìm thấy chuyến tham quan');
+      if (trip.trang_thai === 'DaHuy') {
+        throw new BadRequestException('Không thể điểm danh chuyến tham quan đã bị hủy');
+      }
 
       // 3b. Kiểm tra quyền giảng viên dẫn đoàn trong transaction
       const isLead = await manager.findOne(PhanCongGiangVienDanDoan, {
@@ -306,9 +318,12 @@ export class GiangVienService implements OnModuleInit {
         phieuTQs.map((ptq) => [ptq.phieu_dang_ky_id, ptq]),
       );
 
-      const existingDiemDanhs = await manager.find(DiemDanh, {
-        where: { phieu_tham_quan_id: In(phieuTQIds) },
-      });
+      const existingDiemDanhs =
+        phieuTQIds.length > 0
+          ? await manager.find(DiemDanh, {
+              where: { phieu_tham_quan_id: In(phieuTQIds) },
+            })
+          : [];
       const diemDanhMap = new Map<number, DiemDanh>();
       for (const dd of existingDiemDanhs) {
         diemDanhMap.set(dd.phieu_tham_quan_id, dd);
@@ -331,11 +346,20 @@ export class GiangVienService implements OnModuleInit {
 
         let ptq = ptqMapByPhieuId.get(record.phieuId);
         if (!ptq) {
-          // Tự động cấp phiếu tham quan nếu database bị thiếu do lỗi data/seed
-          ptq = new PhieuThamQuan();
-          ptq.phieu_dang_ky_id = record.phieuId;
-          ptq.trang_thai = 'HopLe';
-          await manager.save(PhieuThamQuan, ptq);
+          // Tự động cấp phiếu tham quan an toàn (tránh lỗi OUTPUT khi bảng có trigger)
+          await manager.query(
+            `INSERT INTO PhieuThamQuan (phieu_dang_ky_id, trang_thai) VALUES (@0, 'HopLe')`,
+            [record.phieuId],
+          );
+          const newPtq = await manager.findOne(PhieuThamQuan, {
+            where: { phieu_dang_ky_id: record.phieuId },
+          });
+          if (!newPtq) {
+            throw new BadRequestException(
+              `Không thể khởi tạo phiếu tham quan cho phiếu #${record.phieuId}`,
+            );
+          }
+          ptq = newPtq;
           ptqMapByPhieuId.set(record.phieuId, ptq);
         }
 

@@ -695,7 +695,7 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                                     <RotateCcw className="w-3 h-3" /> Đợt bổ sung
                                   </span>
                                 )}
-                                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider shrink-0 ${isOnline ? 'bg-slate-800 text-white' : 'bg-[#E7E0C4]/50 text-slate-800'
+                                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider shrink-0 ${isOnline ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-[#E7E0C4]/50 text-slate-800'
                                   }`}>
                                   {isOnline ? <Laptop className="w-3.5 h-3.5" /> : <MapPin className="w-3.5 h-3.5" />}
                                   {isOnline ? 'Trực tuyến' : 'Trực tiếp'}
@@ -969,7 +969,7 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                                 </td>
                                 <td className="p-4 font-medium text-slate-600">{trip?.ngay_tham_quan ? new Date(trip.ngay_tham_quan).toLocaleDateString('vi-VN') : '--'}</td>
                                 <td className="p-4 text-center">
-                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shrink-0 ${isOnline ? 'bg-slate-100 text-slate-600' : 'bg-[#89B449]/10 text-[#407F3E]'
+                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shrink-0 ${isOnline ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-[#89B449]/10 text-[#407F3E]'
                                     }`}>
                                     {isOnline ? <Laptop className="w-3 h-3" /> : <MapPin className="w-3 h-3" />}
                                     {isOnline ? 'Trực tuyến' : 'Trực tiếp'}
@@ -1404,7 +1404,7 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                             {p.ngay_tham_quan_de_xuat ? new Date(p.ngay_tham_quan_de_xuat).toLocaleDateString('vi-VN') : '--'}
                           </td>
                           <td className="p-4 text-center">
-                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-bold uppercase tracking-wider shrink-0 ${isOnline ? 'bg-slate-100 text-slate-600' : 'bg-[#89B449]/10 text-[#407F3E]'
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-bold uppercase tracking-wider shrink-0 ${isOnline ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-[#89B449]/10 text-[#407F3E]'
                               }`}>
                               {isOnline ? <Laptop className="w-3 h-3" /> : <MapPin className="w-3 h-3" />}
                               {isOnline ? 'Trực tuyến' : 'Trực tiếp'}
