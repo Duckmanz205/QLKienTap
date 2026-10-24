@@ -67,7 +67,7 @@ class AppDrawer extends StatelessWidget {
           children: [
             // Header
             Container(
-              padding: const EdgeInsets.symmetric(vertical: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
               width: double.infinity,
               decoration: BoxDecoration(
                 border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.1))),
@@ -76,18 +76,22 @@ class AppDrawer extends StatelessWidget {
                 children: [
                   Image.asset(
                     'assets/images/huit_logo.png',
-                    height: 50,
+                    height: 52,
+                    fit: BoxFit.contain,
+                    color: Colors.white,
+                    colorBlendMode: BlendMode.srcIn,
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
                   const Text(
                     'QUẢN LÝ KIẾN TẬP',
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w900,
-                      fontSize: 14,
+                      fontSize: 15,
                       letterSpacing: 1.2,
                     ),
                   ),
+                  const SizedBox(height: 2),
                   Text(
                     'HUIT — ${role == 'SinhVien' ? 'KHOA CNTP' : 'GIẢNG VIÊN'}',
                     style: TextStyle(
@@ -206,7 +210,8 @@ class AppDrawer extends StatelessWidget {
                       CircleAvatar(
                         radius: 20,
                         backgroundColor: Colors.white,
-                        backgroundImage: NetworkImage(avatarUrl),
+                        backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+                        child: avatarUrl.isEmpty ? const Icon(Icons.person, color: AppColors.primary) : null,
                       ),
                       const SizedBox(width: 12),
                       Expanded(

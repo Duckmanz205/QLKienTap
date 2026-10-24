@@ -13,7 +13,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
-  String _selectedRole = 'student'; // 'student' or 'lecturer'
   bool _isLoading = false;
 
   @override
@@ -21,19 +20,6 @@ class _LoginScreenState extends State<LoginScreen> {
     _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
-  }
-
-  void _fillMockData(String role) {
-    setState(() {
-      _selectedRole = role;
-      if (role == 'student') {
-        _usernameController.text = '2005190573';
-        _passwordController.text = '2005190573';
-      } else {
-        _usernameController.text = 'gv019';
-        _passwordController.text = 'gv019';
-      }
-    });
   }
 
   void _submit() {
@@ -84,7 +70,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.appBackground,
+      backgroundColor: AppColors.primary,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -96,7 +82,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 Center(
                   child: Image.asset(
                     'assets/images/huit_logo.png',
-                    height: 85,
+                    height: 58,
+                    color: Colors.white,
+                    colorBlendMode: BlendMode.srcIn,
                     fit: BoxFit.contain,
                   ),
                 ),
@@ -107,16 +95,16 @@ class _LoginScreenState extends State<LoginScreen> {
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w900,
-                    color: AppColors.primary,
+                    color: Colors.white,
                     letterSpacing: 1.0,
                   ),
                 ),
-                const Text(
+                Text(
                   'Trường ĐH Công Thương TP.HCM (HUIT)',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 13,
-                    color: AppColors.darkSlate,
+                    color: Colors.white.withValues(alpha: 0.9),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -140,67 +128,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () => setState(() => _selectedRole = 'student'),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  decoration: BoxDecoration(
-                                    color: _selectedRole == 'student'
-                                        ? AppColors.primary
-                                        : Colors.grey.shade100,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    'Sinh viên',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: _selectedRole == 'student'
-                                          ? Colors.white
-                                          : AppColors.darkSlate,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () => setState(() => _selectedRole = 'lecturer'),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  decoration: BoxDecoration(
-                                    color: _selectedRole == 'lecturer'
-                                        ? AppColors.primary
-                                        : Colors.grey.shade100,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    'Giảng viên',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: _selectedRole == 'lecturer'
-                                          ? Colors.white
-                                          : AppColors.darkSlate,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-
                         TextFormField(
                           controller: _usernameController,
                           decoration: InputDecoration(
-                            labelText: _selectedRole == 'student'
-                                ? 'Mã số sinh viên (MSSV)'
-                                : 'Mã số giảng viên',
+                            labelText: 'Tài khoản / Mã số (MSSV hoặc MSGV)',
                             prefixIcon: const Icon(Icons.person_outline),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -266,63 +197,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       ],
                     ),
                   ),
-                ),
-                const SizedBox(height: 24),
-
-                const Text(
-                  'Bấm nhanh để dùng tài khoản demo:',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textMuted,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => _fillMockData('student'),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: AppColors.primary, width: 1.2),
-                          backgroundColor: Colors.white.withValues(alpha: 0.4),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        child: const Text(
-                          'Sinh Viên',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => _fillMockData('lecturer'),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: AppColors.primary, width: 1.2),
-                          backgroundColor: Colors.white.withValues(alpha: 0.4),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        child: const Text(
-                          'Giảng Viên',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
                 ),
               ],
             ),

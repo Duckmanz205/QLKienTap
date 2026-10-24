@@ -66,6 +66,7 @@ class _ChamBaiThuHoachGVScreenState extends State<ChamBaiThuHoachGVScreen> {
       final text = await ApiService.fetchReportText(widget.student.reportFileUrl!);
       final data = await ApiService.gradeWithAI(text);
 
+      if (!mounted) return;
       setState(() {
         _aiGrade = double.tryParse(data['diem_bao_cao_cuoi_cung']?.toString() ?? '');
         if (_aiGrade != null) {

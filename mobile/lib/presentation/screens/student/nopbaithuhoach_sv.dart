@@ -80,7 +80,10 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
     }
 
     final selectedSubs = allSubs.where((s) => _campaignSelectedTrips.contains(s.id)).toList();
-    final directCount = selectedSubs.where((s) => s.typeText.toLowerCase().contains('trực tiếp')).length;
+    final directCount = selectedSubs.where((s) {
+      final lower = s.typeText.toLowerCase();
+      return lower.contains('trực tiếp') || lower.contains('tructiep');
+    }).length;
 
     if (directCount < 2) {
       ScaffoldMessenger.of(context).showSnackBar(

@@ -103,10 +103,29 @@ class _DashboardGVScreenState extends State<DashboardGVScreen> {
                 Icon(Icons.chevron_right, size: 20, color: Colors.black54),
               ],
             ),
-            const SizedBox(height: 12),
-            _buildTimelineCard('T5', '25', '[Dẫn đoàn] Tham quan', 'Vinamilk', '08:00', const Color(0xFFBCE77C), const Color(0xFF3B711A)),
-            _buildTimelineCard('T6', '26', '[Hội đồng] Chấm báo cáo', 'Khóa 46', '13:30', const Color(0xFFB76E79).withValues(alpha: 0.8), const Color(0xFF903B4C)),
-            _buildTimelineCard('T7', '27', '[Dẫn đoàn] Tham quan', 'Acecook', '08:30', const Color(0xFFBCE77C), const Color(0xFF3B711A)),
+            if (appState.lecturerTours.isEmpty)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Text('Chưa có lịch dẫn đoàn trong tuần.', style: TextStyle(color: Colors.black54, fontSize: 13)),
+                ),
+              )
+            else
+              ...appState.lecturerTours.take(3).map((tour) {
+                final dayStr = tour.date.length >= 2 ? tour.date.substring(tour.date.length - 2) : '15';
+                return InkWell(
+                  onTap: () => widget.onTourTap(tour.id),
+                  child: _buildTimelineCard(
+                    'Đoàn',
+                    dayStr,
+                    '[Dẫn đoàn] Tham quan',
+                    tour.name,
+                    '${tour.date} | ${tour.timeRange}',
+                    const Color(0xFFBCE77C),
+                    const Color(0xFF3B711A),
+                  ),
+                );
+              }),
           ] else if (_lecturerScope == 'guided') ...[
             Row(
               children: [

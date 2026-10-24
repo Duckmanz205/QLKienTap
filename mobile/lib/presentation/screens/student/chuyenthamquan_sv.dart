@@ -4,6 +4,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../data/models/app_models.dart';
 import '../../../data/state/app_state.dart';
 import '../../../core/network/api_service.dart';
+import '../../../core/utils/company_matcher.dart';
 import '../../widgets/paginated_list.dart';
 
 Future<void> _showCancelDialog(
@@ -181,6 +182,11 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
   List<Map<String, dynamic>> _factories = [];
   String _filterFactory = 'Tất cả';
 
+  List<Map<String, dynamic>> _factorySuggestions = [];
+  bool _isSearchingFactory = false;
+  BestMatchResult? _duplicateMatchResult;
+  int? _matchedCustomFactoryId;
+
   @override
   void initState() {
     super.initState();
@@ -196,6 +202,66 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
         });
       }
     } catch (_) {}
+  }
+
+  void _runCompanyMatchCheck() {
+    final name = _companyNameCtrl.text.trim();
+    final addr = _addressCtrl.text.trim();
+    if (name.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _duplicateMatchResult = null;
+          _matchedCustomFactoryId = null;
+        });
+      }
+      return;
+    }
+
+    final seenIds = <int>{};
+    final candidates = <FactoryCandidate>[];
+    for (final item in [..._factories, ..._factorySuggestions]) {
+      final c = FactoryCandidate.fromMap(item);
+      if (c.id > 0 && !seenIds.contains(c.id)) {
+        seenIds.add(c.id);
+        candidates.add(c);
+      }
+    }
+
+    if (candidates.isEmpty) return;
+
+    final match = CompanyMatcher.findBestMatch(name, addr, candidates);
+    if (mounted) {
+      setState(() {
+        _duplicateMatchResult = match;
+        if (match.bestMatch != null && match.score >= 75) {
+          _matchedCustomFactoryId = match.bestMatch!.id;
+        } else if (_matchedCustomFactoryId != null && match.bestMatch?.id != _matchedCustomFactoryId) {
+          _matchedCustomFactoryId = null;
+        }
+      });
+    }
+  }
+
+  Future<void> _searchFactorySuggestions(String query) async {
+    final trimmed = query.trim();
+    _runCompanyMatchCheck();
+    if (trimmed.length < 2) {
+      if (mounted) setState(() => _factorySuggestions = []);
+      return;
+    }
+    setState(() => _isSearchingFactory = true);
+    try {
+      final res = await ApiService.searchFactories(trimmed);
+      if (mounted && res is List) {
+        setState(() {
+          _factorySuggestions = res.map((item) => Map<String, dynamic>.from(item as Map)).toList();
+        });
+        _runCompanyMatchCheck();
+      }
+    } catch (_) {
+    } finally {
+      if (mounted) setState(() => _isSearchingFactory = false);
+    }
   }
 
   @override
@@ -617,6 +683,48 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
     );
   }
 
+  Future<void> _confirmCancelProposal(
+    BuildContext context,
+    TripProposal prop,
+    AppStateProviderState appStateProvider,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Hủy đề xuất chuyến đi', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        content: Text('Bạn có chắc chắn muốn hủy đề xuất đến "${prop.tenDoanhNghiep}" không?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Đóng'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger, foregroundColor: Colors.white),
+            child: const Text('Hủy đề xuất'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      try {
+        await appStateProvider.cancelStudentProposal(prop.id);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Đã hủy đề xuất thành công')),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Lỗi khi hủy đề xuất: $e'), backgroundColor: AppColors.danger),
+          );
+        }
+      }
+    }
+  }
+
   Widget _buildProposeTab(AppStateProviderState appStateProvider) {
     final proposals = appStateProvider.state.proposals;
 
@@ -679,7 +787,7 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
 
                     if (_proposalMode == 'system') ...[
                       DropdownButtonFormField<int>(
-                        value: _selectedFactoryId,
+                        initialValue: _selectedFactoryId,
                         decoration: const InputDecoration(
                           labelText: 'Chọn nhà máy / doanh nghiệp',
                           border: OutlineInputBorder(),
@@ -698,16 +806,77 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
                     ] else ...[
                       TextFormField(
                         controller: _companyNameCtrl,
-                        decoration: const InputDecoration(
+                        onChanged: _searchFactorySuggestions,
+                        decoration: InputDecoration(
                           labelText: 'Tên doanh nghiệp / Nhà máy',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.business),
+                          border: const OutlineInputBorder(),
+                          prefixIcon: const Icon(Icons.business),
+                          suffixIcon: _isSearchingFactory
+                              ? const Padding(
+                                  padding: EdgeInsets.all(12),
+                                  child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                                )
+                              : null,
                         ),
                         validator: (v) => _proposalMode == 'custom' && (v == null || v.trim().isEmpty) ? 'Vui lòng nhập tên doanh nghiệp' : null,
                       ),
+                      if (_factorySuggestions.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                            boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                child: Text(
+                                  'Gợi ý doanh nghiệp trong hệ thống (nhấn để tự điền):',
+                                  style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Colors.grey.shade700),
+                                ),
+                              ),
+                              ..._factorySuggestions.take(3).map((s) => InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    _companyNameCtrl.text = s['ten_nha_may']?.toString() ?? '';
+                                    if (s['dia_chi'] != null) {
+                                      _addressCtrl.text = s['dia_chi'].toString();
+                                    }
+                                    _matchedCustomFactoryId = s['id'] is int
+                                        ? s['id'] as int
+                                        : int.tryParse(s['id']?.toString() ?? '');
+                                    _factorySuggestions = [];
+                                  });
+                                  _runCompanyMatchCheck();
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.check_circle_outline, size: 14, color: AppColors.primary),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          s['ten_nha_may']?.toString() ?? '',
+                                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.darkSlate),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              )),
+                            ],
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _addressCtrl,
+                        onChanged: (_) => _runCompanyMatchCheck(),
                         decoration: const InputDecoration(
                           labelText: 'Địa chỉ (Tỉnh/Thành phố)',
                           border: OutlineInputBorder(),
@@ -715,6 +884,72 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
                         ),
                         validator: (v) => _proposalMode == 'custom' && (v == null || v.trim().isEmpty) ? 'Vui lòng nhập địa chỉ' : null,
                       ),
+                      if (_proposalMode == 'custom' &&
+                          _duplicateMatchResult != null &&
+                          _duplicateMatchResult!.bestMatch != null) ...[
+                        if (_duplicateMatchResult!.score >= 75) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.secondary.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: AppColors.secondary, width: 1.5),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(Icons.verified, color: AppColors.secondary, size: 20),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Phát hiện trùng khớp ${_duplicateMatchResult!.score}% với doanh nghiệp:',
+                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.darkSlate),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        _duplicateMatchResult!.bestMatch!.tenNhaMay,
+                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      const Text(
+                                        'Hệ thống sẽ tự động liên kết đề xuất với doanh nghiệp này để tránh trùng lặp dữ liệu.',
+                                        style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ] else if (_duplicateMatchResult!.brandScore >= 80 && _duplicateMatchResult!.locationScore == 0) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppColors.warning.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: AppColors.warning, width: 1.2),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(Icons.warning_amber_rounded, color: AppColors.warning, size: 18),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Lưu ý: Tên thương hiệu trùng khớp với "${_duplicateMatchResult!.bestMatch!.tenNhaMay}" nhưng khác chi nhánh hoặc địa điểm.',
+                                    style: const TextStyle(fontSize: 11, color: AppColors.darkSlate),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
                       const SizedBox(height: 12),
                       Row(
                         children: [
@@ -795,7 +1030,7 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
 
                     // Format dropdown (Trực tiếp / Trực tuyến)
                     DropdownButtonFormField<String>(
-                      value: _selectedTripType,
+                      initialValue: _selectedTripType,
                       decoration: const InputDecoration(
                         labelText: 'Hình thức tham quan',
                         border: OutlineInputBorder(),
@@ -830,11 +1065,19 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
                                 setState(() => _isProposing = true);
                                 try {
                                   final timeStr = '${_selectedTime.hour.toString().padLeft(2, '0')}:${_selectedTime.minute.toString().padLeft(2, '0')}';
+                                  final finalName = _matchedCustomFactoryId != null
+                                      ? _companyNameCtrl.text.trim()
+                                      : CompanyMatcher.toTitleCase(_companyNameCtrl.text.trim());
+                                  final finalAddr = CompanyMatcher.toTitleCase(_addressCtrl.text.trim());
+                                  final finalContact = _contactPersonCtrl.text.trim().isNotEmpty
+                                      ? CompanyMatcher.toTitleCase(_contactPersonCtrl.text.trim())
+                                      : null;
+
                                   await appStateProvider.proposeTrip(
-                                    factoryId: _proposalMode == 'system' ? _selectedFactoryId : null,
-                                    companyName: _proposalMode == 'custom' ? _companyNameCtrl.text.trim() : null,
-                                    address: _proposalMode == 'custom' ? _addressCtrl.text.trim() : null,
-                                    contactPerson: _contactPersonCtrl.text.trim().isNotEmpty ? _contactPersonCtrl.text.trim() : null,
+                                    factoryId: _proposalMode == 'system' ? _selectedFactoryId : _matchedCustomFactoryId,
+                                    companyName: _proposalMode == 'custom' ? finalName : null,
+                                    address: _proposalMode == 'custom' ? finalAddr : null,
+                                    contactPerson: finalContact,
                                     contactPhone: _contactPhoneCtrl.text.trim().isNotEmpty ? _contactPhoneCtrl.text.trim() : null,
                                     visitDate: _selectedDate,
                                     startTime: timeStr,
@@ -853,6 +1096,8 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
                                     _contactPersonCtrl.clear();
                                     _contactPhoneCtrl.clear();
                                     _descriptionCtrl.clear();
+                                    _duplicateMatchResult = null;
+                                    _matchedCustomFactoryId = null;
                                   }
                                 } catch (e) {
                                   if (mounted) {
@@ -911,13 +1156,19 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
           else
             ...proposals.map((prop) {
               Color statusColor = AppColors.warning;
-              String statusLabel = 'Chờ duyệt';
-              if (prop.trangThai == 'ChapNhan' || prop.trangThai == 'Approved') {
+              String statusLabel = 'Chờ CLB duyệt';
+              if (prop.trangThai == 'ChoKhoaDuyet') {
+                statusColor = Colors.indigo;
+                statusLabel = 'Chờ Khoa duyệt';
+              } else if (prop.isApproved) {
                 statusColor = AppColors.secondary;
-                statusLabel = 'Đã chấp nhận';
-              } else if (prop.trangThai == 'TuChoi' || prop.trangThai == 'Rejected') {
+                statusLabel = 'Đã duyệt';
+              } else if (prop.isRejected) {
                 statusColor = AppColors.danger;
                 statusLabel = 'Từ chối';
+              } else if (prop.trangThai == 'ChoDuyet') {
+                statusColor = AppColors.warning;
+                statusLabel = 'Chờ CLB duyệt';
               }
 
               return Card(
@@ -991,6 +1242,17 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
                           child: Text(
                             'Phản hồi từ Khoa/CLB: ${prop.phanHoi}',
                             style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: AppColors.darkSlate),
+                          ),
+                        ),
+                      ],
+                      if (prop.isPending) ...[
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton.icon(
+                            onPressed: () => _confirmCancelProposal(context, prop, appStateProvider),
+                            icon: const Icon(Icons.delete_outline, size: 14, color: AppColors.danger),
+                            label: const Text('Hủy đề xuất', style: TextStyle(fontSize: 11, color: AppColors.danger, fontWeight: FontWeight.bold)),
                           ),
                         ),
                       ],

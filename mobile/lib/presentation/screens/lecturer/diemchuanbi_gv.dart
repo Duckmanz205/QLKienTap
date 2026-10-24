@@ -197,7 +197,7 @@ class _DiemChuanBiGVScreenState extends State<DiemChuanBiGVScreen> {
                     ),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<LecturerTour>(
-                        value: tours.any((t) => t.id == _selectedTour?.id) ? _selectedTour : tours.first,
+                        value: tours.firstWhere((t) => t.id == _selectedTour?.id, orElse: () => tours.first),
                         isExpanded: true,
                         icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.primary),
                         items: tours.map((t) {

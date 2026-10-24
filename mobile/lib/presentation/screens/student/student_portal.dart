@@ -136,15 +136,15 @@ class _StudentPortalState extends State<StudentPortal> {
             onTap: () => _openMoreScreen('profile'),
             child: Container(
               margin: const EdgeInsets.only(right: 16, left: 4),
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.grey.shade300, width: 1.5),
-                image: DecorationImage(
-                  image: NetworkImage(appState.studentProfile.avatar),
-                  fit: BoxFit.cover,
-                ),
+              child: CircleAvatar(
+                radius: 16,
+                backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                backgroundImage: appState.studentProfile.avatar.isNotEmpty
+                    ? NetworkImage(appState.studentProfile.avatar)
+                    : null,
+                child: appState.studentProfile.avatar.isEmpty
+                    ? const Icon(Icons.person, size: 18, color: AppColors.primary)
+                    : null,
               ),
             ),
           ),
@@ -198,8 +198,12 @@ class _StudentPortalState extends State<StudentPortal> {
 
   Widget _buildMainBody(AppState appState, AppStateProviderState appStateProvider) {
     if (_selectedTripDetailId != null) {
-      final trip = appState.studentTrips.firstWhere((t) => t.id == _selectedTripDetailId);
-      return ChuyenThamQuanDetailSVScreen(trip: trip, onBack: _closeTripDetail);
+      final tripIndex = appState.studentTrips.indexWhere((t) => t.id == _selectedTripDetailId);
+      if (tripIndex != -1) {
+        return ChuyenThamQuanDetailSVScreen(trip: appState.studentTrips[tripIndex], onBack: _closeTripDetail);
+      } else {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _closeTripDetail());
+      }
     }
 
     if (_moreSubScreen != null) {
@@ -266,7 +270,13 @@ class _StudentPortalState extends State<StudentPortal> {
               children: [
                 CircleAvatar(
                   radius: 40,
-                  backgroundImage: NetworkImage(appState.studentProfile.avatar),
+                  backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                  backgroundImage: appState.studentProfile.avatar.isNotEmpty
+                      ? NetworkImage(appState.studentProfile.avatar)
+                      : null,
+                  child: appState.studentProfile.avatar.isEmpty
+                      ? const Icon(Icons.person, size: 40, color: AppColors.primary)
+                      : null,
                 ),
                 const SizedBox(height: 12),
                 Text(

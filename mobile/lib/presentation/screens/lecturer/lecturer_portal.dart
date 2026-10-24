@@ -64,8 +64,8 @@ class _LecturerPortalState extends State<LecturerPortal> {
       }
     } else if (_currentIndex == 2) {
       if (_gradingActiveStudentId != null) {
-        final student = appState.lecturerStudents.firstWhere((s) => s.id == _gradingActiveStudentId);
-        pageTitle = student.name;
+        final student = appState.lecturerStudents.where((s) => s.id == _gradingActiveStudentId).firstOrNull;
+        pageTitle = student?.name ?? 'Chấm bài thu hoạch';
       } else if (_gradingPrepIntent) {
         pageTitle = 'Điểm chuẩn bị & Cộng';
       } else {
@@ -155,15 +155,15 @@ class _LecturerPortalState extends State<LecturerPortal> {
             onTap: () => setState(() => _profileSubScreen = true),
             child: Container(
               margin: const EdgeInsets.only(right: 16, left: 4),
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.grey.shade300, width: 1.5),
-                image: DecorationImage(
-                  image: NetworkImage(appState.lecturerProfile.avatar),
-                  fit: BoxFit.cover,
-                ),
+              child: CircleAvatar(
+                radius: 16,
+                backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                backgroundImage: appState.lecturerProfile.avatar.isNotEmpty
+                    ? NetworkImage(appState.lecturerProfile.avatar)
+                    : null,
+                child: appState.lecturerProfile.avatar.isEmpty
+                    ? const Icon(Icons.person, size: 18, color: AppColors.primary)
+                    : null,
               ),
             ),
           ),
@@ -246,31 +246,43 @@ class _LecturerPortalState extends State<LecturerPortal> {
         );
       case 1:
         if (_attendanceActiveTourId != null) {
-          final tour = appState.lecturerTours.firstWhere((t) => t.id == _attendanceActiveTourId);
-          return DiemDanhSVGVScreen(initialTour: tour, onBack: () => setState(() => _attendanceActiveTourId = null));
+          final tour = appState.lecturerTours.where((t) => t.id == _attendanceActiveTourId).firstOrNull;
+          if (tour != null) {
+            return DiemDanhSVGVScreen(initialTour: tour, onBack: () => setState(() => _attendanceActiveTourId = null));
+          } else {
+            WidgetsBinding.instance.addPostFrameCallback((_) => setState(() => _attendanceActiveTourId = null));
+          }
         } else if (_attendanceIntent) {
           return const DiemDanhSVGVScreen();
         }
         return LichDanDoanGVScreen(onTourTap: (tourId) => setState(() => _attendanceActiveTourId = tourId));
       case 2:
         if (_gradingActiveStudentId != null) {
-          final student = appState.lecturerStudents.firstWhere((s) => s.id == _gradingActiveStudentId);
-          return ChamBaiThuHoachGVScreen(
-            student: student,
-            onGradeSaved: () {
-              setState(() {
-                _gradingActiveStudentId = null;
-              });
-            },
-          );
+          final student = appState.lecturerStudents.where((s) => s.id == _gradingActiveStudentId).firstOrNull;
+          if (student != null) {
+            return ChamBaiThuHoachGVScreen(
+              student: student,
+              onGradeSaved: () {
+                setState(() {
+                  _gradingActiveStudentId = null;
+                });
+              },
+            );
+          } else {
+            WidgetsBinding.instance.addPostFrameCallback((_) => setState(() => _gradingActiveStudentId = null));
+          }
         } else if (_gradingPrepIntent) {
           return DiemChuanBiGVScreen(onBack: () => setState(() => _gradingPrepIntent = false));
         }
         return SinhVienHuongDanGVScreen(onStudentTap: (studentId) => setState(() => _gradingActiveStudentId = studentId));
       case 3:
         if (_activeCouncilId != null) {
-          final council = appState.councilSessions.firstWhere((c) => c.id == _activeCouncilId);
-          return HoiDongGradingQueueScreen(session: council, onBack: () => setState(() => _activeCouncilId = null));
+          final council = appState.councilSessions.where((c) => c.id == _activeCouncilId).firstOrNull;
+          if (council != null) {
+            return HoiDongGradingQueueScreen(session: council, onBack: () => setState(() => _activeCouncilId = null));
+          } else {
+            WidgetsBinding.instance.addPostFrameCallback((_) => setState(() => _activeCouncilId = null));
+          }
         }
         return HoiDongChamBaoCaoDSBuoiGVScreen(onCouncilTap: (councilId) => setState(() => _activeCouncilId = councilId));
       case 4:
@@ -311,7 +323,13 @@ class _LecturerPortalState extends State<LecturerPortal> {
               children: [
                 CircleAvatar(
                   radius: 40,
-                  backgroundImage: NetworkImage(appState.lecturerProfile.avatar),
+                  backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                  backgroundImage: appState.lecturerProfile.avatar.isNotEmpty
+                      ? NetworkImage(appState.lecturerProfile.avatar)
+                      : null,
+                  child: appState.lecturerProfile.avatar.isEmpty
+                      ? const Icon(Icons.person, size: 40, color: AppColors.primary)
+                      : null,
                 ),
                 const SizedBox(height: 12),
                 Text(

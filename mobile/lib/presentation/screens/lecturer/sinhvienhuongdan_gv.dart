@@ -157,8 +157,12 @@ class _SinhVienHuongDanGVScreenState extends State<SinhVienHuongDanGVScreen> {
                       Row(
                         children: [
                           CircleAvatar(
-                            backgroundImage: NetworkImage(student.avatar),
+                            backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                            backgroundImage: student.avatar.isNotEmpty ? NetworkImage(student.avatar) : null,
                             radius: 22,
+                            child: student.avatar.isEmpty
+                                ? const Icon(Icons.person, size: 22, color: AppColors.primary)
+                                : null,
                             onBackgroundImageError: (_, _) {},
                           ),
                           const SizedBox(width: 12),
@@ -166,9 +170,9 @@ class _SinhVienHuongDanGVScreenState extends State<SinhVienHuongDanGVScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(student.id, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppColors.primary)),
+                                Text(student.id.contains('_') ? student.id.split('_').first : student.id, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppColors.primary)),
                                 Text(student.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.darkSlate)),
-                                Text('Lớp: ${student.className}', style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                                Text('Lớp: ${student.className} • ${student.company}', style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
                               ],
                             ),
                           ),
