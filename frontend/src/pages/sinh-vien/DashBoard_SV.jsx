@@ -270,7 +270,7 @@ export default function DashBoard_SV() {
                           <h3 className="font-bold text-sm text-slate-800 line-clamp-1 group-hover:text-[#407F3E] transition-colors">
                             {trip.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Chưa xác định'}
                           </h3>
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shrink-0 ${isOnline ? 'bg-slate-100 text-slate-600' : 'bg-[#89B449]/10 text-[#407F3E]'
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shrink-0 ${isOnline ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-[#89B449]/10 text-[#407F3E]'
                             }`}>
                             {isOnline ? <Laptop className="w-3 h-3" /> : <MapPin className="w-3 h-3" />}
                             {isOnline ? 'Trực tuyến' : 'Trực tiếp'}

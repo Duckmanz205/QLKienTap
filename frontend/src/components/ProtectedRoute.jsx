@@ -19,10 +19,6 @@ export default function ProtectedRoute({ allowedRoles }) {
 
   const { vai_tro } = session.user;
 
-  if (vai_tro === 'QuanTriVienHeThong' && location.pathname !== '/qtv/accounts') {
-    return <Navigate to="/qtv/accounts" replace />;
-  }
-
   if (allowedRoles && !allowedRoles.includes(vai_tro)) {
     const targetDashboard = getDashboardPathForRole(vai_tro);
     return <Navigate to={targetDashboard} replace />;

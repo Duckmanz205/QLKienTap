@@ -1,5 +1,4 @@
-import { Module } from '@nestjs/common';
-import * as allEntities from './entities/qlkt.entity';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -11,6 +10,9 @@ import { GiangVienModule } from './giang-vien/giang-vien.module';
 import { KhoaModule } from './khoa/khoa.module';
 import { UploadModule } from './upload/upload.module';
 import { QueueModule } from './queue/queue.module';
+import { createRoleTypeOrmOptions } from './common/database-connections.util';
+import { RoleDataSourceModule } from './common/role-datasource.module';
+import { RoleContextMiddleware } from './common/role-context.middleware';
 
 @Module({
   imports: [
@@ -22,40 +24,52 @@ import { QueueModule } from './queue/queue.module';
     // Cau hinh dat lich trinh tu dong
     ScheduleModule.forRoot(),
 
-    // Cau hinh ket noi SQL Server
+    // 1. KẾT NỐI MẶC ĐỊNH (DEFAULT / ADMIN): Dùng cho AuthModule, CronService, QtvController, BackupService
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        type: 'mssql',
-        host: configService.get<string>('DB_HOST', '127.0.0.1'),
-        port: Number(configService.get('DB_PORT', 1433)),
-        username: configService.get<string>('DB_USERNAME', 'sa'),
-        password: configService.get<string>('DB_PASSWORD', ''),
-        database: configService.get<string>('DB_DATABASE', 'QLKienTap'),
-        entities: Object.values(allEntities).filter(
-          (val) => typeof val === 'function',
-        ),
-        autoLoadEntities: true,
-        synchronize: false, // TAT trong production, dung migrations thay the
-        dropSchema: false,
-        pool: {
-          max: 10,
-          min: 2,
-          idleTimeoutMillis: 30000,
-          acquireTimeoutMillis: 30000,
-        },
-        extra: {
-          validateConnection: false,
-        },
-        options: {
-          encrypt: false, // Tat encrypt cho local development
-          trustServerCertificate: true,
-          connectTimeout: 30000,
-          requestTimeout: 30000,
-        },
-      }),
+      useFactory: (configService: ConfigService) =>
+        createRoleTypeOrmOptions(configService, 'ADMIN'),
     }),
+
+    // 2. KẾT NỐI ROLE QUẢN LÝ KHOA
+    TypeOrmModule.forRootAsync({
+      name: 'KHOA_CONNECTION',
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) =>
+        createRoleTypeOrmOptions(configService, 'KHOA', 'KHOA_CONNECTION'),
+    }),
+
+    // 3. KẾT NỐI ROLE QUẢN LÝ CÂU LẠC BỘ
+    TypeOrmModule.forRootAsync({
+      name: 'CLB_CONNECTION',
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) =>
+        createRoleTypeOrmOptions(configService, 'CLB', 'CLB_CONNECTION'),
+    }),
+
+    // 4. KẾT NỐI ROLE GIẢNG VIÊN
+    TypeOrmModule.forRootAsync({
+      name: 'GV_CONNECTION',
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) =>
+        createRoleTypeOrmOptions(configService, 'GV', 'GV_CONNECTION'),
+    }),
+
+    // 5. KẾT NỐI ROLE SINH VIÊN
+    TypeOrmModule.forRootAsync({
+      name: 'SV_CONNECTION',
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) =>
+        createRoleTypeOrmOptions(configService, 'SV', 'SV_CONNECTION'),
+    }),
+
+    // Global Module quản lý điều phối DataSource động theo Role
+    RoleDataSourceModule,
 
     // Dang ky cac phan he nghiep vu
     AuthModule,
@@ -68,4 +82,8 @@ import { QueueModule } from './queue/queue.module';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(RoleContextMiddleware).forRoutes('*');
+  }
+}

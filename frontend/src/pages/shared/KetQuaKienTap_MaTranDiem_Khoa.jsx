@@ -195,8 +195,9 @@ export default function KetQuaKienTap_Khoa() {
       if (activeTab === 'gvdd') fetchTripGradingStatuses();
       if (activeTab === 'gvhd') fetchSupervisorGradingStatuses();
     } catch (err) {
-      console.error(err);
-      toast.error(err?.response?.data?.message || 'Khóa điểm thất bại');
+      console.error('Lỗi khóa điểm:', err);
+      const errorMsg = err?.response?.data?.message || err?.message || 'Khóa điểm thất bại';
+      toast.error(Array.isArray(errorMsg) ? errorMsg.join(', ') : (typeof errorMsg === 'string' ? errorMsg : 'Khóa điểm thất bại'));
     } finally {
       setIsLocking(false);
     }

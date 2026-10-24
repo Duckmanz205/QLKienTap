@@ -180,9 +180,15 @@ export default function DiemDanhSV_GV() {
         records
       });
       setToast({ show: true, message: 'Đã lưu điểm danh thành công!', type: 'success' });
+      await fetchStudents(selectedTrip.id);
     } catch (err) {
-      setToast({ show: true, message: 'Có lỗi xảy ra khi lưu điểm danh', type: 'error' });
-      console.error(err);
+      const errorMsg = err.response?.data?.message || err.message || 'Có lỗi xảy ra khi lưu điểm danh';
+      setToast({ 
+        show: true, 
+        message: Array.isArray(errorMsg) ? errorMsg.join(', ') : (typeof errorMsg === 'string' ? errorMsg : 'Có lỗi xảy ra khi lưu điểm danh'), 
+        type: 'error' 
+      });
+      console.error('Lỗi khi lưu điểm danh:', err);
     } finally {
       setLoading(false);
     }
@@ -571,15 +577,6 @@ export default function DiemDanhSV_GV() {
               Trang cuối
             </button>
           </div>
-
-          <button 
-            onClick={handleSaveAttendance}
-            disabled={loading || students.length === 0}
-            className="w-full md:w-auto flex items-center justify-center gap-2 px-5 py-2 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl shadow-sm hover:shadow-md transition-all cursor-pointer font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-          >
-            <Save className="w-4 h-4" />
-            Lưu điểm danh
-          </button>
         </div>
       </div>
 
@@ -673,14 +670,14 @@ export default function DiemDanhSV_GV() {
                 previewModal.isPdf ? (
                   <iframe
                     src={previewModal.fileUrl}
-                    title="Giấy xác nhận doanh nghiệp"
+                    title="Giấy xác nhận tham quan"
                     className="w-full h-[65vh] rounded-lg border border-slate-300 bg-white"
                   />
                 ) : (
                   <div className="overflow-auto max-w-full max-h-full flex items-center justify-center p-2">
                     <img
                       src={previewModal.fileUrl}
-                      alt="Giấy xác nhận doanh nghiệp"
+                      alt="Giấy xác nhận tham quan"
                       style={{
                         transform: `scale(${zoom / 100}) rotate(${rotation}deg)`,
                         transition: 'transform 0.2s ease',

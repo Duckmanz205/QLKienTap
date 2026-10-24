@@ -349,37 +349,23 @@ export default function BaoCao_TongHopKienTap_Khoa() {
         </div>
 
         {/* Tình trạng tiến độ */}
-        <div className="relative min-w-[190px]">
-          <div 
-            onClick={(e) => { e.stopPropagation(); setIsProgressDropdownOpen(!isProgressDropdownOpen); setIsClassDropdownOpen(false); setIsGVHDDropdownOpen(false); }}
-            className={`w-full px-3.5 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isProgressDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-          >
-            <span className="text-slate-700 font-medium truncate">
-              {progressFilter === 'All' ? 'Tất cả tiến độ' :
-               progressFilter === 'DuDieuKien' ? 'Đủ điều kiện' :
-               progressFilter === 'ThieuOffline' ? 'Thiếu chuyến Offline' : 'Thiếu bài nộp'}
-            </span>
-            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0 ml-1" />
-          </div>
-          {isProgressDropdownOpen && (
-            <div onClick={(e) => e.stopPropagation()} className="absolute top-full right-0 w-52 mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1">
-              {[
-                { label: 'Tất cả tiến độ', value: 'All' },
-                { label: 'Đủ điều kiện kiểm tra', value: 'DuDieuKien' },
-                { label: 'Thiếu chuyến Offline (< 2)', value: 'ThieuOffline' },
-                { label: 'Thiếu bài nộp (< 3)', value: 'ThieuBaoCao' }
-              ].map(opt => (
-                <div 
-                  key={opt.value}
-                  onClick={() => { setProgressFilter(opt.value); setIsProgressDropdownOpen(false); setCurrentPage(1); }}
-                  className={`px-3.5 py-2 text-xs cursor-pointer flex justify-between items-center hover:bg-[#E7E0C4]/40 ${progressFilter === opt.value ? 'bg-[#E7E0C4] font-bold text-slate-800' : 'text-slate-700'}`}
-                >
-                  <span>{opt.label}</span>
-                  {progressFilter === opt.value && <Check className="w-3.5 h-3.5 text-[#407F3E]" />}
-                </div>
-              ))}
-            </div>
-          )}
+        <div className="min-w-[210px]">
+          <SearchableDropdown
+            options={[
+              { value: 'All', label: 'Tất cả tiến độ' },
+              { value: 'DuDieuKien', label: 'Đủ điều kiện kiểm tra' },
+              { value: 'ThieuOffline', label: 'Thiếu chuyến Offline (< 2)' },
+              { value: 'ThieuBaoCao', label: 'Thiếu bài nộp (< 3)' }
+            ]}
+            value={progressFilter}
+            onChange={(val) => {
+              setProgressFilter(val);
+              setCurrentPage(1);
+            }}
+            placeholder="Tất cả tiến độ"
+            searchPlaceholder="Tìm tiến độ..."
+            className="w-full"
+          />
         </div>
       </div>
 

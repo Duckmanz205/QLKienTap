@@ -399,28 +399,22 @@ export default function SupervisorAssignment_Khoa() {
             </div>
 
             {/* Trạng thái Filter */}
-            <div className="relative min-w-[150px]">
-              <div 
-                onClick={(e) => handleDropdownClick(e, setIsStatusDropdownOpen)}
-                className="w-full px-3 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-lg text-sm flex justify-between items-center cursor-pointer hover:border-[#407F3E]"
-              >
-                <span className={`truncate pr-2 font-medium flex-1 text-xs ${selectedStatus ? 'text-slate-700' : 'text-slate-400'}`}>{selectedStatus || 'Tất cả trạng thái'}</span>
-                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 shrink-0 ${isStatusDropdownOpen ? 'rotate-180' : ''}`} />
-              </div>
-              {isStatusDropdownOpen && (
-                <div className="absolute top-full right-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 min-w-[160px]">
-                  {['Tất cả', 'Đã phân công', 'Chưa phân công'].map(opt => (
-                    <div 
-                      key={opt}
-                      onClick={() => { setSelectedStatus(opt === 'Tất cả' ? '' : opt); setIsStatusDropdownOpen(false); setCurrentPage(1); }}
-                      className="px-3 py-1.5 text-xs cursor-pointer flex justify-between items-center hover:bg-slate-50 text-slate-700"
-                    >
-                      <span>{opt}</span>
-                      {(selectedStatus === opt || (!selectedStatus && opt === 'Tất cả')) && <Check className="w-3.5 h-3.5 text-[#407F3E]" />}
-                    </div>
-                  ))}
-                </div>
-              )}
+            <div className="min-w-[170px]">
+              <SearchableDropdown
+                options={[
+                  { value: '', label: 'Tất cả trạng thái' },
+                  { value: 'Đã phân công', label: 'Đã phân công' },
+                  { value: 'Chưa phân công', label: 'Chưa phân công' }
+                ]}
+                value={selectedStatus}
+                onChange={(val) => {
+                  setSelectedStatus(val);
+                  setCurrentPage(1);
+                }}
+                placeholder="Tất cả trạng thái"
+                searchPlaceholder="Tìm trạng thái..."
+                className="w-full"
+              />
             </div>
           </div>
 

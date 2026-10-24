@@ -346,7 +346,7 @@ class _ChamBaiThuHoachGVScreenState extends State<ChamBaiThuHoachGVScreen> {
                       );
                     },
                     icon: const Icon(Icons.visibility_outlined, size: 16),
-                    label: const Text('XEM GIẤY XÁC NHẬN DOANH NGHIỆP', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                    label: const Text('XEM GIẤY XÁC NHẬN THAM QUAN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.secondary,
                       side: const BorderSide(color: AppColors.secondary),
