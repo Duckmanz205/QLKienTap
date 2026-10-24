@@ -136,7 +136,7 @@ class _LichTrinhDoanSVScreenState extends State<LichTrinhDoanSVScreen> {
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<Trip>(
-                  value: registeredTrips.any((t) => t.id == currentTrip.id) ? currentTrip : registeredTrips.first,
+                  value: registeredTrips.firstWhere((t) => t.id == currentTrip.id, orElse: () => registeredTrips.first),
                   isExpanded: true,
                   icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.primary),
                   items: registeredTrips.map((t) {

@@ -24,14 +24,34 @@ class KiemTraBaoCaoSVScreen extends StatefulWidget {
 }
 
 class _KiemTraBaoCaoSVScreenState extends State<KiemTraBaoCaoSVScreen> {
-  bool _isPdfView = true;
   bool _isChecked = false;
   bool _isSubmitting = false;
-  bool _isExtracting = false;
   bool _hasExtracted = false;
   
   final TextEditingController _txtController = TextEditingController(
       text: "Đang tải nội dung...");
+
+  @override
+  void initState() {
+    super.initState();
+    _extractTextInBackground();
+  }
+
+  Future<void> _extractTextInBackground() async {
+    try {
+      final text = await ApiService.extractTextFromPdf(widget.filePath);
+      if (mounted) {
+        setState(() {
+          _hasExtracted = true;
+          if (text != null && text.isNotEmpty) {
+            _txtController.text = text;
+          }
+        });
+      }
+    } catch (_) {
+      // Ignored
+    }
+  }
 
   @override
   void dispose() {
@@ -60,9 +80,11 @@ class _KiemTraBaoCaoSVScreenState extends State<KiemTraBaoCaoSVScreen> {
       extractedText: _hasExtracted ? _txtController.text : null,
     );
 
-    setState(() {
-      _isSubmitting = false;
-    });
+    if (mounted) {
+      setState(() {
+        _isSubmitting = false;
+      });
+    }
 
     if (mounted) {
       if (success) {
@@ -82,29 +104,20 @@ class _KiemTraBaoCaoSVScreenState extends State<KiemTraBaoCaoSVScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isPdfView ? 'Kiểm tra file PDF' : 'Kiểm tra file TXT'),
+        title: const Text('Kiểm tra file PDF'),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
-        leading: !_isPdfView 
-          ? IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () {
-                setState(() {
-                  _isPdfView = true;
-                });
-              },
-            )
-          : IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.of(context).pop();
+          },
+        ),
       ),
       body: Column(
         children: [
           Expanded(
-            child: _isPdfView ? _buildPdfView() : _buildTxtView(),
+            child: _buildPdfView(),
           ),
           
           // Action Buttons Bottom Area
@@ -123,66 +136,6 @@ class _KiemTraBaoCaoSVScreenState extends State<KiemTraBaoCaoSVScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (_isPdfView)
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: _isExtracting ? null : () async {
-                        setState(() {
-                          _isPdfView = false;
-                        });
-                        
-                        if (!_hasExtracted) {
-                          setState(() {
-                            _isExtracting = true;
-                            _txtController.text = "Đang trích xuất nội dung từ PDF, vui lòng đợi...";
-                          });
-                          
-                          final text = await ApiService.extractTextFromPdf(widget.filePath);
-                          
-                          if (mounted) {
-                            setState(() {
-                              _isExtracting = false;
-                              _hasExtracted = true;
-                              if (text != null && text.isNotEmpty) {
-                                _txtController.text = text;
-                              } else {
-                                _txtController.text = "Không thể trích xuất nội dung hoặc file PDF trống/lỗi.";
-                              }
-                            });
-                          }
-                        }
-                      },
-                      icon: _isExtracting 
-                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Icon(Icons.text_snippet),
-                      label: Text(_isExtracting ? 'Đang trích xuất...' : 'Trích xuất sang file text (.txt)'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.primary,
-                        side: const BorderSide(color: AppColors.primary),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                    ),
-                  )
-                else
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        setState(() {
-                          _isPdfView = true;
-                        });
-                      },
-                      icon: const Icon(Icons.picture_as_pdf),
-                      label: const Text('Quay lại xem PDF'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.grey.shade700,
-                        side: BorderSide(color: Colors.grey.shade400),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                    ),
-                  ),
-                const SizedBox(height: 12),
                 Row(
                   children: [
                     SizedBox(
@@ -190,21 +143,21 @@ class _KiemTraBaoCaoSVScreenState extends State<KiemTraBaoCaoSVScreen> {
                       width: 24,
                       child: Checkbox(
                         value: _isChecked,
-                        onChanged: _hasExtracted ? (val) {
+                        onChanged: (val) {
                           setState(() {
                             _isChecked = val ?? false;
                           });
-                        } : null,
+                        },
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Expanded(
+                    const Expanded(
                       child: Text(
                         'Đã kiểm tra nội dung hoàn chỉnh',
                         style: TextStyle(
                           fontSize: 14, 
                           fontWeight: FontWeight.w500,
-                          color: _hasExtracted ? Colors.black87 : Colors.grey,
+                          color: Colors.black87,
                         ),
                       ),
                     ),
@@ -248,40 +201,6 @@ class _KiemTraBaoCaoSVScreenState extends State<KiemTraBaoCaoSVScreen> {
       File(widget.filePath),
       canShowScrollHead: false,
       canShowScrollStatus: false,
-    );
-  }
-
-  Widget _buildTxtView() {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Nội dung trích xuất:',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade300),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: TextField(
-                controller: _txtController,
-                maxLines: null,
-                keyboardType: TextInputType.multiline,
-                decoration: const InputDecoration(
-                  border: InputBorder.none,
-                  hintText: 'Nhập/Chỉnh sửa nội dung văn bản...',
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

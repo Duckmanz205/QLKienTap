@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io';
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'secure_storage.dart';
@@ -79,6 +81,27 @@ class ApiService {
     return Exception(errorMessage);
   }
 
+  static Exception _wrapNetworkException(Object e) {
+    final str = e.toString();
+    if (e is SocketException ||
+        str.contains('SocketException') ||
+        str.contains('Failed host lookup') ||
+        str.contains('Connection refused') ||
+        str.contains('Network is unreachable')) {
+      return Exception(
+          'Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại kết nối mạng Internet.');
+    } else if (e is TimeoutException || str.contains('TimeoutException')) {
+      return Exception(
+          'Hết thời gian chờ phản hồi từ máy chủ (Timeout). Vui lòng thử lại sau.');
+    } else if (e is http.ClientException || str.contains('ClientException')) {
+      return Exception(
+          'Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại kết nối mạng Internet.');
+    } else if (e is Exception) {
+      return e;
+    }
+    return Exception(str);
+  }
+
   // Restore session from SecureStorage on app startup
   static Future<bool> initSessionFromStorage() async {
     try {
@@ -118,7 +141,7 @@ class ApiService {
             Uri.parse('$baseUrl/$path'),
             headers: _headers,
           )
-          .timeout(const Duration(seconds: 4));
+          .timeout(const Duration(seconds: 20));
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
@@ -130,7 +153,7 @@ class ApiService {
         throw _handleErrorResponse(response);
       }
     } catch (e) {
-      rethrow;
+      throw _wrapNetworkException(e);
     }
   }
 
@@ -142,7 +165,7 @@ class ApiService {
             headers: _headers,
             body: jsonEncode(body),
           )
-          .timeout(const Duration(seconds: 4));
+          .timeout(const Duration(seconds: 20));
 
       if (response.statusCode == 200 ||
           response.statusCode == 210 ||
@@ -156,7 +179,7 @@ class ApiService {
         throw _handleErrorResponse(response);
       }
     } catch (e) {
-      rethrow;
+      throw _wrapNetworkException(e);
     }
   }
 
@@ -168,7 +191,7 @@ class ApiService {
             headers: _headers,
             body: jsonEncode(body),
           )
-          .timeout(const Duration(seconds: 4));
+          .timeout(const Duration(seconds: 20));
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         return jsonDecode(response.body);
@@ -180,7 +203,7 @@ class ApiService {
         throw _handleErrorResponse(response);
       }
     } catch (e) {
-      rethrow;
+      throw _wrapNetworkException(e);
     }
   }
 
@@ -191,7 +214,7 @@ class ApiService {
             Uri.parse('$baseUrl/$path'),
             headers: _headers,
           )
-          .timeout(const Duration(seconds: 4));
+          .timeout(const Duration(seconds: 20));
 
       if (response.statusCode == 200 || response.statusCode == 204) {
         if (response.body.isEmpty) return null;
@@ -204,38 +227,42 @@ class ApiService {
         throw _handleErrorResponse(response);
       }
     } catch (e) {
-      rethrow;
+      throw _wrapNetworkException(e);
     }
   }
 
   // Auth
   static Future<Map<String, dynamic>> login(
       String username, String password) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/auth/login'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'ten_dang_nhap': username,
-        'mat_khau': password,
-      }),
-    ).timeout(const Duration(seconds: 4));
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/login'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'ten_dang_nhap': username,
+          'mat_khau': password,
+        }),
+      ).timeout(const Duration(seconds: 20));
 
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      final result = jsonDecode(response.body);
-      token = result['token'];
-      userId = result['user']?['id'];
-      role = result['user']?['vai_tro'];
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final result = jsonDecode(response.body);
+        token = result['token'];
+        userId = result['user']?['id'];
+        role = result['user']?['vai_tro'];
 
-      // Save values to SecureStorage
-      if (token != null && userId != null && role != null) {
-        await SecureStorage.write('token', token!);
-        await SecureStorage.write('userId', userId.toString());
-        await SecureStorage.write('role', role!);
+        // Save values to SecureStorage
+        if (token != null && userId != null && role != null) {
+          await SecureStorage.write('token', token!);
+          await SecureStorage.write('userId', userId.toString());
+          await SecureStorage.write('role', role!);
+        }
+
+        return result;
+      } else {
+        throw _handleErrorResponse(response);
       }
-
-      return result;
-    } else {
-      throw _handleErrorResponse(response);
+    } catch (e) {
+      throw _wrapNetworkException(e);
     }
   }
 
@@ -264,6 +291,10 @@ class ApiService {
     return await get('sinh-vien/factories');
   }
 
+  static Future<dynamic> searchFactories(String query) async {
+    return await get('sinh-vien/factories/search?q=${Uri.encodeComponent(query)}');
+  }
+
   static Future<dynamic> getAvailableTrips(int studentId) async {
     return await get('sinh-vien/available-trips/$studentId');
   }
@@ -284,6 +315,10 @@ class ApiService {
 
   static Future<dynamic> getProposals() async {
     return await get('sinh-vien/proposals');
+  }
+
+  static Future<dynamic> cancelProposal(int proposalId) async {
+    return await delete('sinh-vien/proposals/$proposalId');
   }
 
   static Future<dynamic> requestCancel(Map<String, dynamic> data) async {
@@ -324,7 +359,7 @@ class ApiService {
   static Future<dynamic> selectRepresentativeTrips(
       List<int> registrationIds, {int? termStudentId}) async {
     return await post('sinh-vien/select-representative-trips', {
-      if (termStudentId != null) 'termStudentId': termStudentId,
+      'termStudentId': ?termStudentId,
       'registrationIds': registrationIds,
     });
   }
@@ -347,10 +382,10 @@ class ApiService {
     return await post('sinh-vien/request-refund', {
       'invoiceId': invoiceId,
       'fileScanUrl': fileScanUrl,
-      if (bankName != null) 'ngan_hang': bankName,
-      if (accountNumber != null) 'so_tai_khoan': accountNumber,
-      if (accountName != null) 'ten_nguoi_nhan': accountName,
-      if (reason != null) 'ly_do': reason,
+      'nganHangNhan': bankName ?? '',
+      'soTaiKhoanNhan': accountNumber ?? '',
+      'tenChuTaiKhoanNhan': accountName ?? '',
+      if (reason != null && reason.isNotEmpty) 'lyDo': reason,
     });
   }
 
@@ -369,8 +404,8 @@ class ApiService {
   }
 
   // Student dashboard
-  static Future<dynamic> getStudentDashboardStats(int studentId) async {
-    return await get('sinh-vien/dashboard-stats/$studentId');
+  static Future<dynamic> getStudentDashboardStats([int? studentId]) async {
+    return await get('sinh-vien/dashboard-stats');
   }
 
   // Student propose trip
@@ -385,7 +420,7 @@ class ApiService {
     required String hinhThuc,
   }) async {
     return await post('sinh-vien/propose-trip', {
-      if (nhaMayId != null) 'nhaMayId': nhaMayId,
+      if (nhaMayId != null && nhaMayId > 0) 'nhaMayId': nhaMayId,
       if (tenNhaMayDeXuat != null && tenNhaMayDeXuat.isNotEmpty)
         'tenNhaMayDeXuat': tenNhaMayDeXuat,
       if (diaChiDeXuat != null && diaChiDeXuat.isNotEmpty)
@@ -457,7 +492,7 @@ class ApiService {
         .replace(queryParameters: queryParams);
     try {
       final response =
-          await http.get(uri, headers: _headers).timeout(const Duration(seconds: 4));
+          await http.get(uri, headers: _headers).timeout(const Duration(seconds: 20));
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       } else if (response.statusCode == 401) {
@@ -524,6 +559,16 @@ class ApiService {
     });
   }
 
+  // Lecturer lock council grade (single student or entire board)
+  static Future<dynamic> lockCouncilGrade(Map<String, dynamic> data) async {
+    return await post('giang-vien/lock-council-grade', data);
+  }
+
+  // Lecturer update council student note
+  static Future<dynamic> updateCouncilStudentNote(Map<String, dynamic> data) async {
+    return await put('giang-vien/council-student-note', data);
+  }
+
   // Lecturer notifications
   static Future<dynamic> getLecturerNotifications(int lecturerId) async {
     return await get('giang-vien/notifications/$lecturerId');
@@ -544,7 +589,7 @@ class ApiService {
       request.files.add(await http.MultipartFile.fromPath(fieldName, filePath));
 
       final streamedResponse =
-          await request.send().timeout(const Duration(seconds: 15));
+          await request.send().timeout(const Duration(seconds: 60));
       final response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -586,7 +631,7 @@ class ApiService {
       final uri = Uri.parse(txtUrl);
       final response = await http.get(uri, headers: {
         if (token != null) 'Authorization': 'Bearer $token',
-      }).timeout(const Duration(seconds: 10));
+      }).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         return utf8.decode(response.bodyBytes);

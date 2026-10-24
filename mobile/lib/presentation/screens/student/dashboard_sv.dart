@@ -29,7 +29,7 @@ class DashboardSVScreen extends StatelessWidget {
         final totalScore = completedWithGrades.map((t) => t.gradeDetails!.total).reduce((a, b) => a + b);
         gpaStr = (totalScore / completedWithGrades.length).toStringAsFixed(1);
       } else {
-        gpaStr = '8.7';
+        gpaStr = 'Chưa có';
       }
     }
 

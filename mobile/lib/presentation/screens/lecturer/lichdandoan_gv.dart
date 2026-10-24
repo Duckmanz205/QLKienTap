@@ -27,7 +27,7 @@ class LichDanDoanGVScreen extends StatelessWidget {
         return matchQuery && matchStatus;
       },
       itemBuilder: (tour) {
-        final progress = tour.registeredCount / tour.maxCount;
+        final progress = tour.maxCount > 0 ? (tour.registeredCount / tour.maxCount).clamp(0.0, 1.0) : 0.0;
 
         String statusText;
         Color statusBg;

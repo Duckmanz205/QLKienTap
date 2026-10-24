@@ -291,13 +291,17 @@ class _TaiChinhSVScreenState extends State<TaiChinhSVScreen> {
               
               SearchableDropdown(
                 title: 'Hóa đơn liên quan',
-                value: _refundSelectedInvoice != null ? violatedPayments.firstWhere((p) => p.id == _refundSelectedInvoice).name : 'Chọn hóa đơn liên quan',
+                value: _refundSelectedInvoice != null
+                    ? (violatedPayments.where((p) => p.id == _refundSelectedInvoice).firstOrNull?.name ?? 'Chọn hóa đơn liên quan')
+                    : 'Chọn hóa đơn liên quan',
                 options: violatedPayments.map((p) => p.name).toList(),
                 onChanged: (val) {
-                  final p = violatedPayments.firstWhere((p) => p.name == val);
-                  setState(() {
-                    _refundSelectedInvoice = p.id;
-                  });
+                  final p = violatedPayments.where((p) => p.name == val).firstOrNull;
+                  if (p != null) {
+                    setState(() {
+                      _refundSelectedInvoice = p.id;
+                    });
+                  }
                 },
               ),
               const SizedBox(height: 12),
@@ -318,7 +322,7 @@ class _TaiChinhSVScreenState extends State<TaiChinhSVScreen> {
                       });
                     }
                   } catch (e) {
-                    if (!context.mounted) return;
+                    if (!mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text('Lỗi chọn file: $e'), backgroundColor: AppColors.danger),
                     );
@@ -376,7 +380,13 @@ class _TaiChinhSVScreenState extends State<TaiChinhSVScreen> {
               ElevatedButton(
                 onPressed: _refundSelectedInvoice != null && _refundUploadedFile != null && !_isUploadingRefund
                     ? () async {
-                        final pay = appState.payments.firstWhere((p) => p.id == _refundSelectedInvoice);
+                        final pay = appState.payments.where((p) => p.id == _refundSelectedInvoice).firstOrNull;
+                        if (pay == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Không tìm thấy thông tin hóa đơn đã chọn.')),
+                          );
+                          return;
+                        }
                         
                         final accountNumberController = TextEditingController();
                         final accountNameController = TextEditingController();

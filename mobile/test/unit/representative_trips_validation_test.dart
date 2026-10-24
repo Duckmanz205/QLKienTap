@@ -19,7 +19,10 @@ class RepresentativeTripsValidator {
     final selectedSubs = allSubmissions.where((s) => selectedTripIds.contains(s.id)).toList();
     
     // Kiểm tra tối thiểu 2 chuyến trực tiếp
-    final directCount = selectedSubs.where((s) => s.typeText.toLowerCase().contains('trực tiếp')).length;
+    final directCount = selectedSubs.where((s) {
+      final lower = s.typeText.toLowerCase();
+      return lower.contains('trực tiếp') || lower.contains('tructiep');
+    }).length;
     if (directCount < 2) {
       return 'Quy định: Cần tối thiểu 2 chuyến kiến tập trực tiếp.';
     }

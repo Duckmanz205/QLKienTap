@@ -19,7 +19,7 @@ void main() {
 
       // Kiểm tra có các TextFields
       expect(find.byType(TextFormField), findsNWidgets(2));
-      expect(find.text('Mã số sinh viên (MSSV)'), findsOneWidget);
+      expect(find.text('Tài khoản / Mã số (MSSV hoặc MSGV)'), findsOneWidget);
       expect(find.text('Mật khẩu'), findsOneWidget);
 
       // Kiểm tra nút Đăng nhập
@@ -39,19 +39,18 @@ void main() {
       expect(find.text('Vui lòng nhập mật khẩu'), findsOneWidget);
     });
 
-    testWidgets('Kiểm tra nút gõ nhanh tài khoản mẫu Sinh viên và Giảng viên', (tester) async {
+    testWidgets('Kiểm tra nhập liệu vào trường tài khoản và mật khẩu', (tester) async {
       await tester.pumpWidget(createTestWidget());
       await tester.pumpAndSettle();
 
-      // Bấm nút điền mẫu 'Sinh Viên'
-      final svBtn = find.widgetWithText(OutlinedButton, 'Sinh Viên');
-      expect(svBtn, findsOneWidget);
-      await tester.ensureVisible(svBtn);
-      await tester.tap(svBtn);
+      // Nhập tài khoản và mật khẩu
+      await tester.enterText(find.byType(TextFormField).first, '2005190573');
+      await tester.enterText(find.byType(TextFormField).last, 'password123');
       await tester.pumpAndSettle();
 
       // Xác nhận form đã được điền
-      expect(find.text('2005190573'), findsWidgets);
+      expect(find.text('2005190573'), findsOneWidget);
+      expect(find.text('password123'), findsOneWidget);
     });
   });
 }

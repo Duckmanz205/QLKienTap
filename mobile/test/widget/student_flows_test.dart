@@ -47,7 +47,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Bộ 3 chuyến tham quan báo cáo'), findsOneWidget);
+      final targetFinder = find.textContaining('Bộ 3 chuyến tham quan báo cáo');
+      await tester.scrollUntilVisible(targetFinder, 300, scrollable: find.byType(Scrollable).first);
+      expect(targetFinder, findsOneWidget);
     });
 
     testWidgets('KetQuaDiemSVScreen hiển thị thẻ điểm tổng kết và công thức tính điểm 30-30-40', (tester) async {

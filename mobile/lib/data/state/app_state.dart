@@ -1,5 +1,4 @@
 import 'dart:math';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../models/app_models.dart';
 import '../../core/network/api_service.dart';
@@ -173,32 +172,32 @@ class AppStateProviderState extends State<AppStateContainer> {
       currentRole: null,
       phaiDoiMatKhau: null,
       studentProfile: StudentProfile(
-        name: initialStudentProfile.name,
-        email: initialStudentProfile.email,
-        studentId: initialStudentProfile.studentId,
-        className: initialStudentProfile.className,
-        major: initialStudentProfile.major,
-        avatar: initialStudentProfile.avatar,
+        name: '',
+        email: '',
+        studentId: '',
+        className: '',
+        major: '',
+        avatar: '',
       ),
-      studentTrips: List.from(initialTrips),
-      studentNotifications: List.from(initialStudentNotifications),
-      submissions: List.from(initialSubmissions),
-      payments: List.from(initialPayments),
-      refunds: List.from(initialRefunds),
+      studentTrips: [],
+      studentNotifications: [],
+      submissions: [],
+      payments: [],
+      refunds: [],
       proposals: [],
       termGrade: null,
       repStatus: null,
       lecturerProfile: LecturerProfile(
-        name: initialLecturerProfile.name,
-        email: initialLecturerProfile.email,
-        teacherId: initialLecturerProfile.teacherId,
-        avatar: initialLecturerProfile.avatar,
-        department: initialLecturerProfile.department,
+        name: '',
+        email: '',
+        teacherId: '',
+        avatar: '',
+        department: '',
       ),
-      lecturerStudents: List.from(initialLecturerStudents),
-      lecturerTours: List.from(initialLecturerTours),
-      councilSessions: List.from(initialCouncils),
-      lecturerNotifications: List.from(initialLecturerNotifications),
+      lecturerStudents: [],
+      lecturerTours: [],
+      councilSessions: [],
+      lecturerNotifications: [],
       tripStudentsCache: {},
       councilBoards: [],
     );
@@ -250,7 +249,11 @@ class AppStateProviderState extends State<AppStateContainer> {
                id: reg['id'].toString(),
                registrationId: reg['id'],
                tripName: trip.name,
-               typeText: trip.type == 'TuDo' || trip.type == 'Tự do' ? 'Kiến tập tự do' : 'Kiến tập ${trip.type.toLowerCase()}',
+               typeText: (trip.type == 'TuDo' || trip.type == 'Tự do')
+                   ? 'Kiến tập tự do'
+                   : (trip.type == 'Trực tuyến' || trip.type == 'TrucTuyen')
+                       ? 'Kiến tập trực tuyến'
+                       : 'Kiến tập trực tiếp',
                dateText: trip.date,
                status: bth != null ? 'Đã nộp' : 'Chưa nộp',
                fileName: bth?['file_bao_cao']?.split('/').last ?? (bth != null ? 'baocao.pdf' : null),
@@ -366,7 +369,7 @@ class AppStateProviderState extends State<AppStateContainer> {
       await fetchRepresentativeTripsStatus();
 
     } catch (e) {
-      print('Failed to load student data from backend, staying with in-memory mock data: $e');
+      print('Failed to load student data from backend: $e');
     }
   }
 
@@ -378,11 +381,15 @@ class AppStateProviderState extends State<AppStateContainer> {
       name: nhaMay['ten_nha_may'] ?? json['ten_chuyen_di'] ?? 'Chuyến tham quan',
       date: json['ngay_tham_quan'] != null ? DateTime.tryParse(json['ngay_tham_quan'])?.toLocal().toString().substring(0, 10) ?? 'N/A' : 'N/A',
       time: '${json['gio_bat_dau']?.toString().substring(0, 5) ?? '08:00'} - ${json['gio_ket_thuc']?.toString().substring(0, 5) ?? '12:00'}',
-      type: json['hinh_thuc'] ?? 'Trực tiếp',
+      type: (json['hinh_thuc'] == 'TrucTuyen' || json['hinh_thuc'] == 'Trực tuyến')
+          ? 'Trực tuyến'
+          : (json['hinh_thuc'] == 'TuDo' || json['hinh_thuc'] == 'Tự do')
+              ? 'Tự do'
+              : 'Trực tiếp',
       location: nhaMay['dia_chi'] ?? 'Địa chỉ chưa cập nhật',
       industry: 'Công nghệ thực phẩm',
       description: nhaMay['mo_ta'] ?? 'Chuyến tham quan thực tế doanh nghiệp',
-      heroImage: 'https://images.unsplash.com/photo-1563227812-0ea4c22e6cc8?w=500', // Default image
+      heroImage: '',
       isRegistered: isRegistered,
       isCompleted: json['trang_thai'] == 'DaDienRa' || json['trang_thai'] == 'HoanThanh',
     );
@@ -393,58 +400,57 @@ class AppStateProviderState extends State<AppStateContainer> {
       final reportsRes = await ApiService.getGuidedReports(lecturerId, limit: 100);
       final List<dynamic> reportsJson = reportsRes['data'] ?? [];
       
-      if (reportsJson.isNotEmpty) {
-        setState(() {
-          _state.lecturerStudents = reportsJson.map((r) {
-            final phieuTQ = r['phieuThamQuan'] ?? {};
-            final phieu = phieuTQ['phieuDangKy'] ?? {};
-            final sv = phieu['sinhVien'] ?? {};
-            final chuyen = phieu['chuyenThamQuan'] ?? {};
-            final diem = phieuTQ['diemPhieuThamQuan'] ?? {};
-            
-            return LecturerStudent(
-              id: sv['mssv'] ?? sv['id']?.toString() ?? 'SV',
-              phieuId: phieu['id'],
-              reportId: r['id'],
-              name: sv['ho_ten'] ?? 'Sinh viên',
-              className: sv['lop'] ?? 'N/A',
-              company: chuyen['nhaMay']?['ten_nha_may'] ?? 'Doanh nghiệp',
-              completedTours: '1/1',
-              papersLeft: 0,
-              avatar: sv['avatar'] ?? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100',
-              submittedDate: r['ngay_nop'] != null ? DateTime.tryParse(r['ngay_nop'].toString())?.toLocal().toString().substring(0, 10) ?? 'N/A' : 'N/A',
-              attendanceStatus: phieuTQ['diemDanh']?['trang_thai'] == 'CoMat' ? 'present' : (phieuTQ['diemDanh']?['trang_thai'] == 'Vang' ? 'absent' : 'none'),
-              excuseReason: phieuTQ['diemDanh']?['ly_do_vang'],
-              prelimGrade: double.tryParse(diem['diem_chuan_bi']?.toString() ?? '0') ?? 0,
-              extraGrade: double.tryParse(diem['diem_cong']?.toString() ?? '0') ?? 0,
-              gvhdGrade: double.tryParse(r['diem_thu_hoach']?.toString() ?? '0') ?? 0,
-              aiSuggestedGrade: diem['diem_ai_de_xuat'] != null ? double.tryParse(diem['diem_ai_de_xuat'].toString()) : null,
-              comment: r['nhan_xet_cua_giang_vien'],
-              isGraded: r['trang_thai'] == 'DaCham',
-              tourId: chuyen['id']?.toString() ?? '',
-              reportFileUrl: r['file_bao_cao'],
-              confirmationFileUrl: r['file_xac_nhan_tham_quan'],
-            );
-          }).toList();
-        });
-      }
+      setState(() {
+        _state.lecturerStudents = reportsJson.map((r) {
+          final phieuTQ = r['phieuThamQuan'] ?? {};
+          final phieu = phieuTQ['phieuDangKy'] ?? {};
+          final sv = phieu['sinhVien'] ?? {};
+          final chuyen = phieu['chuyenThamQuan'] ?? {};
+          final diem = phieuTQ['diemPhieuThamQuan'] ?? {};
+          
+          final mssv = sv['mssv'] ?? sv['id']?.toString() ?? 'SV';
+          final uniqueId = r['id'] != null ? '${mssv}_${r['id']}' : mssv;
+          
+          return LecturerStudent(
+            id: uniqueId,
+            phieuId: phieu['id'],
+            reportId: r['id'],
+            name: sv['ho_ten'] ?? 'Sinh viên',
+            className: sv['lop'] ?? 'N/A',
+            company: chuyen['nhaMay']?['ten_nha_may'] ?? 'Doanh nghiệp',
+            completedTours: '1/1',
+            papersLeft: 0,
+            avatar: sv['avatar'] ?? '',
+            submittedDate: r['ngay_nop'] != null ? DateTime.tryParse(r['ngay_nop'].toString())?.toLocal().toString().substring(0, 10) ?? 'N/A' : 'N/A',
+            attendanceStatus: phieuTQ['diemDanh']?['trang_thai'] == 'CoMat' ? 'present' : (phieuTQ['diemDanh']?['trang_thai'] == 'Vang' ? 'absent' : 'none'),
+            excuseReason: phieuTQ['diemDanh']?['ly_do_vang'],
+            prelimGrade: double.tryParse(diem['diem_chuan_bi']?.toString() ?? '0') ?? 0,
+            extraGrade: double.tryParse(diem['diem_cong']?.toString() ?? '0') ?? 0,
+            gvhdGrade: double.tryParse(r['diem_thu_hoach']?.toString() ?? '0') ?? 0,
+            aiSuggestedGrade: diem['diem_ai_de_xuat'] != null ? double.tryParse(diem['diem_ai_de_xuat'].toString()) : null,
+            comment: r['nhan_xet_cua_giang_vien'],
+            isGraded: r['trang_thai'] == 'DaCham',
+            tourId: chuyen['id']?.toString() ?? '',
+            reportFileUrl: r['file_bao_cao'],
+            confirmationFileUrl: r['file_xac_nhan_tham_quan'],
+          );
+        }).toList();
+      });
 
       final List<dynamic> tripsJson = await ApiService.getLedTrips(lecturerId);
-      if (tripsJson.isNotEmpty) {
-        setState(() {
-          _state.lecturerTours = tripsJson.map((t) {
-            return LecturerTour(
-              id: t['id'].toString(),
-              name: t['ten_chuyen_di'] ?? 'Chuyến tham quan',
-              date: t['ngay_tham_quan'] != null ? t['ngay_tham_quan'].substring(0, 10) : '15/10/2026',
-              timeRange: '${t['gio_bat_dau'] ?? '08:00'} - ${t['gio_ket_thuc'] ?? '12:00'}',
-              registeredCount: t['so_luong_dang_ky'] ?? 12,
-              maxCount: t['so_luong_toi_da'] ?? 15,
-              status: t['trang_thai'] == 'HoanThanh' ? 'completed' : 'upcoming',
-            );
-          }).toList();
-        });
-      }
+      setState(() {
+        _state.lecturerTours = tripsJson.map((t) {
+          return LecturerTour(
+            id: t['id'].toString(),
+            name: t['ten_chuyen_di'] ?? 'Chuyến tham quan',
+            date: t['ngay_tham_quan'] != null ? t['ngay_tham_quan'].substring(0, 10) : 'N/A',
+            timeRange: '${t['gio_bat_dau'] ?? '08:00'} - ${t['gio_ket_thuc'] ?? '12:00'}',
+            registeredCount: t['so_luong_dang_ky'] ?? 0,
+            maxCount: t['so_luong_toi_da'] ?? 0,
+            status: t['trang_thai'] == 'HoanThanh' ? 'completed' : 'upcoming',
+          );
+        }).toList();
+      });
 
       final Map<String, dynamic> statsJson = await ApiService.getLecturerDashboardStats(lecturerId);
       setState(() {
@@ -494,7 +500,7 @@ class AppStateProviderState extends State<AppStateContainer> {
       }
 
     } catch (e) {
-      print('Failed to load lecturer data from backend, staying with in-memory mock data: $e');
+      print('Failed to load lecturer data from backend: $e');
     }
   }
 
@@ -519,7 +525,7 @@ class AppStateProviderState extends State<AppStateContainer> {
               studentId: details['mssv'] ?? username,
               className: details['lop'] ?? 'N/A',
               major: details['nganh'] ?? 'Công nghệ Thực phẩm',
-              avatar: details['avatar'] ?? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+              avatar: details['avatar'] ?? '',
             );
           }
         });
@@ -540,7 +546,7 @@ class AppStateProviderState extends State<AppStateContainer> {
               name: details['ho_ten'] ?? 'Giảng viên',
               email: details['email'] ?? 'lecturer@example.com',
               teacherId: details['msgv'] ?? username,
-              avatar: details['avatar'] ?? 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
+              avatar: details['avatar'] ?? '',
               department: details['khoa'] ?? 'Khoa Công nghệ Thực phẩm',
             );
           }
@@ -557,21 +563,6 @@ class AppStateProviderState extends State<AppStateContainer> {
         onError('Tài khoản không có quyền truy cập ứng dụng di động.');
       }
     } catch (e) {
-      if (kDebugMode && (username == '2005190573' || username == 'student' || username.startsWith('20') || username.startsWith('21'))) {
-        setState(() {
-          _state.currentRole = 'student';
-          _state.phaiDoiMatKhau = false;
-        });
-        onSuccess();
-        return;
-      } else if (kDebugMode && (username == 'gv019' || username == 'lecturer' || username.toLowerCase().startsWith('gv'))) {
-        setState(() {
-          _state.currentRole = 'lecturer';
-          _state.phaiDoiMatKhau = false;
-        });
-        onSuccess();
-        return;
-      }
       final msg = e.toString().replaceAll('Exception: ', '');
       onError(msg.isNotEmpty
           ? msg
@@ -622,7 +613,22 @@ class AppStateProviderState extends State<AppStateContainer> {
 
       final paymentExists = _state.payments.any((p) => p.tripId == tripId);
       if (!paymentExists) {
-        final trip = _state.studentTrips.firstWhere((t) => t.id == tripId);
+        final trip = _state.studentTrips.firstWhere(
+          (t) => t.id == tripId,
+          orElse: () => Trip(
+            id: tripId,
+            name: 'Chuyến tham quan',
+            date: '',
+            time: '',
+            type: 'Trực tiếp',
+            location: '',
+            industry: '',
+            description: '',
+            heroImage: '',
+            isRegistered: true,
+            isCompleted: false,
+          ),
+        );
         final codeSuffix = Random().nextInt(90000) + 10000;
         final nameAbbr = trip.name.length > 11 ? trip.name.substring(8, 11).toUpperCase() : 'TRIP';
         final newPayment = Payment(
@@ -671,6 +677,13 @@ class AppStateProviderState extends State<AppStateContainer> {
     await fetchStudentProposals(ApiService.userId!);
   }
 
+  Future<void> cancelStudentProposal(int proposalId) async {
+    await ApiService.cancelProposal(proposalId);
+    setState(() {
+      _state.proposals = _state.proposals.where((p) => p.id != proposalId).toList();
+    });
+  }
+
   Future<void> cancelTripRegistration(String tripId, String? registrationId, {required String lyDo, String? fileMinhChung}) async {
     final regId = int.tryParse(registrationId ?? '');
     if (regId == null) {
@@ -691,7 +704,7 @@ class AppStateProviderState extends State<AppStateContainer> {
     await ApiService.post('sinh-vien/request-cancel', {
       'registrationId': regId,
       'lyDo': lyDo,
-      if (fileReference != null) 'fileMinhChung': fileReference,
+      if (fileReference != null && fileReference.isNotEmpty) 'fileMinhChung': fileReference,
     });
 
     setState(() {
@@ -726,7 +739,17 @@ class AppStateProviderState extends State<AppStateContainer> {
       rethrow;
     }
 
-    final sub = _state.submissions.firstWhere((s) => s.id == submissionId);
+    final sub = _state.submissions.firstWhere(
+      (s) => s.id == submissionId,
+      orElse: () => Submission(
+        id: submissionId,
+        tripName: '',
+        typeText: 'Trực tiếp',
+        dateText: '',
+        status: 'Chưa nộp',
+        hasConfirmationFile: false,
+      ),
+    );
     await ApiService.submitReport(regId, fileReference, sub.fileXacNhanUrl, extractedText: extractedText);
 
     setState(() {
@@ -762,7 +785,17 @@ class AppStateProviderState extends State<AppStateContainer> {
       rethrow;
     }
 
-    final sub = _state.submissions.firstWhere((s) => s.id == submissionId);
+    final sub = _state.submissions.firstWhere(
+      (s) => s.id == submissionId,
+      orElse: () => Submission(
+        id: submissionId,
+        tripName: '',
+        typeText: 'Trực tiếp',
+        dateText: '',
+        status: 'Chưa nộp',
+        hasConfirmationFile: false,
+      ),
+    );
     await ApiService.submitReport(regId, sub.fileBaoCaoUrl ?? '', fileReference);
 
     setState(() {
@@ -943,20 +976,20 @@ class AppStateProviderState extends State<AppStateContainer> {
               id: p['id'] ?? 0,
               tenDoanhNghiep: nhaMay['ten_nha_may'] ?? p['ten_nha_may_de_xuat'] ?? 'Doanh nghiệp đề xuất',
               diaChi: nhaMay['dia_chi'] ?? p['dia_chi_de_xuat'],
-              ngayThamQuan: p['ngay_tham_quan'] != null
-                  ? DateTime.tryParse(p['ngay_tham_quan'].toString())?.toLocal().toString().substring(0, 10)
+              ngayThamQuan: (p['ngay_tham_quan_de_xuat'] ?? p['ngay_tham_quan']) != null
+                  ? DateTime.tryParse((p['ngay_tham_quan_de_xuat'] ?? p['ngay_tham_quan']).toString())?.toLocal().toString().substring(0, 10)
                   : null,
-              gioBatDau: p['gio_bat_dau']?.toString().substring(0, 5),
+              gioBatDau: (p['gio_bat_dau_de_xuat'] ?? p['gio_bat_dau'])?.toString().substring(0, 5),
               hinhThuc: p['hinh_thuc'] == 'TrucTuyen' ? 'Trực tuyến' : 'Trực tiếp',
-              trangThai: p['trang_thai'] ?? 'ChoDuyet',
+              trangThai: p['trang_thai_duyet'] ?? p['trang_thai'] ?? 'ChoDuyet',
               lyDo: p['ly_do'],
               phanHoi: p['phan_hoi'],
             );
           }).toList();
         });
       }
-    } catch (e) {
-      print('Failed to fetch proposals: $e');
+    } catch (_) {
+      // Giữ nguyên danh sách hiện tại
     }
   }
 
@@ -980,6 +1013,10 @@ class AppStateProviderState extends State<AppStateContainer> {
             ketQua: t['ket_qua'],
             nhanXetGvhd: t['nhan_xet_gvhd'],
             nhanXetHoiDong: t['nhan_xet_hoi_dong'],
+            daKhoaChuanBi: t['da_khoa_chuan_bi'] == true,
+            daKhoaThuHoach: t['da_khoa_thu_hoach'] == true,
+            daKhoaHoiDong: t['da_khoa_hoi_dong'] == true,
+            daKhoa: t['da_khoa'] == true,
           );
         }).toList();
 
@@ -994,7 +1031,7 @@ class AppStateProviderState extends State<AppStateContainer> {
         });
       }
     } catch (e) {
-      print('Failed to fetch student grades: $e');
+      // Fallback
     }
   }
 
@@ -1046,7 +1083,7 @@ class AppStateProviderState extends State<AppStateContainer> {
             className: sv['lop'] ?? 'N/A',
             soDienThoai: sv['so_dien_thoai'],
             email: sv['email'],
-            avatar: sv['avatar'] ?? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100',
+            avatar: sv['avatar'] ?? '',
             feeStatus: hoaDon['trang_thai'] ?? 'ChuaDong',
             attendanceStatus: diemDanh['trang_thai'] ?? 'ChuaDiemDanh',
             excuseReason: diemDanh['ly_do_vang'],
@@ -1121,6 +1158,7 @@ class AppStateProviderState extends State<AppStateContainer> {
       if (res is List) {
         final boards = res.map((b) {
           final session = b['session'] ?? {};
+          final isBoardLocked = b['isBoardLocked'] == true || session['isBoardLocked'] == true;
           final List<dynamic> rawStudents = b['students'] ?? b['registrations'] ?? [];
 
           final students = rawStudents.map((st) {
@@ -1131,7 +1169,13 @@ class AppStateProviderState extends State<AppStateContainer> {
               hinhThuc: t['hinh_thuc'] ?? 'TrucTiep',
               myScore: t['myScore'] != null ? double.tryParse(t['myScore'].toString()) : null,
               diemTong: t['diem_bao_cao_tqnm'] != null ? double.tryParse(t['diem_bao_cao_tqnm'].toString()) : null,
+              isLocked: isBoardLocked || t['daKhoa'] == true || t['daKhoaHoiDong'] == true,
             )).toList();
+
+            final isStudentLocked = isBoardLocked ||
+                st['daKhoaHoiDong'] == true ||
+                st['da_khoa_hoi_dong'] == true ||
+                st['isGradeLocked'] == true;
 
             return CouncilStudentItem(
               studentId: st['id'] ?? 0,
@@ -1140,6 +1184,9 @@ class AppStateProviderState extends State<AppStateContainer> {
               className: st['lop'] ?? 'N/A',
               topic: st['de_tai'] ?? st['topic'],
               trips: trips,
+              isGradeLocked: isStudentLocked,
+              councilNote: st['ghi_chu_hoi_dong'] ?? st['councilNote'] ?? st['ghiChu'],
+              boChuyenId: st['boChuyenId'] ?? st['bo_chuyen_id'] ?? st['id'],
             );
           }).toList();
 
@@ -1152,6 +1199,7 @@ class AppStateProviderState extends State<AppStateContainer> {
             timeRange: '${session['gio_bat_dau']?.toString().substring(0, 5) ?? '08:00'} - ${session['gio_ket_thuc']?.toString().substring(0, 5) ?? '11:30'}',
             role: b['role'] ?? 'Ủy viên',
             status: session['trang_thai'] == 'HoanThanh' ? 'completed' : (session['trang_thai'] == 'DangDienRa' ? 'ongoing' : 'upcoming'),
+            isBoardLocked: isBoardLocked,
             students: students,
           );
         }).toList();
@@ -1160,8 +1208,8 @@ class AppStateProviderState extends State<AppStateContainer> {
           _state.councilBoards = boards;
         });
       }
-    } catch (e) {
-      print('Failed to fetch board sessions: $e');
+    } catch (_) {
+      // Bỏ qua lỗi mạng khi load background
     }
   }
 
@@ -1174,6 +1222,27 @@ class AppStateProviderState extends State<AppStateContainer> {
 
   Future<void> submitBoardScoresBatch(int memberId, List<int> phieuIds, double score) async {
     await ApiService.submitBoardScoresBatch(memberId, phieuIds, score);
+    if (ApiService.userId != null) {
+      await fetchBoardSessions(ApiService.userId!);
+    }
+  }
+
+  Future<void> lockCouncilGrade({required int boardId, int? boChuyenId}) async {
+    await ApiService.lockCouncilGrade({
+      'boardId': boardId,
+      'boChuyenId': ?boChuyenId,
+    });
+    if (ApiService.userId != null) {
+      await fetchBoardSessions(ApiService.userId!);
+    }
+  }
+
+  Future<void> updateCouncilStudentNote({required int boardId, required int boChuyenId, required String ghiChu}) async {
+    await ApiService.updateCouncilStudentNote({
+      'boardId': boardId,
+      'boChuyenId': boChuyenId,
+      'ghiChu': ghiChu,
+    });
     if (ApiService.userId != null) {
       await fetchBoardSessions(ApiService.userId!);
     }

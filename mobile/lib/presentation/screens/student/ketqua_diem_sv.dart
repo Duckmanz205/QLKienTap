@@ -332,13 +332,25 @@ class _KetQuaDiemSVScreenState extends State<KetQuaDiemSVScreen> {
             Row(
               children: [
                 Expanded(
-                  child: _buildScoreColumn('Chuẩn bị (30%)', trip.diemChuanBi),
+                  child: _buildScoreColumn(
+                    'Chuẩn bị (30%)',
+                    trip.diemChuanBi,
+                    pendingText: (!trip.daKhoaChuanBi && !trip.daKhoa) ? 'Chờ chốt' : null,
+                  ),
                 ),
                 Expanded(
-                  child: _buildScoreColumn('Báo cáo (30%)', trip.diemBaiThuHoach),
+                  child: _buildScoreColumn(
+                    'Báo cáo (30%)',
+                    trip.diemBaiThuHoach,
+                    pendingText: (!trip.daKhoaThuHoach && !trip.daKhoa) ? 'Chờ chốt' : null,
+                  ),
                 ),
                 Expanded(
-                  child: _buildScoreColumn('Hội đồng (40%)', trip.diemBaoCaoTQNM),
+                  child: _buildScoreColumn(
+                    'Hội đồng (40%)',
+                    trip.diemBaoCaoTQNM,
+                    pendingText: (!trip.daKhoaHoiDong && !trip.daKhoa) ? 'Chờ chốt' : null,
+                  ),
                 ),
                 Expanded(
                   child: _buildScoreColumn('Điểm cộng', trip.diemCong, isBonus: true),
@@ -394,11 +406,13 @@ class _KetQuaDiemSVScreenState extends State<KetQuaDiemSVScreen> {
     );
   }
 
-  Widget _buildScoreColumn(String title, double? score, {bool isBonus = false}) {
-    String scoreText = '--';
+  Widget _buildScoreColumn(String title, double? score, {bool isBonus = false, String? pendingText}) {
+    String scoreText = pendingText ?? '--';
     if (score != null) {
       scoreText = isBonus ? '+${score.toStringAsFixed(1)}' : score.toStringAsFixed(1);
     }
+
+    final isPendingChip = score == null && pendingText != null;
 
     return Column(
       children: [
@@ -410,14 +424,31 @@ class _KetQuaDiemSVScreenState extends State<KetQuaDiemSVScreen> {
           overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: 4),
-        Text(
-          scoreText,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.bold,
-            color: isBonus && (score ?? 0) > 0 ? AppColors.secondary : AppColors.darkSlate,
+        if (isPendingChip)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            decoration: BoxDecoration(
+              color: AppColors.warning.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              scoreText,
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: AppColors.darkSlate,
+              ),
+            ),
+          )
+        else
+          Text(
+            scoreText,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: isBonus && (score ?? 0) > 0 ? AppColors.secondary : AppColors.darkSlate,
+            ),
           ),
-        ),
       ],
     );
   }
