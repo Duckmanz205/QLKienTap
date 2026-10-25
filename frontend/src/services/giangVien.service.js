@@ -7,6 +7,13 @@ export const giangVienApi = {
   getTripRegistrations: (tripId) => api.get(`/giang-vien/trip-registrations/${tripId}`),
   takeAttendance: (data) => api.post('/giang-vien/take-attendance', data),  // data: {tripId, records: [{phieuId, status, note?}]}
   gradePrepAndBonus: (data) => api.post('/giang-vien/grade-prep-bonus', data),
+  gradePrepAndBonusBatch: (data) => api.post('/giang-vien/grade-prep-bonus-batch', data),
+  importPrepGradesExcel: (formData) => api.post('/giang-vien/import-prep-grades-excel', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
+  downloadPrepGradesTemplate: (tripId) => api.get(`/giang-vien/prep-grades-template/${tripId}`, {
+    responseType: 'blob',
+  }),
   lockTripPrepGrades: (data) => api.post('/giang-vien/lock-trip-prep-grades', data),
   getGuidedReports: (lecturerId, params) => api.get(`/giang-vien/guided-reports/${lecturerId}`, { params }),
   gradeReport: (data) => api.post('/giang-vien/grade-report', data),

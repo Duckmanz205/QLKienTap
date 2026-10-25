@@ -56,6 +56,34 @@ export class GradePrepBonusDto {
   diemCong: number;
 }
 
+export class PrepBonusRecordItemDto {
+  @IsInt()
+  @Min(1)
+  phieuId: number;
+
+  @IsNumber()
+  @Min(0, { message: 'Điểm chuẩn bị không được bé hơn 0' })
+  @Max(10, { message: 'Điểm chuẩn bị không được lớn hơn 10' })
+  diemChuanBi: number;
+
+  @IsNumber()
+  @Min(0, { message: 'Điểm cộng không được bé hơn 0' })
+  @Max(1, { message: 'Điểm cộng không được lớn hơn 1' })
+  diemCong: number;
+}
+
+export class GradePrepBonusBatchDto {
+  @IsInt()
+  @Min(1)
+  tripId: number;
+
+  @IsArray()
+  @ArrayNotEmpty({ message: 'Danh sách điểm không được để trống' })
+  @ValidateNested({ each: true })
+  @Type(() => PrepBonusRecordItemDto)
+  records: PrepBonusRecordItemDto[];
+}
+
 export class GradeReportDto {
   @IsInt()
   @Min(1)

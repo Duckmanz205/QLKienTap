@@ -9,7 +9,12 @@ import {
   Query,
   UseGuards,
   BadRequestException,
+  UseInterceptors,
+  UploadedFile,
+  Res,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import type { Response } from 'express';
 import { GiangVienService } from './giang-vien.service';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -18,6 +23,7 @@ import { CurrentUser, JwtPayloadUser } from '../auth/decorators/user.decorator';
 import {
   TakeAttendanceDto,
   GradePrepBonusDto,
+  GradePrepBonusBatchDto,
   GradeReportDto,
   SubmitBoardScoreDto,
   SubmitBoardScoresBatchDto,
@@ -97,6 +103,67 @@ export class GiangVienController {
       body.phieuId,
       body.diemChuanBi,
       body.diemCong,
+    );
+  }
+
+  @Post('grade-prep-bonus-batch')
+  async gradePrepAndBonusBatch(
+    @CurrentUser() user: JwtPayloadUser,
+    @Body() body: GradePrepBonusBatchDto,
+  ) {
+    const gv = await this.gvService.getLecturerByAccountId(user.sub);
+    return this.gvService.gradePrepAndBonusBatch(
+      gv.id,
+      body.tripId,
+      body.records,
+    );
+  }
+
+  @Get('prep-grades-template/:tripId')
+  async getPrepGradesTemplate(
+    @CurrentUser() user: JwtPayloadUser,
+    @Param('tripId', ParseIntPipe) tripId: number,
+    @Res() res: Response,
+  ) {
+    const gv = await this.gvService.getLecturerByAccountId(user.sub);
+    const { buffer, fileName } = await this.gvService.getPrepGradesTemplate(
+      gv.id,
+      tripId,
+    );
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${encodeURIComponent(fileName)}"`,
+    );
+    res.send(buffer);
+  }
+
+  @Post('import-prep-grades-excel')
+  @UseInterceptors(FileInterceptor('file'))
+  async importPrepGradesExcel(
+    @CurrentUser() user: JwtPayloadUser,
+    @UploadedFile() file: Express.Multer.File,
+    @Body('tripId') rawTripId: any,
+    @Body('saveImmediately') rawSaveImmediately: any,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Vui lòng chọn file Excel');
+    }
+    const tripId = parseInt(rawTripId, 10);
+    if (isNaN(tripId) || tripId <= 0) {
+      throw new BadRequestException('Mã chuyến tham quan (tripId) không hợp lệ');
+    }
+    const saveImmediately =
+      rawSaveImmediately === true || rawSaveImmediately === 'true';
+    const gv = await this.gvService.getLecturerByAccountId(user.sub);
+    return this.gvService.importPrepGradesExcel(
+      gv.id,
+      tripId,
+      file.buffer,
+      saveImmediately,
     );
   }
 

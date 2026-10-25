@@ -480,6 +480,45 @@ class ApiService {
     });
   }
 
+  // Lecturer grade preparation and bonus in batch
+  static Future<dynamic> gradePrepAndBonusBatch(
+      int tripId, List<Map<String, dynamic>> records) async {
+    return await post('giang-vien/grade-prep-bonus-batch', {
+      'tripId': tripId,
+      'records': records,
+    });
+  }
+
+  // Lecturer import preparation grades from Excel
+  static Future<Map<String, dynamic>> importPrepGradesExcel(
+      int tripId, String filePath,
+      {bool saveImmediately = false}) async {
+    try {
+      final request = http.MultipartRequest(
+          'POST', Uri.parse('$baseUrl/giang-vien/import-prep-grades-excel'));
+      request.headers.addAll(_headers);
+      request.fields['tripId'] = tripId.toString();
+      request.fields['saveImmediately'] = saveImmediately.toString();
+      request.files.add(await http.MultipartFile.fromPath('file', filePath));
+
+      final streamedResponse =
+          await request.send().timeout(const Duration(seconds: 30));
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return jsonDecode(utf8.decode(response.bodyBytes));
+      } else if (response.statusCode == 401) {
+        await _handleUnauthorized();
+        throw Exception(
+            'Phiên làm việc hết hạn. Vui lòng đăng nhập lại (401).');
+      } else {
+        throw _handleErrorResponse(response);
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   // Lecturer guided reports
   static Future<dynamic> getGuidedReports(int lecturerId,
       {String? search, String? status, int? page, int? limit}) async {

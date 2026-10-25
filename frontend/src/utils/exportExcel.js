@@ -919,3 +919,33 @@ export const exportDanhSachHoiDongTheoDot = (dotInfo, boardsData = []) => {
   const dateStr = new Date().toISOString().slice(0, 10);
   XLSX.writeFile(wb, `DanhSach_HoiDong_ChamBaoCao_${cleanDotName}_${dateStr}.xlsx`);
 };
+
+/**
+ * MẪU XUẤT: File mẫu nhập điểm chuẩn bị & điểm cộng cho Giảng viên dẫn đoàn
+ */
+export const exportPrepGradesTemplate = (tripName = '', students = []) => {
+  const headers = ['STT', 'MSSV', 'Họ và tên', 'Điểm chuẩn bị (0-10)', 'Điểm cộng (0-1.0)', 'Ghi chú'];
+  const rows = (students || []).map((s, idx) => [
+    idx + 1,
+    s.mssv || '',
+    s.name || s.ho_ten || '',
+    s.diemChuanBi !== '' && s.diemChuanBi !== null && s.diemChuanBi !== undefined ? Number(s.diemChuanBi) : '',
+    s.diemCong !== undefined && s.diemCong !== null ? Number(s.diemCong) : 0,
+    '',
+  ]);
+
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  ws['!cols'] = [
+    { wch: 6 },
+    { wch: 15 },
+    { wch: 25 },
+    { wch: 22 },
+    { wch: 18 },
+    { wch: 25 },
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'DiemChuanBi');
+  const cleanTripName = sanitizeFileName(tripName || 'ChuyenDi');
+  XLSX.writeFile(wb, `Mau_Nhap_Diem_Chuan_Bi_${cleanTripName}.xlsx`);
+};

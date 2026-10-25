@@ -28,7 +28,9 @@ import {
 import {
   LockCouncilGradeDto,
   UpdateCouncilStudentNoteDto,
+  PrepBonusRecordItemDto,
 } from './dto/giang-vien.dto';
+import * as xlsx from 'xlsx';
 
 import { R2StorageService } from '../upload/r2-storage.service';
 import { RoleDataSourceService } from '../common/role-datasource.service';
@@ -476,6 +478,421 @@ export class GiangVienService implements OnModuleInit {
     await this.diemPhieuRepo.save(diem);
 
     return { message: 'Cập nhật điểm chuẩn bị và điểm cộng thành công', diem };
+  }
+
+  // Cập nhật điểm chuẩn bị & điểm cộng hàng loạt (Batch Save)
+  async gradePrepAndBonusBatch(
+    lecturerId: number,
+    tripId: number,
+    records: PrepBonusRecordItemDto[],
+  ) {
+    if (!Array.isArray(records) || records.length === 0) {
+      throw new BadRequestException('Danh sách điểm cập nhật không được rỗng');
+    }
+
+    const isLead = await this.danDoanRepo.findOne({
+      where: {
+        chuyen_tham_quan_id: tripId,
+        giang_vien_id: lecturerId,
+      },
+    });
+    if (!isLead) {
+      throw new ForbiddenException(
+        'Bạn không phải giảng viên dẫn đoàn của chuyến tham quan này',
+      );
+    }
+
+    const phieuIds = records.map((r) => r.phieuId);
+    const phieus = await this.phieuRepo.find({
+      where: { id: In(phieuIds), chuyen_tham_quan_id: tripId },
+    });
+    const validPhieuMap = new Map(phieus.map((p) => [p.id, p]));
+
+    const phieuTQs = await this.phieuTQRepo.find({
+      where: { phieu_dang_ky_id: In(phieuIds) },
+    });
+    const phieuTQMap = new Map(phieuTQs.map((ptq) => [ptq.phieu_dang_ky_id, ptq]));
+    const ptqIds = phieuTQs.map((ptq) => ptq.id);
+
+    const diems =
+      ptqIds.length > 0
+        ? await this.diemPhieuRepo.find({
+            where: { phieu_tham_quan_id: In(ptqIds) },
+          })
+        : [];
+    const diemMap = new Map(diems.map((d) => [d.phieu_tham_quan_id, d]));
+
+    // Kiểm tra xem chuyến tham quan hoặc các phiếu này đã bị khóa chưa
+    const isAnyLocked = diems.some((d) => d.da_khoa || d.da_khoa_chuan_bi);
+    if (isAnyLocked) {
+      throw new BadRequestException(
+        'Điểm chuẩn bị của chuyến đi này đã được nộp/khóa, không thể chỉnh sửa',
+      );
+    }
+
+    const diemsToSave: DiemPhieuThamQuan[] = [];
+    const now = new Date();
+
+    for (const rec of records) {
+      const phieu = validPhieuMap.get(rec.phieuId);
+      if (!phieu) continue;
+
+      let ptq = phieuTQMap.get(rec.phieuId);
+      if (!ptq) {
+        ptq = new PhieuThamQuan();
+        ptq.phieu_dang_ky_id = phieu.id;
+        ptq = await this.phieuTQRepo.save(ptq);
+        phieuTQMap.set(rec.phieuId, ptq);
+      }
+
+      let diem = diemMap.get(ptq.id);
+      if (!diem) {
+        diem = new DiemPhieuThamQuan();
+        diem.phieu_tham_quan_id = ptq.id;
+      }
+
+      const prepScore = Math.max(0, Math.min(10, Number(rec.diemChuanBi)));
+      const bonusScore = Math.max(0, Math.min(1.0, Number(rec.diemCong || 0)));
+
+      diem.diem_chuan_bi = prepScore;
+      diem.diem_cong_final = bonusScore;
+      diem.giang_vien_dan_doan_id = lecturerId;
+      diem.ngay_cham_chuan_bi = now;
+
+      diemsToSave.push(diem);
+    }
+
+    if (diemsToSave.length > 0) {
+      await this.diemPhieuRepo.save(diemsToSave);
+    }
+
+    return {
+      message: `Đã lưu điểm chuẩn bị & điểm cộng thành công cho ${diemsToSave.length} sinh viên`,
+      savedCount: diemsToSave.length,
+    };
+  }
+
+  // Tải file Excel mẫu chấm điểm chuẩn bị của chuyến tham quan
+  async getPrepGradesTemplate(lecturerId: number, tripId: number) {
+    const trip = await this.chuyenRepo.findOne({
+      where: { id: tripId },
+      relations: { nhaMay: true },
+    });
+    if (!trip) {
+      throw new NotFoundException('Không tìm thấy chuyến tham quan');
+    }
+
+    const isLead = await this.danDoanRepo.findOne({
+      where: { chuyen_tham_quan_id: tripId, giang_vien_id: lecturerId },
+    });
+    if (!isLead) {
+      throw new ForbiddenException(
+        'Bạn không phải giảng viên dẫn đoàn của chuyến tham quan này',
+      );
+    }
+
+    const registrations = await this.getTripRegistrations(lecturerId, tripId);
+
+    const headers = [
+      'STT',
+      'MSSV',
+      'Họ và tên',
+      'Lớp',
+      'Điểm chuẩn bị (0-10)',
+      'Điểm cộng (0-1.0)',
+      'Ghi chú',
+    ];
+
+    const rows = (registrations || []).map((phieu: any, idx: number) => {
+      const sv = phieu.sinhVien || {};
+      const diem = phieu.diemPhieuThamQuan || {};
+      return [
+        idx + 1,
+        sv.mssv || '',
+        sv.ho_ten || '',
+        sv.ten_lop || '',
+        diem.diem_chuan_bi !== undefined && diem.diem_chuan_bi !== null
+          ? diem.diem_chuan_bi
+          : '',
+        diem.diem_cong !== undefined && diem.diem_cong !== null
+          ? diem.diem_cong
+          : '',
+        '',
+      ];
+    });
+
+    const ws = xlsx.utils.aoa_to_sheet([headers, ...rows]);
+    ws['!cols'] = [
+      { wch: 6 },
+      { wch: 15 },
+      { wch: 25 },
+      { wch: 15 },
+      { wch: 22 },
+      { wch: 18 },
+      { wch: 25 },
+    ];
+
+    const wb = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(wb, ws, 'DiemChuanBi');
+    const buffer = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    const safeTripName = (trip.nhaMay?.ten_nha_may || `Chuyen_${tripId}`)
+      .replace(/[^a-zA-Z0-9_\-\u00C0-\u024F\u1EA0-\u1EF9]/gi, '_');
+
+    return {
+      buffer,
+      fileName: `Mau_Nhap_Diem_Chuan_Bi_${safeTripName}.xlsx`,
+    };
+  }
+
+  // Nhập điểm chuẩn bị từ file Excel (Upload & Parse / Save)
+  async importPrepGradesExcel(
+    lecturerId: number,
+    tripId: number,
+    fileBuffer: Buffer,
+    saveImmediately: boolean = false,
+  ) {
+    const isLead = await this.danDoanRepo.findOne({
+      where: { chuyen_tham_quan_id: tripId, giang_vien_id: lecturerId },
+    });
+    if (!isLead) {
+      throw new ForbiddenException(
+        'Bạn không phải giảng viên dẫn đoàn của chuyến tham quan này',
+      );
+    }
+
+    const trip = await this.chuyenRepo.findOne({ where: { id: tripId } });
+    if (!trip) {
+      throw new NotFoundException('Không tìm thấy chuyến tham quan');
+    }
+
+    // Lấy danh sách phiếu đăng ký của chuyến
+    const phieus = await this.phieuRepo.find({
+      where: {
+        chuyen_tham_quan_id: tripId,
+        trang_thai: In(['HopLe', 'ChoDuyet', 'DaThamGia', 'VangMat']),
+      },
+      relations: { sinhVien: true },
+    });
+
+    const phieuIds = phieus.map((p) => p.id);
+    if (phieuIds.length > 0) {
+      const phieuTQs = await this.phieuTQRepo.find({
+        where: { phieu_dang_ky_id: In(phieuIds) },
+      });
+      const ptqIds = phieuTQs.map((ptq) => ptq.id);
+      if (ptqIds.length > 0) {
+        const diems = await this.diemPhieuRepo.find({
+          where: { phieu_tham_quan_id: In(ptqIds) },
+        });
+        const isLocked =
+          diems.length > 0 &&
+          diems.every((d) => d.da_khoa || d.da_khoa_chuan_bi);
+        if (isLocked) {
+          throw new BadRequestException(
+            'Chuyến tham quan này đã nộp/khóa điểm chuẩn bị, không thể chỉnh sửa.',
+          );
+        }
+      }
+    }
+
+    const mssvToPhieuMap = new Map<string, PhieuDangKy>();
+    for (const p of phieus) {
+      if (p.sinhVien?.mssv) {
+        mssvToPhieuMap.set(String(p.sinhVien.mssv).trim().toLowerCase(), p);
+      }
+    }
+
+    // Đọc file Excel từ buffer
+    let workbook: xlsx.WorkBook;
+    try {
+      workbook = xlsx.read(fileBuffer, { type: 'buffer' });
+    } catch (e) {
+      throw new BadRequestException('Không thể đọc file Excel. Định dạng không hợp lệ.');
+    }
+
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    if (!sheet) {
+      throw new BadRequestException('File Excel không có dữ liệu bảng tính');
+    }
+
+    const rawRows = xlsx.utils.sheet_to_json<any[]>(sheet, { header: 1 });
+    if (!rawRows || rawRows.length === 0) {
+      throw new BadRequestException('File Excel rỗng');
+    }
+
+    // Tự động nhận diện dòng tiêu đề và các cột
+    let headerRowIdx = -1;
+    let mssvColIdx = -1;
+    let prepColIdx = -1;
+    let bonusColIdx = -1;
+
+    for (let i = 0; i < Math.min(10, rawRows.length); i++) {
+      const row = rawRows[i];
+      if (!Array.isArray(row)) continue;
+
+      for (let j = 0; j < row.length; j++) {
+        const cell = String(row[j] || '').trim().toLowerCase();
+        // Cột MSSV
+        if (
+          cell === 'mssv' ||
+          cell === 'mã sv' ||
+          cell === 'mã sinh viên' ||
+          cell === 'ma sv' ||
+          cell === 'masv' ||
+          cell.includes('mssv') ||
+          cell === 'student id'
+        ) {
+          if (mssvColIdx === -1) mssvColIdx = j;
+        }
+
+        // Cột Điểm chuẩn bị
+        if (
+          cell.includes('chuẩn bị') ||
+          cell.includes('chuan bi') ||
+          cell === 'điểm' ||
+          cell === 'diem' ||
+          cell === 'score' ||
+          cell === 'prelim'
+        ) {
+          if (prepColIdx === -1) prepColIdx = j;
+        }
+
+        // Cột Điểm cộng
+        if (
+          cell.includes('cộng') ||
+          cell.includes('cong') ||
+          cell === 'bonus' ||
+          cell === 'extra'
+        ) {
+          if (bonusColIdx === -1) bonusColIdx = j;
+        }
+      }
+
+      if (mssvColIdx !== -1 && prepColIdx !== -1) {
+        headerRowIdx = i;
+        break;
+      }
+    }
+
+    // Fallback: Tìm theo từ khóa MSSV
+    if (headerRowIdx === -1 || mssvColIdx === -1 || prepColIdx === -1) {
+      for (let i = 0; i < Math.min(10, rawRows.length); i++) {
+        const row = rawRows[i];
+        if (!Array.isArray(row)) continue;
+        const colIdx = row.findIndex((c) =>
+          String(c || '').toLowerCase().includes('mssv'),
+        );
+        if (colIdx !== -1) {
+          headerRowIdx = i;
+          mssvColIdx = colIdx;
+          prepColIdx = row.findIndex(
+            (c, idx) =>
+              idx !== mssvColIdx &&
+              (String(c || '').toLowerCase().includes('điểm') ||
+                String(c || '').toLowerCase().includes('diem') ||
+                String(c || '').toLowerCase().includes('score')),
+          );
+          if (prepColIdx === -1 && row.length > mssvColIdx + 2) {
+            prepColIdx = mssvColIdx + 2;
+          }
+          break;
+        }
+      }
+    }
+
+    if (mssvColIdx === -1 || prepColIdx === -1) {
+      throw new BadRequestException(
+        'Không thể nhận diện cột MSSV hoặc Điểm chuẩn bị trong file Excel. Vui lòng đảm bảo file có tiêu đề cột "MSSV" và "Điểm chuẩn bị".',
+      );
+    }
+
+    const matchedRecords: {
+      phieuId: number;
+      mssv: string;
+      hoTen: string;
+      diemChuanBi: number;
+      diemCong: number;
+    }[] = [];
+    const unmatchedMssvs: string[] = [];
+    const invalidRows: { row: number; mssv: string; error: string }[] = [];
+
+    const parseScore = (val: any): number | null => {
+      if (val === undefined || val === null || val === '') return null;
+      if (typeof val === 'number') return isNaN(val) ? null : val;
+      const str = String(val).trim().replace(',', '.');
+      const num = parseFloat(str);
+      return isNaN(num) ? null : num;
+    };
+
+    for (let i = headerRowIdx + 1; i < rawRows.length; i++) {
+      const row = rawRows[i];
+      if (!Array.isArray(row) || row.length === 0) continue;
+
+      const rawMssv = String(row[mssvColIdx] || '').trim();
+      if (!rawMssv) continue;
+
+      const rawPrep = row[prepColIdx];
+      const parsedPrep = parseScore(rawPrep);
+
+      if (parsedPrep === null || parsedPrep < 0 || parsedPrep > 10) {
+        invalidRows.push({
+          row: i + 1,
+          mssv: rawMssv,
+          error: `Điểm chuẩn bị không hợp lệ (${rawPrep}). Phải là số từ 0 đến 10.`,
+        });
+        continue;
+      }
+
+      let parsedBonus = 0;
+      if (bonusColIdx !== -1 && row[bonusColIdx] !== undefined) {
+        const b = parseScore(row[bonusColIdx]);
+        if (b !== null && b >= 0 && b <= 1) {
+          parsedBonus = Math.min(1.0, Math.max(0, b));
+        }
+      }
+
+      const phieu = mssvToPhieuMap.get(rawMssv.toLowerCase());
+      if (!phieu) {
+        unmatchedMssvs.push(rawMssv);
+        continue;
+      }
+
+      matchedRecords.push({
+        phieuId: phieu.id,
+        mssv: phieu.sinhVien?.mssv || rawMssv,
+        hoTen: phieu.sinhVien?.ho_ten || '',
+        diemChuanBi: parsedPrep,
+        diemCong: parsedBonus,
+      });
+    }
+
+    let saveResult: any = null;
+    if (saveImmediately && matchedRecords.length > 0) {
+      saveResult = await this.gradePrepAndBonusBatch(
+        lecturerId,
+        tripId,
+        matchedRecords.map((r) => ({
+          phieuId: r.phieuId,
+          diemChuanBi: r.diemChuanBi,
+          diemCong: r.diemCong,
+        })),
+      );
+    }
+
+    return {
+      success: true,
+      totalRowsInFile: rawRows.length - (headerRowIdx + 1),
+      matchedCount: matchedRecords.length,
+      unmatchedCount: unmatchedMssvs.length,
+      invalidCount: invalidRows.length,
+      records: matchedRecords,
+      unmatchedMssvs,
+      invalidRows,
+      isSaved: !!saveResult,
+      saveResult,
+    };
   }
 
   // Lay danh sach bai thu hoach can cham với phân trang
