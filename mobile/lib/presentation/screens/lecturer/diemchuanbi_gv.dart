@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import '../../../core/network/api_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/app_models.dart';
@@ -18,6 +19,7 @@ class _DiemChuanBiGVScreenState extends State<DiemChuanBiGVScreen> {
   bool _isLoading = false;
   bool _isSaving = false;
   bool _isLocking = false;
+  bool _isImporting = false;
   bool _hasInitialized = false;
 
   final Map<int, TextEditingController> _prepControllers = {};
@@ -69,28 +71,44 @@ class _DiemChuanBiGVScreenState extends State<DiemChuanBiGVScreen> {
   }
 
   Future<void> _saveAllGrades() async {
+    if (_selectedTour == null || _students.isEmpty) return;
+    final tourId = int.tryParse(_selectedTour!.id) ?? 0;
+    if (tourId <= 0) return;
+
     setState(() => _isSaving = true);
-    int savedCount = 0;
     try {
+      final records = <Map<String, dynamic>>[];
       for (var s in _students) {
         if (s.isLockedPrep) continue;
         final prepText = _prepControllers[s.phieuId]?.text.trim() ?? '0';
         final prepScore = double.tryParse(prepText) ?? 0.0;
         final extraScore = _extraGrades[s.phieuId] ?? 0.0;
-
-        await ApiService.gradePrepAndBonus(s.phieuId, prepScore, extraScore);
-        savedCount++;
+        records.add({
+          'phieuId': s.phieuId,
+          'diemChuanBi': prepScore,
+          'diemCong': extraScore,
+        });
       }
+
+      if (records.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Không có điểm sinh viên nào cần lưu.')),
+          );
+        }
+        return;
+      }
+
+      await AppStateProvider.of(context).saveTripPrepGradesBatch(tourId, records);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Đã lưu điểm cho $savedCount sinh viên thành công!'),
+            content: Text('Đã lưu điểm cho ${records.length} sinh viên thành công!'),
             backgroundColor: AppColors.secondary,
           ),
         );
-        final tourId = int.tryParse(_selectedTour?.id ?? '') ?? 0;
-        if (tourId > 0) _loadStudents(tourId);
+        _loadStudents(tourId);
       }
     } catch (e) {
       if (mounted) {
@@ -103,6 +121,405 @@ class _DiemChuanBiGVScreenState extends State<DiemChuanBiGVScreen> {
         setState(() => _isSaving = false);
       }
     }
+  }
+
+  // Chọn file Excel và phân tích xem trước kết quả
+  Future<void> _pickAndImportExcel() async {
+    if (_selectedTour == null) return;
+    final tourId = int.tryParse(_selectedTour!.id) ?? 0;
+    if (tourId <= 0) return;
+
+    final isLocked = _students.isNotEmpty && _students.any((s) => s.isLockedPrep);
+    if (isLocked) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Điểm của chuyến này đã bị khóa, không thể nhập thêm điểm mới.'),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final pickerResult = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['xlsx', 'xls'],
+      );
+
+      if (pickerResult == null || pickerResult.files.single.path == null) {
+        return;
+      }
+
+      final file = pickerResult.files.single;
+
+      setState(() => _isImporting = true);
+
+      final res = await AppStateProvider.of(context)
+          .importPrepGradesExcel(tourId, file.path!, saveImmediately: false);
+
+      if (!mounted) return;
+
+      _showImportPreviewBottomSheet(res, file.name);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi khi đọc file Excel: $e'),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isImporting = false);
+      }
+    }
+  }
+
+  // Hiển thị BottomSheet xem trước đối soát và xác nhận áp dụng
+  void _showImportPreviewBottomSheet(Map<String, dynamic> res, String fileName) {
+    final matchedCount = res['matchedCount'] ?? 0;
+    final unmatchedCount = res['unmatchedCount'] ?? 0;
+    final invalidCount = res['invalidCount'] ?? 0;
+    final List<dynamic> records = res['records'] ?? [];
+    final List<dynamic> unmatchedMssvs = res['unmatchedMssvs'] ?? [];
+    final List<dynamic> invalidRows = res['invalidRows'] ?? [];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (modalContext, setModalState) {
+            bool isSavingModal = false;
+
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.82,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                children: [
+                  Center(
+                    child: Container(
+                      margin: const EdgeInsets.only(top: 10, bottom: 8),
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 14),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE8F5E9),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.table_chart, color: AppColors.primary, size: 22),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Kết quả đọc file Excel',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.darkSlate),
+                              ),
+                              Text(
+                                fileName,
+                                style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.grey),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFE8F5E9),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: const Color(0xFFA5D6A7)),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('$matchedCount / ${_students.length}',
+                                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                                      const SizedBox(height: 2),
+                                      const Text('SV khớp danh sách', style: TextStyle(fontSize: 11, color: Color(0xFF2E7D32), fontWeight: FontWeight.w600)),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFFF8E1),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: const Color(0xFFFFE082)),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('$unmatchedCount',
+                                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFFF57F17))),
+                                      const SizedBox(height: 2),
+                                      const Text('Ngoài chuyến đi', style: TextStyle(fontSize: 11, color: Color(0xFFF57F17), fontWeight: FontWeight.w600)),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              if (invalidCount > 0) ...[
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFFEBEE),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: const Color(0xFFFFCDD2)),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text('$invalidCount',
+                                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.danger)),
+                                        const SizedBox(height: 2),
+                                        const Text('Điểm không hợp lệ', style: TextStyle(fontSize: 11, color: AppColors.danger, fontWeight: FontWeight.w600)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          if (unmatchedMssvs.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFF8E1),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: const Color(0xFFFFE082)),
+                              ),
+                              child: Text(
+                                'Các MSSV không thuộc chuyến: ${unmatchedMssvs.join(', ')}',
+                                style: const TextStyle(fontSize: 11, color: Color(0xFF795548)),
+                              ),
+                            ),
+                          ],
+                          if (invalidRows.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFEBEE),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: const Color(0xFFFFCDD2)),
+                              ),
+                              child: Text(
+                                'Dòng điểm lỗi: ${invalidRows.map((e) => 'Dòng ${e['row']}: ${e['error']}').join('; ')}',
+                                style: const TextStyle(fontSize: 11, color: AppColors.danger),
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Xem trước danh sách cập nhật điểm:',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.darkSlate),
+                          ),
+                          const SizedBox(height: 8),
+                          if (records.isEmpty)
+                            Container(
+                              padding: const EdgeInsets.all(24),
+                              alignment: Alignment.center,
+                              child: const Text('Không tìm thấy sinh viên nào phù hợp trong file Excel.'),
+                            )
+                          else
+                            ListView.separated(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: records.length,
+                              separatorBuilder: (_, __) => const Divider(height: 1),
+                              itemBuilder: (c, idx) {
+                                final r = records[idx];
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(r['hoTen'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                            Text('MSSV: ${r['mssv']}', style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                                          ],
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFE8F5E9),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          'Chuẩn bị: ${r['diemChuanBi']}',
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.primary),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      if ((r['diemCong'] ?? 0) > 0)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFFFF8E1),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Text(
+                                            '+${r['diemCong']}',
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFFF57F17)),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border(top: BorderSide(color: Colors.grey.shade200)),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: isSavingModal || records.isEmpty
+                                ? null
+                                : () {
+                                    for (var r in records) {
+                                      final phieuId = r['phieuId'];
+                                      if (phieuId != null && _prepControllers.containsKey(phieuId)) {
+                                        _prepControllers[phieuId]?.text = r['diemChuanBi']?.toString() ?? '';
+                                        _extraGrades[phieuId] = (r['diemCong'] as num?)?.toDouble() ?? 0.0;
+                                      }
+                                    }
+                                    setState(() {});
+                                    Navigator.pop(ctx);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Đã áp dụng điểm từ file Excel cho ${records.length} sinh viên! Bấm "LƯU ĐIỂM CHUẨN BỊ" để lưu.'),
+                                        backgroundColor: AppColors.secondary,
+                                      ),
+                                    );
+                                  },
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.primary,
+                              side: const BorderSide(color: AppColors.primary),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            child: const Text('ÁP DỤNG VÀO BẢNG', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: isSavingModal || records.isEmpty
+                                ? null
+                                : () async {
+                                    setModalState(() => isSavingModal = true);
+                                    try {
+                                      final tourId = int.tryParse(_selectedTour?.id ?? '') ?? 0;
+                                      final batchRecords = records.map((r) => {
+                                        'phieuId': r['phieuId'],
+                                        'diemChuanBi': r['diemChuanBi'],
+                                        'diemCong': r['diemCong'] ?? 0,
+                                      }).toList();
+
+                                      await AppStateProvider.of(context).saveTripPrepGradesBatch(tourId, batchRecords);
+
+                                      for (var r in records) {
+                                        final phieuId = r['phieuId'];
+                                        if (phieuId != null && _prepControllers.containsKey(phieuId)) {
+                                          _prepControllers[phieuId]?.text = r['diemChuanBi']?.toString() ?? '';
+                                          _extraGrades[phieuId] = (r['diemCong'] as num?)?.toDouble() ?? 0.0;
+                                        }
+                                      }
+                                      if (mounted) {
+                                        setState(() {});
+                                        Navigator.pop(ctx);
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text('Đã cập nhật và lưu điểm thành công cho ${records.length} sinh viên!'),
+                                            backgroundColor: AppColors.secondary,
+                                          ),
+                                        );
+                                      }
+                                    } catch (e) {
+                                      setModalState(() => isSavingModal = false);
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text('Lỗi khi lưu điểm: $e'), backgroundColor: AppColors.danger),
+                                        );
+                                      }
+                                    }
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            child: isSavingModal
+                                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                : const Text('ÁP DỤNG & LƯU NGAY', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _lockTripPrepGrades() async {
@@ -176,6 +593,21 @@ class _DiemChuanBiGVScreenState extends State<DiemChuanBiGVScreen> {
                 onPressed: widget.onBack,
               )
             : null,
+        actions: [
+          if (!isLocked && _students.isNotEmpty)
+            IconButton(
+              icon: _isImporting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          color: AppColors.primary, strokeWidth: 2))
+                  : const Icon(Icons.table_view_rounded,
+                      color: AppColors.primary),
+              tooltip: 'Nhập điểm từ file Excel',
+              onPressed: _isImporting ? null : _pickAndImportExcel,
+            ),
+        ],
       ),
       body: Column(
         children: [
@@ -263,6 +695,30 @@ class _DiemChuanBiGVScreenState extends State<DiemChuanBiGVScreen> {
                       ],
                     ),
                   ),
+
+                if (!isLocked && _students.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    onPressed: _isImporting ? null : _pickAndImportExcel,
+                    icon: _isImporting
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.file_upload_outlined, size: 18),
+                    label: const Text('Nhập nhanh từ file Excel',
+                        style: TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.bold)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: const BorderSide(color: AppColors.primary),
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 10, horizontal: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

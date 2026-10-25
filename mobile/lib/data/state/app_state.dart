@@ -1108,6 +1108,19 @@ class AppStateProviderState extends State<AppStateContainer> {
     await fetchTripRegistrations(tripId);
   }
 
+  Future<void> saveTripPrepGradesBatch(int tripId, List<Map<String, dynamic>> records) async {
+    await ApiService.gradePrepAndBonusBatch(tripId, records);
+    await fetchTripRegistrations(tripId);
+  }
+
+  Future<Map<String, dynamic>> importPrepGradesExcel(int tripId, String filePath, {bool saveImmediately = false}) async {
+    final res = await ApiService.importPrepGradesExcel(tripId, filePath, saveImmediately: saveImmediately);
+    if (saveImmediately) {
+      await fetchTripRegistrations(tripId);
+    }
+    return res;
+  }
+
   Future<void> lockGuidedReportsGrades(int dotKienTapId) async {
     await ApiService.lockGuidedReportsGrades(dotKienTapId);
     if (ApiService.userId != null) {
