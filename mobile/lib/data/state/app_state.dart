@@ -245,6 +245,8 @@ class AppStateProviderState extends State<AppStateContainer> {
           
           if (isCompleted) {
              final bth = reg['baiThuHoach'];
+             final rawNgayThamQuan = reg['chuyenThamQuan']?['ngay_tham_quan'];
+             final tripDate = rawNgayThamQuan != null ? DateTime.tryParse(rawNgayThamQuan.toString()) : null;
              realSubmissions.add(Submission(
                id: reg['id'].toString(),
                registrationId: reg['id'],
@@ -255,6 +257,7 @@ class AppStateProviderState extends State<AppStateContainer> {
                        ? 'Kiến tập trực tuyến'
                        : 'Kiến tập trực tiếp',
                dateText: trip.date,
+               tripDate: tripDate,
                status: bth != null ? 'Đã nộp' : 'Chưa nộp',
                fileName: bth?['file_bao_cao']?.split('/').last ?? (bth != null ? 'baocao.pdf' : null),
                fileSize: bth != null ? 'N/A' : null,
@@ -1040,17 +1043,19 @@ class AppStateProviderState extends State<AppStateContainer> {
       final res = await ApiService.getRepresentativeTripsStatus();
       if (res != null) {
         final List<dynamic> regIds = res['selectedRegistrationIds'] ?? [];
-        final council = res['hoiDong'] ?? res['council'];
+        final council = res['assignedCouncil'] ?? res['hoiDong'] ?? res['council'];
         final List<dynamic> members = council?['thanhVien'] ?? [];
         
         setState(() {
           _state.repStatus = RepresentativeTripsStatus(
             selectedRegistrationIds: regIds.map((id) => int.tryParse(id.toString()) ?? 0).where((id) => id > 0).toList(),
             isLockedByKhoa: res['isLockedByKhoa'] == true,
-            councilSessionName: council?['ten_hoi_dong'] ?? council?['ten_buoi'],
+            lockReason: res['lockReason'] as String?,
+            canEdit: res['canEdit'] ?? !(res['isLockedByKhoa'] == true),
+            councilSessionName: council?['ten_hoi_dong'] ?? council?['tenHoiDong'] ?? council?['ten_buoi'],
             councilRoom: council?['phong'],
-            councilTime: council?['thoi_gian'],
-            councilMembers: members.map((m) => m['ho_ten']?.toString() ?? '').where((m) => m.isNotEmpty).toList(),
+            councilTime: council?['thoi_gian'] ?? council?['ngayCham'],
+            councilMembers: members.map((m) => (m['ho_ten'] ?? m['giangVien']?['ho_ten'])?.toString() ?? '').where((m) => m.isNotEmpty).toList(),
           );
         });
       }

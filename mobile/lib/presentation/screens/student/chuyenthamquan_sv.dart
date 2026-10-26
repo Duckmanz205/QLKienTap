@@ -504,23 +504,38 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: trip.type == 'Trực tiếp'
-                                ? AppColors.primary.withValues(alpha: 0.1)
-                                : AppColors.secondary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            trip.type,
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: trip.type == 'Trực tiếp' ? AppColors.primary : AppColors.secondary,
+                        Builder(builder: (context) {
+                          final isOnline = trip.type == 'Trực tuyến' || trip.type == 'TrucTuyen';
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: isOnline ? const Color(0xFFEFF6FF) : AppColors.primary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: isOnline ? const Color(0xFFBFDBFE) : AppColors.primary.withValues(alpha: 0.2),
+                              ),
                             ),
-                          ),
-                        ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  isOnline ? Icons.laptop_mac : Icons.location_on,
+                                  size: 11,
+                                  color: isOnline ? const Color(0xFF1D4ED8) : AppColors.primary,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  trip.type,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: isOnline ? const Color(0xFF1D4ED8) : AppColors.primary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
                         const SizedBox(width: 12),
                         const Text(
                           'Mở đăng ký',
@@ -639,6 +654,39 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
                 const SizedBox(height: 8),
                 Row(
                   children: [
+                    Builder(builder: (context) {
+                      final isOnline = trip.type == 'Trực tuyến' || trip.type == 'TrucTuyen';
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: isOnline ? const Color(0xFFEFF6FF) : AppColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: isOnline ? const Color(0xFFBFDBFE) : AppColors.primary.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isOnline ? Icons.laptop_mac : Icons.location_on,
+                              size: 11,
+                              color: isOnline ? const Color(0xFF1D4ED8) : AppColors.primary,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              trip.type,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: isOnline ? const Color(0xFF1D4ED8) : AppColors.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                    const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
@@ -809,6 +857,7 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
                         onChanged: _searchFactorySuggestions,
                         decoration: InputDecoration(
                           labelText: 'Tên doanh nghiệp / Nhà máy',
+                          hintText: 'Nhập tên nhà máy đề xuất...',
                           border: const OutlineInputBorder(),
                           prefixIcon: const Icon(Icons.business),
                           suffixIcon: _isSearchingFactory

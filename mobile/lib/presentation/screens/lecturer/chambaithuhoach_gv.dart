@@ -400,7 +400,7 @@ class _ChamBaiThuHoachGVScreenState extends State<ChamBaiThuHoachGVScreen> {
                         ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                         : const Icon(Icons.auto_awesome, size: 16),
                     label: Text(
-                      _isAIGrading ? 'Đang phân tích bài nộp...' : 'Chấm điểm tự động bằng AI',
+                      _isAIGrading ? 'AI (Qwen3.7 Flash) đang phân tích bài nộp...' : 'Chấm điểm tự động bằng AI',
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                     ),
                     style: ElevatedButton.styleFrom(

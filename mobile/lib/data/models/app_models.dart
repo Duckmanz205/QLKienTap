@@ -186,6 +186,7 @@ class Submission {
   final String? confirmationFileName;
   final String? fileBaoCaoUrl;
   final String? fileXacNhanUrl;
+  final DateTime? tripDate;
 
   Submission({
     required this.id,
@@ -201,6 +202,7 @@ class Submission {
     this.confirmationFileName,
     this.fileBaoCaoUrl,
     this.fileXacNhanUrl,
+    this.tripDate,
   });
 
   Submission copyWith({
@@ -213,6 +215,7 @@ class Submission {
     String? confirmationFileName,
     String? fileBaoCaoUrl,
     String? fileXacNhanUrl,
+    DateTime? tripDate,
   }) {
     return Submission(
       id: id,
@@ -228,6 +231,7 @@ class Submission {
       confirmationFileName: confirmationFileName ?? this.confirmationFileName,
       fileBaoCaoUrl: fileBaoCaoUrl ?? this.fileBaoCaoUrl,
       fileXacNhanUrl: fileXacNhanUrl ?? this.fileXacNhanUrl,
+      tripDate: tripDate ?? this.tripDate,
     );
   }
 }
@@ -394,6 +398,8 @@ class StudentTermGrade {
 class RepresentativeTripsStatus {
   final List<int> selectedRegistrationIds;
   final bool isLockedByKhoa;
+  final String? lockReason;
+  final bool canEdit;
   final String? councilSessionName;
   final String? councilRoom;
   final String? councilTime;
@@ -402,6 +408,8 @@ class RepresentativeTripsStatus {
   RepresentativeTripsStatus({
     this.selectedRegistrationIds = const [],
     this.isLockedByKhoa = false,
+    this.lockReason,
+    this.canEdit = true,
     this.councilSessionName,
     this.councilRoom,
     this.councilTime,
