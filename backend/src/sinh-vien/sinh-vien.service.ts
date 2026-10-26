@@ -1250,6 +1250,200 @@ export class SinhVienService {
     return { message: 'Xóa bài thu hoạch thành công' };
   }
 
+  // Helper tính thời điểm 23:59:59.999 (múi giờ Việt Nam UTC+7) của ngày kết thúc đợt
+  private getEndOfDayVietnam(dateInput: Date | string): Date {
+    if (!dateInput) return new Date();
+    let dateStr = '';
+    if (typeof dateInput === 'string') {
+      dateStr = dateInput.split('T')[0];
+    } else if (dateInput instanceof Date) {
+      if (isNaN(dateInput.getTime())) return new Date();
+      dateStr = dateInput.toISOString().split('T')[0];
+    } else {
+      dateStr = String(dateInput).split('T')[0];
+    }
+    return new Date(`${dateStr}T23:59:59.999+07:00`);
+  }
+
+  // Tự động chọn & tạo Bộ 3 chuyến báo cáo cho sinh viên đủ điều kiện khi hết hạn
+  async autoPickTriadsForStudent(
+    studentId: number,
+    termStudentId: number,
+  ): Promise<BoChuyenBaoCao | null> {
+    const existingBo = await this.boChuyenRepo.findOne({
+      where: { dot_kien_tap_sinh_vien_id: termStudentId },
+    });
+    if (existingBo) return existingBo;
+
+    const dksv = await this.dksvRepo.findOne({
+      where: { id: termStudentId },
+      relations: { dotKienTap: true },
+    });
+    if (!dksv) return null;
+
+    const phieus = await this.phieuRepo.find({
+      where: { sinh_vien_id: studentId },
+      relations: {
+        chuyenThamQuan: { nhaMay: true, lichKienTap: true },
+        phieuThamQuan: {
+          baiThuHoach: true,
+          diemPhieuThamQuan: true,
+        },
+      },
+      order: { ngay_dang_ky: 'DESC' },
+    });
+
+    if (!phieus || phieus.length < 3) return null;
+
+    const ptqIds = phieus
+      .map((p) => p.phieuThamQuan?.id)
+      .filter((id): id is number => typeof id === 'number');
+
+    const diemDanhMap = new Map<number, string>();
+    if (ptqIds.length > 0) {
+      const dds = await this.diemDanhRepo.find({
+        where: { phieu_tham_quan_id: In(ptqIds) },
+      });
+      for (const dd of dds) {
+        diemDanhMap.set(dd.phieu_tham_quan_id, dd.trang_thai);
+      }
+    }
+
+    const eighteenMonthsAgo = new Date();
+    eighteenMonthsAgo.setMonth(eighteenMonthsAgo.getMonth() - 18);
+
+    const validTrips = phieus.filter((p) => {
+      if (!['HopLe', 'DaThamGia', 'HoanThanh'].includes(p.trang_thai)) return false;
+      if (['KhongDat', 'BiLoai', 'DaHuy', 'VangMat'].includes(p.trang_thai)) return false;
+      if (!p.phieuThamQuan || p.phieuThamQuan.trang_thai !== 'HopLe') return false;
+      if (!p.phieuThamQuan.baiThuHoach) return false;
+
+      const ddStatus = diemDanhMap.get(p.phieuThamQuan.id);
+      if (ddStatus && ddStatus !== 'CoMat') return false;
+
+      const ngayThamQuan = p.chuyenThamQuan?.ngay_tham_quan;
+      if (ngayThamQuan && new Date(ngayThamQuan) < eighteenMonthsAgo) {
+        return false;
+      }
+
+      if (!p.chuyenThamQuan?.nha_may_id) return false;
+
+      return true;
+    });
+
+    if (validTrips.length < 3) return null;
+
+    const getTripPriorityScore = (p: PhieuDangKy): number => {
+      const bth = p.phieuThamQuan?.baiThuHoach;
+      const isOnTimeScore = bth?.trang_thai === 'DaNop' ? 1000 : 0;
+
+      const dptq = p.phieuThamQuan?.diemPhieuThamQuan;
+      const grade = Number(
+        dptq?.diem_thu_hoach ??
+        (bth as any)?.diem_ai_de_xuat ??
+        dptq?.diem_chuan_bi ??
+        0,
+      );
+
+      const tripTime = p.chuyenThamQuan?.ngay_tham_quan
+        ? new Date(p.chuyenThamQuan.ngay_tham_quan).getTime() / 1e12
+        : 0;
+
+      return isOnTimeScore + grade * 10 + tripTime;
+    };
+
+    const directTrips = validTrips
+      .filter((p) => p.chuyenThamQuan?.hinh_thuc === 'TrucTiep')
+      .sort((a, b) => getTripPriorityScore(b) - getTripPriorityScore(a));
+
+    const onlineTrips = validTrips
+      .filter((p) => p.chuyenThamQuan?.hinh_thuc === 'TrucTuyen')
+      .sort((a, b) => getTripPriorityScore(b) - getTripPriorityScore(a));
+
+    let selectedTrips: PhieuDangKy[] | null = null;
+    let bestScore = -1;
+
+    if (directTrips.length >= 2 && onlineTrips.length >= 1) {
+      for (let i = 0; i < directTrips.length - 1; i++) {
+        for (let j = i + 1; j < directTrips.length; j++) {
+          const d1 = directTrips[i];
+          const d2 = directTrips[j];
+          if (d1.chuyenThamQuan.nha_may_id === d2.chuyenThamQuan.nha_may_id) continue;
+
+          for (const onl of onlineTrips) {
+            if (
+              onl.chuyenThamQuan.nha_may_id === d1.chuyenThamQuan.nha_may_id ||
+              onl.chuyenThamQuan.nha_may_id === d2.chuyenThamQuan.nha_may_id
+            ) {
+              continue;
+            }
+
+            const totalScore =
+              getTripPriorityScore(d1) +
+              getTripPriorityScore(d2) +
+              getTripPriorityScore(onl);
+
+            if (totalScore > bestScore) {
+              bestScore = totalScore;
+              selectedTrips = [d1, d2, onl];
+              break;
+            }
+          }
+          if (selectedTrips) break;
+        }
+        if (selectedTrips) break;
+      }
+    }
+
+    if (!selectedTrips && directTrips.length >= 3) {
+      for (let i = 0; i < directTrips.length - 2; i++) {
+        for (let j = i + 1; j < directTrips.length - 1; j++) {
+          for (let k = j + 1; k < directTrips.length; k++) {
+            const d1 = directTrips[i];
+            const d2 = directTrips[j];
+            const d3 = directTrips[k];
+            const factorySet = new Set([
+              d1.chuyenThamQuan.nha_may_id,
+              d2.chuyenThamQuan.nha_may_id,
+              d3.chuyenThamQuan.nha_may_id,
+            ]);
+            if (factorySet.size === 3) {
+              selectedTrips = [d1, d2, d3];
+              break;
+            }
+          }
+          if (selectedTrips) break;
+        }
+        if (selectedTrips) break;
+      }
+    }
+
+    if (!selectedTrips || selectedTrips.length !== 3) {
+      return null;
+    }
+
+    return this.dataSource.transaction(async (manager: EntityManager) => {
+      const boRepo = manager.getRepository(BoChuyenBaoCao);
+      const ptqRepo = manager.getRepository(PhieuThamQuan);
+
+      const bo = new BoChuyenBaoCao();
+      bo.dot_kien_tap_sinh_vien_id = termStudentId;
+      bo.ngay_chon = new Date();
+      bo.ghi_chu = 'Hệ thống tự động chốt bộ 3 chuyến khi hết hạn đợt kiến tập';
+      const savedBo = await boRepo.save(bo);
+
+      for (const trip of selectedTrips!) {
+        if (trip.phieuThamQuan) {
+          await ptqRepo.update(trip.phieuThamQuan.id, {
+            bo_chuyen_bao_cao_id: savedBo.id,
+          });
+        }
+      }
+
+      return savedBo;
+    });
+  }
+
   // Chot bo 3 chuyen bao cao dai dien theo nguyen vong
   async selectRepresentativeTrips(
     studentId: number,
@@ -1294,16 +1488,22 @@ export class SinhVienService {
         throw new BadRequestException('Thông tin đợt kiến tập không hợp lệ.');
       }
 
-    // 1. Kiem tra xem Khoa co dang Khoa cong chon bo chuyen cua dot khong
+    // 1. Kiem tra xem Khoa co dang Khoa cong hoac da qua han ket thuc dot khong
     const dotCheck = await this.dataSource.manager
       .getRepository(DotKienTap)
       .findOne({
         where: { id: dksv.dot_kien_tap_id },
-        select: { id: true, is_bo_chuyen_locked: true },
+        select: { id: true, is_bo_chuyen_locked: true, ngay_ket_thuc: true },
       });
-    if (dotCheck?.is_bo_chuyen_locked) {
+
+    const deadline = dotCheck?.ngay_ket_thuc
+      ? this.getEndOfDayVietnam(dotCheck.ngay_ket_thuc)
+      : null;
+    const isDeadlineExpired = deadline ? new Date() > deadline : false;
+
+    if (dotCheck?.is_bo_chuyen_locked || isDeadlineExpired) {
       throw new BadRequestException(
-        'Quản lý Khoa đã khóa cổng đăng ký / thay đổi Bộ 3 chuyến báo cáo cho đợt này (Đã chốt danh sách báo cáo).',
+        'Đã quá hạn kết thúc đợt kiến tập, hệ thống đã tự động khóa cổng chọn Bộ 3 chuyến báo cáo.',
       );
     }
 
@@ -1496,14 +1696,21 @@ export class SinhVienService {
 
     const dotId = dksv?.dot_kien_tap_id;
     let isFacultyMasterLocked = false;
+    let isDeadlineExpired = false;
+    let deadline: Date | null = null;
+
     if (dotId) {
       const dotForLock = await this.dataSource.manager
         .getRepository(DotKienTap)
         .findOne({
           where: { id: dotId },
-          select: { id: true, is_bo_chuyen_locked: true },
+          select: { id: true, is_bo_chuyen_locked: true, ngay_ket_thuc: true },
         });
       isFacultyMasterLocked = dotForLock?.is_bo_chuyen_locked ?? false;
+      if (dotForLock?.ngay_ket_thuc) {
+        deadline = this.getEndOfDayVietnam(dotForLock.ngay_ket_thuc);
+        isDeadlineExpired = new Date() > deadline;
+      }
     }
 
     const phieus = await this.phieuRepo.find({
@@ -1545,12 +1752,17 @@ export class SinhVienService {
     const isEligible = directOk && onlineOk && factoriesOk;
 
     // Tim BoChuyenBaoCao hien tai
-    const bo = dksv
+    let bo = dksv
       ? await this.boChuyenRepo.findOne({
         where: { dot_kien_tap_sinh_vien_id: dksv.id },
         relations: { hoiDong: true },
       })
       : null;
+
+    // Lazy Auto-Pick nếu đã quá hạn hoặc Khoa đã khóa mà SV chưa có BoChuyenBaoCao
+    if (!bo && dksv && (isDeadlineExpired || isFacultyMasterLocked)) {
+      bo = await this.autoPickTriadsForStudent(studentId, dksv.id);
+    }
 
     let selectedRegistrationIds: number[] = [];
     let isGradesLocked = false;
@@ -1597,13 +1809,15 @@ export class SinhVienService {
       dksv?.dotKienTap?.trang_thai === 'DaKhoa' ||
       dksv?.dotKienTap?.trang_thai === 'DaKetThuc';
     const isLockedByKhoa =
-      isFacultyMasterLocked || isGradesLocked || isDotLocked;
+      isFacultyMasterLocked || isGradesLocked || isDotLocked || isDeadlineExpired;
 
     let lockReason: string | null = null;
     if (isGradesLocked) {
       lockReason = 'GRADES_LOCKED';
     } else if (isFacultyMasterLocked) {
       lockReason = 'KHOA_LOCKED';
+    } else if (isDeadlineExpired) {
+      lockReason = 'DEADLINE_EXPIRED';
     } else if (isDotLocked) {
       lockReason = 'DOT_LOCKED';
     }
@@ -1635,9 +1849,12 @@ export class SinhVienService {
           id: bo.id,
           ngayChon: bo.ngay_chon,
           hoiDongId: bo.hoi_dong_id,
+          ghiChu: bo.ghi_chu,
         }
         : null,
       isLockedByKhoa,
+      isDeadlineExpired,
+      hanChotChonBoChuyen: deadline ? deadline.toISOString() : null,
       lockReason,
       assignedCouncil,
       canEdit,

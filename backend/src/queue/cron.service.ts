@@ -1,12 +1,22 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { DataSource } from 'typeorm';
+import { KhoaService } from '../khoa/shared/khoa.service';
 
 @Injectable()
-export class CronService {
+export class CronService implements OnModuleInit {
   private readonly logger = new Logger(CronService.name);
+  private khoaService: KhoaService;
 
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly moduleRef: ModuleRef,
+  ) {}
+
+  onModuleInit() {
+    this.khoaService = this.moduleRef.get(KhoaService, { strict: false });
+  }
 
   // 1. Chạy mỗi phút: Đảm bảo sinh viên đăng ký được đúng giờ, khóa sổ đúng giờ
   @Cron(CronExpression.EVERY_MINUTE)
@@ -26,6 +36,19 @@ export class CronService {
       await this.dataSource.query('EXEC sp_TuDongCapNhatChuyenThamQuan');
       await this.dataSource.query('EXEC sp_TuDongKetThucLichKienTap');
       await this.dataSource.query('EXEC sp_DongBoTrangThaiDotKienTap');
+
+      // Tự động khóa cổng Bộ 3 chuyến cho các đợt đã quá hạn kết thúc và chốt bộ 3 cho SV đủ điều kiện
+      try {
+        if (!this.khoaService) {
+          this.khoaService = this.moduleRef.get(KhoaService, { strict: false });
+        }
+        if (this.khoaService) {
+          await this.khoaService.autoLockExpiredBoChuyen();
+          this.logger.log('Executed autoLockExpiredBoChuyen successfully.');
+        }
+      } catch (autoLockErr: any) {
+        this.logger.error('Failed to execute autoLockExpiredBoChuyen', autoLockErr?.stack || autoLockErr);
+      }
 
       // 1. Khởi tạo bản ghi điểm (nếu chưa có) cho những Phiếu Tham Quan quá hạn 20 ngày mà chưa nộp bài
       await this.dataSource.query(`
@@ -61,3 +84,4 @@ export class CronService {
     }
   }
 }
+
