@@ -299,19 +299,15 @@ class _HoiDongChamBaoCaoDSBuoiGVScreenState extends State<HoiDongChamBaoCaoDSBuo
 
             ElevatedButton(
               onPressed: () {
-                if (widget.onCouncilTap != null) {
-                  widget.onCouncilTap!(board.sessionId.toString());
-                } else {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => HoiDongGradingQueueScreen(
-                        board: board,
-                        onBack: () => Navigator.pop(context),
-                      ),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => HoiDongGradingQueueScreen(
+                      board: board,
+                      onBack: () => Navigator.pop(context),
                     ),
-                  );
-                }
+                  ),
+                );
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,

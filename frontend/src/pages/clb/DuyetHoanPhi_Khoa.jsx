@@ -34,28 +34,45 @@ export default function DuyetHoanPhi_Khoa() {
 
   const handleApprove = async (id) => {
     try {
-      await khoaApi.approveRefund({ request_id: id, status: 'Approved' });
+      const userStr = localStorage.getItem('user');
+      const user = userStr ? JSON.parse(userStr) : {};
+      const approverId = user?.user?.id || user?.id || 1;
+      await khoaApi.approveRefund({ 
+        refundId: id,
+        request_id: id,
+        approverId: approverId, 
+        isApproved: true,
+        status: 'Approved' 
+      });
       fetchRefunds();
+      toast.success('Duyệt hoàn phí thành công');
     } catch (err) {
       console.error(err);
-      toast.error('Có lỗi xảy ra');
+      toast.error(err.response?.data?.message || 'Có lỗi xảy ra khi duyệt hoàn phí');
     }
   };
 
   const handleRejectSubmit = async (e) => {
     e.preventDefault();
     try {
+      const userStr = localStorage.getItem('user');
+      const user = userStr ? JSON.parse(userStr) : {};
+      const approverId = user?.user?.id || user?.id || 1;
       await khoaApi.approveRefund({ 
+        refundId: rejectionTarget.id,
         request_id: rejectionTarget.id, 
+        approverId: approverId, 
+        isApproved: false,
         status: 'Rejected', 
         reason: rejectionReason 
       });
       setRejectionTarget(null);
       setRejectionReason('');
       fetchRefunds();
+      toast.success('Đã từ chối hoàn phí');
     } catch (err) {
       console.error(err);
-      toast.error('Có lỗi xảy ra');
+      toast.error(err.response?.data?.message || 'Có lỗi xảy ra');
     }
   };
 
@@ -63,10 +80,13 @@ export default function DuyetHoanPhi_Khoa() {
   const getStatusBadge = (status) => {
     switch (status) {
       case 'Approved':
+      case 'DaHoanTien':
         return <span className="inline-flex items-center px-3 py-1 whitespace-nowrap rounded-full text-[11px] font-bold bg-[#89B449] text-white shadow-sm border border-[#89B449]/20">Đã hoàn tiền</span>;
       case 'Pending':
+      case 'ChoXuLy':
         return <span className="inline-flex items-center px-3 py-1 whitespace-nowrap rounded-full text-[11px] font-bold bg-[#DBD468] text-slate-800 shadow-sm border border-[#DBD468]/20">Chờ xử lý</span>;
       case 'Rejected':
+      case 'TuChoi':
         return <span className="inline-flex items-center px-3 py-1 whitespace-nowrap rounded-full text-[11px] font-bold bg-[#E68A8C] text-white shadow-sm border border-[#E68A8C]/20">Từ chối</span>;
       default:
         return <span className="inline-flex items-center px-3 py-1 whitespace-nowrap rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200">{status}</span>;
@@ -75,9 +95,9 @@ export default function DuyetHoanPhi_Khoa() {
 
   const statusOptions = [
     { value: '', label: 'Tất cả trạng thái' },
-    { value: 'Pending', label: 'Chờ xử lý' },
-    { value: 'Approved', label: 'Đã hoàn tiền' },
-    { value: 'Rejected', label: 'Từ chối' },
+    { value: 'ChoXuLy', label: 'Chờ xử lý' },
+    { value: 'DaHoanTien', label: 'Đã hoàn tiền' },
+    { value: 'TuChoi', label: 'Từ chối' },
   ];
 
   const filteredStatusOptions = statusOptions.filter(opt =>

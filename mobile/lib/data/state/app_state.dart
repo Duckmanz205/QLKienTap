@@ -219,19 +219,18 @@ class AppStateProviderState extends State<AppStateContainer> {
       final List<dynamic> availableTripsJson = await ApiService.getAvailableTrips(studentId);
       final List<dynamic> regTripsJson = await ApiService.getRegisteredTrips(studentId);
       
-      final Map<int, dynamic> regTripsMap = {
-        for (var t in regTripsJson)
-          if (t['chuyenThamQuan'] != null) t['chuyenThamQuan']['id']: t
-      };
-
       // Combine available and registered to form the studentTrips list
       List<Trip> realTrips = [];
       
-      // Process available trips (not registered yet)
+      // Process available trips (all trips available for regular or supplementary registration)
       for (var t in availableTripsJson) {
-        if (!regTripsMap.containsKey(t['id'])) {
-          realTrips.add(_mapJsonToTrip(t, isRegistered: false));
-        }
+        final trip = _mapJsonToTrip(t, isRegistered: false);
+        realTrips.add(trip.copyWith(
+          isRegistered: false,
+          daTungDangKy: t['da_tung_dang_ky'] == true,
+          trangThaiCu: t['trang_thai_cu'],
+          tripStatus: t['trang_thai'],
+        ));
       }
       
       // Process registered trips
@@ -239,11 +238,19 @@ class AppStateProviderState extends State<AppStateContainer> {
       for (var reg in regTripsJson) {
         if (reg['chuyenThamQuan'] != null) {
           final trip = _mapJsonToTrip(reg['chuyenThamQuan'], isRegistered: true);
-          final status = reg['trang_thai'];
-          final isCompleted = status == 'HoanThanh' || status == 'DaChamDiem' || trip.isCompleted;
-          realTrips.add(trip.copyWith(isRegistered: true, isCompleted: isCompleted, registrationId: reg['id'].toString()));
+          final regStatus = reg['trang_thai']?.toString();
+          final tripStatus = reg['chuyenThamQuan']?['trang_thai']?.toString();
+          final isCompleted = regStatus == 'HoanThanh' || regStatus == 'DaChamDiem' || regStatus == 'DaThamGia' || trip.isCompleted;
           
-          if (isCompleted) {
+          realTrips.add(trip.copyWith(
+            isRegistered: true,
+            isCompleted: isCompleted,
+            registrationId: reg['id'].toString(),
+            registrationStatus: regStatus,
+            tripStatus: tripStatus,
+          ));
+          
+          if (isCompleted || regStatus == 'HopLe' || regStatus == 'DaThamGia') {
              final bth = reg['baiThuHoach'];
              final rawNgayThamQuan = reg['chuyenThamQuan']?['ngay_tham_quan'];
              final tripDate = rawNgayThamQuan != null ? DateTime.tryParse(rawNgayThamQuan.toString()) : null;
@@ -282,17 +289,73 @@ class AppStateProviderState extends State<AppStateContainer> {
         if (invoicesJson.isNotEmpty) {
           _state.payments = invoicesJson.map((inv) {
             final chuyen = inv['chuyen_di'] ?? inv['phieuDangKy']?['chuyenThamQuan'] ?? {};
+            final nhaMay = chuyen['nhaMay'] ?? {};
+            final tenNhaMay = nhaMay['ten_nha_may'] ?? chuyen['ten_chuyen_di'] ?? 'Chuyến kiến tập';
+
+            final rawHan = inv['han_dong'] ?? inv['han_thanh_toan'];
+            String formattedDueDate = 'Chưa cập nhật';
+            if (rawHan != null) {
+              final dt = DateTime.tryParse(rawHan.toString())?.toLocal();
+              if (dt != null) {
+                formattedDueDate = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+              }
+            }
+
+            final rawStatus = inv['trang_thai']?.toString() ?? 'ChuaDong';
+            String displayStatus = 'Chưa đóng';
+            if (rawStatus == 'DaDongDungHan') {
+              displayStatus = 'Đã đóng đúng hạn';
+            } else if (rawStatus == 'DaDongTreHan') {
+              displayStatus = 'Đã đóng trễ hạn';
+            } else if (rawStatus == 'ViPham') {
+              displayStatus = 'Vi phạm';
+            } else if (rawStatus == 'DaHoanPhi') {
+              displayStatus = 'Đã hoàn phí';
+            }
+
+            final rawTripDate = chuyen['ngay_tham_quan'];
+            String formattedTripDate = '--';
+            if (rawTripDate != null) {
+              final dt = DateTime.tryParse(rawTripDate.toString())?.toLocal();
+              if (dt != null) {
+                formattedTripDate = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+              }
+            }
+
+            final rawPaidDate = inv['ngay_dong_thuc_te'];
+            String? formattedPaidDate;
+            if (rawPaidDate != null) {
+              final dt = DateTime.tryParse(rawPaidDate.toString())?.toLocal();
+              if (dt != null) {
+                formattedPaidDate = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+              }
+            }
+
+            final hinhThuc = chuyen['hinh_thuc']?.toString();
+            final tripType = (hinhThuc == 'TrucTuyen' || hinhThuc == 'Trực tuyến')
+                ? 'Trực tuyến'
+                : (hinhThuc == 'TuDo' || hinhThuc == 'Tự do')
+                    ? 'Tự do'
+                    : 'Trực tiếp';
+
+            // Transfer code: read directly from DB noi_dung_chuyen_khoan
+            final rawCode = inv['noi_dung_chuyen_khoan']?.toString().trim();
+            final transferContent = (rawCode != null && rawCode.isNotEmpty)
+                ? rawCode
+                : (inv['ma_hoa_don'] ?? 'KT-${inv['id']}');
+
             return Payment(
               id: inv['id'].toString(),
               tripId: chuyen['id']?.toString() ?? '',
-              name: 'Đoàn: ${chuyen['ten_chuyen_di'] ?? 'Kiến tập'}',
-              code: inv['ma_hoa_don'] ?? inv['ma_giao_dich'] ?? 'KT-TRANSFER',
-              amount: double.tryParse(inv['so_tien']?.toString() ?? '50000') ?? 50000,
-              dueDate: inv['han_thanh_toan'] != null ? DateTime.tryParse(inv['han_thanh_toan'])?.toLocal().toString().substring(0, 10) ?? '15/12/2026' : '15/12/2026',
-              status: inv['trang_thai'] == 'ViPham' ? 'Vi phạm'
-                  : inv['trang_thai'] == 'DaHoanPhi' ? 'Đã hoàn phí'
-                  : (inv['trang_thai'] == 'DaDongDungHan' || inv['trang_thai'] == 'DaDongTreHan') ? 'Đã đóng đúng hạn' 
-                  : 'Chưa đóng',
+              name: tenNhaMay,
+              code: transferContent,
+              amount: double.tryParse(inv['so_tien']?.toString() ?? '150000') ?? 150000,
+              dueDate: formattedDueDate,
+              status: displayStatus,
+              rawStatus: rawStatus,
+              tripDate: formattedTripDate,
+              tripType: tripType,
+              paidDate: formattedPaidDate,
             );
           }).toList();
         } else {
@@ -308,14 +371,37 @@ class AppStateProviderState extends State<AppStateContainer> {
           _state.refunds = refundsJson.map((ref) {
             final invoice = ref['hoaDon'] ?? {};
             String mappedStatus = 'Chờ xử lý';
-            if (ref['trang_thai'] == 'Approved') mappedStatus = 'Đã hoàn tiền';
-            if (ref['trang_thai'] == 'Rejected') mappedStatus = 'Từ chối';
+            final rawStatus = ref['trang_thai']?.toString() ?? '';
+            if (rawStatus == 'Approved' || rawStatus == 'DaHoanTien' || rawStatus == 'DaHoanPhi') {
+              mappedStatus = 'Đã hoàn tiền';
+            } else if (rawStatus == 'Rejected' || rawStatus == 'TuChoi') {
+              mappedStatus = 'Từ chối';
+            } else {
+              mappedStatus = 'Chờ xử lý';
+            }
+            
+            final rawDate = ref['ngay_nop'] ?? ref['ngay_yeu_cau'] ?? ref['created_at'];
+            String dateText = 'N/A';
+            if (rawDate != null) {
+              final dt = DateTime.tryParse(rawDate.toString())?.toLocal();
+              if (dt != null) {
+                dateText = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+              }
+            }
+
+            final amountNum = double.tryParse(invoice['so_tien']?.toString() ?? '0') ?? 0;
+            final amountFormatted = amountNum > 0
+                ? amountNum.toInt().toString().replaceAllMapped(
+                    RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+                    (Match m) => '${m[1]}.',
+                  )
+                : (invoice['so_tien']?.toString() ?? '0');
             
             return RefundRequest(
               id: ref['id'].toString(),
               invoiceName: invoice['ma_hoa_don'] ?? 'Hóa đơn #${invoice['id']}',
-              dateText: ref['ngay_yeu_cau'] != null ? DateTime.tryParse(ref['ngay_yeu_cau'])?.toLocal().toString().substring(0, 10) ?? 'N/A' : 'N/A',
-              amountText: invoice['so_tien']?.toString() ?? '50000',
+              dateText: dateText,
+              amountText: '$amountFormatted đ',
               status: mappedStatus,
             );
           }).toList();
@@ -426,7 +512,7 @@ class AppStateProviderState extends State<AppStateContainer> {
             avatar: sv['avatar'] ?? '',
             submittedDate: r['ngay_nop'] != null ? DateTime.tryParse(r['ngay_nop'].toString())?.toLocal().toString().substring(0, 10) ?? 'N/A' : 'N/A',
             attendanceStatus: phieuTQ['diemDanh']?['trang_thai'] == 'CoMat' ? 'present' : (phieuTQ['diemDanh']?['trang_thai'] == 'Vang' ? 'absent' : 'none'),
-            excuseReason: phieuTQ['diemDanh']?['ly_do_vang'],
+            excuseReason: phieuTQ['diemDanh']?['ghi_chu'] ?? phieuTQ['diemDanh']?['ly_do_vang'],
             prelimGrade: double.tryParse(diem['diem_chuan_bi']?.toString() ?? '0') ?? 0,
             extraGrade: double.tryParse(diem['diem_cong']?.toString() ?? '0') ?? 0,
             gvhdGrade: double.tryParse(r['diem_thu_hoach']?.toString() ?? '0') ?? 0,
@@ -687,7 +773,7 @@ class AppStateProviderState extends State<AppStateContainer> {
     });
   }
 
-  Future<void> cancelTripRegistration(String tripId, String? registrationId, {required String lyDo, String? fileMinhChung}) async {
+  Future<String> cancelTripRegistration(String tripId, String? registrationId, {required String lyDo, String? fileMinhChung}) async {
     final regId = int.tryParse(registrationId ?? '');
     if (regId == null) {
       throw Exception('Không tìm thấy mã phiếu đăng ký hợp lệ cho chuyến này.');
@@ -704,27 +790,35 @@ class AppStateProviderState extends State<AppStateContainer> {
       }
     }
 
-    await ApiService.post('sinh-vien/request-cancel', {
+    final res = await ApiService.post('sinh-vien/request-cancel', {
       'registrationId': regId,
       'lyDo': lyDo,
       if (fileReference != null && fileReference.isNotEmpty) 'fileMinhChung': fileReference,
     });
 
-    setState(() {
-      _state.studentTrips = _state.studentTrips.map((t) {
-        if (t.id == tripId) {
-          return t.copyWith(isRegistered: false);
-        }
-        return t;
-      }).toList();
+    final message = res is Map && res['message'] != null ? res['message'].toString() : 'Đã xử lý yêu cầu hủy thành công';
 
-      _state.payments = _state.payments.map((p) {
-        if (p.tripId == tripId) {
-          return p.copyWith(status: 'Đã hoàn phí');
-        }
-        return p;
-      }).toList();
-    });
+    if (ApiService.userId != null) {
+      await fetchStudentDataFromApi(ApiService.userId!);
+    } else {
+      setState(() {
+        _state.studentTrips = _state.studentTrips.map((t) {
+          if (t.id == tripId) {
+            return t.copyWith(registrationStatus: 'DaHuy');
+          }
+          return t;
+        }).toList();
+
+        _state.payments = _state.payments.map((p) {
+          if (p.tripId == tripId) {
+            return p.copyWith(status: 'Đã hoàn phí');
+          }
+          return p;
+        }).toList();
+      });
+    }
+
+    return message;
   }
 
   Future<bool> uploadReport(String submissionId, String localPath, String fileName, String fileSize, {String? extractedText}) async {
@@ -1091,7 +1185,7 @@ class AppStateProviderState extends State<AppStateContainer> {
             avatar: sv['avatar'] ?? '',
             feeStatus: hoaDon['trang_thai'] ?? 'ChuaDong',
             attendanceStatus: diemDanh['trang_thai'] ?? 'ChuaDiemDanh',
-            excuseReason: diemDanh['ly_do_vang'],
+            excuseReason: diemDanh['ghi_chu'] ?? diemDanh['ly_do_vang'],
             prelimGrade: double.tryParse(diem['diem_chuan_bi']?.toString() ?? '0') ?? 0.0,
             extraGrade: double.tryParse(diem['diem_cong']?.toString() ?? '0') ?? 0.0,
             isLockedPrep: phieuTQ['is_locked_prep'] == true || phieuTQ['trang_thai_khoa_diem_chuan_bi'] == true,
