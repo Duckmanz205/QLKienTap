@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import '../../../core/network/api_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/app_models.dart';
 import '../../../data/state/app_state.dart';
@@ -655,20 +654,20 @@ class _DiemChuanBiGVScreenState extends State<DiemChuanBiGVScreen> {
                 // Locked Status Notice or Info Box
                 if (isLocked)
                   Container(
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
-                      color: Colors.amber.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.amber.shade300),
+                      color: const Color(0xFFECFDF5),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFA7F3D0)),
                     ),
                     child: const Row(
                       children: [
-                        Icon(Icons.lock, size: 18, color: Colors.amber),
+                        Icon(Icons.lock, size: 18, color: Color(0xFF047857)),
                         SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Điểm chuẩn bị của chuyến này đã được khóa. Không thể chỉnh sửa.',
-                            style: TextStyle(fontSize: 12, color: Colors.brown, fontWeight: FontWeight.bold),
+                            'Đã nộp điểm lên Khoa (Đã khóa sổ)',
+                            style: TextStyle(fontSize: 12, color: Color(0xFF065F46), fontWeight: FontWeight.bold),
                           ),
                         ),
                       ],

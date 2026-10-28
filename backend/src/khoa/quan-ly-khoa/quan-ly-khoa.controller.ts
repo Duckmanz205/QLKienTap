@@ -785,12 +785,20 @@ export class KhoaController {
 
   @Roles('QuanLyCLB')
   @Post('approve-refund')
-  async approveRefund(@Body() body: ApproveRefundDto) {
-    return this.khoaService.approveRefund(
-      body.refundId,
-      body.approverId,
-      body.isApproved,
-    );
+  async approveRefund(
+    @Body() body: ApproveRefundDto,
+    @CurrentUser() user?: JwtPayloadUser,
+  ) {
+    const refundId = body.refundId ?? body.request_id;
+    if (!refundId) {
+      throw new BadRequestException('Thiếu mã đơn hoàn phí (refundId)');
+    }
+    const isApproved =
+      body.isApproved !== undefined
+        ? body.isApproved
+        : body.status === 'Approved';
+    const approverId = body.approverId ?? user?.sub ?? 1;
+    return this.khoaService.approveRefund(refundId, approverId, isApproved);
   }
 
   @Roles('QuanLyKhoa')

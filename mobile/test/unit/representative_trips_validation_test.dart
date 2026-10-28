@@ -7,8 +7,15 @@ class RepresentativeTripsValidator {
     required List<String> selectedTripIds,
     required List<Submission> allSubmissions,
     required bool isLockedByKhoa,
+    String? lockReason,
+    DateTime? currentDate,
   }) {
     if (isLockedByKhoa) {
+      if (lockReason == 'COUNCIL_ASSIGNED') {
+        return 'Bạn đã được Khoa phân công vào Hội đồng bảo vệ. Không thể thay đổi bộ chuyến đi.';
+      } else if (lockReason == 'GRADES_LOCKED') {
+        return 'Điểm báo cáo của bộ chuyến đã được chốt/khóa sổ. Không thể thay đổi.';
+      }
       return 'Khoa đã chốt danh sách hội đồng. Không thể thay đổi bộ chuyến đi.';
     }
 
@@ -17,6 +24,26 @@ class RepresentativeTripsValidator {
     }
 
     final selectedSubs = allSubmissions.where((s) => selectedTripIds.contains(s.id)).toList();
+
+    // Kiểm tra mốc 18 tháng tính từ ngày tham quan theo quy chế HUIT
+    final now = currentDate ?? DateTime.now();
+    final eighteenMonthsAgo = DateTime(now.year, now.month - 18, now.day);
+    for (final s in selectedSubs) {
+      DateTime? tripDate = s.tripDate;
+      if (tripDate == null && s.dateText.isNotEmpty) {
+        final parts = s.dateText.split(RegExp(r'[/.-]'));
+        if (parts.length == 3) {
+          if (parts[0].length == 4) {
+            tripDate = DateTime.tryParse('${parts[0]}-${parts[1].padLeft(2, '0')}-${parts[2].padLeft(2, '0')}');
+          } else {
+            tripDate = DateTime.tryParse('${parts[2]}-${parts[1].padLeft(2, '0')}-${parts[0].padLeft(2, '0')}');
+          }
+        }
+      }
+      if (tripDate != null && tripDate.isBefore(eighteenMonthsAgo)) {
+        return 'Chuyến đi "${s.tripName}" (${s.dateText}) đã quá 18 tháng kể từ ngày tham quan, không được phép đưa vào Bộ 3 chuyến báo cáo theo quy chế HUIT.';
+      }
+    }
     
     // Kiểm tra tối thiểu 2 chuyến trực tiếp
     final directCount = selectedSubs.where((s) {
@@ -145,6 +172,56 @@ void main() {
         isLockedByKhoa: true,
       );
       expect(error, contains('Khoa đã chốt danh sách hội đồng'));
+    });
+
+    test('Không hợp lệ: Chuyến đi đã quá 18 tháng kể từ ngày tham quan theo quy chế HUIT', () {
+      final subExpired = Submission(
+        id: 'sub-expired',
+        tripName: 'Nhà máy Cũ (Đã quá hạn)',
+        typeText: 'Kiến tập trực tiếp',
+        dateText: '10/01/2024',
+        tripDate: DateTime(2024, 1, 10),
+        status: 'Đã nộp',
+      );
+      final testDate = DateTime(2026, 10, 24); // Hiện tại: 24/10/2026 (> 18 tháng so với 10/01/2024)
+
+      final error = RepresentativeTripsValidator.validateSelection(
+        selectedTripIds: ['sub-1', 'sub-3', 'sub-expired'],
+        allSubmissions: [...allSubs, subExpired],
+        isLockedByKhoa: false,
+        currentDate: testDate,
+      );
+      expect(error, contains('đã quá 18 tháng kể từ ngày tham quan'));
+    });
+
+    test('Hợp lệ: Chuyến đi diễn ra trong vòng 18 tháng trở lại', () {
+      final subWithin18M = Submission(
+        id: 'sub-recent',
+        tripName: 'Nhà máy Mới Nhất',
+        typeText: 'Kiến tập trực tiếp',
+        dateText: '01/05/2026',
+        tripDate: DateTime(2026, 5, 1),
+        status: 'Đã nộp',
+      );
+      final testDate = DateTime(2026, 10, 24);
+
+      final error = RepresentativeTripsValidator.validateSelection(
+        selectedTripIds: ['sub-1', 'sub-3', 'sub-recent'],
+        allSubmissions: [...allSubs, subWithin18M],
+        isLockedByKhoa: false,
+        currentDate: testDate,
+      );
+      expect(error, isNull);
+    });
+
+    test('Thông báo khóa cụ thể khi đã phân công vào Hội đồng bảo vệ', () {
+      final error = RepresentativeTripsValidator.validateSelection(
+        selectedTripIds: ['sub-1', 'sub-2', 'sub-3'],
+        allSubmissions: allSubs,
+        isLockedByKhoa: true,
+        lockReason: 'COUNCIL_ASSIGNED',
+      );
+      expect(error, contains('phân công vào Hội đồng bảo vệ'));
     });
   });
 }

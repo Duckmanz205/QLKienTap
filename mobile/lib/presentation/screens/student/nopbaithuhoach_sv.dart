@@ -60,9 +60,17 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
     final repStatus = appStateProvider.state.repStatus;
 
     if (repStatus?.isLockedByKhoa == true) {
+      String lockMsg = 'Khoa đã chốt danh sách hội đồng. Không thể thay đổi bộ chuyến đi.';
+      if (repStatus?.lockReason == 'COUNCIL_ASSIGNED') {
+        lockMsg = 'Bạn đã được Khoa phân công vào Hội đồng bảo vệ. Danh sách Bộ 3 chuyến báo cáo đã được cố định chính thức.';
+      } else if (repStatus?.lockReason == 'GRADES_LOCKED') {
+        lockMsg = 'Điểm báo cáo của bộ chuyến đã được chốt/khóa sổ. Không thể thay đổi.';
+      } else if (repStatus?.lockReason == 'DOT_LOCKED') {
+        lockMsg = 'Đợt kiến tập đã kết thúc hoặc đang bị khóa.';
+      }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Khoa đã chốt danh sách hội đồng. Không thể thay đổi bộ chuyến đi.'),
+        SnackBar(
+          content: Text(lockMsg),
           backgroundColor: AppColors.danger,
         ),
       );
@@ -80,6 +88,36 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
     }
 
     final selectedSubs = allSubs.where((s) => _campaignSelectedTrips.contains(s.id)).toList();
+
+    // 1. Kiểm tra quy định thời hạn 18 tháng theo quy chế HUIT
+    final now = DateTime.now();
+    final eighteenMonthsAgo = DateTime(now.year, now.month - 18, now.day);
+    for (final s in selectedSubs) {
+      DateTime? tripDate = s.tripDate;
+      if (tripDate == null && s.dateText.isNotEmpty) {
+        final parts = s.dateText.split(RegExp(r'[/.-]'));
+        if (parts.length == 3) {
+          if (parts[0].length == 4) {
+            tripDate = DateTime.tryParse('${parts[0]}-${parts[1].padLeft(2, '0')}-${parts[2].padLeft(2, '0')}');
+          } else {
+            tripDate = DateTime.tryParse('${parts[2]}-${parts[1].padLeft(2, '0')}-${parts[0].padLeft(2, '0')}');
+          }
+        }
+      }
+      if (tripDate != null && tripDate.isBefore(eighteenMonthsAgo)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Chuyến đi "${s.tripName}" (${s.dateText}) đã quá 18 tháng kể từ ngày tham quan, không được phép đưa vào Bộ 3 chuyến báo cáo theo quy chế HUIT.',
+            ),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+        return;
+      }
+    }
+
+    // 2. Kiểm tra tối thiểu 2 chuyến trực tiếp
     final directCount = selectedSubs.where((s) {
       final lower = s.typeText.toLowerCase();
       return lower.contains('trực tiếp') || lower.contains('tructiep');
@@ -89,6 +127,18 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Quy định: Cần tối thiểu 2 chuyến kiến tập trực tiếp.'),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+      return;
+    }
+
+    // 3. Kiểm tra không trùng lặp nhà máy
+    final uniqueTripNames = selectedSubs.map((s) => s.tripName.trim().toLowerCase()).toSet();
+    if (uniqueTripNames.length < 3) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Các chuyến tham quan được chọn không được trùng nhà máy.'),
           backgroundColor: AppColors.danger,
         ),
       );
@@ -318,20 +368,26 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
               if (isLocked) ...[
                 const SizedBox(height: 8),
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: Colors.amber.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.amber.shade200),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.amber.shade300),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
-                      Icon(Icons.lock, size: 14, color: Colors.orange),
-                      SizedBox(width: 6),
+                      const Icon(Icons.lock, size: 16, color: Colors.orange),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Khoa đã khóa lựa chọn chuyến báo cáo để chuẩn bị hội đồng.',
-                          style: TextStyle(fontSize: 11, color: Colors.brown, fontWeight: FontWeight.w500),
+                          repStatus?.lockReason == 'COUNCIL_ASSIGNED'
+                              ? 'Bạn đã được Khoa phân công vào Hội đồng bảo vệ. Danh sách Bộ 3 chuyến báo cáo đã được cố định chính thức.'
+                              : repStatus?.lockReason == 'GRADES_LOCKED'
+                                  ? 'Điểm báo cáo của bộ chuyến đã được chốt/khóa sổ. Không thể thay đổi.'
+                                  : repStatus?.lockReason == 'DOT_LOCKED'
+                                      ? 'Đợt kiến tập đã kết thúc hoặc đang bị khóa.'
+                                      : 'Quản lý Khoa đã khóa cổng đăng ký cho đợt này. Bạn không thể thực hiện chọn hoặc thay đổi bộ chuyến.',
+                          style: const TextStyle(fontSize: 11, color: Colors.brown, fontWeight: FontWeight.w600),
                         ),
                       ),
                     ],
@@ -342,11 +398,27 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
 
               ...appState.submissions.map((s) {
                 final isSelected = _campaignSelectedTrips.contains(s.id);
+                
+                DateTime? tripDate = s.tripDate;
+                if (tripDate == null && s.dateText.isNotEmpty) {
+                  final parts = s.dateText.split(RegExp(r'[/.-]'));
+                  if (parts.length == 3) {
+                    if (parts[0].length == 4) {
+                      tripDate = DateTime.tryParse('${parts[0]}-${parts[1].padLeft(2, '0')}-${parts[2].padLeft(2, '0')}');
+                    } else {
+                      tripDate = DateTime.tryParse('${parts[2]}-${parts[1].padLeft(2, '0')}-${parts[0].padLeft(2, '0')}');
+                    }
+                  }
+                }
+                final now = DateTime.now();
+                final eighteenMonthsAgo = DateTime(now.year, now.month - 18, now.day);
+                final isExpired = tripDate != null && tripDate.isBefore(eighteenMonthsAgo);
+
                 return Material(
                   color: Colors.transparent,
                   child: CheckboxListTile(
                   value: isSelected,
-                  onChanged: isLocked
+                  onChanged: (isLocked || isExpired)
                       ? null
                       : (val) {
                           setState(() {
@@ -363,8 +435,23 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
                             }
                           });
                         },
-                  title: Text(s.tripName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                  subtitle: Text(s.typeText, style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                  title: Row(
+                    children: [
+                      Expanded(
+                        child: Text(s.tripName, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isExpired ? Colors.grey : AppColors.darkSlate)),
+                      ),
+                      if (isExpired)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.danger.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text('Quá 18 tháng', style: TextStyle(color: AppColors.danger, fontSize: 10, fontWeight: FontWeight.bold)),
+                        ),
+                    ],
+                  ),
+                  subtitle: Text('${s.typeText} • ${s.dateText}', style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
                   controlAffinity: ListTileControlAffinity.leading,
                   dense: true,
                   contentPadding: EdgeInsets.zero,

@@ -18,8 +18,12 @@ class DashboardSVScreen extends StatelessWidget {
     final appState = appStateProvider.state;
     final stats = appState.studentDashboardStats;
     
-    final String registeredCount = stats != null ? '${stats.registered}' : '${appState.studentTrips.where((t) => t.isRegistered).length}';
-    final String completedCount = stats != null ? '${stats.completed}' : '${appState.studentTrips.where((t) => t.isCompleted).length}';
+    final String registeredCount = stats != null
+        ? '${stats.registered}'
+        : '${appState.studentTrips.where((t) => t.isRegistered && (t.registrationStatus == null || ['HopLe', 'ChoDuyet', 'DaThamGia', 'HoanThanh'].contains(t.registrationStatus))).length}';
+    final String completedCount = stats != null
+        ? '${stats.completed}'
+        : '${appState.studentTrips.where((t) => t.isCompleted && (t.registrationStatus == null || ['HopLe', 'DaThamGia', 'HoanThanh'].contains(t.registrationStatus))).length}';
     final int pendingCount = stats != null ? stats.pendingReports : appState.submissions.where((s) => s.status != 'Đã nộp').length;
     
     String gpaStr = stats?.avgScore ?? 'Chưa có';
@@ -33,7 +37,7 @@ class DashboardSVScreen extends StatelessWidget {
       }
     }
 
-    final upcomingTrips = appState.studentTrips.where((t) => t.isRegistered && !t.isCompleted).toList();
+    final upcomingTrips = appState.studentTrips.where((t) => t.isRegistered && !t.isCompleted && (t.registrationStatus == null || ['HopLe', 'ChoDuyet'].contains(t.registrationStatus))).toList();
     final recentNotifications = appState.studentNotifications.take(3).toList();
 
     return SingleChildScrollView(

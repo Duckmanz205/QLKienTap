@@ -110,7 +110,7 @@ Future<void> _showCancelDialog(
 
                         setDialogState(() => isSubmitting = true);
                         try {
-                          await appStateProvider.cancelTripRegistration(
+                          final msg = await appStateProvider.cancelTripRegistration(
                             trip.id,
                             trip.registrationId,
                             lyDo: reasonCtrl.text.trim(),
@@ -119,7 +119,10 @@ Future<void> _showCancelDialog(
                           if (context.mounted) {
                             Navigator.pop(ctx);
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Đã gửi yêu cầu hủy đăng ký chuyến ${trip.name}')),
+                              SnackBar(
+                                content: Text(msg.isNotEmpty ? msg : 'Đã xử lý yêu cầu hủy chuyến ${trip.name}'),
+                                backgroundColor: AppColors.secondary,
+                              ),
                             );
                             if (onBack != null) onBack();
                           }
@@ -504,28 +507,69 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: trip.type == 'Trực tiếp'
-                                ? AppColors.primary.withValues(alpha: 0.1)
-                                : AppColors.secondary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            trip.type,
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: trip.type == 'Trực tiếp' ? AppColors.primary : AppColors.secondary,
+                        Builder(builder: (context) {
+                          final isOnline = trip.type == 'Trực tuyến' || trip.type == 'TrucTuyen';
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: isOnline ? const Color(0xFFEFF6FF) : AppColors.primary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: isOnline ? const Color(0xFFBFDBFE) : AppColors.primary.withValues(alpha: 0.2),
+                              ),
                             ),
-                          ),
-                        ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  isOnline ? Icons.laptop_mac : Icons.location_on,
+                                  size: 11,
+                                  color: isOnline ? const Color(0xFF1D4ED8) : AppColors.primary,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  trip.type,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: isOnline ? const Color(0xFF1D4ED8) : AppColors.primary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
                         const SizedBox(width: 12),
                         const Text(
                           'Mở đăng ký',
                           style: TextStyle(fontSize: 11, color: AppColors.secondary, fontWeight: FontWeight.bold),
                         ),
+                        if (trip.daTungDangKy) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF7ED),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFFFED7AA)),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.refresh, size: 11, color: Color(0xFFC2410C)),
+                                SizedBox(width: 4),
+                                Text(
+                                  'ĐỢT BỔ SUNG',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFFC2410C),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ],
@@ -536,11 +580,23 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
                 child: ElevatedButton(
                   onPressed: () => _showRegisterConfirmDialog(trip, appStateProvider),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
+                    backgroundColor: trip.daTungDangKy ? const Color(0xFFEA580C) : AppColors.primary,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
-                  child: const Text('ĐĂNG KÝ CHUYẾN ĐI', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (trip.daTungDangKy) ...[
+                        const Icon(Icons.refresh, size: 16),
+                        const SizedBox(width: 6),
+                      ],
+                      Text(
+                        trip.daTungDangKy ? 'ĐĂNG KÝ LẠI' : 'ĐĂNG KÝ CHUYẾN ĐI',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -557,18 +613,61 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
       items: trips,
       searchHint: 'Tìm kiếm chuyến...',
       dropdownTitle: 'Trạng thái',
-      dropdownOptions: const ['Tất cả', 'Hợp lệ/Hoàn thành', 'Chờ duyệt'],
+      dropdownOptions: const ['Tất cả', 'Chờ duyệt', 'Hợp lệ', 'Đã tham gia', 'Hoàn thành', 'Đã hủy', 'Bị loại'],
       itemName: 'chuyến',
       emptyWidget: const Center(child: Text('Bạn chưa đăng ký chuyến tham quan nào.')),
       filter: (trip, query, status) {
         final matchesQuery = trip.name.toLowerCase().contains(query.toLowerCase());
-        final tripStatus = trip.isCompleted ? 'Hợp lệ/Hoàn thành' : 'Chờ duyệt';
-        final matchesStatus = status == 'Tất cả' || tripStatus == status;
+        final regStatus = trip.registrationStatus ?? (trip.isCompleted ? 'HoanThanh' : 'ChoDuyet');
+        String displayStatus = 'Chờ duyệt';
+        if (regStatus == 'ChoDuyet' || regStatus == 'ChoHuy') {
+          displayStatus = 'Chờ duyệt';
+        } else if (regStatus == 'HopLe') {
+          displayStatus = 'Hợp lệ';
+        } else if (regStatus == 'DaThamGia') {
+          displayStatus = 'Đã tham gia';
+        } else if (regStatus == 'HoanThanh') {
+          displayStatus = 'Hoàn thành';
+        } else if (regStatus == 'DaHuy') {
+          displayStatus = 'Đã hủy';
+        } else if (regStatus == 'BiLoai' || regStatus == 'VangMat' || regStatus == 'KhongDat') {
+          displayStatus = 'Bị loại';
+        }
+
+        final matchesStatus = status == 'Tất cả' || displayStatus == status;
         return matchesQuery && matchesStatus;
       },
       itemBuilder: (trip) {
-        final status = trip.isCompleted ? 'Hoàn thành' : 'Chờ diễn ra';
-        final statusColor = trip.isCompleted ? AppColors.secondary : AppColors.primary;
+        final regStatus = trip.registrationStatus ?? (trip.isCompleted ? 'HoanThanh' : 'ChoDuyet');
+        String statusText = 'Chờ duyệt';
+        Color statusColor = const Color(0xFF854D0E);
+        Color statusBgColor = const Color(0xFFFEF9C3);
+        Color statusBorderColor = const Color(0xFFDBD468);
+
+        if (regStatus == 'ChoDuyet' || regStatus == 'ChoHuy') {
+          statusText = regStatus == 'ChoHuy' ? 'Chờ hủy' : 'Chờ duyệt';
+          statusColor = const Color(0xFF854D0E);
+          statusBgColor = const Color(0xFFFEF9C3);
+          statusBorderColor = const Color(0xFFDBD468);
+        } else if (regStatus == 'HopLe' || regStatus == 'DaThamGia' || regStatus == 'HoanThanh') {
+          statusText = regStatus == 'HopLe' ? 'Hợp lệ' : (regStatus == 'DaThamGia' ? 'Đã tham gia' : 'Hoàn thành');
+          statusColor = const Color(0xFF166534);
+          statusBgColor = const Color(0xFFDCFCE7);
+          statusBorderColor = const Color(0xFF86EFAC);
+        } else if (regStatus == 'DaHuy') {
+          statusText = 'Đã hủy';
+          statusColor = const Color(0xFF64748B);
+          statusBgColor = const Color(0xFFF1F5F9);
+          statusBorderColor = const Color(0xFFCBD5E1);
+        } else if (regStatus == 'BiLoai' || regStatus == 'VangMat' || regStatus == 'KhongDat') {
+          statusText = regStatus == 'BiLoai' ? 'Bị loại' : (regStatus == 'VangMat' ? 'Vắng mặt' : 'Không đạt');
+          statusColor = const Color(0xFF991B1B);
+          statusBgColor = const Color(0xFFFEE2E2);
+          statusBorderColor = const Color(0xFFFCA5A5);
+        }
+
+        final canCancel = (regStatus == 'ChoDuyet' || regStatus == 'HopLe') && !trip.isCompleted && trip.tripStatus != 'DaDienRa';
+        final canReRegister = (regStatus == 'DaHuy' || regStatus == 'BiLoai') && trip.tripStatus == 'MoDangKy';
 
         // Payment status lookup
         final payment = appState.payments.firstWhere(
@@ -608,13 +707,14 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
+                        color: statusBgColor,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: statusBorderColor),
                       ),
                       child: Text(
-                        status,
+                        statusText,
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
@@ -639,6 +739,39 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
                 const SizedBox(height: 8),
                 Row(
                   children: [
+                    Builder(builder: (context) {
+                      final isOnline = trip.type == 'Trực tuyến' || trip.type == 'TrucTuyen';
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: isOnline ? const Color(0xFFEFF6FF) : AppColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: isOnline ? const Color(0xFFBFDBFE) : AppColors.primary.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isOnline ? Icons.laptop_mac : Icons.location_on,
+                              size: 11,
+                              color: isOnline ? const Color(0xFF1D4ED8) : AppColors.primary,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              trip.type,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: isOnline ? const Color(0xFF1D4ED8) : AppColors.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                    const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
@@ -657,7 +790,7 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
                     ),
                   ],
                 ),
-                if (!trip.isCompleted) ...[
+                if (canCancel) ...[
                   const SizedBox(height: 12),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
@@ -670,6 +803,24 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
                         label: const Text('Yêu cầu hủy đăng ký', style: TextStyle(fontWeight: FontWeight.bold)),
                         style: TextButton.styleFrom(
                           foregroundColor: AppColors.danger,
+                        ),
+                      ),
+                    ],
+                  ),
+                ] else if (canReRegister) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: () => _showRegisterConfirmDialog(trip, appStateProvider),
+                        icon: const Icon(Icons.refresh, size: 14),
+                        label: const Text('Đăng ký lại', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFEA580C),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
                       ),
                     ],
@@ -809,6 +960,7 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
                         onChanged: _searchFactorySuggestions,
                         decoration: InputDecoration(
                           labelText: 'Tên doanh nghiệp / Nhà máy',
+                          hintText: 'Nhập tên nhà máy đề xuất...',
                           border: const OutlineInputBorder(),
                           prefixIcon: const Icon(Icons.business),
                           suffixIcon: _isSearchingFactory

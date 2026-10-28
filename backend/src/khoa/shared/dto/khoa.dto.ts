@@ -558,16 +558,35 @@ export class UnlockBoardCouncilGradesDto {
 }
 
 export class ApproveRefundDto {
+  @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @Min(1)
-  refundId: number;
+  refundId?: number;
 
+  @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @Min(1)
-  approverId: number;
+  request_id?: number;
 
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  approverId?: number;
+
+  @IsOptional()
   @IsBoolean()
-  isApproved: boolean;
+  isApproved?: boolean;
+
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
 }
 
 // (v11) khoa_id → khoa_hoc_id

@@ -92,6 +92,10 @@ class Trip {
   final bool isCompleted;
   final GradeDetail? gradeDetails;
   final String? registrationId;
+  final bool daTungDangKy;
+  final String? trangThaiCu;
+  final String? registrationStatus;
+  final String? tripStatus;
 
   Trip({
     required this.id,
@@ -107,6 +111,10 @@ class Trip {
     required this.isCompleted,
     this.gradeDetails,
     this.registrationId,
+    this.daTungDangKy = false,
+    this.trangThaiCu,
+    this.registrationStatus,
+    this.tripStatus,
   });
 
   Trip copyWith({
@@ -114,6 +122,10 @@ class Trip {
     bool? isCompleted,
     GradeDetail? gradeDetails,
     String? registrationId,
+    bool? daTungDangKy,
+    String? trangThaiCu,
+    String? registrationStatus,
+    String? tripStatus,
   }) {
     return Trip(
       id: id,
@@ -129,6 +141,10 @@ class Trip {
       isCompleted: isCompleted ?? this.isCompleted,
       gradeDetails: gradeDetails ?? this.gradeDetails,
       registrationId: registrationId ?? this.registrationId,
+      daTungDangKy: daTungDangKy ?? this.daTungDangKy,
+      trangThaiCu: trangThaiCu ?? this.trangThaiCu,
+      registrationStatus: registrationStatus ?? this.registrationStatus,
+      tripStatus: tripStatus ?? this.tripStatus,
     );
   }
 }
@@ -186,6 +202,7 @@ class Submission {
   final String? confirmationFileName;
   final String? fileBaoCaoUrl;
   final String? fileXacNhanUrl;
+  final DateTime? tripDate;
 
   Submission({
     required this.id,
@@ -201,6 +218,7 @@ class Submission {
     this.confirmationFileName,
     this.fileBaoCaoUrl,
     this.fileXacNhanUrl,
+    this.tripDate,
   });
 
   Submission copyWith({
@@ -213,6 +231,7 @@ class Submission {
     String? confirmationFileName,
     String? fileBaoCaoUrl,
     String? fileXacNhanUrl,
+    DateTime? tripDate,
   }) {
     return Submission(
       id: id,
@@ -228,6 +247,7 @@ class Submission {
       confirmationFileName: confirmationFileName ?? this.confirmationFileName,
       fileBaoCaoUrl: fileBaoCaoUrl ?? this.fileBaoCaoUrl,
       fileXacNhanUrl: fileXacNhanUrl ?? this.fileXacNhanUrl,
+      tripDate: tripDate ?? this.tripDate,
     );
   }
 }
@@ -236,10 +256,14 @@ class Payment {
   final String id;
   final String tripId;
   final String name;
-  final String code; // Syntax KT2026-XXX
+  final String code;
   final double amount;
   final String dueDate;
-  final String status; // 'Chưa đóng', 'Đã đóng đúng hạn', 'Vi phạm', 'Đã hoàn phí'
+  final String status; // 'Chưa đóng', 'Đã đóng đúng hạn', 'Đã đóng trễ hạn', 'Vi phạm', 'Đã hoàn phí'
+  final String? rawStatus;
+  final String? tripDate;
+  final String? tripType;
+  final String? paidDate;
 
   Payment({
     required this.id,
@@ -249,10 +273,18 @@ class Payment {
     required this.amount,
     required this.dueDate,
     required this.status,
+    this.rawStatus,
+    this.tripDate,
+    this.tripType,
+    this.paidDate,
   });
 
   Payment copyWith({
     String? status,
+    String? rawStatus,
+    String? tripDate,
+    String? tripType,
+    String? paidDate,
   }) {
     return Payment(
       id: id,
@@ -262,6 +294,10 @@ class Payment {
       amount: amount,
       dueDate: dueDate,
       status: status ?? this.status,
+      rawStatus: rawStatus ?? this.rawStatus,
+      tripDate: tripDate ?? this.tripDate,
+      tripType: tripType ?? this.tripType,
+      paidDate: paidDate ?? this.paidDate,
     );
   }
 }
@@ -394,6 +430,8 @@ class StudentTermGrade {
 class RepresentativeTripsStatus {
   final List<int> selectedRegistrationIds;
   final bool isLockedByKhoa;
+  final String? lockReason;
+  final bool canEdit;
   final String? councilSessionName;
   final String? councilRoom;
   final String? councilTime;
@@ -402,6 +440,8 @@ class RepresentativeTripsStatus {
   RepresentativeTripsStatus({
     this.selectedRegistrationIds = const [],
     this.isLockedByKhoa = false,
+    this.lockReason,
+    this.canEdit = true,
     this.councilSessionName,
     this.councilRoom,
     this.councilTime,

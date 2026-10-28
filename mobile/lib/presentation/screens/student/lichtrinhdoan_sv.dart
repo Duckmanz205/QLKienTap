@@ -23,7 +23,9 @@ class _LichTrinhDoanSVScreenState extends State<LichTrinhDoanSVScreen> {
     if (!_hasInitialized) {
       _hasInitialized = true;
       final appState = AppStateProvider.of(context).state;
-      final registered = appState.studentTrips.where((t) => t.isRegistered).toList();
+      final registered = appState.studentTrips
+          .where((t) => t.isRegistered && (t.registrationStatus == null || ['HopLe', 'ChoDuyet', 'DaThamGia', 'HoanThanh'].contains(t.registrationStatus)))
+          .toList();
       if (registered.isNotEmpty) {
         _selectedTrip = registered.first;
         _loadBusInfo(int.tryParse(_selectedTrip!.id) ?? 0);
@@ -76,7 +78,9 @@ class _LichTrinhDoanSVScreenState extends State<LichTrinhDoanSVScreen> {
     final appStateProvider = AppStateProvider.of(context);
     final appState = appStateProvider.state;
 
-    final registeredTrips = appState.studentTrips.where((t) => t.isRegistered).toList();
+    final registeredTrips = appState.studentTrips
+        .where((t) => t.isRegistered && (t.registrationStatus == null || ['HopLe', 'ChoDuyet', 'DaThamGia', 'HoanThanh'].contains(t.registrationStatus)))
+        .toList();
 
     if (registeredTrips.isEmpty) {
       return Center(
