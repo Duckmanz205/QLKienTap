@@ -1,4 +1,32 @@
-// --- Entities & Models ---
+import 'package:flutter/material.dart';
+
+// --- Smart Reminders & Entities ---
+
+enum ReminderSeverity { info, warning, urgent }
+
+class SmartReminderItem {
+  final String id;
+  final String title;
+  final String message;
+  final ReminderSeverity severity;
+  final IconData icon;
+  final String? actionLabel;
+  final String? actionType;
+  final String? targetId;
+  final DateTime? deadline;
+
+  SmartReminderItem({
+    required this.id,
+    required this.title,
+    required this.message,
+    required this.severity,
+    required this.icon,
+    this.actionLabel,
+    this.actionType,
+    this.targetId,
+    this.deadline,
+  });
+}
 
 class StudentProfile {
   final String name;
@@ -155,25 +183,37 @@ class StudentNotification {
   final String content;
   final String timeText;
   final bool isRead;
+  final String? type;
   final String? attachment;
   final String? fileUrl;
-  final String? type;
+  final String? senderName;
+  final String? targetAudience;
+  final bool isEdited;
+  final String? editedAt;
 
   StudentNotification({
     required this.id,
     required this.title,
     required this.content,
     required this.timeText,
-    required this.isRead,
+    this.isRead = false,
+    this.type,
     this.attachment,
     this.fileUrl,
-    this.type,
+    this.senderName,
+    this.targetAudience,
+    this.isEdited = false,
+    this.editedAt,
   });
 
   StudentNotification copyWith({
     bool? isRead,
     String? fileUrl,
     String? type,
+    String? senderName,
+    String? targetAudience,
+    bool? isEdited,
+    String? editedAt,
   }) {
     return StudentNotification(
       id: id,
@@ -184,6 +224,10 @@ class StudentNotification {
       attachment: attachment,
       fileUrl: fileUrl ?? this.fileUrl,
       type: type ?? this.type,
+      senderName: senderName ?? this.senderName,
+      targetAudience: targetAudience ?? this.targetAudience,
+      isEdited: isEdited ?? this.isEdited,
+      editedAt: editedAt ?? this.editedAt,
     );
   }
 }
@@ -777,25 +821,37 @@ class LecturerNotification {
   final String body;
   final String time;
   final bool isUnread;
+  final String? type;
   final String? attachment;
   final String? fileUrl;
-  final String? type;
+  final String? senderName;
+  final String? targetAudience;
+  final bool isEdited;
+  final String? editedAt;
 
   LecturerNotification({
     required this.id,
     required this.title,
     required this.body,
     required this.time,
-    required this.isUnread,
+    this.isUnread = false,
+    this.type,
     this.attachment,
     this.fileUrl,
-    this.type,
+    this.senderName,
+    this.targetAudience,
+    this.isEdited = false,
+    this.editedAt,
   });
 
   LecturerNotification copyWith({
     bool? isUnread,
     String? fileUrl,
     String? type,
+    String? senderName,
+    String? targetAudience,
+    bool? isEdited,
+    String? editedAt,
   }) {
     return LecturerNotification(
       id: id,
@@ -806,6 +862,10 @@ class LecturerNotification {
       attachment: attachment,
       fileUrl: fileUrl ?? this.fileUrl,
       type: type ?? this.type,
+      senderName: senderName ?? this.senderName,
+      targetAudience: targetAudience ?? this.targetAudience,
+      isEdited: isEdited ?? this.isEdited,
+      editedAt: editedAt ?? this.editedAt,
     );
   }
 }

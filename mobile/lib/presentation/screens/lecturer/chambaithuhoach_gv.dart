@@ -193,19 +193,27 @@ class _ChamBaiThuHoachGVScreenState extends State<ChamBaiThuHoachGVScreen> {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: Image.network(
-                    widget.student.avatar,
-                    width: 60,
-                    height: 60,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => Container(
-                      width: 60,
-                      height: 60,
-                      color: AppColors.primary.withValues(alpha: 0.1),
-                      alignment: Alignment.center,
-                      child: const Icon(Icons.person, color: AppColors.primary, size: 30),
-                    ),
-                  ),
+                  child: (widget.student.avatar.isNotEmpty && (widget.student.avatar.startsWith('http://') || widget.student.avatar.startsWith('https://')))
+                      ? Image.network(
+                          widget.student.avatar,
+                          width: 60,
+                          height: 60,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => Container(
+                            width: 60,
+                            height: 60,
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            alignment: Alignment.center,
+                            child: const Icon(Icons.person, color: AppColors.primary, size: 30),
+                          ),
+                        )
+                      : Container(
+                          width: 60,
+                          height: 60,
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          alignment: Alignment.center,
+                          child: const Icon(Icons.person, color: AppColors.primary, size: 30),
+                        ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
