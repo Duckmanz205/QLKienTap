@@ -45,11 +45,18 @@ class _KiemTraBaoCaoSVScreenState extends State<KiemTraBaoCaoSVScreen> {
           _hasExtracted = true;
           if (text != null && text.isNotEmpty) {
             _txtController.text = text;
+          } else {
+            _txtController.text = '';
           }
         });
       }
     } catch (_) {
-      // Ignored
+      if (mounted) {
+        setState(() {
+          _hasExtracted = true;
+          _txtController.text = '';
+        });
+      }
     }
   }
 

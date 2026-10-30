@@ -49,6 +49,7 @@ class ApiService {
 
   static String? token;
   static int? userId;
+  static int? profileId;
   static String? role;
 
   // Centralized callback when API returns 401 Unauthorized
@@ -107,6 +108,7 @@ class ApiService {
     try {
       final savedToken = await SecureStorage.read('token');
       final savedUserIdStr = await SecureStorage.read('userId');
+      final savedProfileIdStr = await SecureStorage.read('profileId');
       final savedRole = await SecureStorage.read('role');
 
       if (savedToken != null &&
@@ -118,6 +120,7 @@ class ApiService {
         if (parsedUserId != null && parsedUserId > 0) {
           token = savedToken;
           userId = parsedUserId;
+          profileId = int.tryParse(savedProfileIdStr ?? '') ?? parsedUserId;
           role = savedRole;
           return true;
         }
@@ -249,11 +252,20 @@ class ApiService {
         token = result['token'];
         userId = result['user']?['id'];
         role = result['user']?['vai_tro'];
+        final details = result['user']?['details'];
+        if (details != null && details['id'] is int) {
+          profileId = details['id'] as int;
+        } else {
+          profileId = userId;
+        }
 
         // Save values to SecureStorage
         if (token != null && userId != null && role != null) {
           await SecureStorage.write('token', token!);
           await SecureStorage.write('userId', userId.toString());
+          if (profileId != null) {
+            await SecureStorage.write('profileId', profileId.toString());
+          }
           await SecureStorage.write('role', role!);
         }
 
@@ -269,6 +281,7 @@ class ApiService {
   static Future<void> clearSession() async {
     token = null;
     userId = null;
+    profileId = null;
     role = null;
     await SecureStorage.clearAll();
   }
@@ -385,7 +398,6 @@ class ApiService {
       'nganHangNhan': bankName ?? '',
       'soTaiKhoanNhan': accountNumber ?? '',
       'tenChuTaiKhoanNhan': accountName ?? '',
-      if (reason != null && reason.isNotEmpty) 'lyDo': reason,
     });
   }
 

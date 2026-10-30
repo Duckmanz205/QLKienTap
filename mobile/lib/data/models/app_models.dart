@@ -661,6 +661,7 @@ class LecturerStudent {
   final String? comment;
   final bool isGraded;
   final String tourId;
+  final int? dotKienTapId;
   final String? reportFileUrl;
   final String? confirmationFileUrl;
 
@@ -684,6 +685,7 @@ class LecturerStudent {
     this.comment,
     required this.isGraded,
     required this.tourId,
+    this.dotKienTapId,
     this.reportFileUrl,
     this.confirmationFileUrl,
   });

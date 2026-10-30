@@ -155,13 +155,14 @@ class AppStateProviderState extends State<AppStateContainer> {
   Future<void> _tryRestoreSession() async {
     final success = await ApiService.initSessionFromStorage();
     if (success && ApiService.role != null && ApiService.userId != null) {
+      final activeId = ApiService.profileId ?? ApiService.userId!;
       setState(() {
         if (ApiService.role == 'SinhVien') {
           _state.currentRole = 'student';
-          fetchStudentDataFromApi(ApiService.userId!);
+          fetchStudentDataFromApi(activeId);
         } else if (ApiService.role == 'GiangVien') {
           _state.currentRole = 'lecturer';
-          _fetchLecturerDataFromApi(ApiService.userId!);
+          _fetchLecturerDataFromApi(activeId);
         }
       });
     }
@@ -462,14 +463,22 @@ class AppStateProviderState extends State<AppStateContainer> {
     }
   }
 
+  String _safeSub(dynamic val, int length, {int start = 0}) {
+    if (val == null) return '';
+    final str = val.toString();
+    if (str.isEmpty || str.length <= start) return '';
+    if (str.length < start + length) return str.substring(start);
+    return str.substring(start, start + length);
+  }
+
   Trip _mapJsonToTrip(Map<String, dynamic> json, {required bool isRegistered}) {
     final nhaMay = json['nhaMay'] ?? {};
     
     return Trip(
       id: json['id'].toString(),
       name: nhaMay['ten_nha_may'] ?? json['ten_chuyen_di'] ?? 'Chuyến tham quan',
-      date: json['ngay_tham_quan'] != null ? DateTime.tryParse(json['ngay_tham_quan'])?.toLocal().toString().substring(0, 10) ?? 'N/A' : 'N/A',
-      time: '${json['gio_bat_dau']?.toString().substring(0, 5) ?? '08:00'} - ${json['gio_ket_thuc']?.toString().substring(0, 5) ?? '12:00'}',
+      date: json['ngay_tham_quan'] != null ? (_safeSub(DateTime.tryParse(json['ngay_tham_quan'])?.toLocal().toString(), 10).isNotEmpty ? _safeSub(DateTime.tryParse(json['ngay_tham_quan'])?.toLocal().toString(), 10) : 'N/A') : 'N/A',
+      time: '${_safeSub(json['gio_bat_dau'], 5).isNotEmpty ? _safeSub(json['gio_bat_dau'], 5) : '08:00'} - ${_safeSub(json['gio_ket_thuc'], 5).isNotEmpty ? _safeSub(json['gio_ket_thuc'], 5) : '12:00'}',
       type: (json['hinh_thuc'] == 'TrucTuyen' || json['hinh_thuc'] == 'Trực tuyến')
           ? 'Trực tuyến'
           : (json['hinh_thuc'] == 'TuDo' || json['hinh_thuc'] == 'Tự do')
@@ -510,7 +519,8 @@ class AppStateProviderState extends State<AppStateContainer> {
             completedTours: '1/1',
             papersLeft: 0,
             avatar: sv['avatar'] ?? '',
-            submittedDate: r['ngay_nop'] != null ? DateTime.tryParse(r['ngay_nop'].toString())?.toLocal().toString().substring(0, 10) ?? 'N/A' : 'N/A',
+            submittedDate: r['ngay_nop'] != null ? (_safeSub(DateTime.tryParse(r['ngay_nop'].toString())?.toLocal().toString(), 10).isNotEmpty ? _safeSub(DateTime.tryParse(r['ngay_nop'].toString())?.toLocal().toString(), 10) : 'N/A') : 'N/A',
+            dotKienTapId: chuyen['dot_kien_tap_id'] ?? chuyen['dotId'],
             attendanceStatus: phieuTQ['diemDanh']?['trang_thai'] == 'CoMat' ? 'present' : (phieuTQ['diemDanh']?['trang_thai'] == 'Vang' ? 'absent' : 'none'),
             excuseReason: phieuTQ['diemDanh']?['ghi_chu'] ?? phieuTQ['diemDanh']?['ly_do_vang'],
             prelimGrade: double.tryParse(diem['diem_chuan_bi']?.toString() ?? '0') ?? 0,
@@ -532,7 +542,7 @@ class AppStateProviderState extends State<AppStateContainer> {
           return LecturerTour(
             id: t['id'].toString(),
             name: t['ten_chuyen_di'] ?? 'Chuyến tham quan',
-            date: t['ngay_tham_quan'] != null ? t['ngay_tham_quan'].substring(0, 10) : 'N/A',
+            date: t['ngay_tham_quan'] != null ? (_safeSub(t['ngay_tham_quan'], 10).isNotEmpty ? _safeSub(t['ngay_tham_quan'], 10) : 'N/A') : 'N/A',
             timeRange: '${t['gio_bat_dau'] ?? '08:00'} - ${t['gio_ket_thuc'] ?? '12:00'}',
             registeredCount: t['so_luong_dang_ky'] ?? 0,
             maxCount: t['so_luong_toi_da'] ?? 0,
@@ -663,10 +673,11 @@ class AppStateProviderState extends State<AppStateContainer> {
     setState(() {
       _state.phaiDoiMatKhau = false;
     });
-    if (_state.currentRole == 'student' && ApiService.userId != null) {
-      fetchStudentDataFromApi(ApiService.userId!);
-    } else if (_state.currentRole == 'lecturer' && ApiService.userId != null) {
-      _fetchLecturerDataFromApi(ApiService.userId!);
+    final activeId = ApiService.profileId ?? ApiService.userId;
+    if (_state.currentRole == 'student' && activeId != null) {
+      fetchStudentDataFromApi(activeId);
+    } else if (_state.currentRole == 'lecturer' && activeId != null) {
+      _fetchLecturerDataFromApi(activeId);
     }
   }
 
@@ -882,18 +893,7 @@ class AppStateProviderState extends State<AppStateContainer> {
       rethrow;
     }
 
-    final sub = _state.submissions.firstWhere(
-      (s) => s.id == submissionId,
-      orElse: () => Submission(
-        id: submissionId,
-        tripName: '',
-        typeText: 'Trực tiếp',
-        dateText: '',
-        status: 'Chưa nộp',
-        hasConfirmationFile: false,
-      ),
-    );
-    await ApiService.submitReport(regId, sub.fileBaoCaoUrl ?? '', fileReference);
+    await ApiService.submitConfirmationPaper(regId, fileReference);
 
     setState(() {
       _state.submissions = _state.submissions.map((s) {
@@ -1074,9 +1074,9 @@ class AppStateProviderState extends State<AppStateContainer> {
               tenDoanhNghiep: nhaMay['ten_nha_may'] ?? p['ten_nha_may_de_xuat'] ?? 'Doanh nghiệp đề xuất',
               diaChi: nhaMay['dia_chi'] ?? p['dia_chi_de_xuat'],
               ngayThamQuan: (p['ngay_tham_quan_de_xuat'] ?? p['ngay_tham_quan']) != null
-                  ? DateTime.tryParse((p['ngay_tham_quan_de_xuat'] ?? p['ngay_tham_quan']).toString())?.toLocal().toString().substring(0, 10)
+                  ? _safeSub(DateTime.tryParse((p['ngay_tham_quan_de_xuat'] ?? p['ngay_tham_quan']).toString())?.toLocal().toString(), 10)
                   : null,
-              gioBatDau: (p['gio_bat_dau_de_xuat'] ?? p['gio_bat_dau'])?.toString().substring(0, 5),
+              gioBatDau: _safeSub(p['gio_bat_dau_de_xuat'] ?? p['gio_bat_dau'], 5),
               hinhThuc: p['hinh_thuc'] == 'TrucTuyen' ? 'Trực tuyến' : 'Trực tiếp',
               trangThai: p['trang_thai_duyet'] ?? p['trang_thai'] ?? 'ChoDuyet',
               lyDo: p['ly_do'],
@@ -1147,8 +1147,8 @@ class AppStateProviderState extends State<AppStateContainer> {
             lockReason: res['lockReason'] as String?,
             canEdit: res['canEdit'] ?? !(res['isLockedByKhoa'] == true),
             councilSessionName: council?['ten_hoi_dong'] ?? council?['tenHoiDong'] ?? council?['ten_buoi'],
-            councilRoom: council?['phong'],
-            councilTime: council?['thoi_gian'] ?? council?['ngayCham'],
+            councilRoom: council?['diaDiem'] ?? council?['phong'] ?? 'Chưa xếp phòng',
+            councilTime: council?['ngayBaoCao'] ?? council?['thoi_gian'] ?? council?['ngayCham'] ?? 'Chưa có lịch',
             councilMembers: members.map((m) => (m['ho_ten'] ?? m['giangVien']?['ho_ten'])?.toString() ?? '').where((m) => m.isNotEmpty).toList(),
           );
         });
@@ -1224,9 +1224,9 @@ class AppStateProviderState extends State<AppStateContainer> {
 
         return TripBusInfo(
           tripId: tripId,
-          tenChuyenDi: chuyen['ten_chuyen_di'] ?? 'Chuyến tham quan',
-          gioBatDau: chuyen['gio_bat_dau']?.toString().substring(0, 5) ?? '08:00',
-          gioKetThuc: chuyen['gio_ket_thuc']?.toString().substring(0, 5) ?? '12:00',
+          tenChuyenDi: chuyen['ten_nha_may'] ?? chuyen['ten_chuyen_di'] ?? 'Chuyến tham quan',
+          gioBatDau: _safeSub(chuyen['gio_bat_dau'], 5).isNotEmpty ? _safeSub(chuyen['gio_bat_dau'], 5) : '08:00',
+          gioKetThuc: _safeSub(chuyen['gio_ket_thuc'], 5).isNotEmpty ? _safeSub(chuyen['gio_ket_thuc'], 5) : '12:00',
           hinhThuc: chuyen['hinh_thuc'] ?? 'TrucTiep',
           lecturerName: leadGv?['ho_ten'],
           lecturerPhone: leadGv?['so_dien_thoai'],
@@ -1307,8 +1307,8 @@ class AppStateProviderState extends State<AppStateContainer> {
             memberId: b['memberId'] ?? 0,
             sessionName: session['ten_buoi'] ?? session['ten_hoi_dong'] ?? 'Buổi chấm hội đồng',
             room: session['phong'] ?? 'Phòng bảo vệ',
-            date: session['ngay_bao_cao'] != null ? session['ngay_bao_cao'].toString().substring(0, 10) : 'N/A',
-            timeRange: '${session['gio_bat_dau']?.toString().substring(0, 5) ?? '08:00'} - ${session['gio_ket_thuc']?.toString().substring(0, 5) ?? '11:30'}',
+            date: session['ngay_bao_cao'] != null ? (_safeSub(session['ngay_bao_cao'], 10).isNotEmpty ? _safeSub(session['ngay_bao_cao'], 10) : 'N/A') : 'N/A',
+            timeRange: '${_safeSub(session['gio_bat_dau'], 5).isNotEmpty ? _safeSub(session['gio_bat_dau'], 5) : '08:00'} - ${_safeSub(session['gio_ket_thuc'], 5).isNotEmpty ? _safeSub(session['gio_ket_thuc'], 5) : '11:30'}',
             role: b['role'] ?? 'Ủy viên',
             status: session['trang_thai'] == 'HoanThanh' ? 'completed' : (session['trang_thai'] == 'DangDienRa' ? 'ongoing' : 'upcoming'),
             isBoardLocked: isBoardLocked,
@@ -1351,12 +1351,12 @@ class AppStateProviderState extends State<AppStateContainer> {
 
   Future<void> updateCouncilStudentNote({required int boardId, required int boChuyenId, required String ghiChu}) async {
     await ApiService.updateCouncilStudentNote({
-      'boardId': boardId,
       'boChuyenId': boChuyenId,
       'ghiChu': ghiChu,
     });
-    if (ApiService.userId != null) {
-      await fetchBoardSessions(ApiService.userId!);
+    final activeId = ApiService.profileId ?? ApiService.userId;
+    if (activeId != null) {
+      await fetchBoardSessions(activeId);
     }
   }
 

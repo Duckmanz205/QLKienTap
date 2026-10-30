@@ -153,8 +153,8 @@ class _DiemChuanBiGVScreenState extends State<DiemChuanBiGVScreen> {
 
       setState(() => _isImporting = true);
 
-      final res = await AppStateProvider.of(context)
-          .importPrepGradesExcel(tourId, file.path!, saveImmediately: false);
+      final appState = AppStateProvider.of(context);
+      final res = await appState.importPrepGradesExcel(tourId, file.path!, saveImmediately: false);
 
       if (!mounted) return;
 
@@ -368,7 +368,7 @@ class _DiemChuanBiGVScreenState extends State<DiemChuanBiGVScreen> {
                               shrinkWrap: true,
                               physics: const NeverScrollableScrollPhysics(),
                               itemCount: records.length,
-                              separatorBuilder: (_, __) => const Divider(height: 1),
+                              separatorBuilder: (_, idx) => const Divider(height: 1),
                               itemBuilder: (c, idx) {
                                 final r = records[idx];
                                 return Padding(
@@ -439,12 +439,14 @@ class _DiemChuanBiGVScreenState extends State<DiemChuanBiGVScreen> {
                                     }
                                     setState(() {});
                                     Navigator.pop(ctx);
-                                    ScaffoldMessenger.of(context).showSnackBar(
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Text('Đã áp dụng điểm từ file Excel cho ${records.length} sinh viên! Bấm "LƯU ĐIỂM CHUẨN BỊ" để lưu.'),
                                         backgroundColor: AppColors.secondary,
                                       ),
                                     );
+                                    }
                                   },
                             style: OutlinedButton.styleFrom(
                               foregroundColor: AppColors.primary,
@@ -470,7 +472,9 @@ class _DiemChuanBiGVScreenState extends State<DiemChuanBiGVScreen> {
                                         'diemCong': r['diemCong'] ?? 0,
                                       }).toList();
 
-                                      await AppStateProvider.of(context).saveTripPrepGradesBatch(tourId, batchRecords);
+                                      final appState = AppStateProvider.of(context);
+                                      final messenger = ScaffoldMessenger.of(context);
+                                      await appState.saveTripPrepGradesBatch(tourId, batchRecords);
 
                                       for (var r in records) {
                                         final phieuId = r['phieuId'];
@@ -482,7 +486,7 @@ class _DiemChuanBiGVScreenState extends State<DiemChuanBiGVScreen> {
                                       if (mounted) {
                                         setState(() {});
                                         Navigator.pop(ctx);
-                                        ScaffoldMessenger.of(context).showSnackBar(
+                                        messenger.showSnackBar(
                                           SnackBar(
                                             content: Text('Đã cập nhật và lưu điểm thành công cho ${records.length} sinh viên!'),
                                             backgroundColor: AppColors.secondary,
