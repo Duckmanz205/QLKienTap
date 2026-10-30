@@ -210,8 +210,12 @@ class AppDrawer extends StatelessWidget {
                       CircleAvatar(
                         radius: 20,
                         backgroundColor: Colors.white,
-                        backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
-                        child: avatarUrl.isEmpty ? const Icon(Icons.person, color: AppColors.primary) : null,
+                        backgroundImage: (avatarUrl.isNotEmpty && (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')))
+                            ? NetworkImage(avatarUrl)
+                            : null,
+                        child: (avatarUrl.isEmpty || (!avatarUrl.startsWith('http://') && !avatarUrl.startsWith('https://')))
+                            ? const Icon(Icons.person, color: AppColors.primary)
+                            : null,
                       ),
                       const SizedBox(width: 12),
                       Expanded(

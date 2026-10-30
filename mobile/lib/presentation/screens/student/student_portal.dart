@@ -128,9 +128,32 @@ class _StudentPortalState extends State<StudentPortal> {
           ),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_none, color: AppColors.darkSlate),
-            onPressed: () => _openMoreScreen('notifications'),
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.notifications_none, color: AppColors.darkSlate),
+                onPressed: () => _openMoreScreen('notifications'),
+              ),
+              if (appState.activeStudentReminders.isNotEmpty || appState.studentNotifications.isNotEmpty)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: const BoxDecoration(
+                      color: AppColors.danger,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                    child: Text(
+                      '${appState.activeStudentReminders.isNotEmpty ? appState.activeStudentReminders.length : appState.studentNotifications.length}',
+                      style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
           ),
           GestureDetector(
             onTap: () => _openMoreScreen('profile'),
@@ -139,10 +162,10 @@ class _StudentPortalState extends State<StudentPortal> {
               child: CircleAvatar(
                 radius: 16,
                 backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                backgroundImage: appState.studentProfile.avatar.isNotEmpty
+                backgroundImage: (appState.studentProfile.avatar.isNotEmpty && (appState.studentProfile.avatar.startsWith('http://') || appState.studentProfile.avatar.startsWith('https://')))
                     ? NetworkImage(appState.studentProfile.avatar)
                     : null,
-                child: appState.studentProfile.avatar.isEmpty
+                child: (appState.studentProfile.avatar.isEmpty || (!appState.studentProfile.avatar.startsWith('http://') && !appState.studentProfile.avatar.startsWith('https://')))
                     ? const Icon(Icons.person, size: 18, color: AppColors.primary)
                     : null,
               ),
@@ -215,6 +238,19 @@ class _StudentPortalState extends State<StudentPortal> {
         return DashboardSVScreen(
           onTripTap: _openTripDetail,
           onNotifTap: () => _openMoreScreen('notifications'),
+          onAction: (actionType, targetId) {
+            if (actionType == 'trip') {
+              if (targetId != null) _openTripDetail(targetId);
+            } else if (actionType == 'finance') {
+              _openMoreScreen('finance');
+            } else if (actionType == 'report') {
+              _navigateTo(2);
+            } else if (actionType == 'council') {
+              _navigateTo(3);
+            } else if (actionType == 'notifications') {
+              _openMoreScreen('notifications');
+            }
+          },
         );
       case 1:
         return ChuyenThamQuanSVScreen(
@@ -232,6 +268,19 @@ class _StudentPortalState extends State<StudentPortal> {
         return DashboardSVScreen(
           onTripTap: _openTripDetail,
           onNotifTap: () => _openMoreScreen('notifications'),
+          onAction: (actionType, targetId) {
+            if (actionType == 'trip') {
+              if (targetId != null) _openTripDetail(targetId);
+            } else if (actionType == 'finance') {
+              _openMoreScreen('finance');
+            } else if (actionType == 'report') {
+              _navigateTo(2);
+            } else if (actionType == 'council') {
+              _navigateTo(3);
+            } else if (actionType == 'notifications') {
+              _openMoreScreen('notifications');
+            }
+          },
         );
     }
   }
@@ -271,10 +320,10 @@ class _StudentPortalState extends State<StudentPortal> {
                 CircleAvatar(
                   radius: 40,
                   backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                  backgroundImage: appState.studentProfile.avatar.isNotEmpty
+                  backgroundImage: (appState.studentProfile.avatar.isNotEmpty && (appState.studentProfile.avatar.startsWith('http://') || appState.studentProfile.avatar.startsWith('https://')))
                       ? NetworkImage(appState.studentProfile.avatar)
                       : null,
-                  child: appState.studentProfile.avatar.isEmpty
+                  child: (appState.studentProfile.avatar.isEmpty || (!appState.studentProfile.avatar.startsWith('http://') && !appState.studentProfile.avatar.startsWith('https://')))
                       ? const Icon(Icons.person, size: 40, color: AppColors.primary)
                       : null,
                 ),
