@@ -107,7 +107,11 @@ class _SinhVienHuongDanGVScreenState extends State<SinhVienHuongDanGVScreen> {
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: _isLocking ? null : () => _lockAllGuidedReports(2),
+                  onPressed: _isLocking ? null : () {
+                    final students = AppStateProvider.of(context).state.lecturerStudents;
+                    final dotId = students.map((s) => s.dotKienTapId).firstWhere((id) => id != null && id > 0, orElse: () => 2) ?? 2;
+                    _lockAllGuidedReports(dotId);
+                  },
                   icon: _isLocking
                       ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(color: AppColors.danger, strokeWidth: 2))
                       : const Icon(Icons.lock_outline, size: 16, color: AppColors.danger),

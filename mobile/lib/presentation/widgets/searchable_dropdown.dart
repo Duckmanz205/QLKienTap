@@ -114,12 +114,14 @@ class _DropdownBottomSheetState extends State<_DropdownBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.6,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Container(
+        height: MediaQuery.of(context).size.height * 0.6,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
       child: Column(
         children: [
           Container(
@@ -190,6 +192,7 @@ class _DropdownBottomSheetState extends State<_DropdownBottomSheet> {
           ),
         ],
       ),
+    ),
     );
   }
 }
