@@ -147,9 +147,32 @@ class _LecturerPortalState extends State<LecturerPortal> {
           ),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_none, color: AppColors.darkSlate),
-            onPressed: () => setState(() => _notificationSubScreen = true),
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.notifications_none, color: AppColors.darkSlate),
+                onPressed: () => setState(() => _notificationSubScreen = true),
+              ),
+              if (appState.activeLecturerReminders.isNotEmpty || appState.lecturerNotifications.isNotEmpty)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: const BoxDecoration(
+                      color: AppColors.danger,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                    child: Text(
+                      '${appState.activeLecturerReminders.isNotEmpty ? appState.activeLecturerReminders.length : appState.lecturerNotifications.length}',
+                      style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
           ),
           GestureDetector(
             onTap: () => setState(() => _profileSubScreen = true),
@@ -158,10 +181,10 @@ class _LecturerPortalState extends State<LecturerPortal> {
               child: CircleAvatar(
                 radius: 16,
                 backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                backgroundImage: appState.lecturerProfile.avatar.isNotEmpty
+                backgroundImage: (appState.lecturerProfile.avatar.isNotEmpty && (appState.lecturerProfile.avatar.startsWith('http://') || appState.lecturerProfile.avatar.startsWith('https://')))
                     ? NetworkImage(appState.lecturerProfile.avatar)
                     : null,
-                child: appState.lecturerProfile.avatar.isEmpty
+                child: (appState.lecturerProfile.avatar.isEmpty || (!appState.lecturerProfile.avatar.startsWith('http://') && !appState.lecturerProfile.avatar.startsWith('https://')))
                     ? const Icon(Icons.person, size: 18, color: AppColors.primary)
                     : null,
               ),
@@ -324,10 +347,10 @@ class _LecturerPortalState extends State<LecturerPortal> {
                 CircleAvatar(
                   radius: 40,
                   backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                  backgroundImage: appState.lecturerProfile.avatar.isNotEmpty
+                  backgroundImage: (appState.lecturerProfile.avatar.isNotEmpty && (appState.lecturerProfile.avatar.startsWith('http://') || appState.lecturerProfile.avatar.startsWith('https://')))
                       ? NetworkImage(appState.lecturerProfile.avatar)
                       : null,
-                  child: appState.lecturerProfile.avatar.isEmpty
+                  child: (appState.lecturerProfile.avatar.isEmpty || (!appState.lecturerProfile.avatar.startsWith('http://') && !appState.lecturerProfile.avatar.startsWith('https://')))
                       ? const Icon(Icons.person, size: 40, color: AppColors.primary)
                       : null,
                 ),

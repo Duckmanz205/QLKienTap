@@ -162,12 +162,16 @@ class _SinhVienHuongDanGVScreenState extends State<SinhVienHuongDanGVScreen> {
                         children: [
                           CircleAvatar(
                             backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                            backgroundImage: student.avatar.isNotEmpty ? NetworkImage(student.avatar) : null,
+                            backgroundImage: (student.avatar.isNotEmpty && (student.avatar.startsWith('http://') || student.avatar.startsWith('https://')))
+                                ? NetworkImage(student.avatar)
+                                : null,
                             radius: 22,
-                            child: student.avatar.isEmpty
+                            onBackgroundImageError: (student.avatar.isNotEmpty && (student.avatar.startsWith('http://') || student.avatar.startsWith('https://')))
+                                ? (_, _) {}
+                                : null,
+                            child: (student.avatar.isEmpty || (!student.avatar.startsWith('http://') && !student.avatar.startsWith('https://')))
                                 ? const Icon(Icons.person, size: 22, color: AppColors.primary)
                                 : null,
-                            onBackgroundImageError: student.avatar.isNotEmpty ? (_, _) {} : null,
                           ),
                           const SizedBox(width: 12),
                           Expanded(

@@ -1,6 +1,9 @@
 import 'dart:math';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import '../models/app_models.dart';
+import '../../core/services/notification_service.dart';
 import '../../core/network/api_service.dart';
 
 class AppState {
@@ -97,6 +100,197 @@ class AppState {
       councilBoards: councilBoards ?? this.councilBoards,
     );
   }
+
+  // --- Real-time Smart Reminders Engine (Computed purely from backend state) ---
+  List<SmartReminderItem> get activeStudentReminders {
+    final List<SmartReminderItem> reminders = [];
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    // 1. Chuyen di khoi hanh trong vong 48h (Hom nay hoac Ngay mai)
+    for (var trip in studentTrips) {
+      if (trip.isRegistered && !trip.isCompleted && (trip.registrationStatus == null || ['HopLe', 'ChoDuyet'].contains(trip.registrationStatus))) {
+        DateTime? tripDt;
+        final rawDate = trip.date.trim();
+        if (rawDate.isNotEmpty && rawDate != 'N/A') {
+          tripDt = DateTime.tryParse(rawDate);
+          if (tripDt == null && rawDate.contains('/')) {
+            final parts = rawDate.split('/');
+            if (parts.length == 3) {
+              tripDt = DateTime.tryParse('${parts[2]}-${parts[1].padLeft(2, '0')}-${parts[0].padLeft(2, '0')}');
+            }
+          }
+        }
+        if (tripDt != null) {
+          final tripDateOnly = DateTime(tripDt.year, tripDt.month, tripDt.day);
+          final diffDays = tripDateOnly.difference(today).inDays;
+          if (diffDays == 0 || diffDays == 1) {
+            reminders.add(SmartReminderItem(
+              id: 'trip-${trip.id}',
+              title: diffDays == 0 ? 'Khởi hành HÔM NAY: ${trip.name}' : 'Khởi hành NGÀY MAI: ${trip.name}',
+              message: 'Khởi hành lúc ${trip.time}. Vui lòng có mặt đúng giờ, trang phục chỉnh tề và mang theo thẻ sinh viên!',
+              severity: ReminderSeverity.urgent,
+              icon: Icons.directions_bus,
+              actionLabel: 'Xem chuyến',
+              actionType: 'trip',
+              targetId: trip.id,
+              deadline: tripDt,
+            ));
+          }
+        }
+      }
+    }
+
+    // 2. Nhac nho Le phi chua thanh toan
+    final unpaidInvoices = payments.where((p) => p.rawStatus == 'ChuaDong' || p.status == 'Chưa đóng').toList();
+    if (unpaidInvoices.isNotEmpty) {
+      final firstUnpaid = unpaidInvoices.first;
+      reminders.add(SmartReminderItem(
+        id: 'payment-${firstUnpaid.id}',
+        title: 'Nhắc nhở đóng lệ phí kiến tập',
+        message: 'Bạn có ${unpaidInvoices.length} khoản lệ phí chưa thanh toán (Hạn: ${firstUnpaid.dueDate}). Vui lòng hoàn tất đúng hạn!',
+        severity: ReminderSeverity.warning,
+        icon: Icons.account_balance_wallet,
+        actionLabel: 'Đóng lệ phí',
+        actionType: 'finance',
+        targetId: firstUnpaid.id,
+      ));
+    }
+
+    // 3. Nhac nho Nop bai thu hoach
+    for (var sub in submissions) {
+      if (sub.status == 'Chưa nộp' || sub.status == 'ChuaNop') {
+        reminders.add(SmartReminderItem(
+          id: 'sub-${sub.id}',
+          title: 'Nhắc nhở nộp bài thu hoạch',
+          message: 'Bạn chưa nộp bài thu hoạch cho chuyến "${sub.tripName}". Hãy nộp file sớm để giảng viên chấm điểm!',
+          severity: ReminderSeverity.warning,
+          icon: Icons.upload_file,
+          actionLabel: 'Nộp bài ngay',
+          actionType: 'report',
+          targetId: sub.id,
+        ));
+      }
+    }
+
+    // 4. Nhac nho Lich bao cao Hoi dong
+    if (repStatus != null && repStatus!.councilTime != null && repStatus!.councilTime != 'Chưa có lịch') {
+      reminders.add(SmartReminderItem(
+        id: 'council-rep',
+        title: 'Lịch bảo vệ Hội đồng kiến tập',
+        message: 'Hội đồng: ${repStatus!.councilSessionName ?? "Hội đồng khoa"} - Phòng: ${repStatus!.councilRoom ?? "Chưa xếp"} - Thời gian: ${repStatus!.councilTime}',
+        severity: ReminderSeverity.info,
+        icon: Icons.gavel,
+        actionLabel: 'Xem lịch',
+        actionType: 'council',
+      ));
+    }
+
+    // 5. Thong bao co loai "NhacNho" hoac "CanhBao" tu Backend
+    for (var notif in studentNotifications) {
+      if (notif.type == 'NhacNho' || notif.type == 'CanhBao') {
+        reminders.add(SmartReminderItem(
+          id: 'notif-${notif.id}',
+          title: notif.title,
+          message: notif.content,
+          severity: notif.type == 'CanhBao' ? ReminderSeverity.urgent : ReminderSeverity.warning,
+          icon: notif.type == 'CanhBao' ? Icons.warning_amber_rounded : Icons.alarm_on,
+          actionLabel: 'Xem chi tiết',
+          actionType: 'notifications',
+          targetId: notif.id,
+        ));
+      }
+    }
+
+    return reminders;
+  }
+
+  List<SmartReminderItem> get activeLecturerReminders {
+    final List<SmartReminderItem> reminders = [];
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    // 1. Nhac nho Bai thu hoach can cham
+    final ungradedStudents = lecturerStudents.where((s) => !s.isGraded).toList();
+    if (ungradedStudents.isNotEmpty) {
+      reminders.add(SmartReminderItem(
+        id: 'gv-grade-pending',
+        title: 'Nhắc nhở chấm bài thu hoạch',
+        message: 'Thầy/Cô hiện có ${ungradedStudents.length} bài thu hoạch của sinh viên đang chờ chấm điểm!',
+        severity: ReminderSeverity.warning,
+        icon: Icons.assignment_late,
+        actionLabel: 'Chấm bài ngay',
+        actionType: 'grading',
+      ));
+    }
+
+    // 2. Nhac nho Chuyen dan doan sap toi (Hom nay hoac Ngay mai)
+    for (var tour in lecturerTours) {
+      if (tour.status != 'completed') {
+        DateTime? tourDt;
+        final rawDate = tour.date.trim();
+        if (rawDate.isNotEmpty && rawDate != 'N/A') {
+          tourDt = DateTime.tryParse(rawDate);
+          if (tourDt == null && rawDate.contains('/')) {
+            final parts = rawDate.split('/');
+            if (parts.length == 3) {
+              tourDt = DateTime.tryParse('${parts[2]}-${parts[1].padLeft(2, '0')}-${parts[0].padLeft(2, '0')}');
+            }
+          }
+        }
+        if (tourDt != null) {
+          final tourDateOnly = DateTime(tourDt.year, tourDt.month, tourDt.day);
+          final diffDays = tourDateOnly.difference(today).inDays;
+          if (diffDays == 0 || diffDays == 1) {
+            reminders.add(SmartReminderItem(
+              id: 'tour-${tour.id}',
+              title: diffDays == 0 ? 'Dẫn đoàn HÔM NAY: ${tour.name}' : 'Dẫn đoàn NGÀY MAI: ${tour.name}',
+              message: 'Khởi hành: ${tour.timeRange}. Sĩ số: ${tour.registeredCount}/${tour.maxCount} sinh viên.',
+              severity: ReminderSeverity.urgent,
+              icon: Icons.groups,
+              actionLabel: 'Xem đoàn',
+              actionType: 'tour',
+              targetId: tour.id,
+            ));
+          }
+        }
+      }
+    }
+
+    // 3. Nhac nho Buoi cham Hoi dong
+    for (var board in councilBoards) {
+      if (!board.isBoardLocked && board.status != 'completed') {
+        reminders.add(SmartReminderItem(
+          id: 'board-${board.sessionId}',
+          title: 'Buổi chấm Hội đồng: ${board.sessionName}',
+          message: 'Phòng: ${board.room} - Thời gian: ${board.date} (${board.timeRange}). Vai trò: ${board.role}.',
+          severity: ReminderSeverity.info,
+          icon: Icons.gavel,
+          actionLabel: 'Vào hội đồng',
+          actionType: 'board',
+          targetId: board.sessionId.toString(),
+        ));
+      }
+    }
+
+    // 4. Thong bao loai NhacNho hoac CanhBao gui cho GV
+    for (var notif in lecturerNotifications) {
+      if (notif.type == 'NhacNho' || notif.type == 'CanhBao') {
+        reminders.add(SmartReminderItem(
+          id: 'gv-notif-${notif.id}',
+          title: notif.title,
+          message: notif.body,
+          severity: notif.type == 'CanhBao' ? ReminderSeverity.urgent : ReminderSeverity.warning,
+          icon: notif.type == 'CanhBao' ? Icons.warning_amber_rounded : Icons.alarm_on,
+          actionLabel: 'Xem chi tiết',
+          actionType: 'notifications',
+          targetId: notif.id,
+        ));
+      }
+    }
+
+    return reminders;
+  }
 }
 
 class AppStateProvider extends InheritedWidget {
@@ -146,6 +340,18 @@ class AppStateProviderState extends State<AppStateContainer> {
     // Bind 401 Unauthorized handler
     ApiService.onUnauthorized = () {
       logout();
+    };
+
+    // Lắng nghe mạng phục hồi để tự động đồng bộ và bắn thông báo đẩy tức thì
+    NotificationService.instance.onNetworkRestored = () {
+      final activeId = ApiService.profileId ?? ApiService.userId;
+      if (activeId != null) {
+        if (_state.currentRole == 'student') {
+          fetchStudentDataFromApi(activeId);
+        } else if (_state.currentRole == 'lecturer') {
+          _fetchLecturerDataFromApi(activeId);
+        }
+      }
     };
 
     // Attempt auto-login on startup
@@ -213,6 +419,285 @@ class AppStateProviderState extends State<AppStateContainer> {
   }
 
   // --- Hybrid API Helpers ---
+
+
+
+  static const String _cachedStudentNotifsKey = 'qlkt_cached_student_notifs';
+  static const String _cachedLecturerNotifsKey = 'qlkt_cached_lecturer_notifs';
+
+  Future<void> _saveStudentNotificationsCache(List<StudentNotification> notifs) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonList = notifs.map((n) => {
+        'id': n.id,
+        'title': n.title,
+        'content': n.content,
+        'timeText': n.timeText,
+        'isRead': n.isRead,
+        'type': n.type,
+        'attachment': n.attachment,
+        'fileUrl': n.fileUrl,
+        'senderName': n.senderName,
+        'targetAudience': n.targetAudience,
+        'isEdited': n.isEdited,
+        'editedAt': n.editedAt,
+      }).toList();
+      await prefs.setString(_cachedStudentNotifsKey, jsonEncode(jsonList));
+    } catch (e) {
+      debugPrint('Error saving student notifications cache: $e');
+    }
+  }
+
+  Future<List<StudentNotification>> _loadStudentNotificationsCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedStr = prefs.getString(_cachedStudentNotifsKey);
+      if (cachedStr != null && cachedStr.isNotEmpty) {
+        final List<dynamic> list = jsonDecode(cachedStr);
+        return list.map((item) => StudentNotification(
+          id: item['id']?.toString() ?? '',
+          title: item['title'] ?? 'Thông báo',
+          content: item['content'] ?? '',
+          timeText: item['timeText'] ?? 'Ngoại tuyến',
+          isRead: item['isRead'] == true,
+          type: item['type'] ?? 'ThongBao',
+          attachment: item['attachment'],
+          fileUrl: item['fileUrl'],
+          senderName: item['senderName'] ?? 'Ban Chủ nhiệm Khoa',
+          targetAudience: item['targetAudience'] ?? 'STUDENT',
+          isEdited: item['isEdited'] == true,
+          editedAt: item['editedAt'],
+        )).toList();
+      }
+    } catch (e) {
+      debugPrint('Error loading student notifications cache: $e');
+    }
+    return [];
+  }
+
+  Future<void> _saveLecturerNotificationsCache(List<LecturerNotification> notifs) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonList = notifs.map((n) => {
+        'id': n.id,
+        'title': n.title,
+        'body': n.body,
+        'time': n.time,
+        'isUnread': n.isUnread,
+        'type': n.type,
+        'attachment': n.attachment,
+        'fileUrl': n.fileUrl,
+        'senderName': n.senderName,
+        'targetAudience': n.targetAudience,
+        'isEdited': n.isEdited,
+        'editedAt': n.editedAt,
+      }).toList();
+      await prefs.setString(_cachedLecturerNotifsKey, jsonEncode(jsonList));
+    } catch (e) {
+      debugPrint('Error saving lecturer notifications cache: $e');
+    }
+  }
+
+  Future<List<LecturerNotification>> _loadLecturerNotificationsCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedStr = prefs.getString(_cachedLecturerNotifsKey);
+      if (cachedStr != null && cachedStr.isNotEmpty) {
+        final List<dynamic> list = jsonDecode(cachedStr);
+        return list.map((item) => LecturerNotification(
+          id: item['id']?.toString() ?? '',
+          title: item['title'] ?? 'Thông báo',
+          body: item['body'] ?? '',
+          time: item['time'] ?? 'Ngoại tuyến',
+          isUnread: item['isUnread'] == true,
+          type: item['type'] ?? 'ThongBao',
+          attachment: item['attachment'],
+          fileUrl: item['fileUrl'],
+          senderName: item['senderName'] ?? 'Ban Chủ nhiệm Khoa',
+          targetAudience: item['targetAudience'] ?? 'LECTURER',
+          isEdited: item['isEdited'] == true,
+          editedAt: item['editedAt'],
+        )).toList();
+      }
+    } catch (e) {
+      debugPrint('Error loading lecturer notifications cache: $e');
+    }
+    return [];
+  }
+
+  List<StudentNotification> _generateAutoRemindersForStudent() {
+    final List<StudentNotification> autoReminders = [];
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    // 1. Chuyen di sap khoi hanh (Hom nay hoac Ngay mai)
+    for (var trip in _state.studentTrips) {
+      if (trip.isRegistered &&
+          !trip.isCompleted &&
+          (trip.registrationStatus == null ||
+              ['HopLe', 'ChoDuyet'].contains(trip.registrationStatus))) {
+        DateTime? tripDt;
+        final rawDate = trip.date.trim();
+        if (rawDate.isNotEmpty && rawDate != 'N/A') {
+          tripDt = DateTime.tryParse(rawDate);
+          if (tripDt == null && rawDate.contains('/')) {
+            final parts = rawDate.split('/');
+            if (parts.length == 3) {
+              tripDt = DateTime.tryParse(
+                  '${parts[2]}-${parts[1].padLeft(2, '0')}-${parts[0].padLeft(2, '0')}');
+            }
+          }
+        }
+        if (tripDt != null) {
+          final tripDateOnly = DateTime(tripDt.year, tripDt.month, tripDt.day);
+          final diffDays = tripDateOnly.difference(today).inDays;
+          if (diffDays == 0 || diffDays == 1) {
+            final whenStr = diffDays == 0 ? 'HÔM NAY' : 'NGÀY MAI';
+            final timeTag = diffDays == 0 ? 'Hôm nay' : 'Ngày mai';
+            autoReminders.add(StudentNotification(
+              id: 'auto-trip-${trip.id}',
+              title: '[Nhắc nhở] Khởi hành $whenStr: ${trip.name}',
+              content:
+                  'Chuyến tham quan "${trip.name}" sẽ khởi hành $timeTag lúc ${trip.time}. Địa điểm: ${trip.location}. Bạn vui lòng có mặt đúng giờ, mặc trang phục chỉnh tề và mang theo thẻ sinh viên!',
+              timeText: timeTag,
+              type: 'NhacNho',
+              senderName: 'Hệ thống tự động',
+              targetAudience: 'STUDENT',
+            ));
+          }
+        }
+      }
+    }
+
+    // 2. Nhac nho Dong le phi kien tap
+    final unpaidPayments = _state.payments
+        .where((p) =>
+            p.rawStatus == 'ChuaDong' ||
+            p.status == 'Chưa đóng' ||
+            p.status == 'Chưa thanh toán')
+        .toList();
+    for (var unpaid in unpaidPayments) {
+      autoReminders.add(StudentNotification(
+        id: 'auto-fee-${unpaid.id}',
+        title: '[Nhắc nhở] Đóng lệ phí: ${unpaid.name}',
+        content:
+            'Bạn có khoản lệ phí ${unpaid.amount.toInt()} đ cho hóa đơn "${unpaid.name}" chưa thanh toán (Hạn chót: ${unpaid.dueDate}). Vui lòng hoàn tất đúng hạn!',
+        timeText: 'Chưa đóng',
+        type: 'TaiChinh',
+        senderName: 'Hệ thống tự động',
+        targetAudience: 'STUDENT',
+      ));
+    }
+
+    // 3. Nhac nho Nop bai thu hoach
+    for (var sub in _state.submissions) {
+      if (sub.status == 'Chưa nộp' || sub.status == 'ChuaNop') {
+        autoReminders.add(StudentNotification(
+          id: 'auto-sub-${sub.id}',
+          title: '[Nhắc nhở] Nộp bài thu hoạch: ${sub.tripName}',
+          content:
+              'Bạn chưa nộp bài thu hoạch cho chuyến "${sub.tripName}". Hãy nộp file báo cáo sớm trên ứng dụng để giảng viên chấm điểm!',
+          timeText: 'Cần nộp',
+          type: 'NhacNho',
+          senderName: 'Hệ thống tự động',
+          targetAudience: 'STUDENT',
+        ));
+      }
+    }
+
+    // 4. Lich bao ve Hoi dong kien tap
+    if (_state.repStatus != null &&
+        _state.repStatus!.councilTime != null &&
+        _state.repStatus!.councilTime != 'Chưa có lịch') {
+      autoReminders.add(StudentNotification(
+        id: 'auto-council-rep',
+        title: '[Nhắc nhở] Lịch bảo vệ Hội đồng kiến tập',
+        content:
+            'Hội đồng: ${_state.repStatus!.councilSessionName ?? "Hội đồng khoa"} - Phòng: ${_state.repStatus!.councilRoom ?? "Chưa xếp"} - Thời gian: ${_state.repStatus!.councilTime}',
+        timeText: 'Sắp diễn ra',
+        type: 'NhacNho',
+        senderName: 'Hệ thống tự động',
+        targetAudience: 'STUDENT',
+      ));
+    }
+
+    return autoReminders;
+  }
+
+  List<LecturerNotification> _generateAutoRemindersForLecturer() {
+    final List<LecturerNotification> autoReminders = [];
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    // 1. Nhac nho cham bai
+    final ungraded = _state.lecturerStudents.where((s) => !s.isGraded).toList();
+    if (ungraded.isNotEmpty) {
+      autoReminders.add(LecturerNotification(
+        id: 'auto-gv-grading',
+        title: '[Nhắc nhở] Chấm bài thu hoạch sinh viên',
+        body:
+            'Thầy/Cô hiện có ${ungraded.length} bài thu hoạch của sinh viên đang chờ chấm điểm. Vui lòng vào mục "Chấm bài" để hoàn tất!',
+        time: 'Cần chấm',
+        type: 'NhacNho',
+        senderName: 'Hệ thống tự động',
+        isUnread: true,
+      ));
+    }
+
+    // 2. Dan doan Hom nay / Ngay mai
+    for (var tour in _state.lecturerTours) {
+      if (tour.status != 'completed') {
+        DateTime? tourDt;
+        final rawDate = tour.date.trim();
+        if (rawDate.isNotEmpty && rawDate != 'N/A') {
+          tourDt = DateTime.tryParse(rawDate);
+          if (tourDt == null && rawDate.contains('/')) {
+            final parts = rawDate.split('/');
+            if (parts.length == 3) {
+              tourDt = DateTime.tryParse(
+                  '${parts[2]}-${parts[1].padLeft(2, '0')}-${parts[0].padLeft(2, '0')}');
+            }
+          }
+        }
+        if (tourDt != null) {
+          final tourDateOnly = DateTime(tourDt.year, tourDt.month, tourDt.day);
+          final diffDays = tourDateOnly.difference(today).inDays;
+          if (diffDays == 0 || diffDays == 1) {
+            final whenStr = diffDays == 0 ? 'HÔM NAY' : 'NGÀY MAI';
+            final timeTag = diffDays == 0 ? 'Hôm nay' : 'Ngày mai';
+            autoReminders.add(LecturerNotification(
+              id: 'auto-gv-tour-${tour.id}',
+              title: '[Nhắc nhở] Dẫn đoàn $whenStr: ${tour.name}',
+              body:
+                  'Thời gian khởi hành: ${tour.timeRange}. Sĩ số: ${tour.registeredCount}/${tour.maxCount} sinh viên. Thầy/Cô vui lòng có mặt đúng giờ để điểm danh sinh viên!',
+              time: timeTag,
+              type: 'NhacNho',
+              senderName: 'Hệ thống tự động',
+              isUnread: true,
+            ));
+          }
+        }
+      }
+    }
+
+    // 3. Hoi dong sap toi
+    for (var board in _state.councilBoards) {
+      if (!board.isBoardLocked && board.status != 'completed') {
+        autoReminders.add(LecturerNotification(
+          id: 'auto-gv-board-${board.sessionId}',
+          title: '[Nhắc nhở] Buổi chấm Hội đồng: ${board.sessionName}',
+          body:
+              'Phòng: ${board.room} - Thời gian: ${board.date} (${board.timeRange}). Vai trò: ${board.role}.',
+          time: 'Sắp diễn ra',
+          type: 'NhacNho',
+          senderName: 'Hệ thống tự động',
+          isUnread: true,
+        ));
+      }
+    }
+
+    return autoReminders;
+  }
 
   Future<void> fetchStudentDataFromApi(int studentId) async {
     try {
@@ -415,33 +900,48 @@ class AppStateProviderState extends State<AppStateContainer> {
       }
 
       final List<dynamic> notifsJson = await ApiService.getStudentNotifications(studentId);
-      setState(() {
-        if (notifsJson.isNotEmpty) {
-          _state.studentNotifications = notifsJson.map((n) {
-            final rawDate = n['ngay_gui'] ?? n['created_at'];
-            String formattedTime = 'Vừa xong';
-            if (rawDate != null) {
-              final dt = DateTime.tryParse(rawDate.toString())?.toLocal();
-              if (dt != null) {
-                formattedTime = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+      final List<StudentNotification> backendNotifs = notifsJson.isNotEmpty
+          ? notifsJson.map((n) {
+              final rawDate = n['ngay_gui'] ?? n['created_at'];
+              String formattedTime = 'Vừa xong';
+              if (rawDate != null) {
+                final dt = DateTime.tryParse(rawDate.toString())?.toLocal();
+                if (dt != null) {
+                  formattedTime = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+                }
               }
-            }
 
-            return StudentNotification(
-              id: n['id'].toString(),
-              title: n['tieu_de'] ?? 'Thông báo',
-              content: n['noi_dung'] ?? '',
-              timeText: formattedTime,
-              isRead: n['da_doc'] ?? false,
-              attachment: n['file_dinh_kem'] ?? (n['files'] != null && (n['files'] as List).isNotEmpty ? n['files'][0]['ten_file'] : null),
-              fileUrl: n['file_url'] ?? (n['files'] != null && (n['files'] as List).isNotEmpty ? n['files'][0]['duong_dan'] : null),
-              type: n['loai_thong_bao'] ?? n['type'] ?? 'ThongBao',
-            );
-          }).toList();
-        } else {
-          _state.studentNotifications = [];
-        }
+              final rawEditedDate = n['ngay_chinh_sua'];
+              String? formattedEditedTime;
+              if (rawEditedDate != null) {
+                final dt = DateTime.tryParse(rawEditedDate.toString())?.toLocal();
+                if (dt != null) {
+                  formattedEditedTime = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+                }
+              }
+
+              return StudentNotification(
+                id: n['id'].toString(),
+                title: n['tieu_de'] ?? 'Thông báo',
+                content: n['noi_dung'] ?? '',
+                timeText: formattedTime,
+                attachment: n['file_dinh_kem'] ?? (n['files'] != null && (n['files'] as List).isNotEmpty ? n['files'][0]['ten_file'] : null),
+                fileUrl: n['file_url'] ?? (n['files'] != null && (n['files'] as List).isNotEmpty ? n['files'][0]['duong_dan'] : null),
+                type: n['loai_thong_bao'] ?? n['type'] ?? 'ThongBao',
+                senderName: n['nguoi_gui'] ?? 'Ban Chủ nhiệm Khoa',
+                targetAudience: n['doi_tuong_nhan'] ?? 'STUDENT',
+                isEdited: n['da_chinh_sua'] == true || n['da_chinh_sua'] == 1,
+                editedAt: formattedEditedTime,
+              );
+            }).toList()
+          : [];
+
+      final autoReminders = _generateAutoRemindersForStudent();
+      setState(() {
+        _state.studentNotifications = [...autoReminders, ...backendNotifs];
       });
+      _saveStudentNotificationsCache(_state.studentNotifications);
+      NotificationService.instance.notifyStudentReminders(autoReminders);
 
       final Map<String, dynamic> statsJson = await ApiService.getStudentDashboardStats(studentId);
       setState(() {
@@ -459,7 +959,15 @@ class AppStateProviderState extends State<AppStateContainer> {
       await fetchRepresentativeTripsStatus();
 
     } catch (e) {
-      print('Failed to load student data from backend: $e');
+      print('Failed to load student data from backend (Offline mode active): $e');
+      if (_state.studentNotifications.isEmpty) {
+        final cached = await _loadStudentNotificationsCache();
+        if (cached.isNotEmpty) {
+          setState(() {
+            _state.studentNotifications = cached;
+          });
+        }
+      }
     }
   }
 
@@ -492,6 +1000,8 @@ class AppStateProviderState extends State<AppStateContainer> {
       isCompleted: json['trang_thai'] == 'DaDienRa' || json['trang_thai'] == 'HoanThanh',
     );
   }
+
+  Future<void> fetchLecturerDataFromApi(int lecturerId) => _fetchLecturerDataFromApi(lecturerId);
 
   Future<void> _fetchLecturerDataFromApi(int lecturerId) async {
     try {
@@ -563,31 +1073,48 @@ class AppStateProviderState extends State<AppStateContainer> {
 
       try {
         final notifsJson = await ApiService.getLecturerNotifications(lecturerId);
-        if (notifsJson is List && notifsJson.isNotEmpty) {
-          setState(() {
-            _state.lecturerNotifications = notifsJson.map((n) {
-              final rawDate = n['ngay_gui'] ?? n['created_at'];
-              String formattedTime = 'Vừa xong';
-              if (rawDate != null) {
-                final dt = DateTime.tryParse(rawDate.toString())?.toLocal();
-                if (dt != null) {
-                  formattedTime = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+        final List<LecturerNotification> backendLecturerNotifs = (notifsJson is List && notifsJson.isNotEmpty)
+            ? notifsJson.map((n) {
+                final rawDate = n['ngay_gui'] ?? n['created_at'];
+                String formattedTime = 'Vừa xong';
+                if (rawDate != null) {
+                  final dt = DateTime.tryParse(rawDate.toString())?.toLocal();
+                  if (dt != null) {
+                    formattedTime = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+                  }
                 }
-              }
 
-              return LecturerNotification(
-                id: n['id'].toString(),
-                title: n['tieu_de'] ?? 'Thông báo',
-                body: n['noi_dung'] ?? '',
-                time: formattedTime,
-                isUnread: !(n['da_doc'] == true),
-                attachment: n['file_dinh_kem'] ?? (n['files'] != null && (n['files'] as List).isNotEmpty ? n['files'][0]['ten_file'] : null),
-                fileUrl: n['file_url'] ?? (n['files'] != null && (n['files'] as List).isNotEmpty ? n['files'][0]['duong_dan'] : null),
-                type: n['loai_thong_bao'] ?? n['type'] ?? 'ThongBao',
-              );
-            }).toList();
-          });
-        }
+                final rawEditedDate = n['ngay_chinh_sua'];
+                String? formattedEditedTime;
+                if (rawEditedDate != null) {
+                  final dt = DateTime.tryParse(rawEditedDate.toString())?.toLocal();
+                  if (dt != null) {
+                    formattedEditedTime = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+                  }
+                }
+
+                return LecturerNotification(
+                  id: n['id'].toString(),
+                  title: n['tieu_de'] ?? 'Thông báo',
+                  body: n['noi_dung'] ?? '',
+                  time: formattedTime,
+                  attachment: n['file_dinh_kem'] ?? (n['files'] != null && (n['files'] as List).isNotEmpty ? n['files'][0]['ten_file'] : null),
+                  fileUrl: n['file_url'] ?? (n['files'] != null && (n['files'] as List).isNotEmpty ? n['files'][0]['duong_dan'] : null),
+                  type: n['loai_thong_bao'] ?? n['type'] ?? 'ThongBao',
+                  senderName: n['nguoi_gui'] ?? 'Ban Chủ nhiệm Khoa',
+                  targetAudience: n['doi_tuong_nhan'] ?? 'LECTURER',
+                  isEdited: n['da_chinh_sua'] == true || n['da_chinh_sua'] == 1,
+                  editedAt: formattedEditedTime,
+                );
+              }).toList()
+            : [];
+
+        final autoLecturerReminders = _generateAutoRemindersForLecturer();
+        setState(() {
+          _state.lecturerNotifications = [...autoLecturerReminders, ...backendLecturerNotifs];
+        });
+        _saveLecturerNotificationsCache(_state.lecturerNotifications);
+        NotificationService.instance.notifyLecturerReminders(autoLecturerReminders);
       } catch (e) {
         print('Error fetching notifications: $e');
       }
@@ -599,7 +1126,15 @@ class AppStateProviderState extends State<AppStateContainer> {
       }
 
     } catch (e) {
-      print('Failed to load lecturer data from backend: $e');
+      print('Failed to load lecturer data from backend (Offline mode active): $e');
+      if (_state.lecturerNotifications.isEmpty) {
+        final cached = await _loadLecturerNotificationsCache();
+        if (cached.isNotEmpty) {
+          setState(() {
+            _state.lecturerNotifications = cached;
+          });
+        }
+      }
     }
   }
 
@@ -683,6 +1218,7 @@ class AppStateProviderState extends State<AppStateContainer> {
 
   void logout() {
     ApiService.clearSession();
+    NotificationService.instance.clearNotificationHistory();
     setState(() {
       _resetToDefaults(notify: true);
       _state.currentRole = null;

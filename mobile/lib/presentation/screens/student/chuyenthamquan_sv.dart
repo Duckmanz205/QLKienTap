@@ -1433,15 +1433,22 @@ class ChuyenThamQuanDetailSVScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final appStateProvider = AppStateProvider.of(context);
 
+    final hasValidHeroImage = trip.heroImage.trim().isNotEmpty &&
+        (trip.heroImage.startsWith('http://') || trip.heroImage.startsWith('https://'));
+
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Image.network(
-            trip.heroImage,
-            height: 200,
-            fit: BoxFit.cover,
-          ),
+          if (hasValidHeroImage)
+            Image.network(
+              trip.heroImage,
+              height: 180,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => _buildPlaceholderHeader(trip),
+            )
+          else
+            _buildPlaceholderHeader(trip),
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
@@ -1534,6 +1541,76 @@ class ChuyenThamQuanDetailSVScreen extends StatelessWidget {
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPlaceholderHeader(Trip trip) {
+    return Container(
+      height: 180,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppColors.primary,
+            AppColors.primary.withValues(alpha: 0.8),
+            const Color(0xFF1B5E20),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -20,
+            bottom: -20,
+            child: Icon(
+              Icons.factory_outlined,
+              size: 160,
+              color: Colors.white.withValues(alpha: 0.12),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.4)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.business, size: 14, color: Colors.white),
+                      const SizedBox(width: 6),
+                      Text(
+                        trip.industry.isNotEmpty ? trip.industry : 'Kiến tập doanh nghiệp',
+                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  trip.name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    shadows: [Shadow(color: Colors.black38, blurRadius: 4, offset: Offset(0, 1))],
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
             ),
           ),

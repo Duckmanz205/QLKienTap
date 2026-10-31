@@ -5,11 +5,13 @@ import '../../../data/state/app_state.dart';
 class DashboardSVScreen extends StatelessWidget {
   final Function(String) onTripTap;
   final VoidCallback onNotifTap;
+  final Function(String actionType, String? targetId)? onAction;
 
   const DashboardSVScreen({
     super.key,
     required this.onTripTap,
     required this.onNotifTap,
+    this.onAction,
   });
 
   @override
@@ -39,6 +41,7 @@ class DashboardSVScreen extends StatelessWidget {
 
     final upcomingTrips = appState.studentTrips.where((t) => t.isRegistered && !t.isCompleted && (t.registrationStatus == null || ['HopLe', 'ChoDuyet'].contains(t.registrationStatus))).toList();
     final recentNotifications = appState.studentNotifications.take(3).toList();
+
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
@@ -176,11 +179,21 @@ class DashboardSVScreen extends StatelessWidget {
                   onTap: onNotifTap,
                   leading: Container(
                     padding: const EdgeInsets.all(8),
-                    decoration: const BoxDecoration(
-                      color: AppColors.appBackground,
+                    decoration: BoxDecoration(
+                      color: notif.type == 'NhacNho'
+                          ? const Color(0xFFFFF3E0)
+                          : (notif.type == 'CanhBao' ? const Color(0xFFFFEBEE) : AppColors.appBackground),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.campaign, size: 20, color: AppColors.primary),
+                    child: Icon(
+                      notif.type == 'NhacNho'
+                          ? Icons.alarm_on
+                          : (notif.type == 'CanhBao' ? Icons.warning_amber_rounded : Icons.campaign),
+                      size: 20,
+                      color: notif.type == 'NhacNho'
+                          ? const Color(0xFFE65100)
+                          : (notif.type == 'CanhBao' ? const Color(0xFFC62828) : AppColors.primary),
+                    ),
                   ),
                   title: Text(
                     notif.title,
