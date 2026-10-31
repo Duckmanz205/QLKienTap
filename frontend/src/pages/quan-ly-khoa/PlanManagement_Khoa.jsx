@@ -34,19 +34,7 @@ export default function PlanManagement_Khoa() {
   const [filterHocKy, setFilterHocKy] = useState('');
   const [filterTrangThai, setFilterTrangThai] = useState('');
 
-  // Filter Popover Dropdown States
-  const [isNamHocDropdownOpen, setIsNamHocDropdownOpen] = useState(false);
-  const [searchNamHocDropdown, setSearchNamHocDropdown] = useState('');
-  const [isHocKyDropdownOpen, setIsHocKyDropdownOpen] = useState(false);
-  const [searchHocKyDropdown, setSearchHocKyDropdown] = useState('');
-  const [isTrangThaiDropdownOpen, setIsTrangThaiDropdownOpen] = useState(false);
-  const [searchTrangThaiDropdown, setSearchTrangThaiDropdown] = useState('');
 
-  const closeFilterDropdowns = () => {
-    setIsNamHocDropdownOpen(false);
-    setIsHocKyDropdownOpen(false);
-    setIsTrangThaiDropdownOpen(false);
-  };
     
   // Student Pagination & Search State
   const [studentPage, setStudentPage] = useState(1);
@@ -130,24 +118,20 @@ export default function PlanManagement_Khoa() {
   const [isDeleteStudentConfirmOpen, setIsDeleteStudentConfirmOpen] = useState(false);
   const [deletingStudentId, setDeletingStudentId] = useState(null);
 
+  // Send to Club Confirm State
+  const [sendToClubTarget, setSendToClubTarget] = useState(null);
+
   // Modal Form States
   const [campaignName, setCampaignName] = useState('');
+  const [selectedYear, setSelectedYear] = useState('');
+  const [selectedTerm, setSelectedTerm] = useState('');
+  const [selectedCourse, setSelectedCourse] = useState('');
   const [campaignBD, setCampaignBD] = useState('');
   const [campaignKT, setCampaignKT] = useState('');
   const [importData, setImportData] = useState([]);
   const [fileName, setFileName] = useState('');
-  
-  // Custom Dropdown for Năm học
-  const [selectedYear, setSelectedYear] = useState('');
-  const [isYearDropdownOpen, setIsYearDropdownOpen] = useState(false);
 
-  // Custom Dropdown for Học kỳ
-  const [selectedTerm, setSelectedTerm] = useState('');
-  const [isTermDropdownOpen, setIsTermDropdownOpen] = useState(false);
 
-  // Custom Dropdown for Khóa
-  const [selectedCourse, setSelectedCourse] = useState('');
-  const [isCourseDropdownOpen, setIsCourseDropdownOpen] = useState(false);
 
   useEffect(() => {
     fetchInitialData();
@@ -207,6 +191,12 @@ export default function PlanManagement_Khoa() {
     setCampaignKT('');
     setImportData([]);
     setFileName('');
+    setActiveTab('info');
+    setNewStudentMssv('');
+    setNewStudentName('');
+    setNewStudentClass('');
+    setNewStudentCourse('');
+    setCampaignStudents([]);
   };
 
   const handleFileUpload = (e) => {
@@ -285,6 +275,7 @@ export default function PlanManagement_Khoa() {
         await khoaApi.createCampaign(payload);
         setToast({ show: true, message: 'Tạo đợt kiến tập thành công', type: 'success' });
       }
+      setIsModalOpen(false);
       resetForm();
       fetchCampaigns();
     } catch (err) {
@@ -425,15 +416,22 @@ export default function PlanManagement_Khoa() {
     }
   };
 
-  const handleSendToClub = async (id) => {
+  const handleSendToClubClick = (campaign) => {
+    setSendToClubTarget(campaign);
+    setActiveDropdown(null);
+  };
+
+  const confirmSendToClub = async () => {
+    if (!sendToClubTarget) return;
     try {
-      await khoaApi.updateCampaign(id, { trang_thai: 'DangTrienKhai' });
-      setToast({ show: true, message: 'Đã gửi đợt kiến tập cho Câu lạc bộ lập lịch!', type: 'success' });
+      await khoaApi.updateCampaign(sendToClubTarget.id, { trang_thai: 'DangTrienKhai' });
+      setToast({ show: true, message: `Đã gửi đợt "${sendToClubTarget.ten_dot}" cho Câu lạc bộ lập lịch!`, type: 'success' });
       fetchCampaigns();
-      setActiveDropdown(null);
+      setSendToClubTarget(null);
     } catch (err) {
       console.error(err);
       setToast({ show: true, message: err.response?.data?.message || 'Có lỗi xảy ra khi gửi cho CLB', type: 'error' });
+      setSendToClubTarget(null);
     }
   };
 
@@ -480,7 +478,7 @@ export default function PlanManagement_Khoa() {
   });
 
   return (
-    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300 relative" onClick={closeFilterDropdowns}>
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300 relative">
       <Toast show={toast.show} message={toast.message} type={toast.type} onClose={() => setToast({ show: false, message: '', type: 'success' })} />
       {/* Header section */}
       <div className="flex flex-col gap-4 mb-6">
@@ -513,196 +511,60 @@ export default function PlanManagement_Khoa() {
           </div>
           
           {/* Năm học Dropdown */}
-          <div className="relative min-w-[170px]" onClick={(e) => e.stopPropagation()}>
-            <div 
-              onClick={() => {
-                setIsNamHocDropdownOpen(!isNamHocDropdownOpen);
-                setIsHocKyDropdownOpen(false);
-                setIsTrangThaiDropdownOpen(false);
-              }}
-              className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isNamHocDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-            >
-              <span className="truncate pr-2 font-medium text-slate-700">
-                {filterNamHoc ? (years.find(y => String(y.id) === String(filterNamHoc))?.ten_nam_hoc || 'Năm học') : 'Tất cả năm học'}
-              </span>
-              <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-            </div>
-            {isNamHocDropdownOpen && (
-              <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[200px]">
-                <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
-                  <input 
-                    type="text" 
-                    placeholder="Tìm năm học..." 
-                    value={searchNamHocDropdown}
-                    onChange={(e) => setSearchNamHocDropdown(e.target.value)}
-                    onClick={(e) => e.stopPropagation()}
-                    className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
-                  />
-                </div>
-                <div className="max-h-60 overflow-y-auto">
-                  <div 
-                    onClick={() => { setFilterNamHoc(''); setIsNamHocDropdownOpen(false); setSearchNamHocDropdown(''); setCampaignPage(1); }}
-                    className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                      !filterNamHoc ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50'
-                    }`}
-                  >
-                    <span>Tất cả năm học</span>
-                    {!filterNamHoc && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                  </div>
-                  {years
-                    .filter(y => y.ten_nam_hoc?.toLowerCase().includes(searchNamHocDropdown.toLowerCase()))
-                    .map(y => (
-                    <div 
-                      key={y.id}
-                      onClick={() => { setFilterNamHoc(y.id); setIsNamHocDropdownOpen(false); setSearchNamHocDropdown(''); setCampaignPage(1); }}
-                      className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                        String(filterNamHoc) === String(y.id) ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50'
-                      }`}
-                    >
-                      <span className="truncate pr-2">{y.ten_nam_hoc}</span>
-                      {String(filterNamHoc) === String(y.id) && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                    </div>
-                  ))}
-                  {years.filter(y => y.ten_nam_hoc?.toLowerCase().includes(searchNamHocDropdown.toLowerCase())).length === 0 && (
-                    <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy</div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
+          <SearchableDropdown
+            options={[
+              { value: '', label: 'Tất cả năm học' },
+              ...years.map(y => ({ value: y.id, label: y.ten_nam_hoc }))
+            ]}
+            value={filterNamHoc}
+            onChange={(val) => {
+              setFilterNamHoc(val);
+              setCampaignPage(1);
+              if (val && filterHocKy) {
+                const match = terms.some(t => t.id === Number(filterHocKy) && t.nam_hoc_id === Number(val));
+                if (!match) setFilterHocKy('');
+              }
+            }}
+            placeholder="Tất cả năm học"
+            searchPlaceholder="Tìm năm học..."
+            className="min-w-[170px]"
+          />
 
           {/* Học kỳ Dropdown */}
-          <div className="relative min-w-[160px]" onClick={(e) => e.stopPropagation()}>
-            <div 
-              onClick={() => {
-                setIsHocKyDropdownOpen(!isHocKyDropdownOpen);
-                setIsNamHocDropdownOpen(false);
-                setIsTrangThaiDropdownOpen(false);
-              }}
-              className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isHocKyDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-            >
-              <span className="truncate pr-2 font-medium text-slate-700">
-                {filterHocKy ? (terms.find(t => String(t.id) === String(filterHocKy))?.ten_hoc_ky || 'Học kỳ') : 'Tất cả học kỳ'}
-              </span>
-              <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-            </div>
-            {isHocKyDropdownOpen && (
-              <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[200px]">
-                <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
-                  <input 
-                    type="text" 
-                    placeholder="Tìm học kỳ..." 
-                    value={searchHocKyDropdown}
-                    onChange={(e) => setSearchHocKyDropdown(e.target.value)}
-                    onClick={(e) => e.stopPropagation()}
-                    className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
-                  />
-                </div>
-                <div className="max-h-60 overflow-y-auto">
-                  <div 
-                    onClick={() => { setFilterHocKy(''); setIsHocKyDropdownOpen(false); setSearchHocKyDropdown(''); setCampaignPage(1); }}
-                    className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                      !filterHocKy ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50'
-                    }`}
-                  >
-                    <span>Tất cả học kỳ</span>
-                    {!filterHocKy && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                  </div>
-                  {terms
-                    .filter(t => t.ten_hoc_ky?.toLowerCase().includes(searchHocKyDropdown.toLowerCase()))
-                    .map(t => (
-                    <div 
-                      key={t.id}
-                      onClick={() => { setFilterHocKy(t.id); setIsHocKyDropdownOpen(false); setSearchHocKyDropdown(''); setCampaignPage(1); }}
-                      className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                        String(filterHocKy) === String(t.id) ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50'
-                      }`}
-                    >
-                      <span className="truncate pr-2">{t.ten_hoc_ky}</span>
-                      {String(filterHocKy) === String(t.id) && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                    </div>
-                  ))}
-                  {terms.filter(t => t.ten_hoc_ky?.toLowerCase().includes(searchHocKyDropdown.toLowerCase())).length === 0 && (
-                    <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy</div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
+          <SearchableDropdown
+            options={[
+              { value: '', label: 'Tất cả học kỳ' },
+              ...(filterNamHoc ? terms.filter(t => t.nam_hoc_id === Number(filterNamHoc)) : terms).map(t => ({ value: t.id, label: t.ten_hoc_ky }))
+            ]}
+            value={filterHocKy}
+            onChange={(val) => {
+              setFilterHocKy(val);
+              setCampaignPage(1);
+            }}
+            placeholder="Tất cả học kỳ"
+            searchPlaceholder="Tìm học kỳ..."
+            className="min-w-[160px]"
+          />
 
           {/* Trạng thái Dropdown */}
-          <div className="relative min-w-[170px]" onClick={(e) => e.stopPropagation()}>
-            <div 
-              onClick={() => {
-                setIsTrangThaiDropdownOpen(!isTrangThaiDropdownOpen);
-                setIsNamHocDropdownOpen(false);
-                setIsHocKyDropdownOpen(false);
-              }}
-              className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isTrangThaiDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-            >
-              <span className="truncate pr-2 font-medium text-slate-700">
-                {filterTrangThai === '' ? 'Tất cả trạng thái' : 
-                 filterTrangThai === 'Nhap' ? 'Nháp' :
-                 filterTrangThai === 'DangTrienKhai' ? 'Đang triển khai' :
-                 filterTrangThai === 'DaKetThuc' ? 'Đã kết thúc' :
-                 filterTrangThai === 'DaKhoa' ? 'Đã khóa' :
-                 filterTrangThai === 'DaHuy' ? 'Đã hủy' : filterTrangThai}
-              </span>
-              <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-            </div>
-            {isTrangThaiDropdownOpen && (
-              <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[200px]">
-                <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
-                  <input 
-                    type="text" 
-                    placeholder="Tìm trạng thái..." 
-                    value={searchTrangThaiDropdown}
-                    onChange={(e) => setSearchTrangThaiDropdown(e.target.value)}
-                    onClick={(e) => e.stopPropagation()}
-                    className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
-                  />
-                </div>
-                <div className="max-h-60 overflow-y-auto">
-                  {[
-                    { value: '', label: 'Tất cả trạng thái' },
-                    { value: 'Nhap', label: 'Nháp' },
-                    { value: 'DangTrienKhai', label: 'Đang triển khai' },
-                    { value: 'DaKetThuc', label: 'Đã kết thúc' },
-                    { value: 'DaKhoa', label: 'Đã khóa' },
-                    { value: 'DaHuy', label: 'Đã hủy' }
-                  ]
-                    .filter(opt => !searchTrangThaiDropdown || opt.label.toLowerCase().includes(searchTrangThaiDropdown.toLowerCase()))
-                    .map(opt => (
-                      <div 
-                        key={opt.value}
-                        onClick={() => { 
-                          setFilterTrangThai(opt.value); 
-                          setIsTrangThaiDropdownOpen(false); 
-                          setSearchTrangThaiDropdown('');
-                          setCampaignPage(1); 
-                        }}
-                        className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                          filterTrangThai === opt.value ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50'
-                        }`}
-                      >
-                        <span>{opt.label}</span>
-                        {filterTrangThai === opt.value && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                      </div>
-                    ))}
-                  {[
-                    { value: '', label: 'Tất cả trạng thái' },
-                    { value: 'Nhap', label: 'Nháp' },
-                    { value: 'DangTrienKhai', label: 'Đang triển khai' },
-                    { value: 'DaKetThuc', label: 'Đã kết thúc' },
-                    { value: 'DaKhoa', label: 'Đã khóa' },
-                    { value: 'DaHuy', label: 'Đã hủy' }
-                  ].filter(opt => !searchTrangThaiDropdown || opt.label.toLowerCase().includes(searchTrangThaiDropdown.toLowerCase())).length === 0 && (
-                    <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy</div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
+          <SearchableDropdown
+            options={[
+              { value: '', label: 'Tất cả trạng thái' },
+              { value: 'Nhap', label: 'Nháp' },
+              { value: 'DangTrienKhai', label: 'Đang triển khai' },
+              { value: 'DaKetThuc', label: 'Đã kết thúc' },
+              { value: 'DaKhoa', label: 'Đã khóa' },
+              { value: 'DaHuy', label: 'Đã hủy' }
+            ]}
+            value={filterTrangThai}
+            onChange={(val) => {
+              setFilterTrangThai(val);
+              setCampaignPage(1);
+            }}
+            placeholder="Tất cả trạng thái"
+            searchPlaceholder="Tìm trạng thái..."
+            className="min-w-[170px]"
+          />
         </div>
       </div>
 
@@ -877,7 +739,13 @@ export default function PlanManagement_Khoa() {
                   <SearchableDropdown
                     options={years.map(y => ({ value: y.id, label: y.ten_nam_hoc }))}
                     value={selectedYear}
-                    onChange={(val) => setSelectedYear(val)}
+                    onChange={(val) => {
+                      setSelectedYear(val);
+                      if (val && selectedTerm) {
+                        const match = terms.some(t => t.id === Number(selectedTerm) && t.nam_hoc_id === Number(val));
+                        if (!match) setSelectedTerm('');
+                      }
+                    }}
                     placeholder="Chọn năm học"
                     searchPlaceholder="Tìm năm học..."
                     className="w-full"
@@ -889,9 +757,17 @@ export default function PlanManagement_Khoa() {
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Học kỳ</label>
                   <SearchableDropdown
-                    options={terms.map(t => ({ value: t.id, label: t.ten_hoc_ky }))}
+                    options={(selectedYear ? terms.filter(t => t.nam_hoc_id === Number(selectedYear)) : terms).map(t => ({ value: t.id, label: t.ten_hoc_ky }))}
                     value={selectedTerm}
-                    onChange={(val) => setSelectedTerm(val)}
+                    onChange={(val) => {
+                      setSelectedTerm(val);
+                      if (val) {
+                        const targetTerm = terms.find(t => t.id === Number(val));
+                        if (targetTerm && targetTerm.nam_hoc_id) {
+                          setSelectedYear(targetTerm.nam_hoc_id);
+                        }
+                      }
+                    }}
                     placeholder="Chọn học kỳ"
                     searchPlaceholder="Tìm học kỳ..."
                     className="w-full"
@@ -1358,6 +1234,25 @@ export default function PlanManagement_Khoa() {
         </div>
       )}
 
+      {/* Send to Club Confirm Modal */}
+      {sendToClubTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-slate-900/20 backdrop-blur-sm" onClick={() => setSendToClubTarget(null)}></div>
+          <div className="bg-white p-6 rounded-2xl shadow-xl z-10 max-w-md w-full animate-in zoom-in-95 duration-150">
+            <h3 className="text-lg font-bold text-slate-800 mb-2">Gửi đợt kiến tập cho CLB</h3>
+            <p className="text-sm text-slate-600 mb-6">
+              Bạn có chắc chắn muốn gửi đợt <b>{sendToClubTarget.ten_dot}</b> cho Ban chủ nhiệm Câu lạc bộ để tiến hành lập lịch kiến tập?
+              <br/><br/>
+              Sau khi gửi, đợt kiến tập sẽ chuyển sang trạng thái <b>Đang triển khai</b> và hiển thị cho CLB lập lịch.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setSendToClubTarget(null)} className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 font-bold cursor-pointer">Hủy</button>
+              <button onClick={confirmSendToClub} className="px-4 py-2 bg-[#407F3E] text-white rounded-lg hover:bg-[#407F3E]/90 font-bold cursor-pointer">Xác nhận gửi</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Delete Student Confirm Modal */}
       {isDeleteStudentConfirmOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -1448,7 +1343,7 @@ export default function PlanManagement_Khoa() {
         >
           {activeDropdown?.raw_trang_thai === 'Nhap' && (
             <button 
-              onClick={() => { handleSendToClub(activeDropdown.id); }} 
+              onClick={() => { handleSendToClubClick(activeDropdown); }} 
               className="flex items-center w-full px-4 py-3 text-sm font-semibold text-green-700 hover:bg-green-50 transition-colors border-b border-slate-100 cursor-pointer"
             >
               <Rocket className="w-4 h-4 mr-3 text-green-500" /> Gửi CLB lên lịch

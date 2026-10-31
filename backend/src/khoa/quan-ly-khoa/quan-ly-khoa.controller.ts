@@ -157,19 +157,25 @@ export class KhoaController {
     return this.khoaService.getFactoryIndustryGroups();
   }
 
-  @Roles('QuanLyCLB')
+  @Roles('QuanLyKhoa', 'QuanLyCLB')
   @Post('factories')
   async createFactory(@Body() body: CreateFactoryDto) {
     return this.khoaService.createFactory(body);
   }
 
-  @Roles('QuanLyCLB')
+  @Roles('QuanLyKhoa', 'QuanLyCLB')
   @Put('factories/:id')
   async updateFactory(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: UpdateFactoryDto,
   ) {
     return this.khoaService.updateFactory(id, body);
+  }
+
+  @Roles('QuanLyKhoa', 'QuanLyCLB')
+  @Delete('factories/:id')
+  async deleteFactory(@Param('id', ParseIntPipe) id: number) {
+    return this.khoaService.deleteFactory(id);
   }
 
   @Roles('QuanLyKhoa')
@@ -210,7 +216,7 @@ export class KhoaController {
     return this.khoaService.updateLecturerBoardEligibility(+id, duDkHoiDong);
   }
 
-  @Roles('QuanLyKhoa')
+  @Roles('QuanLyKhoa', 'QuanLyCLB')
   @Get('students/classes')
   async getUniqueClasses() {
     return this.khoaService.getUniqueClasses();
@@ -253,9 +259,11 @@ export class KhoaController {
     @Query('namHoc') namHoc?: string,
     @Query('hocKy') hocKy?: string,
     @Query('trangThai') trangThai?: string,
+    @CurrentUser() user?: JwtPayloadUser,
   ) {
     const pageNum = page ? parseInt(page, 10) : 1;
     const limitNum = limit ? parseInt(limit, 10) : 15;
+    const excludeDraft = user?.role === 'QuanLyCLB';
     return this.khoaService.getCampaigns(
       pageNum,
       limitNum,
@@ -263,6 +271,7 @@ export class KhoaController {
       namHoc,
       hocKy,
       trangThai,
+      excludeDraft,
     );
   }
 
@@ -280,8 +289,9 @@ export class KhoaController {
   async updateCampaign(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: UpdateCampaignDto,
+    @CurrentUser() user: JwtPayloadUser,
   ) {
-    return this.khoaService.updateCampaign(id, body);
+    return this.khoaService.updateCampaign(id, body, user?.sub);
   }
 
   @Roles('QuanLyKhoa')
@@ -437,12 +447,18 @@ export class KhoaController {
     );
   }
 
-  @Roles('QuanLyCLB')
+  @Roles('QuanLyCLB', 'QuanLyKhoa')
   @Post('approve-cancel')
   async approveCancel(@Body() body: ApproveCancelDto) {
+    const id = body.requestId ?? body.cancelId;
+    if (!id) {
+      throw new BadRequestException(
+        'Mã yêu cầu hủy (requestId hoặc cancelId) không được để trống',
+      );
+    }
     return this.khoaService.approveCancelRequest(
-      body.requestId,
-      body.approverId,
+      id,
+      body.approverId ?? 0,
       body.isApproved,
     );
   }
@@ -555,6 +571,7 @@ export class KhoaController {
       body.name,
       body.date,
       body.room,
+      body.members,
     );
   }
 

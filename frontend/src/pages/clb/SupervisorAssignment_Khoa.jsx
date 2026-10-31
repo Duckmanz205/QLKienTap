@@ -18,17 +18,9 @@ export default function SupervisorAssignment_Khoa() {
   const [limit, setLimit] = useState(15);
 
   // Dropdown States for Filters
-  const [isCampaignDropdownOpen, setIsCampaignDropdownOpen] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState('');
-  const [searchCampaignTerm, setSearchCampaignTerm] = useState('');
-
-  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState('');
-  const [searchStatusTerm, setSearchStatusTerm] = useState('');
-
-  const [isClassDropdownOpen, setIsClassDropdownOpen] = useState(false);
   const [selectedClass, setSelectedClass] = useState('');
-  const [searchClassTerm, setSearchClassTerm] = useState('');
 
   const [selectAll, setSelectAll] = useState(false);
   
@@ -36,6 +28,26 @@ export default function SupervisorAssignment_Khoa() {
   const [openDropdownId, setOpenDropdownId] = useState(null);
   const [dropdownPosition, setDropdownPosition] = useState('down');
   const [searchLecturerTerm, setSearchLecturerTerm] = useState('');
+
+  useEffect(() => {
+    if (!openDropdownId) return;
+    const handleClickOutside = (e) => {
+      if (!e.target.closest('.inline-assign-dropdown') && !e.target.closest('.assign-btn')) {
+        setOpenDropdownId(null);
+      }
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setOpenDropdownId(null);
+    };
+    document.addEventListener('mousedown', handleClickOutside, true);
+    document.addEventListener('touchstart', handleClickOutside, true);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside, true);
+      document.removeEventListener('touchstart', handleClickOutside, true);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [openDropdownId]);
 
   useEffect(() => {
     fetchInitialData();
@@ -102,30 +114,12 @@ export default function SupervisorAssignment_Khoa() {
     setEnrollments(enrollments.map(e => e.id === id ? { ...e, checked: !e.checked } : e));
   };
 
-  // Close all dropdowns
-  const closeAllDropdowns = () => {
-    setIsCampaignDropdownOpen(false);
-    setIsStatusDropdownOpen(false);
-    setIsClassDropdownOpen(false);
-    setOpenDropdownId(null);
-    setSearchCampaignTerm('');
-    setSearchClassTerm('');
-    setSearchStatusTerm('');
-    setSearchLecturerTerm('');
-  };
-
-  const handleDropdownClick = (e, setter) => {
-    e.stopPropagation();
-    closeAllDropdowns();
-    setter(true);
-  };
-
   const toggleInlineDropdown = (e, id) => {
     e.stopPropagation();
     if (openDropdownId === id) {
       setOpenDropdownId(null);
     } else {
-      closeAllDropdowns();
+      setSearchLecturerTerm('');
       const rect = e.currentTarget.getBoundingClientRect();
       const spaceBelow = window.innerHeight - rect.bottom;
       setDropdownPosition(spaceBelow < 330 ? 'up' : 'down');
@@ -160,18 +154,7 @@ export default function SupervisorAssignment_Khoa() {
   const validCurrentPage = Math.min(currentPage, totalPages);
   const paginatedEnrollments = filteredEnrollments.slice((validCurrentPage - 1) * limit, validCurrentPage * limit);
 
-  const filteredCampaigns = campaigns.filter(s => 
-    s.ten_dot?.toLowerCase().includes(searchCampaignTerm.toLowerCase())
-  );
-
-  const filteredClassList = classList.filter(cls => 
-    cls.toLowerCase().includes(searchClassTerm.toLowerCase())
-  );
-
   const statusOptions = ['Tất cả', 'Đã phân công', 'Chưa phân công'];
-  const filteredStatusOptions = statusOptions.filter(opt => 
-    opt.toLowerCase().includes(searchStatusTerm.toLowerCase())
-  );
 
   const filteredLecturers = lecturers.filter(gv => 
     gv.ho_ten?.toLowerCase().includes(searchLecturerTerm.toLowerCase()) ||
@@ -179,7 +162,7 @@ export default function SupervisorAssignment_Khoa() {
   );
 
   return (
-    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300 relative" onClick={closeAllDropdowns}>
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300 relative">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-800">Phân công GVHD</h1>
@@ -203,141 +186,50 @@ export default function SupervisorAssignment_Khoa() {
         </div>
 
         {/* Đợt kiến tập Dropdown */}
-        <div className="relative min-w-[260px]">
-          <div 
-            onClick={(e) => handleDropdownClick(e, setIsCampaignDropdownOpen)}
-            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isCampaignDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-          >
-            <span className={`truncate pr-2 font-medium ${selectedCampaign ? 'text-slate-700' : 'text-slate-400'}`}>
-              {campaigns.find(s => s.id === selectedCampaign)?.ten_dot || 'Chọn đợt kiến tập'}
-            </span>
-            <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isCampaignDropdownOpen ? 'rotate-180 text-[#407F3E]' : ''}`} />
-          </div>
-          {isCampaignDropdownOpen && (
-            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[260px]">
-              <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
-                <input 
-                  type="text" 
-                  placeholder="Tìm đợt kiến tập..." 
-                  value={searchCampaignTerm}
-                  onChange={(e) => setSearchCampaignTerm(e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
-                />
-              </div>
-              <div className="max-h-60 overflow-y-auto">
-                {filteredCampaigns.map(opt => (
-                  <div 
-                    key={opt.id}
-                    onClick={() => { setSelectedCampaign(opt.id); setIsCampaignDropdownOpen(false); setCurrentPage(1); }}
-                    className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                      selectedCampaign === opt.id ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/30 font-medium'
-                    }`}
-                  >
-                    <span className="truncate pr-2">{opt.ten_dot}</span>
-                    {selectedCampaign === opt.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                  </div>
-                ))}
-                {filteredCampaigns.length === 0 && (
-                  <div className="px-4 py-2 text-xs text-slate-400 text-center">Không tìm thấy đợt nào</div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+        <SearchableDropdown
+          options={campaigns.map(opt => ({ value: opt.id, label: opt.ten_dot }))}
+          value={selectedCampaign}
+          onChange={(val) => {
+            setSelectedCampaign(val);
+            setCurrentPage(1);
+          }}
+          placeholder="Chọn đợt kiến tập"
+          searchPlaceholder="Tìm đợt kiến tập..."
+          className="min-w-[260px]"
+        />
 
         {/* Lớp Dropdown */}
-        <div className="relative min-w-[160px]">
-          <div 
-            onClick={(e) => handleDropdownClick(e, setIsClassDropdownOpen)}
-            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isClassDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-          >
-            <span className={`truncate pr-2 font-medium ${selectedClass ? 'text-slate-700' : 'text-slate-400'}`}>{selectedClass || 'Tất cả lớp'}</span>
-            <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isClassDropdownOpen ? 'rotate-180 text-[#407F3E]' : ''}`} />
-          </div>
-          {isClassDropdownOpen && (
-            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[180px]">
-              <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
-                <input 
-                  type="text" 
-                  placeholder="Tìm lớp..." 
-                  value={searchClassTerm}
-                  onChange={(e) => setSearchClassTerm(e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
-                />
-              </div>
-              <div className="max-h-60 overflow-y-auto">
-                <div 
-                  onClick={() => { setSelectedClass(''); setIsClassDropdownOpen(false); setCurrentPage(1); }}
-                  className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                    selectedClass === '' ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/30 font-medium'
-                  }`}
-                >
-                  <span>Tất cả lớp</span>
-                  {selectedClass === '' && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                </div>
-                {filteredClassList.map(cls => (
-                  <div 
-                    key={cls}
-                    onClick={() => { setSelectedClass(cls); setIsClassDropdownOpen(false); setCurrentPage(1); }}
-                    className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                      selectedClass === cls ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/30 font-medium'
-                    }`}
-                  >
-                    <span className="truncate pr-2">{cls}</span>
-                    {selectedClass === cls && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                  </div>
-                ))}
-                {filteredClassList.length === 0 && searchClassTerm && (
-                  <div className="px-4 py-2 text-xs text-slate-400 text-center">Không tìm thấy lớp</div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+        <SearchableDropdown
+          options={[
+            { value: '', label: 'Tất cả lớp' },
+            ...classList.map(cls => ({ value: cls, label: cls }))
+          ]}
+          value={selectedClass}
+          onChange={(val) => {
+            setSelectedClass(val);
+            setCurrentPage(1);
+          }}
+          placeholder="Tất cả lớp"
+          searchPlaceholder="Tìm lớp..."
+          className="min-w-[160px]"
+        />
 
         {/* Trạng thái Dropdown */}
-        <div className="relative min-w-[180px]">
-          <div 
-            onClick={(e) => handleDropdownClick(e, setIsStatusDropdownOpen)}
-            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isStatusDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-          >
-            <span className={`truncate pr-2 font-medium ${selectedStatus ? 'text-slate-700' : 'text-slate-400'}`}>{selectedStatus || 'Tất cả trạng thái'}</span>
-            <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isStatusDropdownOpen ? 'rotate-180 text-[#407F3E]' : ''}`} />
-          </div>
-          {isStatusDropdownOpen && (
-            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[180px]">
-              <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
-                <input 
-                  type="text" 
-                  placeholder="Tìm trạng thái..." 
-                  value={searchStatusTerm}
-                  onChange={(e) => setSearchStatusTerm(e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
-                />
-              </div>
-              <div className="max-h-60 overflow-y-auto">
-                {filteredStatusOptions.map(opt => (
-                  <div 
-                    key={opt}
-                    onClick={() => { setSelectedStatus(opt === 'Tất cả' ? '' : opt); setIsStatusDropdownOpen(false); setCurrentPage(1); }}
-                    className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                      (selectedStatus === opt || (!selectedStatus && opt === 'Tất cả')) ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/30 font-medium'
-                    }`}
-                  >
-                    <span className="truncate pr-2">{opt}</span>
-                    {(selectedStatus === opt || (!selectedStatus && opt === 'Tất cả')) && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                  </div>
-                ))}
-                {filteredStatusOptions.length === 0 && (
-                  <div className="px-4 py-2 text-xs text-slate-400 text-center">Không tìm thấy trạng thái</div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+        <SearchableDropdown
+          options={statusOptions.map(opt => ({
+            value: opt === 'Tất cả' ? '' : opt,
+            label: opt
+          }))}
+          value={selectedStatus}
+          onChange={(val) => {
+            setSelectedStatus(val);
+            setCurrentPage(1);
+          }}
+          placeholder="Tất cả trạng thái"
+          searchPlaceholder="Tìm trạng thái..."
+          className="min-w-[180px]"
+        />
+      </div>
       </div>
 
       {/* Bulk Action Bar */}
@@ -416,7 +308,7 @@ export default function SupervisorAssignment_Khoa() {
                       <td className="p-4 text-right pr-6 relative">
                         <button 
                           onClick={(e) => toggleInlineDropdown(e, sv.id)}
-                          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center justify-end gap-2 ml-auto cursor-pointer ${
+                          className={`assign-btn px-4 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center justify-end gap-2 ml-auto cursor-pointer ${
                             openDropdownId === sv.id 
                               ? 'bg-[#407F3E] text-white shadow-sm' 
                               : 'bg-slate-50 border border-slate-200 text-[#407F3E] hover:bg-[#407F3E]/10'
@@ -429,7 +321,7 @@ export default function SupervisorAssignment_Khoa() {
                         {/* Inline Dropdown */}
                         {openDropdownId === sv.id && (
                           <div 
-                            className={`absolute right-6 w-[260px] bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-50 overflow-hidden animate-in zoom-in-95 text-left ${
+                            className={`inline-assign-dropdown absolute right-6 w-[260px] bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-50 overflow-hidden animate-in zoom-in-95 text-left ${
                               dropdownPosition === 'up'
                                 ? 'bottom-full mb-2 origin-bottom-right'
                                 : 'top-full mt-2 origin-top-right'

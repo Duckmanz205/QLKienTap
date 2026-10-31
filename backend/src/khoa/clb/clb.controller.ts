@@ -68,8 +68,25 @@ export class ClbController {
   }
 
   @Get('campaigns')
-  async getCampaigns() {
-    return this.khoaService.getCampaigns();
+  async getCampaigns(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('namHoc') namHoc?: string,
+    @Query('hocKy') hocKy?: string,
+    @Query('trangThai') trangThai?: string,
+  ) {
+    const pageNum = page ? parseInt(page, 10) : 1;
+    const limitNum = limit ? parseInt(limit, 10) : 1000;
+    return this.khoaService.getCampaigns(
+      pageNum,
+      limitNum,
+      search,
+      namHoc,
+      hocKy,
+      trangThai,
+      true,
+    );
   }
 
   @Get('courses')
@@ -90,6 +107,16 @@ export class ClbController {
     return this.khoaService.updateFactory(id, body);
   }
 
+  @Delete('factories/:id')
+  async deleteFactory(@Param('id', ParseIntPipe) id: number) {
+    return this.khoaService.deleteFactory(id);
+  }
+
+  @Get('students/classes')
+  async getUniqueClasses() {
+    return this.khoaService.getUniqueClasses();
+  }
+
   @Get('students')
   async getStudents(@Query() query: GetStudentsQueryDto) {
     return this.khoaService.getStudents(
@@ -97,21 +124,6 @@ export class ClbController {
       query.limit || 10,
       query.search,
     );
-  }
-
-  @Post('students')
-  async createStudent(@Body() body: CreateStudentDto) {
-    return this.khoaService.createStudent(body);
-  }
-
-  @Put('students/:id')
-  async updateStudent(@Param('id') id: number, @Body() body: UpdateStudentDto) {
-    return this.khoaService.updateStudent(+id, body);
-  }
-
-  @Delete('students/:id')
-  async deleteStudent(@Param('id') id: number) {
-    return this.khoaService.deleteStudent(+id);
   }
 
   @Get('trips')
@@ -214,9 +226,15 @@ export class ClbController {
 
   @Post('approve-cancel')
   async approveCancel(@Body() body: ApproveCancelDto) {
+    const id = body.requestId ?? body.cancelId;
+    if (!id) {
+      throw new BadRequestException(
+        'Mã yêu cầu hủy (requestId hoặc cancelId) không được để trống',
+      );
+    }
     return this.khoaService.approveCancelRequest(
-      body.requestId,
-      body.approverId,
+      id,
+      body.approverId ?? 0,
       body.isApproved,
     );
   }

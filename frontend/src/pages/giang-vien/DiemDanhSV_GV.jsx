@@ -9,12 +9,8 @@ import SearchableDropdown from '../../components/SearchableDropdown';
 
 export default function DiemDanhSV_GV() {
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
-  const [isTripDropdownOpen, setIsTripDropdownOpen] = useState(false);
-  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState('ALL');
-  const [searchStatusDropdown, setSearchStatusDropdown] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [tripSearch, setTripSearch] = useState('');
   const [loading, setLoading] = useState(false);
   
   const [currentPage, setCurrentPage] = useState(1);
@@ -36,11 +32,6 @@ export default function DiemDanhSV_GV() {
   });
   const [zoom, setZoom] = useState(100);
   const [rotation, setRotation] = useState(0);
-
-  const closeAllDropdowns = () => {
-    setIsTripDropdownOpen(false);
-    setIsStatusDropdownOpen(false);
-  };
 
   useEffect(() => {
     const userJson = localStorage.getItem('user');
@@ -215,7 +206,7 @@ export default function DiemDanhSV_GV() {
   const totalCount = students.length;
 
   return (
-    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300 relative" onClick={closeAllDropdowns}>
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300 relative">
       <Toast 
         message={toast.show ? toast.message : ''} 
         type={toast.type} 
@@ -243,140 +234,40 @@ export default function DiemDanhSV_GV() {
           />
         </div>
 
-        {/* Trip Selector Popover */}
-        <div className="relative min-w-[260px] flex-1" onClick={(e) => e.stopPropagation()}>
-          <div 
-            onClick={() => {
-              setIsTripDropdownOpen(!isTripDropdownOpen);
-              setIsStatusDropdownOpen(false);
-            }}
-            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isTripDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-          >
-            <span className="truncate pr-2 font-medium text-slate-700 flex items-center gap-2">
-              {selectedTrip?.cachToChuc === 'TuDo' && (
-                <span className="px-1.5 py-0.5 rounded text-[10px] bg-indigo-100 text-indigo-700 font-bold shrink-0">
-                  Tự do
-                </span>
-              )}
-              <span className="truncate">{selectedTrip ? selectedTrip.name : 'Đang tải chuyến...'}</span>
-            </span>
-            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-          </div>
-          {isTripDropdownOpen && trips.length > 0 && (
-            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-50 py-1 overflow-hidden animate-in slide-in-from-top-1 max-h-64 flex flex-col">
-              <div className="p-2 border-b border-[#E7E0C4] sticky top-0 bg-white z-10">
-                <input
-                  type="text"
-                  placeholder="Tìm chuyến đi..."
-                  value={tripSearch}
-                  onChange={(e) => setTripSearch(e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-[#E7E0C4] rounded-lg focus:outline-none focus:border-[#407F3E]"
-                />
-              </div>
-              <div className="overflow-y-auto">
-                {trips
-                  .filter(t => !tripSearch || t.name.toLowerCase().includes(tripSearch.toLowerCase()))
-                  .map(trip => (
-                    <div 
-                      key={trip.id}
-                      onClick={() => {
-                        setSelectedTrip(trip);
-                        setIsTripDropdownOpen(false);
-                        setTripSearch('');
-                      }}
-                      className={`px-4 py-2.5 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                        selectedTrip?.id === trip.id ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50 font-medium'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 truncate pr-2">
-                        {trip.cachToChuc === 'TuDo' && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-indigo-100 text-indigo-700 font-bold shrink-0">
-                            Tự do
-                          </span>
-                        )}
-                        <span className="truncate">{trip.name}</span>
-                      </div>
-                      {selectedTrip?.id === trip.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                    </div>
-                  ))}
-                {trips.filter(t => !tripSearch || t.name.toLowerCase().includes(tripSearch.toLowerCase())).length === 0 && (
-                  <div className="px-4 py-3 text-xs text-slate-500 text-center">Không tìm thấy chuyến đi</div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+        {/* Trip Selector Dropdown */}
+        <SearchableDropdown
+          options={trips.map(t => ({
+            value: t.id,
+            label: `${t.cachToChuc === 'TuDo' ? '[Tự do] ' : ''}${t.name}`
+          }))}
+          value={selectedTrip?.id || ''}
+          onChange={(val) => {
+            const found = trips.find(t => t.id === val);
+            if (found) setSelectedTrip(found);
+          }}
+          placeholder={trips.length > 0 ? "Chọn chuyến đi..." : "Đang tải chuyến..."}
+          searchPlaceholder="Tìm chuyến đi..."
+          className="min-w-[260px] flex-1"
+        />
 
-        {/* Status Filter Popover */}
-        <div className="relative min-w-[200px]" onClick={(e) => e.stopPropagation()}>
-          <div 
-            onClick={() => {
-              setIsStatusDropdownOpen(!isStatusDropdownOpen);
-              setIsTripDropdownOpen(false);
-            }}
-            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isStatusDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-          >
-            <span className="truncate pr-2 font-medium text-slate-700">
-              {statusFilter === 'ALL' && 'Tất cả trạng thái'}
-              {statusFilter === 'CoMat' && 'Có mặt'}
-              {statusFilter === 'Vang' && 'Vắng'}
-              {statusFilter === 'TuChoiThamGia' && 'Từ chối tham gia'}
-              {statusFilter === 'ChuaDiemDanh' && 'Chưa điểm danh'}
-            </span>
-            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-          </div>
-          {isStatusDropdownOpen && (
-            <div className="absolute top-full right-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-50 py-1 overflow-hidden animate-in slide-in-from-top-1">
-              <div className="p-2 border-b border-[#E7E0C4]">
-                <input
-                  type="text"
-                  placeholder="Tìm trạng thái..."
-                  value={searchStatusDropdown}
-                  onChange={(e) => setSearchStatusDropdown(e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-[#E7E0C4] rounded-lg focus:outline-none focus:border-[#407F3E]"
-                />
-              </div>
-              <div className="max-h-60 overflow-y-auto">
-                {[
-                  { id: 'ALL', label: 'Tất cả trạng thái' },
-                  { id: 'CoMat', label: 'Có mặt' },
-                  { id: 'Vang', label: 'Vắng' },
-                  { id: 'TuChoiThamGia', label: 'Từ chối tham gia' },
-                  { id: 'ChuaDiemDanh', label: 'Chưa điểm danh' },
-                ]
-                  .filter(opt => !searchStatusDropdown || opt.label.toLowerCase().includes(searchStatusDropdown.toLowerCase()))
-                  .map(opt => (
-                    <div 
-                      key={opt.id}
-                      onClick={() => {
-                        setStatusFilter(opt.id);
-                        setIsStatusDropdownOpen(false);
-                        setSearchStatusDropdown('');
-                        setCurrentPage(1);
-                      }}
-                      className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                        statusFilter === opt.id ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50 font-medium'
-                      }`}
-                    >
-                      <span>{opt.label}</span>
-                      {statusFilter === opt.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                    </div>
-                  ))}
-                {[
-                  { id: 'ALL', label: 'Tất cả trạng thái' },
-                  { id: 'CoMat', label: 'Có mặt' },
-                  { id: 'Vang', label: 'Vắng' },
-                  { id: 'TuChoiThamGia', label: 'Từ chối tham gia' },
-                  { id: 'ChuaDiemDanh', label: 'Chưa điểm danh' },
-                ].filter(opt => !searchStatusDropdown || opt.label.toLowerCase().includes(searchStatusDropdown.toLowerCase())).length === 0 && (
-                  <div className="px-4 py-3 text-xs text-slate-500 text-center">Không tìm thấy trạng thái</div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+        {/* Status Filter Dropdown */}
+        <SearchableDropdown
+          options={[
+            { value: 'ALL', label: 'Tất cả trạng thái' },
+            { value: 'CoMat', label: 'Có mặt' },
+            { value: 'Vang', label: 'Vắng' },
+            { value: 'TuChoiThamGia', label: 'Từ chối tham gia' },
+            { value: 'ChuaDiemDanh', label: 'Chưa điểm danh' }
+          ]}
+          value={statusFilter}
+          onChange={(val) => {
+            setStatusFilter(val);
+            setCurrentPage(1);
+          }}
+          placeholder="Tất cả trạng thái"
+          searchPlaceholder="Tìm trạng thái..."
+          className="min-w-[200px]"
+        />
 
       </div>
 

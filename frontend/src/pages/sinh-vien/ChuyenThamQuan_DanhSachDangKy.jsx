@@ -155,13 +155,19 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
     }
   };
 
-  const handleRegister = (tripId) => {
+  const handleRegister = (tripOrId) => {
+    let trip = typeof tripOrId === 'object' ? tripOrId : availableTrips.find(t => t.id === tripOrId);
+    if (trip?.bi_trung_ngay) {
+      showPopup(trip.thong_tin_trung_ngay || 'Chuyến đi này bị trùng ngày với một chuyến khác bạn đã đăng ký!', 'error');
+      return;
+    }
+    const targetId = typeof tripOrId === 'object' ? tripOrId.id : tripOrId;
     setConfirmModal({
       isOpen: true,
       title: 'Xác nhận đăng ký',
       message: 'Bạn có chắc chắn muốn đăng ký chuyến kiến tập này?',
       type: 'register',
-      targetId: tripId,
+      targetId: targetId,
       reason: ''
     });
   };
@@ -478,6 +484,12 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                   </div>
                 </div>
               )}
+
+              {viewingTrip.bi_trung_ngay && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs font-semibold flex items-center gap-2">
+                  <span>⚠️ {viewingTrip.thong_tin_trung_ngay || 'Chuyến đi này trùng ngày với một chuyến khác bạn đã đăng ký.'}</span>
+                </div>
+              )}
             </div>
 
             {/* Modal Footer */}
@@ -489,15 +501,25 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                 Đóng
               </button>
               {availableTrips.some(t => t.id === viewingTrip.id) && (
-                <button
-                  onClick={() => {
-                    handleRegister(viewingTrip.id);
-                    setViewingTrip(null);
-                  }}
-                  className="px-6 py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl text-sm font-bold transition-colors cursor-pointer shadow-sm"
-                >
-                  Đăng ký ngay
-                </button>
+                viewingTrip.bi_trung_ngay ? (
+                  <button
+                    disabled
+                    title={viewingTrip.thong_tin_trung_ngay || 'Trùng ngày với chuyến đã đăng ký'}
+                    className="px-6 py-2.5 bg-slate-100 border border-slate-200 text-slate-400 rounded-xl text-sm font-bold cursor-not-allowed shadow-sm"
+                  >
+                    Trùng ngày tham quan
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      handleRegister(viewingTrip);
+                      setViewingTrip(null);
+                    }}
+                    className="px-6 py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl text-sm font-bold transition-colors cursor-pointer shadow-sm"
+                  >
+                    Đăng ký ngay
+                  </button>
+                )
               )}
             </div>
           </div>
@@ -695,6 +717,14 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                                     <RotateCcw className="w-3 h-3" /> Đợt bổ sung
                                   </span>
                                 )}
+                                {trip.bi_trung_ngay && (
+                                  <span
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-200"
+                                    title={trip.thong_tin_trung_ngay}
+                                  >
+                                    Trùng ngày
+                                  </span>
+                                )}
                                 <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider shrink-0 ${isOnline ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-[#E7E0C4]/50 text-slate-800'
                                   }`}>
                                   {isOnline ? <Laptop className="w-3.5 h-3.5" /> : <MapPin className="w-3.5 h-3.5" />}
@@ -733,19 +763,30 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                               </div>
                             </div>
 
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleRegister(trip.id);
-                              }}
-                              className={`w-full py-2.5 rounded-xl text-sm font-bold uppercase tracking-wider transition-colors shadow-sm cursor-pointer mt-4 flex items-center justify-center gap-2 ${trip.da_tung_dang_ky
-                                ? 'bg-orange-600 hover:bg-orange-700 text-white'
-                                : 'bg-[#407F3E] text-white hover:bg-[#407F3E]/90'
-                                }`}
-                            >
-                              {trip.da_tung_dang_ky && <RotateCcw className="w-4 h-4" />}
-                              {trip.da_tung_dang_ky ? 'Đăng ký lại' : 'Đăng ký'}
-                            </button>
+                            {trip.bi_trung_ngay ? (
+                              <button
+                                disabled
+                                onClick={(e) => e.stopPropagation()}
+                                title={trip.thong_tin_trung_ngay || 'Trùng ngày với chuyến đã đăng ký'}
+                                className="w-full py-2.5 rounded-xl text-sm font-bold uppercase tracking-wider bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed mt-4 flex items-center justify-center gap-2"
+                              >
+                                Trùng ngày tham quan
+                              </button>
+                            ) : (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRegister(trip);
+                                }}
+                                className={`w-full py-2.5 rounded-xl text-sm font-bold uppercase tracking-wider transition-colors shadow-sm cursor-pointer mt-4 flex items-center justify-center gap-2 ${trip.da_tung_dang_ky
+                                  ? 'bg-orange-600 hover:bg-orange-700 text-white'
+                                  : 'bg-[#407F3E] text-white hover:bg-[#407F3E]/90'
+                                  }`}
+                              >
+                                {trip.da_tung_dang_ky && <RotateCcw className="w-4 h-4" />}
+                                {trip.da_tung_dang_ky ? 'Đăng ký lại' : 'Đăng ký'}
+                              </button>
+                            )}
                           </div>
                         );
                       })

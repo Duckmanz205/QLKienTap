@@ -62,19 +62,32 @@ export default function HoiDongChamBaoCao_Khoa() {
   const [actionMenu, setActionMenu] = useState(null);
 
   useEffect(() => {
-    const handleClose = () => {
-      setActionMenu(null);
+    if (!actionMenu) return;
+    const handleClose = (e) => {
+      if (!e.target.closest?.('.action-menu-popup') && !e.target.closest?.('.action-btn-trigger')) {
+        setActionMenu(null);
+      }
     };
-    if (actionMenu) {
-      window.addEventListener('click', handleClose);
-      window.addEventListener('scroll', handleClose, true);
-      window.addEventListener('resize', handleClose);
-      return () => {
-        window.removeEventListener('click', handleClose);
-        window.removeEventListener('scroll', handleClose, true);
-        window.removeEventListener('resize', handleClose);
-      };
-    }
+    const handleScroll = (e) => {
+      if (!e.target.closest?.('.action-menu-popup')) {
+        setActionMenu(null);
+      }
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setActionMenu(null);
+    };
+    document.addEventListener('mousedown', handleClose, true);
+    document.addEventListener('touchstart', handleClose, true);
+    document.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('scroll', handleScroll, true);
+    window.addEventListener('resize', handleClose);
+    return () => {
+      document.removeEventListener('mousedown', handleClose, true);
+      document.removeEventListener('touchstart', handleClose, true);
+      document.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('scroll', handleScroll, true);
+      window.removeEventListener('resize', handleClose);
+    };
   }, [actionMenu]);
 
   // Form States (Create)
@@ -259,31 +272,74 @@ export default function HoiDongChamBaoCao_Khoa() {
     }
   };
 
+  const checkLecturerConflict = (lecturerId, targetDateTime, excludeBoardId = null) => {
+    if (!lecturerId || !targetDateTime) return null;
+    const targetDate = new Date(targetDateTime);
+    if (isNaN(targetDate.getTime())) return null;
+
+    for (const board of committees) {
+      if (excludeBoardId && board.id === excludeBoardId) continue;
+      if (!board.raw_ngay_bao_cao) continue;
+      const boardDate = new Date(board.raw_ngay_bao_cao);
+      if (isNaN(boardDate.getTime())) continue;
+
+      const isSameDay =
+        targetDate.getFullYear() === boardDate.getFullYear() &&
+        targetDate.getMonth() === boardDate.getMonth() &&
+        targetDate.getDate() === boardDate.getDate();
+
+      const diffMinutes = Math.abs(targetDate.getTime() - boardDate.getTime()) / (60 * 1000);
+
+      // Trùng ngày và khoảng cách thời gian < 120 phút (trong cùng khung giờ bảo vệ)
+      if (isSameDay && diffMinutes < 120) {
+        const isMember = (board.members || []).some(
+          m => (m.giang_vien_id === lecturerId || m.giangVien?.id === lecturerId)
+        );
+        if (isMember) {
+          return {
+            conflictingBoard: board,
+            boardName: board.ten,
+            room: board.diaDiem,
+            time: board.gio || boardDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+            date: board.ngay || boardDate.toLocaleDateString('vi-VN'),
+          };
+        }
+      }
+    }
+    return null;
+  };
+
   const handleCreateBoard = async (e) => {
     e.preventDefault();
     if (!selectedSchedule || !boardName || !dateTime || !room) {
       toast.error('Vui lòng điền đủ thông tin bắt buộc');
       return;
     }
+
+    // Pre-check xung đột lịch cho từng thành viên đã chọn
+    for (const m of selectedMembers) {
+      const conflict = checkLecturerConflict(m.id, dateTime);
+      if (conflict) {
+        const lec = lecturers.find(l => l.id === m.id);
+        toast.error(
+          `Không thể tạo: Giảng viên "${lec?.ho_ten || m.id}" bị trùng lịch với hội đồng "${conflict.boardName}" (${conflict.time} ngày ${conflict.date}).`,
+        );
+        return;
+      }
+    }
+
     try {
       setIsSubmittingBoard(true);
-      const res = await khoaApi.createBoard({
-        dotKienTapId: selectedSchedule,
+      await khoaApi.createBoard({
+        dotKienTapId: Number(selectedSchedule),
         name: boardName,
         date: dateTime,
-        room: room
+        room: room,
+        members: selectedMembers.map(m => ({
+          lecturerId: m.id,
+          role: m.role || 'ThanhVien',
+        })),
       });
-
-      const boardId = res.data.id;
-
-      // add board members
-      for (const member of selectedMembers) {
-        await khoaApi.addBoardMember({
-          boardId,
-          lecturerId: member.id,
-          role: member.role
-        });
-      }
 
       toast.success('Tạo hội đồng thành công!');
       setIsModalOpen(false);
@@ -335,6 +391,19 @@ export default function HoiDongChamBaoCao_Khoa() {
       toast.error('Vui lòng điền đủ thông tin bắt buộc');
       return;
     }
+
+    // Pre-check xung đột lịch cho từng thành viên đã chọn
+    for (const m of editSelectedMembers) {
+      const conflict = checkLecturerConflict(m.id, editDateTime, editingBoardId);
+      if (conflict) {
+        const lec = lecturers.find(l => l.id === m.id);
+        toast.error(
+          `Không thể cập nhật: Giảng viên "${lec?.ho_ten || m.id}" bị trùng lịch với hội đồng "${conflict.boardName}" (${conflict.time} ngày ${conflict.date}).`,
+        );
+        return;
+      }
+    }
+
     try {
       setIsSubmittingEdit(true);
       await khoaApi.updateBoard(editingBoardId, {
@@ -349,6 +418,12 @@ export default function HoiDongChamBaoCao_Khoa() {
       });
       toast.success('Cập nhật thông tin hội đồng thành công!');
       setIsEditModalOpen(false);
+      setEditingBoardId(null);
+      setEditBoardName('');
+      setEditSelectedSchedule('');
+      setEditDateTime('');
+      setEditRoom('');
+      setEditSelectedMembers([]);
       fetchData();
     } catch (err) {
       console.error(err);
@@ -467,6 +542,8 @@ export default function HoiDongChamBaoCao_Khoa() {
       });
       toast.success(res.data?.message || 'Mở khóa điểm hội đồng thành công!');
       setIsUnlockModalOpen(false);
+      setUnlockReason('');
+      setUnlockTarget(null);
       if (viewingDetail?.id) {
         const updatedStudents = await khoaApi.getBoardStudents(viewingDetail.id);
         setBoardStudents(updatedStudents.data || []);
@@ -526,15 +603,25 @@ export default function HoiDongChamBaoCao_Khoa() {
   };
 
   useEffect(() => {
-    const handleOutside = () => setActiveRoleDropdown(null);
-    if (activeRoleDropdown) {
-      window.addEventListener('click', handleOutside);
-      window.addEventListener('resize', handleOutside);
-      return () => {
-        window.removeEventListener('click', handleOutside);
-        window.removeEventListener('resize', handleOutside);
-      };
-    }
+    if (!activeRoleDropdown) return;
+    const handleOutside = (e) => {
+      if (!e.target.closest?.('.role-dropdown-popup')) {
+        setActiveRoleDropdown(null);
+      }
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setActiveRoleDropdown(null);
+    };
+    document.addEventListener('mousedown', handleOutside, true);
+    document.addEventListener('touchstart', handleOutside, true);
+    document.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('resize', handleOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleOutside, true);
+      document.removeEventListener('touchstart', handleOutside, true);
+      document.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('resize', handleOutside);
+    };
   }, [activeRoleDropdown]);
 
   const handleAssignStudents = async () => {
@@ -644,7 +731,6 @@ export default function HoiDongChamBaoCao_Khoa() {
       className="min-h-[calc(100vh-64px)] p-6 lg:p-8 space-y-6 relative"
       onClick={() => {
         setActionMenu(null);
-        setIsStatusDropdownOpen(false);
       }}
     >
       {/* Hàng 1: Tiêu đề trang độc lập */}
@@ -1020,7 +1106,7 @@ export default function HoiDongChamBaoCao_Khoa() {
             bottom: actionMenu.isDropup ? `${window.innerHeight - actionMenu.top}px` : undefined,
             right: `${actionMenu.right}px`,
           }}
-          className="w-72 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 py-1 text-left animate-in fade-in zoom-in-95 duration-150"
+          className="action-menu-popup w-72 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 py-1 text-left animate-in fade-in zoom-in-95 duration-150"
           onClick={(e) => e.stopPropagation()}
         >
           <button
@@ -1202,6 +1288,7 @@ export default function HoiDongChamBaoCao_Khoa() {
                             )
                             .map(lec => {
                               const isChecked = selectedMembers.some(m => m.id === lec.id);
+                              const conflict = checkLecturerConflict(lec.id, dateTime);
                               return (
                                 <div
                                   key={lec.id}
@@ -1209,20 +1296,38 @@ export default function HoiDongChamBaoCao_Khoa() {
                                     if (isChecked) {
                                       setSelectedMembers(selectedMembers.filter(m => m.id !== lec.id));
                                     } else {
+                                      if (conflict) {
+                                        toast.error(
+                                          `Giảng viên "${lec.ho_ten}" đã trùng lịch với hội đồng "${conflict.boardName}" lúc ${conflict.time} ngày ${conflict.date}!`,
+                                        );
+                                        return;
+                                      }
                                       setSelectedMembers([...selectedMembers, { id: lec.id, role: 'ThanhVien' }]);
                                     }
                                   }}
-                                  className="px-4 py-1.5 text-sm flex items-center gap-2 cursor-pointer hover:bg-slate-50 transition-colors"
+                                  className={`px-4 py-2 text-sm flex items-center justify-between gap-2 cursor-pointer transition-colors ${
+                                    conflict && !isChecked
+                                      ? 'opacity-70 bg-rose-50/40 hover:bg-rose-50/80 cursor-not-allowed'
+                                      : 'hover:bg-slate-50'
+                                  }`}
                                 >
-                                  <input
-                                    type="checkbox"
-                                    className="w-3.5 h-3.5 text-[#407F3E] rounded border-slate-300 focus:ring-[#407F3E] cursor-pointer"
-                                    checked={isChecked}
-                                    readOnly
-                                  />
-                                  <span className={isChecked ? "font-bold text-slate-800" : "font-medium text-slate-600"}>
-                                    {lec.ho_ten} {lec.ma_gv ? `(${lec.ma_gv})` : ''}
-                                  </span>
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <input
+                                      type="checkbox"
+                                      className="w-3.5 h-3.5 text-[#407F3E] rounded border-slate-300 focus:ring-[#407F3E] cursor-pointer"
+                                      checked={isChecked}
+                                      disabled={Boolean(conflict && !isChecked)}
+                                      readOnly
+                                    />
+                                    <span className={isChecked ? "font-bold text-slate-800 truncate" : "font-medium text-slate-600 truncate"}>
+                                      {lec.ho_ten} {lec.ma_gv ? `(${lec.ma_gv})` : ''}
+                                    </span>
+                                  </div>
+                                  {conflict && (
+                                    <span className="shrink-0 text-[10px] font-semibold text-rose-600 bg-rose-100/70 border border-rose-200 px-1.5 py-0.5 rounded">
+                                      Trùng: {conflict.boardName} ({conflict.time})
+                                    </span>
+                                  )}
                                 </div>
                               );
                             })}
@@ -1236,41 +1341,59 @@ export default function HoiDongChamBaoCao_Khoa() {
                     <div className="mt-2.5 max-h-72 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-3 pr-1">
                       {selectedMembers.map(m => {
                         const lec = lecturers.find(l => l.id === m.id);
+                        const conflict = checkLecturerConflict(m.id, dateTime);
                         return (
-                          <div key={m.id} className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded-xl hover:border-slate-300 transition-colors">
-                            <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                              <div className="w-7 h-7 rounded-lg bg-[#407F3E]/10 text-[#407F3E] flex items-center justify-center font-bold text-xs shrink-0">
-                                {lec?.ho_ten?.charAt(0) || 'G'}
+                          <div
+                            key={m.id}
+                            className={`flex flex-col p-2.5 rounded-xl border transition-colors ${
+                              conflict
+                                ? 'bg-rose-50/60 border-rose-300 ring-1 ring-rose-300'
+                                : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between w-full">
+                              <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${
+                                  conflict ? 'bg-rose-100 text-rose-700' : 'bg-[#407F3E]/10 text-[#407F3E]'
+                                }`}>
+                                  {lec?.ho_ten?.charAt(0) || 'G'}
+                                </div>
+                                <div className="truncate">
+                                  <span className="text-sm font-semibold text-slate-800 truncate block">{lec?.ho_ten}</span>
+                                  {lec?.ma_gv && <span className="text-xs text-slate-400 block font-normal">{lec.ma_gv}</span>}
+                                </div>
                               </div>
-                              <div className="truncate">
-                                <span className="text-sm font-semibold text-slate-800 truncate block">{lec?.ho_ten}</span>
-                                {lec?.ma_gv && <span className="text-xs text-slate-400 block font-normal">{lec.ma_gv}</span>}
+                              <div className="flex items-center gap-2 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleOpenRoleDropdown(e, m.id, 'create')}
+                                  className={`px-2.5 py-1.5 bg-white border rounded-lg text-xs font-bold flex items-center justify-between gap-1.5 cursor-pointer shadow-2xs transition-all ${activeRoleDropdown?.id === m.id && activeRoleDropdown?.context === 'create'
+                                    ? 'border-[#407F3E] ring-1 ring-[#407F3E] text-[#407F3E]'
+                                    : 'border-slate-200 text-slate-700 hover:border-[#407F3E]'
+                                    }`}
+                                >
+                                  <span>{getRoleLabel(m.role)}</span>
+                                  <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${activeRoleDropdown?.id === m.id && activeRoleDropdown?.context === 'create' ? 'rotate-180' : ''}`} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (activeRoleDropdown?.id === m.id && activeRoleDropdown?.context === 'create') setActiveRoleDropdown(null);
+                                    setSelectedMembers(selectedMembers.filter(item => item.id !== m.id));
+                                  }}
+                                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                  title="Xóa thành viên"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
                               </div>
                             </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <button
-                                type="button"
-                                onClick={(e) => handleOpenRoleDropdown(e, m.id, 'create')}
-                                className={`px-2.5 py-1.5 bg-white border rounded-lg text-xs font-bold flex items-center justify-between gap-1.5 cursor-pointer shadow-2xs transition-all ${activeRoleDropdown?.id === m.id && activeRoleDropdown?.context === 'create'
-                                  ? 'border-[#407F3E] ring-1 ring-[#407F3E] text-[#407F3E]'
-                                  : 'border-slate-200 text-slate-700 hover:border-[#407F3E]'
-                                  }`}
-                              >
-                                <span>{getRoleLabel(m.role)}</span>
-                                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${activeRoleDropdown?.id === m.id && activeRoleDropdown?.context === 'create' ? 'rotate-180' : ''}`} />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (activeRoleDropdown?.id === m.id && activeRoleDropdown?.context === 'create') setActiveRoleDropdown(null);
-                                  setSelectedMembers(selectedMembers.filter(item => item.id !== m.id));
-                                }}
-                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                                title="Xóa thành viên"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            </div>
+                            {conflict && (
+                              <div className="mt-1.5 text-[11px] text-rose-600 font-semibold flex items-center gap-1">
+                                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                <span>Trùng: {conflict.boardName} ({conflict.time} ngày {conflict.date})</span>
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -1438,6 +1561,7 @@ export default function HoiDongChamBaoCao_Khoa() {
                             )
                             .map(lec => {
                               const isChecked = editSelectedMembers.some(m => m.id === lec.id);
+                              const conflict = checkLecturerConflict(lec.id, editDateTime, editingBoardId);
                               return (
                                 <div
                                   key={lec.id}
@@ -1445,20 +1569,38 @@ export default function HoiDongChamBaoCao_Khoa() {
                                     if (isChecked) {
                                       setEditSelectedMembers(editSelectedMembers.filter(m => m.id !== lec.id));
                                     } else {
+                                      if (conflict) {
+                                        toast.error(
+                                          `Giảng viên "${lec.ho_ten}" đã trùng lịch với hội đồng "${conflict.boardName}" lúc ${conflict.time} ngày ${conflict.date}!`,
+                                        );
+                                        return;
+                                      }
                                       setEditSelectedMembers([...editSelectedMembers, { id: lec.id, role: 'ThanhVien' }]);
                                     }
                                   }}
-                                  className="px-4 py-1.5 text-sm flex items-center gap-2 cursor-pointer hover:bg-slate-50 transition-colors"
+                                  className={`px-4 py-2 text-sm flex items-center justify-between gap-2 cursor-pointer transition-colors ${
+                                    conflict && !isChecked
+                                      ? 'opacity-70 bg-rose-50/40 hover:bg-rose-50/80 cursor-not-allowed'
+                                      : 'hover:bg-slate-50'
+                                  }`}
                                 >
-                                  <input
-                                    type="checkbox"
-                                    className="w-3.5 h-3.5 text-[#407F3E] rounded border-slate-300 focus:ring-[#407F3E] cursor-pointer"
-                                    checked={isChecked}
-                                    readOnly
-                                  />
-                                  <span className={isChecked ? "font-bold text-slate-800" : "font-medium text-slate-600"}>
-                                    {lec.ho_ten} {lec.ma_gv ? `(${lec.ma_gv})` : ''}
-                                  </span>
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <input
+                                      type="checkbox"
+                                      className="w-3.5 h-3.5 text-[#407F3E] rounded border-slate-300 focus:ring-[#407F3E] cursor-pointer"
+                                      checked={isChecked}
+                                      disabled={Boolean(conflict && !isChecked)}
+                                      readOnly
+                                    />
+                                    <span className={isChecked ? "font-bold text-slate-800 truncate" : "font-medium text-slate-600 truncate"}>
+                                      {lec.ho_ten} {lec.ma_gv ? `(${lec.ma_gv})` : ''}
+                                    </span>
+                                  </div>
+                                  {conflict && (
+                                    <span className="shrink-0 text-[10px] font-semibold text-rose-600 bg-rose-100/70 border border-rose-200 px-1.5 py-0.5 rounded">
+                                      Trùng: {conflict.boardName} ({conflict.time})
+                                    </span>
+                                  )}
                                 </div>
                               );
                             })}
@@ -1472,43 +1614,61 @@ export default function HoiDongChamBaoCao_Khoa() {
                     <div className="mt-2.5 max-h-72 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-3 pr-1">
                       {editSelectedMembers.map(m => {
                         const lec = lecturers.find(l => l.id === m.id);
+                        const conflict = checkLecturerConflict(m.id, editDateTime, editingBoardId);
                         return (
-                          <div key={m.id} className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded-xl hover:border-slate-300 transition-colors">
-                            <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                              <div className="w-7 h-7 rounded-lg bg-[#407F3E]/10 text-[#407F3E] flex items-center justify-center font-bold text-xs shrink-0">
-                                {lec?.ho_ten?.charAt(0) || 'G'}
+                          <div
+                            key={m.id}
+                            className={`flex flex-col p-2.5 rounded-xl border transition-colors ${
+                              conflict
+                                ? 'bg-rose-50/60 border-rose-300 ring-1 ring-rose-300'
+                                : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between w-full">
+                              <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${
+                                  conflict ? 'bg-rose-100 text-rose-700' : 'bg-[#407F3E]/10 text-[#407F3E]'
+                                }`}>
+                                  {lec?.ho_ten?.charAt(0) || 'G'}
+                                </div>
+                                <div className="truncate">
+                                  <span className="text-sm font-semibold text-slate-800 truncate block">{lec?.ho_ten}</span>
+                                  {lec?.ma_gv && <span className="text-xs text-slate-400 block font-normal">{lec.ma_gv}</span>}
+                                </div>
                               </div>
-                              <div className="truncate">
-                                <span className="text-sm font-semibold text-slate-800 truncate block">{lec?.ho_ten}</span>
-                                {lec?.ma_gv && <span className="text-xs text-slate-400 block font-normal">{lec.ma_gv}</span>}
+                              <div className="flex items-center gap-2 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleOpenRoleDropdown(e, m.id, 'edit')}
+                                  className={`px-2.5 py-1.5 bg-white border rounded-lg text-xs font-bold flex items-center justify-between gap-1.5 cursor-pointer shadow-2xs transition-all ${activeRoleDropdown?.id === m.id && activeRoleDropdown?.context === 'edit'
+                                    ? 'border-[#407F3E] ring-1 ring-[#407F3E] text-[#407F3E]'
+                                    : 'border-slate-200 text-slate-700 hover:border-[#407F3E]'
+                                    }`}
+                                >
+                                  <span>{getRoleLabel(m.role)}</span>
+                                  <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${activeRoleDropdown?.id === m.id && activeRoleDropdown?.context === 'edit' ? 'rotate-180' : ''}`} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (activeRoleDropdown?.id === m.id && activeRoleDropdown?.context === 'edit') {
+                                      setActiveRoleDropdown(null);
+                                    }
+                                    setEditSelectedMembers(editSelectedMembers.filter(item => item.id !== m.id));
+                                  }}
+                                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                  title="Xóa thành viên"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
                               </div>
                             </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <button
-                                type="button"
-                                onClick={(e) => handleOpenRoleDropdown(e, m.id, 'edit')}
-                                className={`px-2.5 py-1.5 bg-white border rounded-lg text-xs font-bold flex items-center justify-between gap-1.5 cursor-pointer shadow-2xs transition-all ${activeRoleDropdown?.id === m.id && activeRoleDropdown?.context === 'edit'
-                                  ? 'border-[#407F3E] ring-1 ring-[#407F3E] text-[#407F3E]'
-                                  : 'border-slate-200 text-slate-700 hover:border-[#407F3E]'
-                                  }`}
-                              >
-                                <span>{getRoleLabel(m.role)}</span>
-                                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${activeRoleDropdown?.id === m.id && activeRoleDropdown?.context === 'edit' ? 'rotate-180' : ''}`} />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (activeRoleDropdown?.id === m.id && activeRoleDropdown?.context === 'edit') {
-                                    setActiveRoleDropdown(null);
-                                  }
-                                  setEditSelectedMembers(editSelectedMembers.filter(item => item.id !== m.id));
-                                }}
-                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                                title="Xóa thành viên"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            </div>
+                            {conflict && (
+                              <div className="mt-1.5 text-[11px] text-rose-600 font-semibold flex items-center gap-1">
+                                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                <span>Trùng: {conflict.boardName} ({conflict.time} ngày {conflict.date})</span>
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -2333,7 +2493,7 @@ export default function HoiDongChamBaoCao_Khoa() {
       {/* Portal Dropdown Menu cho chọn vai trò thành viên hội đồng */}
       {activeRoleDropdown && createPortal(
         <div
-          className="fixed w-36 bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-[9999] py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+          className="role-dropdown-popup fixed w-36 bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-[9999] py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-150"
           style={{ top: roleDropdownPos.top, left: roleDropdownPos.left }}
           onClick={(e) => e.stopPropagation()}
         >

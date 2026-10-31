@@ -8,6 +8,7 @@ import html2canvas from 'html2canvas';
 import { khoaApi } from '../../services/api';
 import Toast from '../../components/Toast';
 import SearchableDropdown from '../../components/SearchableDropdown';
+import useClickOutside from '../../hooks/useClickOutside';
 
 function convertNumberToWords(amount) {
   if (amount === 0) return "Không đồng";
@@ -164,19 +165,17 @@ export default function QuanLyLePhi_Khoa() {
     ten_chu_tai_khoan: '',
     ghi_chu: ''
   });
-  const [isLichDropdownOpen, setIsLichDropdownOpen] = useState(false);
   const [selectedLich, setSelectedLich] = useState('');
-  const [searchLichTerm, setSearchLichTerm] = useState('');
   const [bankList, setBankList] = useState([]);
 
   const [confirmPaymentModal, setConfirmPaymentModal] = useState({ show: false, hoaDonId: null });
 
   const [isBankDropdownOpen, setIsBankDropdownOpen] = useState(false);
   const [bankSearchTerm, setBankSearchTerm] = useState('');
+  const bankDropdownRef = useRef(null);
+  useClickOutside(bankDropdownRef, () => setIsBankDropdownOpen(false), isBankDropdownOpen);
 
-  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState('');
-  const [searchStatusTerm, setSearchStatusTerm] = useState('');
   const statusOptions = ["Tất cả", "Chưa đóng", "Đã đóng", "Hủy - Chờ hoàn", "Đã hoàn phí"];
 
   useEffect(() => {
@@ -240,12 +239,14 @@ export default function QuanLyLePhi_Khoa() {
   const handleSaveConfig = async () => {
     try {
       await khoaApi.saveTaiKhoanThuHuong(paymentConfig);
-      setToast({ show: true, message: 'Đã lưu cấu hình thanh toán', type: 'success' });
+      setToast({ show: true, message: 'Đã lưu cấu hình tài khoản thanh toán thành công', type: 'success' });
+      setIsConfigModalOpen(false);
       setConfigViewMode('list');
+      setPaymentConfig({ id: null, ma_ngan_hang: '', ten_ngan_hang: '', so_tai_khoan: '', ten_chu_tai_khoan: '', ghi_chu: '' });
       fetchConfig();
     } catch (err) {
       console.error(err);
-      setToast({ show: true, message: 'Lỗi lưu cấu hình', type: 'error' });
+      setToast({ show: true, message: err.response?.data?.message || 'Lỗi lưu cấu hình thanh toán', type: 'error' });
     }
   };
 
@@ -262,21 +263,6 @@ export default function QuanLyLePhi_Khoa() {
   const handleEditConfig = (config) => {
     setPaymentConfig(config);
     setConfigViewMode('form');
-  };
-
-  // Close all dropdowns
-  const closeAllDropdowns = () => {
-    setIsLichDropdownOpen(false);
-    setIsStatusDropdownOpen(false);
-    setIsBankDropdownOpen(false);
-    setSearchLichTerm('');
-    setSearchStatusTerm('');
-  };
-
-  const handleDropdownClick = (e, setter) => {
-    e.stopPropagation();
-    closeAllDropdowns();
-    setter(true);
   };
 
   // Status Badge Helper
@@ -362,7 +348,7 @@ export default function QuanLyLePhi_Khoa() {
   };
 
   return (
-    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300 relative" onClick={closeAllDropdowns}>
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300 relative">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <h1 className="text-2xl font-bold text-slate-800">Quản lý lệ phí</h1>
@@ -409,114 +395,36 @@ export default function QuanLyLePhi_Khoa() {
         </div>
 
         {/* Lịch Dropdown */}
-        <div className="relative min-w-[260px]">
-          <div
-            onClick={(e) => handleDropdownClick(e, setIsLichDropdownOpen)}
-            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isLichDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-          >
-            <span className={`truncate pr-2 font-medium ${selectedLich ? 'text-slate-700' : 'text-slate-400'}`}>
-              {selectedLich === 'ALL' ? 'Tất cả lịch' : (schedules.find(s => s.id === selectedLich)?.ten_lich || 'Chọn lịch kiến tập')}
-            </span>
-            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-          </div>
-          {isLichDropdownOpen && (
-            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[260px]">
-              <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
-                <input
-                  type="text"
-                  placeholder="Tìm lịch..."
-                  value={searchLichTerm}
-                  onChange={(e) => setSearchLichTerm(e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
-                />
-              </div>
-              <div className="max-h-60 overflow-y-auto">
-                <div
-                  onClick={() => {
-                    setSelectedLich('ALL');
-                    setIsLichDropdownOpen(false);
-                    setCurrentPage(1);
-                    setSearchLichTerm('');
-                  }}
-                  className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${selectedLich === 'ALL' ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50 font-medium'}`}
-                >
-                  <span className="truncate pr-2">Tất cả lịch</span>
-                  {selectedLich === 'ALL' && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                </div>
-                {schedules
-                  .filter(opt => opt.ten_lich?.toLowerCase().includes(searchLichTerm.toLowerCase()))
-                  .map(opt => (
-                    <div
-                      key={opt.id}
-                      onClick={() => {
-                        setSelectedLich(opt.id);
-                        setIsLichDropdownOpen(false);
-                        setCurrentPage(1);
-                        setSearchLichTerm('');
-                      }}
-                      className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${selectedLich === opt.id ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50 font-medium'
-                        }`}
-                    >
-                      <span className="truncate pr-2">{opt.ten_lich}</span>
-                      {selectedLich === opt.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                    </div>
-                  ))}
-                {schedules.filter(opt => opt.ten_lich?.toLowerCase().includes(searchLichTerm.toLowerCase())).length === 0 && searchLichTerm && (
-                  <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy</div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+        <SearchableDropdown
+          options={[
+            { value: 'ALL', label: 'Tất cả lịch' },
+            ...schedules.map(s => ({ value: s.id, label: s.ten_lich }))
+          ]}
+          value={selectedLich}
+          onChange={(val) => {
+            setSelectedLich(val);
+            setCurrentPage(1);
+          }}
+          placeholder="Chọn lịch kiến tập"
+          searchPlaceholder="Tìm lịch..."
+          className="min-w-[260px]"
+        />
 
         {/* Trạng thái Dropdown */}
-        <div className="relative min-w-[180px]">
-          <div
-            onClick={(e) => handleDropdownClick(e, setIsStatusDropdownOpen)}
-            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isStatusDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-          >
-            <span className={`truncate pr-2 font-medium ${selectedStatus ? 'text-slate-700' : 'text-slate-400'}`}>{selectedStatus || 'Tất cả trạng thái'}</span>
-            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-          </div>
-          {isStatusDropdownOpen && (
-            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[190px]">
-              <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
-                <input
-                  type="text"
-                  placeholder="Tìm trạng thái..."
-                  value={searchStatusTerm}
-                  onChange={(e) => setSearchStatusTerm(e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
-                />
-              </div>
-              <div className="max-h-60 overflow-y-auto">
-                {statusOptions
-                  .filter(opt => opt.toLowerCase().includes(searchStatusTerm.toLowerCase()))
-                  .map(opt => (
-                    <div
-                      key={opt}
-                      onClick={() => {
-                        setSelectedStatus(opt === 'Tất cả' ? '' : opt);
-                        setIsStatusDropdownOpen(false);
-                        setCurrentPage(1);
-                        setSearchStatusTerm('');
-                      }}
-                      className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${(selectedStatus === opt || (!selectedStatus && opt === 'Tất cả')) ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50 font-medium'
-                        }`}
-                    >
-                      <span className="truncate pr-2">{opt}</span>
-                      {(selectedStatus === opt || (!selectedStatus && opt === 'Tất cả')) && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                    </div>
-                  ))}
-                {statusOptions.filter(opt => opt.toLowerCase().includes(searchStatusTerm.toLowerCase())).length === 0 && searchStatusTerm && (
-                  <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy</div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+        <SearchableDropdown
+          options={statusOptions.map(opt => ({
+            value: opt === 'Tất cả' ? '' : opt,
+            label: opt
+          }))}
+          value={selectedStatus}
+          onChange={(val) => {
+            setSelectedStatus(val);
+            setCurrentPage(1);
+          }}
+          placeholder="Tất cả trạng thái"
+          searchPlaceholder="Tìm trạng thái..."
+          className="min-w-[180px]"
+        />
       </div>
 
       {/* Main Table */}
@@ -882,10 +790,10 @@ export default function QuanLyLePhi_Khoa() {
               </div>
             ) : (
               <div className="p-6 space-y-4">
-                <div className="relative">
+                <div className="relative" ref={bankDropdownRef}>
                   <label className="block text-sm font-bold text-slate-700 mb-1">Ngân hàng thụ hưởng</label>
                   <div
-                    onClick={(e) => { e.stopPropagation(); setIsBankDropdownOpen(!isBankDropdownOpen); setBankSearchTerm(''); }}
+                    onClick={() => { setIsBankDropdownOpen(!isBankDropdownOpen); setBankSearchTerm(''); }}
                     className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg flex justify-between items-center cursor-pointer hover:bg-slate-100 transition-colors"
                   >
                     <span className={`truncate ${!paymentConfig.ma_ngan_hang ? 'text-slate-400' : 'text-slate-700'}`}>

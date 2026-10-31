@@ -16,6 +16,7 @@ import {
   Not,
   IsNull,
   FindOptionsWhere,
+  QueryFailedError,
 } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import * as xlsx from 'xlsx';
@@ -181,32 +182,143 @@ export class KhoaService implements OnModuleInit {
   }
 
   // -------------------------------------------------------------
-  // Danh Muc CRUD
   // -------------------------------------------------------------
+  // Danh Muc CRUD: Năm học & Học kỳ (Ràng buộc chặt chẽ)
+  // -------------------------------------------------------------
+  private toDateOnlyString(date: Date | string | null | undefined): string {
+    if (!date) return '';
+    if (typeof date === 'string') {
+      return date.split('T')[0].trim();
+    }
+    const d = new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  private formatDateVN(dateStr: string): string {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return dateStr;
+  }
+
+  private validateYearName(name: string): { startYear: number; endYear: number } {
+    if (!name || typeof name !== 'string') {
+      throw new BadRequestException('Tên năm học không được để trống');
+    }
+    const trimmed = name.trim();
+    const match = trimmed.match(/^(\d{4})-(\d{4})$/);
+    if (!match) {
+      throw new BadRequestException(
+        'Tên năm học phải có định dạng YYYY-YYYY (Ví dụ: 2024-2025)',
+      );
+    }
+    const startYear = parseInt(match[1], 10);
+    const endYear = parseInt(match[2], 10);
+    if (endYear !== startYear + 1) {
+      throw new BadRequestException(
+        `Năm kết thúc (${endYear}) phải bằng năm bắt đầu (${startYear}) + 1 (Ví dụ: ${startYear}-${startYear + 1})`,
+      );
+    }
+    return { startYear, endYear };
+  }
+
   async getYears() {
-    return this.namHocRepo.find();
+    return this.namHocRepo.find({ order: { ten_nam_hoc: 'DESC' } });
   }
+
   async createYear(data: Partial<NamHoc>) {
+    if (!data.ten_nam_hoc) {
+      throw new BadRequestException('Tên năm học không được để trống');
+    }
+    const { startYear, endYear } = this.validateYearName(data.ten_nam_hoc);
+    const tenNamHoc = `${startYear}-${endYear}`;
+
+    // 1. Kiểm tra trùng tên năm học
+    const existing = await this.namHocRepo.findOne({
+      where: { ten_nam_hoc: tenNamHoc },
+    });
+    if (existing) {
+      throw new BadRequestException(`Năm học "${tenNamHoc}" đã tồn tại trên hệ thống`);
+    }
+
+    // 2. Kiểm tra ngày bắt đầu và ngày kết thúc
+    if (!data.ngay_bat_dau || !data.ngay_ket_thuc) {
+      throw new BadRequestException('Vui lòng chọn ngày bắt đầu và kết thúc năm học');
+    }
+    const startStr = this.toDateOnlyString(data.ngay_bat_dau);
+    const endStr = this.toDateOnlyString(data.ngay_ket_thuc);
+    if (startStr >= endStr) {
+      throw new BadRequestException('Ngày kết thúc năm học phải lớn hơn ngày bắt đầu');
+    }
+
+    // 3. Kiểm tra chồng chéo khoảng thời gian với các năm học khác
+    const allYears = await this.namHocRepo.find();
+    for (const y of allYears) {
+      const yStart = this.toDateOnlyString(y.ngay_bat_dau);
+      const yEnd = this.toDateOnlyString(y.ngay_ket_thuc);
+      if (startStr <= yEnd && endStr >= yStart) {
+        throw new BadRequestException(
+          `Khoảng thời gian năm học (${this.formatDateVN(startStr)} - ${this.formatDateVN(endStr)}) bị chồng chéo với năm học "${y.ten_nam_hoc}" (${this.formatDateVN(yStart)} - ${this.formatDateVN(yEnd)})`,
+        );
+      }
+    }
+
+    data.ten_nam_hoc = tenNamHoc;
     return this.namHocRepo.save(data);
-  }
-
-  async getTerms() {
-    return this.hocKyRepo.find({ relations: { namHoc: true } });
-  }
-  async createTerm(data: Partial<HocKy>) {
-    return this.hocKyRepo.save(data);
-  }
-
-  async getCourses() {
-    return this.khoaHocRepo.find();
-  }
-  async createCourse(data: Partial<KhoaHoc>) {
-    return this.khoaHocRepo.save(data);
   }
 
   async updateYear(id: number, data: Partial<NamHoc>) {
     const nh = await this.namHocRepo.findOne({ where: { id } });
     if (!nh) throw new NotFoundException('Không tìm thấy năm học');
+
+    let tenNamHoc = nh.ten_nam_hoc;
+    if (data.ten_nam_hoc) {
+      const { startYear, endYear } = this.validateYearName(data.ten_nam_hoc);
+      tenNamHoc = `${startYear}-${endYear}`;
+      const duplicate = await this.namHocRepo.findOne({
+        where: { ten_nam_hoc: tenNamHoc, id: Not(id) },
+      });
+      if (duplicate) {
+        throw new BadRequestException(`Năm học "${tenNamHoc}" đã tồn tại trên hệ thống`);
+      }
+      data.ten_nam_hoc = tenNamHoc;
+    }
+
+    const startStr = this.toDateOnlyString(data.ngay_bat_dau ?? nh.ngay_bat_dau);
+    const endStr = this.toDateOnlyString(data.ngay_ket_thuc ?? nh.ngay_ket_thuc);
+    if (startStr >= endStr) {
+      throw new BadRequestException('Ngày kết thúc năm học phải lớn hơn ngày bắt đầu');
+    }
+
+    // Kiểm tra chồng chéo thời gian với các năm học khác
+    const otherYears = await this.namHocRepo.find({ where: { id: Not(id) } });
+    for (const y of otherYears) {
+      const yStart = this.toDateOnlyString(y.ngay_bat_dau);
+      const yEnd = this.toDateOnlyString(y.ngay_ket_thuc);
+      if (startStr <= yEnd && endStr >= yStart) {
+        throw new BadRequestException(
+          `Khoảng thời gian năm học (${this.formatDateVN(startStr)} - ${this.formatDateVN(endStr)}) bị chồng chéo với năm học "${y.ten_nam_hoc}" (${this.formatDateVN(yStart)} - ${this.formatDateVN(yEnd)})`,
+        );
+      }
+    }
+
+    // Kiểm tra không thu hẹp thời gian năm học làm rơi các học kỳ con ra ngoài
+    const childTerms = await this.hocKyRepo.find({ where: { nam_hoc_id: id } });
+    for (const term of childTerms) {
+      const termStart = this.toDateOnlyString(term.ngay_bat_dau);
+      const termEnd = this.toDateOnlyString(term.ngay_ket_thuc);
+      if (startStr > termStart || endStr < termEnd) {
+        throw new BadRequestException(
+          `Không thể điều chỉnh thời gian năm học vì học kỳ "${term.ten_hoc_ky}" (${this.formatDateVN(termStart)} - ${this.formatDateVN(termEnd)}) sẽ nằm ngoài phạm vi năm học mới (${this.formatDateVN(startStr)} - ${this.formatDateVN(endStr)})`,
+        );
+      }
+    }
+
     Object.assign(nh, data);
     await this.namHocRepo.save(nh);
     return { message: 'Cập nhật năm học thành công', data: nh };
@@ -214,29 +326,179 @@ export class KhoaService implements OnModuleInit {
 
   async deleteYear(id: number) {
     const count = await this.hocKyRepo.count({ where: { nam_hoc_id: id } });
-    if (count > 0)
+    if (count > 0) {
       throw new BadRequestException(
         'Không thể xóa năm học đã có học kỳ được gắn vào',
       );
+    }
     const nh = await this.namHocRepo.findOne({ where: { id } });
     if (!nh) throw new NotFoundException('Không tìm thấy năm học');
     await this.namHocRepo.remove(nh);
     return { message: 'Xóa năm học thành công' };
   }
 
+  async getTerms() {
+    return this.hocKyRepo.find({
+      relations: { namHoc: true },
+      order: { ngay_bat_dau: 'DESC' },
+    });
+  }
+
+  async createTerm(data: Partial<HocKy>) {
+    if (!data.nam_hoc_id) {
+      throw new BadRequestException('Vui lòng chọn năm học cho học kỳ');
+    }
+    const namHoc = await this.namHocRepo.findOne({ where: { id: data.nam_hoc_id } });
+    if (!namHoc) {
+      throw new NotFoundException('Không tìm thấy năm học đã chọn');
+    }
+
+    if (!data.ten_hoc_ky || !data.ten_hoc_ky.trim()) {
+      throw new BadRequestException('Tên học kỳ không được để trống');
+    }
+    const tenHocKy = data.ten_hoc_ky.trim();
+
+    // 1. Kiểm tra trùng tên học kỳ trong cùng năm học
+    const existingSameName = await this.hocKyRepo.findOne({
+      where: { nam_hoc_id: data.nam_hoc_id, ten_hoc_ky: tenHocKy },
+    });
+    if (existingSameName) {
+      throw new BadRequestException(
+        `Học kỳ "${tenHocKy}" đã tồn tại trong năm học ${namHoc.ten_nam_hoc}`,
+      );
+    }
+
+    // 2. Kiểm tra ngày bắt đầu và ngày kết thúc
+    if (!data.ngay_bat_dau || !data.ngay_ket_thuc) {
+      throw new BadRequestException('Vui lòng chọn ngày bắt đầu và kết thúc của học kỳ');
+    }
+    const termStartStr = this.toDateOnlyString(data.ngay_bat_dau);
+    const termEndStr = this.toDateOnlyString(data.ngay_ket_thuc);
+    if (termStartStr >= termEndStr) {
+      throw new BadRequestException('Ngày kết thúc học kỳ phải lớn hơn ngày bắt đầu');
+    }
+
+    // 3. RÀNG BUỘC CỐT LÕI: Thời gian học kỳ phải nằm trong năm học cha
+    const yearStartStr = this.toDateOnlyString(namHoc.ngay_bat_dau);
+    const yearEndStr = this.toDateOnlyString(namHoc.ngay_ket_thuc);
+    if (termStartStr < yearStartStr || termEndStr > yearEndStr) {
+      throw new BadRequestException(
+        `Thời gian học kỳ (${this.formatDateVN(termStartStr)} - ${this.formatDateVN(termEndStr)}) phải nằm trong khoảng thời gian của năm học ${namHoc.ten_nam_hoc} (${this.formatDateVN(yearStartStr)} - ${this.formatDateVN(yearEndStr)})`,
+      );
+    }
+
+    // 4. Kiểm tra không chồng chéo thời gian giữa các học kỳ trong cùng năm học
+    const termsInYear = await this.hocKyRepo.find({
+      where: { nam_hoc_id: data.nam_hoc_id },
+    });
+    for (const otherTerm of termsInYear) {
+      const oStart = this.toDateOnlyString(otherTerm.ngay_bat_dau);
+      const oEnd = this.toDateOnlyString(otherTerm.ngay_ket_thuc);
+      if (termStartStr <= oEnd && termEndStr >= oStart) {
+        throw new BadRequestException(
+          `Thời gian học kỳ (${this.formatDateVN(termStartStr)} - ${this.formatDateVN(termEndStr)}) bị chồng chéo với học kỳ "${otherTerm.ten_hoc_ky}" (${this.formatDateVN(oStart)} - ${this.formatDateVN(oEnd)}) trong cùng năm học`,
+        );
+      }
+    }
+
+    data.ten_hoc_ky = tenHocKy;
+    return this.hocKyRepo.save(data);
+  }
+
   async updateTerm(id: number, data: Partial<HocKy>) {
-    const hk = await this.hocKyRepo.findOne({ where: { id } });
+    const hk = await this.hocKyRepo.findOne({
+      where: { id },
+      relations: { namHoc: true },
+    });
     if (!hk) throw new NotFoundException('Không tìm thấy học kỳ');
+
+    const targetNamHocId = data.nam_hoc_id ?? hk.nam_hoc_id;
+    const namHoc = await this.namHocRepo.findOne({ where: { id: targetNamHocId } });
+    if (!namHoc) throw new NotFoundException('Không tìm thấy năm học');
+
+    let tenHocKy = hk.ten_hoc_ky;
+    if (data.ten_hoc_ky) {
+      tenHocKy = data.ten_hoc_ky.trim();
+      const duplicate = await this.hocKyRepo.findOne({
+        where: {
+          nam_hoc_id: targetNamHocId,
+          ten_hoc_ky: tenHocKy,
+          id: Not(id),
+        },
+      });
+      if (duplicate) {
+        throw new BadRequestException(
+          `Học kỳ "${tenHocKy}" đã tồn tại trong năm học ${namHoc.ten_nam_hoc}`,
+        );
+      }
+      data.ten_hoc_ky = tenHocKy;
+    }
+
+    const termStartStr = this.toDateOnlyString(data.ngay_bat_dau ?? hk.ngay_bat_dau);
+    const termEndStr = this.toDateOnlyString(data.ngay_ket_thuc ?? hk.ngay_ket_thuc);
+    if (termStartStr >= termEndStr) {
+      throw new BadRequestException('Ngày kết thúc học kỳ phải lớn hơn ngày bắt đầu');
+    }
+
+    // Thời gian học kỳ phải nằm trong năm học cha
+    const yearStartStr = this.toDateOnlyString(namHoc.ngay_bat_dau);
+    const yearEndStr = this.toDateOnlyString(namHoc.ngay_ket_thuc);
+    if (termStartStr < yearStartStr || termEndStr > yearEndStr) {
+      throw new BadRequestException(
+        `Thời gian học kỳ (${this.formatDateVN(termStartStr)} - ${this.formatDateVN(termEndStr)}) phải nằm trong khoảng thời gian của năm học ${namHoc.ten_nam_hoc} (${this.formatDateVN(yearStartStr)} - ${this.formatDateVN(yearEndStr)})`,
+      );
+    }
+
+    // Kiểm tra không chồng chéo với học kỳ khác trong cùng năm học
+    const otherTerms = await this.hocKyRepo.find({
+      where: { nam_hoc_id: targetNamHocId, id: Not(id) },
+    });
+    for (const otherTerm of otherTerms) {
+      const oStart = this.toDateOnlyString(otherTerm.ngay_bat_dau);
+      const oEnd = this.toDateOnlyString(otherTerm.ngay_ket_thuc);
+      if (termStartStr <= oEnd && termEndStr >= oStart) {
+        throw new BadRequestException(
+          `Thời gian học kỳ (${this.formatDateVN(termStartStr)} - ${this.formatDateVN(termEndStr)}) bị chồng chéo với học kỳ "${otherTerm.ten_hoc_ky}" (${this.formatDateVN(oStart)} - ${this.formatDateVN(oEnd)}) trong cùng năm học`,
+        );
+      }
+    }
+
+    // Kiểm tra không thu hẹp thời gian học kỳ ngoài phạm vi các đợt kiến tập con hiện có
+    const childDots = await this.dotRepo.find({ where: { hoc_ky_id: id } });
+    for (const dot of childDots) {
+      const dotStart = this.toDateOnlyString(dot.ngay_bat_dau);
+      const dotEnd = this.toDateOnlyString(dot.ngay_ket_thuc);
+      if (termStartStr > dotStart || termEndStr < dotEnd) {
+        throw new BadRequestException(
+          `Không thể điều chỉnh thời gian học kỳ vì đợt kiến tập "${dot.ten_dot}" (${this.formatDateVN(dotStart)} - ${this.formatDateVN(dotEnd)}) sẽ nằm ngoài phạm vi học kỳ mới (${this.formatDateVN(termStartStr)} - ${this.formatDateVN(termEndStr)})`,
+        );
+      }
+    }
+
     Object.assign(hk, data);
     await this.hocKyRepo.save(hk);
     return { message: 'Cập nhật học kỳ thành công', data: hk };
   }
 
   async deleteTerm(id: number) {
+    const dotCount = await this.dotRepo.count({ where: { hoc_ky_id: id } });
+    if (dotCount > 0) {
+      throw new BadRequestException(
+        'Không thể xóa học kỳ đã có đợt kiến tập được gắn vào',
+      );
+    }
     const hk = await this.hocKyRepo.findOne({ where: { id } });
     if (!hk) throw new NotFoundException('Không tìm thấy học kỳ');
     await this.hocKyRepo.remove(hk);
     return { message: 'Xóa học kỳ thành công' };
+  }
+
+  async getCourses() {
+    return this.khoaHocRepo.find();
+  }
+
+  async createCourse(data: Partial<KhoaHoc>) {
+    return this.khoaHocRepo.save(data);
   }
 
   async updateCourse(id: number, data: Partial<KhoaHoc>) {
@@ -260,23 +522,100 @@ export class KhoaService implements OnModuleInit {
   }
 
   async getFactories() {
-    return this.nhaMayRepo.find();
+    const factories = await this.nhaMayRepo.find();
+    if (factories.length === 0) return [];
+
+    const tripCounts = await this.chuyenRepo
+      .createQueryBuilder('ctq')
+      .select('ctq.nha_may_id', 'nha_may_id')
+      .addSelect('COUNT(ctq.id)', 'count')
+      .groupBy('ctq.nha_may_id')
+      .getRawMany();
+
+    const deXuatCounts = await this.deXuatRepo
+      .createQueryBuilder('dx')
+      .select('dx.nha_may_id', 'nha_may_id')
+      .addSelect('COUNT(dx.id)', 'count')
+      .where('dx.nha_may_id IS NOT NULL')
+      .groupBy('dx.nha_may_id')
+      .getRawMany();
+
+    const draftTripCounts = await this.chuyenRepo
+      .createQueryBuilder('ctq')
+      .select('ctq.nha_may_id', 'nha_may_id')
+      .addSelect('COUNT(ctq.id)', 'count')
+      .where("ctq.trang_thai = 'Nhap'")
+      .groupBy('ctq.nha_may_id')
+      .getRawMany();
+
+    const tripMap = new Map<number, number>();
+    for (const r of tripCounts) {
+      if (r.nha_may_id != null) {
+        tripMap.set(Number(r.nha_may_id), Number(r.count) || 0);
+      }
+    }
+    for (const r of deXuatCounts) {
+      if (r.nha_may_id != null) {
+        const factoryId = Number(r.nha_may_id);
+        const current = tripMap.get(factoryId) || 0;
+        tripMap.set(factoryId, current + (Number(r.count) || 0));
+      }
+    }
+
+    const draftMap = new Map<number, number>();
+    for (const r of draftTripCounts) {
+      if (r.nha_may_id != null) {
+        draftMap.set(Number(r.nha_may_id), Number(r.count) || 0);
+      }
+    }
+
+    return factories.map((f) => ({
+      ...f,
+      so_chuyen_tham_quan: tripMap.get(f.id) || 0,
+      so_chuyen_nhap: draftMap.get(f.id) || 0,
+    }));
   }
 
   async getFactoryIndustryGroups() {
-    const rows = await this.nhaMayRepo
-      .createQueryBuilder('nm')
-      .select('DISTINCT nm.nhom_nganh', 'nhom_nganh')
-      .where('nm.nhom_nganh IS NOT NULL')
-      .getRawMany();
-    return rows.map((r) => r.nhom_nganh).filter(Boolean);
+    return [];
   }
   async createFactory(data: Partial<NhaMay>) {
     return this.nhaMayRepo.save(data);
   }
   async updateFactory(id: number, data: Partial<NhaMay>) {
+    if (data.trang_thai === 'NgungHopTac') {
+      const draftCount = await this.chuyenRepo.count({
+        where: { nha_may_id: id, trang_thai: 'Nhap' },
+      });
+      if (draftCount > 0) {
+        throw new BadRequestException(
+          `Nhà máy này đang có ${draftCount} chuyến tham quan ở trạng thái Nháp. Vui lòng xóa các chuyến tham quan nháp trước khi chọn ngừng hợp tác.`,
+        );
+      }
+    }
+
     await this.nhaMayRepo.update(id, data);
     return this.nhaMayRepo.findOne({ where: { id } });
+  }
+
+  async deleteFactory(id: number) {
+    const factory = await this.nhaMayRepo.findOne({ where: { id } });
+    if (!factory) {
+      throw new NotFoundException('Không tìm thấy nhà máy cần xóa');
+    }
+
+    const tripCount = await this.chuyenRepo.count({ where: { nha_may_id: id } });
+    const proposalCount = await this.deXuatRepo.count({ where: { nha_may_id: id } });
+    const totalLinked = tripCount + proposalCount;
+
+    if (totalLinked > 0) {
+      throw new BadRequestException(
+        `Nhà máy "${factory.ten_nha_may}" đã có ${totalLinked} chuyến tham quan/đề xuất liên quan trong hệ thống. Không thể xóa để bảo toàn dữ liệu học vụ, chỉ có thể chuyển sang trạng thái "Ngừng hợp tác".`
+      );
+    }
+
+    await this.nhaMayRepo.delete(id);
+    return { success: true, message: 'Xóa nhà máy thành công' };
   }
 
   // -------------------------------------------------------------
@@ -422,9 +761,18 @@ export class KhoaService implements OnModuleInit {
         where: { ten_dang_nhap: data.mssv },
       });
       if (existUser) {
-        throw new BadRequestException(
-          'Mã số sinh viên (tên đăng nhập) đã tồn tại',
-        );
+        // Kiểm tra xem tài khoản này có đang gắn với sinh viên nào không
+        const linkedStudent = await manager.findOne(SinhVien, {
+          where: { taikhoan_id: existUser.id },
+        });
+        if (linkedStudent) {
+          throw new BadRequestException(
+            'Mã số sinh viên (tên đăng nhập) đã tồn tại',
+          );
+        } else {
+          // Tài khoản mồ côi (tồn dư từ trước) -> dọn dẹp để tạo lại sạch sẽ
+          await manager.delete(TaiKhoan, existUser.id);
+        }
       }
 
       // 2. Tạo tài khoản
@@ -507,9 +855,17 @@ export class KhoaService implements OnModuleInit {
           where: { ten_dang_nhap: data.mssv },
         });
         if (existUser) {
-          throw new BadRequestException(
-            'Mã số sinh viên (tên đăng nhập) đã tồn tại',
-          );
+          const linkedStudent = await manager.findOne(SinhVien, {
+            where: { taikhoan_id: existUser.id },
+          });
+          if (linkedStudent && linkedStudent.id !== id) {
+            throw new BadRequestException(
+              'Mã số sinh viên (tên đăng nhập) đã tồn tại',
+            );
+          } else if (!linkedStudent) {
+            // Tài khoản mồ côi -> dọn dẹp
+            await manager.delete(TaiKhoan, existUser.id);
+          }
         }
         sv.mssv = data.mssv;
         if (sv.taiKhoan) {
@@ -550,26 +906,56 @@ export class KhoaService implements OnModuleInit {
   }
 
   async deleteStudent(id: number) {
-    const sv = await this.svRepo.findOne({
-      where: { id },
-      relations: { taiKhoan: true },
-    });
-    if (!sv) throw new NotFoundException('Không tìm thấy sinh viên');
-    const hasRegistrations = await this.phieuRepo.count({
-      where: { sinh_vien_id: id },
-    });
-    if (hasRegistrations > 0) {
-      if (sv.taiKhoan) {
-        sv.taiKhoan.trang_thai = 'KhoaTaiKhoan';
-        await this.taiKhoanRepo.save(sv.taiKhoan);
+    return this.dataSource.transaction(async (manager: EntityManager) => {
+      const sv = await manager.findOne(SinhVien, {
+        where: { id },
+        relations: { taiKhoan: true },
+      });
+      if (!sv) throw new NotFoundException('Không tìm thấy sinh viên');
+
+      // 1. Kiểm tra toàn diện các ràng buộc dữ liệu
+      const [hasRegistrations, hasCampaigns, hasProposals, hasBlacklist] =
+        await Promise.all([
+          manager.count(PhieuDangKy, { where: { sinh_vien_id: id } }),
+          manager.count(DotKienTap_SinhVien, { where: { sinh_vien_id: id } }),
+          manager.count(PhieuDeXuatChuyenThamQuan, {
+            where: { sinh_vien_id: id },
+          }),
+          manager.count(DanhSachDen, { where: { sinh_vien_id: id } }),
+        ]);
+
+      const hasConstraints =
+        hasRegistrations > 0 ||
+        hasCampaigns > 0 ||
+        hasProposals > 0 ||
+        hasBlacklist > 0;
+
+      // 2. Nếu đã có dữ liệu tham gia, chuyển sang khóa tài khoản thay vì xóa cứng
+      if (hasConstraints) {
+        if (sv.taiKhoan) {
+          sv.taiKhoan.trang_thai = 'KhoaTaiKhoan';
+          await manager.save(TaiKhoan, sv.taiKhoan);
+        }
+        return {
+          message:
+            'Sinh viên đã có dữ liệu trong hệ thống (đợt kiến tập/đăng ký) nên không thể xóa hoàn toàn — đã chuyển sang khóa tài khoản thay thế',
+          action: 'locked',
+        };
       }
+
+      // 3. Nếu chưa có ràng buộc, xóa đồng thời SinhVien và TaiKhoan trong cùng transaction
+      const taiKhoanId = sv.taikhoan_id || sv.taiKhoan?.id;
+      await manager.remove(SinhVien, sv);
+
+      if (taiKhoanId) {
+        await manager.delete(TaiKhoan, taiKhoanId);
+      }
+
       return {
-        message:
-          'Sinh viên đã có dữ liệu đăng ký kiến tập nên không thể xóa cứng — đã khóa tài khoản thay thế',
+        message: 'Xóa sinh viên và tài khoản liên kết thành công',
+        action: 'deleted',
       };
-    }
-    await this.svRepo.remove(sv);
-    return { message: 'Xóa sinh viên thành công' };
+    });
   }
 
   async getAccounts(
@@ -648,6 +1034,7 @@ export class KhoaService implements OnModuleInit {
     namHoc?: string,
     hocKy?: string,
     trangThai?: string,
+    excludeDraft: boolean = false,
   ) {
     const query = this.dotRepo
       .createQueryBuilder('dot')
@@ -666,6 +1053,10 @@ export class KhoaService implements OnModuleInit {
 
     if (hocKy) {
       query.andWhere('hocKy.id = :hocKy', { hocKy: parseInt(hocKy) });
+    }
+
+    if (excludeDraft) {
+      query.andWhere('dot.trang_thai != :draftStatus', { draftStatus: 'Nhap' });
     }
 
     if (trangThai) {
@@ -769,32 +1160,11 @@ export class KhoaService implements OnModuleInit {
         }
       }
 
-      // Gửi thông báo đến Duyệt lịch CLB
-      try {
-        const thoiGianStr =
-          savedDot.ngay_bat_dau && savedDot.ngay_ket_thuc
-            ? ` (Từ ${new Date(savedDot.ngay_bat_dau).toLocaleDateString('vi-VN')} đến ${new Date(savedDot.ngay_ket_thuc).toLocaleDateString('vi-VN')})`
-            : '';
-
-        const notif = new ThongBao();
-        notif.tieu_de = `[Đợt kiến tập mới] ${savedDot.ten_dot}`;
-        notif.noi_dung = `Khoa đã khởi tạo đợt kiến tập mới: "${savedDot.ten_dot}"${thoiGianStr}. Ban chủ nhiệm CLB vui lòng chuẩn bị kế hoạch tham quan và lập lịch kiến tập cho sinh viên.`;
-        notif.nguoi_gui_id = userId || 1;
-        notif.doi_tuong_nhan = 'CLB';
-        notif.loai_thong_bao = 'NhacNho';
-        if (savedDot.khoa_hoc_id) notif.khoa_hoc_id = savedDot.khoa_hoc_id;
-        notif.ngay_gui = new Date();
-        notif.da_chinh_sua = false;
-        await manager.save(ThongBao, notif);
-      } catch (err) {
-        console.warn('Lỗi khi gửi thông báo đợt kiến tập mới cho CLB:', err);
-      }
-
       return savedDot;
     });
   }
 
-  async updateCampaign(id: number, data: any) {
+  async updateCampaign(id: number, data: any, userId?: number) {
     return this.dataSource.transaction(async (manager: EntityManager) => {
       const campaign = await manager.findOne(DotKienTap, { where: { id } });
       if (!campaign) throw new NotFoundException('Không tìm thấy đợt kiến tập');
@@ -838,6 +1208,7 @@ export class KhoaService implements OnModuleInit {
         }
       }
 
+      const oldTrangThai = campaign.trang_thai;
       const { danh_sach_sinh_vien, ...updateData } = data;
       Object.assign(campaign, updateData);
 
@@ -851,7 +1222,32 @@ export class KhoaService implements OnModuleInit {
         );
       }
 
-      return manager.save(DotKienTap, campaign);
+      const savedCampaign = await manager.save(DotKienTap, campaign);
+
+      // Gửi thông báo đến Ban chủ nhiệm CLB khi Khoa chính thức gửi đợt (chuyển sang 'DangTrienKhai')
+      if (oldTrangThai === 'Nhap' && savedCampaign.trang_thai === 'DangTrienKhai') {
+        try {
+          const thoiGianStr =
+            savedCampaign.ngay_bat_dau && savedCampaign.ngay_ket_thuc
+              ? ` (Từ ${new Date(savedCampaign.ngay_bat_dau).toLocaleDateString('vi-VN')} đến ${new Date(savedCampaign.ngay_ket_thuc).toLocaleDateString('vi-VN')})`
+              : '';
+
+          const notif = new ThongBao();
+          notif.tieu_de = `[Đợt kiến tập mới] ${savedCampaign.ten_dot}`;
+          notif.noi_dung = `Khoa đã gửi đợt kiến tập: "${savedCampaign.ten_dot}"${thoiGianStr}. Ban chủ nhiệm CLB vui lòng chuẩn bị kế hoạch tham quan và lập lịch kiến tập cho sinh viên.`;
+          notif.nguoi_gui_id = userId || 1;
+          notif.doi_tuong_nhan = 'CLB';
+          notif.loai_thong_bao = 'NhacNho';
+          if (savedCampaign.khoa_hoc_id) notif.khoa_hoc_id = savedCampaign.khoa_hoc_id;
+          notif.ngay_gui = new Date();
+          notif.da_chinh_sua = false;
+          await manager.save(ThongBao, notif);
+        } catch (err) {
+          console.warn('Lỗi khi gửi thông báo đợt kiến tập mới cho CLB:', err);
+        }
+      }
+
+      return savedCampaign;
     });
   }
 
@@ -994,9 +1390,161 @@ export class KhoaService implements OnModuleInit {
     }
     return result;
   }
+  private validateRegistrationTimeWithCampaign(
+    dot: DotKienTap,
+    tgTu: Date | string,
+    tgDen: Date | string,
+  ) {
+    if (!tgTu || !tgDen) return;
+
+    const tu = new Date(tgTu);
+    const den = new Date(tgDen);
+
+    if (isNaN(tu.getTime()) || isNaN(den.getTime())) {
+      throw new BadRequestException('Thời gian mở đăng ký không hợp lệ.');
+    }
+
+    // Nếu chỉ truyền date string (YYYY-MM-DD), chuẩn hóa tu về đầu ngày (00:00:00) và den về cuối ngày (23:59:59.999)
+    if (typeof tgTu === 'string' && !tgTu.includes('T') && !tgTu.includes(':')) {
+      tu.setHours(0, 0, 0, 0);
+    }
+    if (typeof tgDen === 'string' && !tgDen.includes('T') && !tgDen.includes(':')) {
+      den.setHours(23, 59, 59, 999);
+    }
+
+    // Nếu cùng ngày (ví dụ mở cùng ngày 31/10/2026), cho phép trùng ngày bằng cách gán tu lúc 00:00:00 và den lúc 23:59:59.999
+    const tuDateOnly = new Date(tu.getFullYear(), tu.getMonth(), tu.getDate());
+    const denDateOnly = new Date(den.getFullYear(), den.getMonth(), den.getDate());
+
+    if (tuDateOnly.getTime() === denDateOnly.getTime() && tu.getTime() >= den.getTime()) {
+      tu.setHours(0, 0, 0, 0);
+      den.setHours(23, 59, 59, 999);
+    }
+
+    if (tu > den) {
+      throw new BadRequestException(
+        'Thời gian mở đăng ký (từ) không được sau thời gian mở đăng ký (đến).',
+      );
+    }
+
+    // Chuẩn hóa mốc bắt đầu đợt kiến tập (00:00:00)
+    const dotStart = new Date(dot.ngay_bat_dau);
+    dotStart.setHours(0, 0, 0, 0);
+
+    // Chuẩn hóa mốc kết thúc đợt kiến tập (23:59:59.999)
+    const dotEnd = new Date(dot.ngay_ket_thuc);
+    dotEnd.setHours(23, 59, 59, 999);
+
+    if (tu < dotStart) {
+      const dotStartStr = new Date(dot.ngay_bat_dau).toLocaleDateString('vi-VN');
+      throw new BadRequestException(
+        `Thời gian mở đăng ký (từ) không được sớm hơn ngày bắt đầu của đợt kiến tập (${dotStartStr}).`,
+      );
+    }
+
+    if (den > dotEnd) {
+      const dotEndStr = new Date(dot.ngay_ket_thuc).toLocaleDateString('vi-VN');
+      throw new BadRequestException(
+        `Thời gian mở đăng ký (đến) không được muộn hơn ngày kết thúc của đợt kiến tập (${dotEndStr}).`,
+      );
+    }
+  }
+
+  private validateRegistrationTimeWithTrips(
+    tgDen: Date | string,
+    trips: ChuyenThamQuan[],
+  ) {
+    if (!tgDen || !trips || trips.length === 0) return;
+
+    const denDate = new Date(tgDen);
+    const denDay = new Date(
+      denDate.getFullYear(),
+      denDate.getMonth(),
+      denDate.getDate(),
+    );
+
+    for (const trip of trips) {
+      if (trip.ngay_tham_quan) {
+        const tripDate = new Date(trip.ngay_tham_quan);
+        const tripDay = new Date(
+          tripDate.getFullYear(),
+          tripDate.getMonth(),
+          tripDate.getDate(),
+        );
+
+        if (denDay >= tripDay) {
+          const denStr = denDate.toLocaleDateString('vi-VN');
+          const tripStr = tripDate.toLocaleDateString('vi-VN');
+          const nhaMayName = trip.nhaMay?.ten_nha_may || 'Chuyến tham quan';
+          throw new BadRequestException(
+            `Thời gian kết thúc mở đăng ký (${denStr}) không được sau hoặc bằng ngày tổ chức chuyến tham quan (${tripStr} tại "${nhaMayName}"). Chuyến tham quan phải diễn ra sau khi kết thúc đăng ký.`,
+          );
+        }
+      }
+    }
+  }
+
   async createSchedule(data: any) {
     return this.dataSource.transaction(async (manager: EntityManager) => {
       const { chuyen_tham_quan_ids, isSubmit, ...lichData } = data;
+
+      if (lichData.dot_kien_tap_id) {
+        const dot = await manager.findOne(DotKienTap, {
+          where: { id: lichData.dot_kien_tap_id },
+        });
+        if (!dot) {
+          throw new NotFoundException('Không tìm thấy đợt kiến tập.');
+        }
+        if (dot.trang_thai === 'Nhap') {
+          throw new BadRequestException(
+            'Đợt kiến tập đang ở trạng thái Nháp và chưa được Khoa gửi cho CLB để lập lịch.',
+          );
+        }
+        if (['DaKetThuc', 'DaKhoa', 'DaHuy'].includes(dot.trang_thai)) {
+          throw new BadRequestException(
+            'Không thể lập lịch cho đợt kiến tập đã kết thúc hoặc đã hủy.',
+          );
+        }
+
+        // Kiểm tra thời gian đăng ký phải nằm trong khoảng thời gian diễn ra đợt kiến tập
+        this.validateRegistrationTimeWithCampaign(
+          dot,
+          lichData.tg_mo_dang_ky_tu,
+          lichData.tg_mo_dang_ky_den,
+        );
+      }
+
+      // Kiểm tra thời gian đăng ký phải kết thúc TRƯỚC ngày tổ chức của tất cả các chuyến tham quan trong lịch
+      if (
+        chuyen_tham_quan_ids &&
+        Array.isArray(chuyen_tham_quan_ids) &&
+        chuyen_tham_quan_ids.length > 0 &&
+        lichData.tg_mo_dang_ky_den
+      ) {
+        const selectedTrips = await manager.find(ChuyenThamQuan, {
+          where: { id: In(chuyen_tham_quan_ids) },
+          relations: { nhaMay: true },
+        });
+        this.validateRegistrationTimeWithTrips(
+          lichData.tg_mo_dang_ky_den,
+          selectedTrips,
+        );
+      }
+
+      if (lichData.tg_mo_dang_ky_tu) {
+        const tuDate = new Date(lichData.tg_mo_dang_ky_tu);
+        if (typeof lichData.tg_mo_dang_ky_tu === 'string' && !lichData.tg_mo_dang_ky_tu.includes('T')) {
+          tuDate.setHours(0, 0, 0, 0);
+          lichData.tg_mo_dang_ky_tu = tuDate;
+        }
+      }
+      if (lichData.tg_mo_dang_ky_den) {
+        const denDate = new Date(lichData.tg_mo_dang_ky_den);
+        if (typeof lichData.tg_mo_dang_ky_den === 'string' && !lichData.tg_mo_dang_ky_den.includes('T')) {
+          denDate.setHours(23, 59, 59, 999);
+          lichData.tg_mo_dang_ky_den = denDate;
+        }
+      }
 
       const newLich = new LichKienTap();
       Object.assign(newLich, lichData);
@@ -1034,6 +1582,77 @@ export class KhoaService implements OnModuleInit {
           const { chuyen_tham_quan_ids, ...lichData } = data;
           const lich = await manager.findOne(LichKienTap, { where: { id } });
           if (!lich) throw new NotFoundException('Lịch không tồn tại');
+
+          const targetDotId = lichData.dot_kien_tap_id || lich.dot_kien_tap_id;
+          if (targetDotId) {
+            const dot = await manager.findOne(DotKienTap, {
+              where: { id: targetDotId },
+            });
+            if (!dot) {
+              throw new NotFoundException('Không tìm thấy đợt kiến tập.');
+            }
+            if (dot.trang_thai === 'Nhap') {
+              throw new BadRequestException(
+                'Đợt kiến tập đang ở trạng thái Nháp và chưa được Khoa gửi cho CLB để lập lịch.',
+              );
+            }
+            if (['DaKetThuc', 'DaKhoa', 'DaHuy'].includes(dot.trang_thai)) {
+              throw new BadRequestException(
+                'Không thể lập lịch cho đợt kiến tập đã kết thúc hoặc đã hủy.',
+              );
+            }
+
+            const tgTu =
+              lichData.tg_mo_dang_ky_tu !== undefined
+                ? lichData.tg_mo_dang_ky_tu
+                : lich.tg_mo_dang_ky_tu;
+            const tgDen =
+              lichData.tg_mo_dang_ky_den !== undefined
+                ? lichData.tg_mo_dang_ky_den
+                : lich.tg_mo_dang_ky_den;
+            this.validateRegistrationTimeWithCampaign(dot, tgTu, tgDen);
+          }
+
+          const effectiveTgDen =
+            lichData.tg_mo_dang_ky_den !== undefined
+              ? lichData.tg_mo_dang_ky_den
+              : lich.tg_mo_dang_ky_den;
+
+          let targetTripIds: number[] = [];
+          if (chuyen_tham_quan_ids !== undefined) {
+            if (Array.isArray(chuyen_tham_quan_ids)) {
+              targetTripIds = chuyen_tham_quan_ids;
+            }
+          } else {
+            const existingTrips = await manager.find(ChuyenThamQuan, {
+              where: { lich_kien_tap_id: id },
+              select: { id: true },
+            });
+            targetTripIds = existingTrips.map((t) => t.id);
+          }
+
+          if (targetTripIds.length > 0 && effectiveTgDen) {
+            const trips = await manager.find(ChuyenThamQuan, {
+              where: { id: In(targetTripIds) },
+              relations: { nhaMay: true },
+            });
+            this.validateRegistrationTimeWithTrips(effectiveTgDen, trips);
+          }
+
+          if (lichData.tg_mo_dang_ky_tu) {
+            const tuDate = new Date(lichData.tg_mo_dang_ky_tu);
+            if (typeof lichData.tg_mo_dang_ky_tu === 'string' && !lichData.tg_mo_dang_ky_tu.includes('T')) {
+              tuDate.setHours(0, 0, 0, 0);
+              lichData.tg_mo_dang_ky_tu = tuDate;
+            }
+          }
+          if (lichData.tg_mo_dang_ky_den) {
+            const denDate = new Date(lichData.tg_mo_dang_ky_den);
+            if (typeof lichData.tg_mo_dang_ky_den === 'string' && !lichData.tg_mo_dang_ky_den.includes('T')) {
+              denDate.setHours(23, 59, 59, 999);
+              lichData.tg_mo_dang_ky_den = denDate;
+            }
+          }
 
           Object.assign(lich, lichData);
           const savedLich = await manager.save(LichKienTap, lich);
@@ -1478,18 +2097,17 @@ export class KhoaService implements OnModuleInit {
       where: { dot_kien_tap_id: dotId },
     });
     if (liches.length === 0) {
-      // Chưa có lịch nào → giữ Nhap
-      if (dot.trang_thai !== 'Nhap') {
-        dot.trang_thai = 'Nhap';
-        await dotRepo.save(dot);
-      }
+      // Chưa có lịch nào → Giữ nguyên trạng thái hiện tại (không tự ý ép về Nhap nếu Khoa đã gửi CLB)
       return;
     }
 
     const statuses = liches.map((l) => l.trang_thai);
 
-    // Các trạng thái LichKienTap cho thấy đợt đã "hoạt động" (chốt danh sách trở đi)
+    // Các trạng thái LichKienTap cho thấy đợt đang hoạt động
     const activeStatuses = [
+      'ChoDuyet',
+      'DaDuyet',
+      'MoDangKy',
       'DaChotDanhSach',
       'DangDienRa',
       'DaDienRa',
@@ -1508,7 +2126,7 @@ export class KhoaService implements OnModuleInit {
     } else if (statuses.some((s) => activeStatuses.includes(s))) {
       newStatus = 'DangTrienKhai';
     } else {
-      newStatus = 'Nhap';
+      newStatus = dot.trang_thai;
     }
 
     if (newStatus !== dot.trang_thai) {
@@ -1580,6 +2198,9 @@ export class KhoaService implements OnModuleInit {
       .where('hd.trang_thai = :status', { status: 'ChuaDong' })
       .andWhere('hd.han_dong < :now', { now })
       .andWhere('hd.so_tien > 0')
+      .andWhere('(phieu.trang_thai IS NULL OR phieu.trang_thai != :daHuy)', {
+        daHuy: 'DaHuy',
+      })
       .getMany();
 
     for (const inv of lateInvoices) {
@@ -1691,6 +2312,11 @@ export class KhoaService implements OnModuleInit {
         where: { id: data.nha_may_id },
       });
       if (!nhaMay) throw new NotFoundException('Không tìm thấy nhà máy');
+      if (nhaMay.trang_thai === 'NgungHopTac') {
+        throw new BadRequestException(
+          `Nhà máy "${nhaMay.ten_nha_may}" đã ngừng hợp tác, không thể tạo chuyến tham quan mới.`,
+        );
+      }
       if (data.hinh_thuc === 'TrucTuyen' && !nhaMay.ho_tro_truc_tuyen) {
         throw new BadRequestException(
           'Nhà máy này không hỗ trợ tham quan trực tuyến',
@@ -1753,6 +2379,33 @@ export class KhoaService implements OnModuleInit {
     try {
       let parsedGioBatDau: Date | null = null;
       let parsedNgayThamQuan = data.ngay_tham_quan ? new Date(data.ngay_tham_quan) : null;
+
+      // Kiểm tra nếu chuyến đang thuộc một lịch kiến tập thì ngày tổ chức mới không được trước hoặc bằng hạn đăng ký của lịch
+      if (trip.lich_kien_tap_id && parsedNgayThamQuan) {
+        const attachedLich = await this.lichRepo.findOne({
+          where: { id: trip.lich_kien_tap_id },
+        });
+        if (attachedLich && attachedLich.tg_mo_dang_ky_den) {
+          const denDate = new Date(attachedLich.tg_mo_dang_ky_den);
+          const denDay = new Date(
+            denDate.getFullYear(),
+            denDate.getMonth(),
+            denDate.getDate(),
+          );
+          const tripDay = new Date(
+            parsedNgayThamQuan.getFullYear(),
+            parsedNgayThamQuan.getMonth(),
+            parsedNgayThamQuan.getDate(),
+          );
+          if (tripDay <= denDay) {
+            const denStr = denDate.toLocaleDateString('vi-VN');
+            const tripStr = parsedNgayThamQuan.toLocaleDateString('vi-VN');
+            throw new BadRequestException(
+              `Ngày tổ chức chuyến tham quan (${tripStr}) không được trước hoặc bằng thời gian kết thúc mở đăng ký (${denStr}) của lịch kiến tập "${attachedLich.ten_lich}".`,
+            );
+          }
+        }
+      }
 
       if (data.gio_bat_dau) {
         const startStr = typeof data.gio_bat_dau === 'string' ? data.gio_bat_dau : null;
@@ -2680,7 +3333,18 @@ export class KhoaService implements OnModuleInit {
             await manager.save(PhieuThamQuan, ptq);
           }
         }
-        // KHÔNG tạo DanhSachDen — Khoa đã xác nhận lý do hợp lệ (minh chứng)
+
+        // MIỄN TRỪ ÁN PHẠT THEO QUY ĐỊNH:
+        // Gỡ bỏ toàn bộ ghi nhận vi phạm trong DanhSachDen liên quan đến phiếu đăng ký này
+        await manager.delete(DanhSachDen, {
+          phieu_dang_ky_id: req.phieu_dang_ky_id,
+        });
+
+        // Dọn dẹp hóa đơn lệ phí chưa thanh toán (ChuaDong, ViPham) để tránh bị phạt trễ hạn sau khi đã được duyệt hủy
+        await manager.delete(HoaDonLePhi, {
+          phieu_dang_ky_id: req.phieu_dang_ky_id,
+          trang_thai: In(['ChuaDong', 'ViPham']),
+        });
       }
 
       return { message: 'Xử lý yêu cầu hủy thành công' };
@@ -3631,26 +4295,157 @@ export class KhoaService implements OnModuleInit {
     );
   }
 
+  async validateLecturersBoardScheduleConflict(
+    lecturerIds: number[],
+    boardDate: Date | string,
+    excludeBoardId?: number,
+  ) {
+    if (!lecturerIds || lecturerIds.length === 0 || !boardDate) return;
+    const targetDate = new Date(boardDate);
+    if (isNaN(targetDate.getTime())) return;
+
+    // Lấy tất cả thành viên hội đồng của các giảng viên này
+    const otherMembers = await this.hdTvRepo.find({
+      where: { giang_vien_id: In(lecturerIds) },
+      relations: { hoiDong: true, giangVien: true },
+    });
+
+    for (const m of otherMembers) {
+      if (!m.hoiDong || (excludeBoardId && m.hoi_dong_id === excludeBoardId)) {
+        continue;
+      }
+      const otherDate = new Date(m.hoiDong.ngay_bao_cao);
+      if (isNaN(otherDate.getTime())) continue;
+
+      const isSameDay =
+        targetDate.getFullYear() === otherDate.getFullYear() &&
+        targetDate.getMonth() === otherDate.getMonth() &&
+        targetDate.getDate() === otherDate.getDate();
+
+      const diffMinutes = Math.abs(targetDate.getTime() - otherDate.getTime()) / (60 * 1000);
+
+      // Trùng ngày và khoảng cách thời gian < 120 phút (trong cùng khung giờ bảo vệ)
+      if (isSameDay && diffMinutes < 120) {
+        const gvName = m.giangVien?.ho_ten || `ID ${m.giang_vien_id}`;
+        const gvCode = m.giangVien?.ma_gv ? ` (Mã: ${m.giangVien.ma_gv})` : '';
+        const boardName = m.hoiDong.ten_hoi_dong || `Hội đồng #${m.hoi_dong_id}`;
+        const roomStr = m.hoiDong.dia_diem ? ` tại phòng ${m.hoiDong.dia_diem}` : '';
+        const timeStr = otherDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+        const dateStr = otherDate.toLocaleDateString('vi-VN');
+
+        throw new BadRequestException(
+          `Xung đột lịch bảo vệ: Giảng viên "${gvName}"${gvCode} đã được phân công vào hội đồng "${boardName}"${roomStr} lúc ${timeStr} ngày ${dateStr}. Vui lòng chọn giảng viên khác hoặc điều chỉnh khung giờ bảo vệ.`,
+        );
+      }
+    }
+  }
+
   async createBoard(
     dotKienTapId: number,
     name: string,
     date: Date,
     room: string,
+    members?: Array<{ lecturerId: number; role: string }>,
   ) {
-    const hd = new HoiDongChamBaoCao();
-    hd.dot_kien_tap_id = dotKienTapId;
-    hd.ten_hoi_dong = name;
-    hd.ngay_bao_cao = date;
-    hd.dia_diem = room;
-    return this.hdRepo.save(hd);
+    // 1. Kiểm tra nghiệp vụ thành viên nếu có truyền lên
+    if (members && members.length > 0) {
+      const uniqueLecturerIds = new Set(members.map((m) => m.lecturerId));
+      if (uniqueLecturerIds.size !== members.length) {
+        throw new BadRequestException('Mỗi giảng viên chỉ có thể đảm nhiệm một vai trò trong cùng một hội đồng.');
+      }
+
+      const chuTichCount = members.filter((m) => m.role === 'ChuTich').length;
+      if (chuTichCount !== 1) {
+        throw new BadRequestException('Hội đồng phải có chính xác 1 Chủ tịch.');
+      }
+
+      const thuKyCount = members.filter((m) => m.role === 'ThuKy').length;
+      if (thuKyCount < 1) {
+        throw new BadRequestException('Hội đồng phải có ít nhất 1 Thư ký.');
+      }
+
+      const lecturerIds = members.map((m) => m.lecturerId);
+      const lecturers = await this.gvRepo.find({ where: { id: In(lecturerIds) } });
+      for (const gv of lecturers) {
+        if (!gv.du_dk_hoi_dong) {
+          throw new BadRequestException(
+            `Giảng viên "${gv.ho_ten}" (Mã: ${gv.ma_gv}) chưa đủ điều kiện tham gia Hội đồng theo tiêu chuẩn khoa.`,
+          );
+        }
+      }
+
+      // Kiểm tra xung đột lịch bảo vệ
+      await this.validateLecturersBoardScheduleConflict(lecturerIds, date);
+    }
+
+    // 2. Thực hiện lưu bằng transaction đảm bảo tính toàn vẹn (atomic)
+    return this.dataSource.transaction(async (manager) => {
+      try {
+        const hd = new HoiDongChamBaoCao();
+        hd.dot_kien_tap_id = dotKienTapId;
+        hd.ten_hoi_dong = name;
+        hd.ngay_bao_cao = date;
+        hd.dia_diem = room;
+        const savedBoard = await manager.save(HoiDongChamBaoCao, hd);
+
+        if (members && members.length > 0) {
+          const memberEntities = members.map((m) => {
+            const hdtv = new HoiDong_ThanhVien();
+            hdtv.hoi_dong_id = savedBoard.id;
+            hdtv.giang_vien_id = m.lecturerId;
+            hdtv.vai_tro = m.role;
+            return hdtv;
+          });
+          await manager.save(HoiDong_ThanhVien, memberEntities);
+        }
+
+        return savedBoard;
+      } catch (error: any) {
+        if (
+          error?.message?.includes('trg_HoiDongThanhVien_ChanTrungLich') ||
+          error?.message?.includes('Giảng viên đã tham gia một hội đồng khác cùng thời gian báo cáo')
+        ) {
+          throw new BadRequestException(
+            'Xung đột lịch bảo vệ: Giảng viên đã được phân công vào một hội đồng khác trong cùng khung thời gian báo cáo. Vui lòng kiểm tra lại lịch phân công.',
+          );
+        }
+        throw error;
+      }
+    });
   }
 
   async addBoardMember(boardId: number, lecturerId: number, role: string) {
-    const m = new HoiDong_ThanhVien();
-    m.hoi_dong_id = boardId;
-    m.giang_vien_id = lecturerId;
-    m.vai_tro = role;
-    return this.hdTvRepo.save(m);
+    const board = await this.hdRepo.findOne({ where: { id: boardId } });
+    if (!board) throw new NotFoundException('Không tìm thấy hội đồng');
+
+    const gv = await this.gvRepo.findOne({ where: { id: lecturerId } });
+    if (!gv) throw new NotFoundException('Không tìm thấy giảng viên');
+    if (!gv.du_dk_hoi_dong) {
+      throw new BadRequestException(
+        `Giảng viên "${gv.ho_ten}" (Mã: ${gv.ma_gv}) chưa đủ điều kiện tham gia Hội đồng theo tiêu chuẩn khoa.`,
+      );
+    }
+
+    // Kiểm tra xung đột lịch bảo vệ
+    await this.validateLecturersBoardScheduleConflict([lecturerId], board.ngay_bao_cao, boardId);
+
+    try {
+      const m = new HoiDong_ThanhVien();
+      m.hoi_dong_id = boardId;
+      m.giang_vien_id = lecturerId;
+      m.vai_tro = role;
+      return await this.hdTvRepo.save(m);
+    } catch (error: any) {
+      if (
+        error?.message?.includes('trg_HoiDongThanhVien_ChanTrungLich') ||
+        error?.message?.includes('Giảng viên đã tham gia một hội đồng khác cùng thời gian báo cáo')
+      ) {
+        throw new BadRequestException(
+          `Xung đột lịch bảo vệ: Giảng viên "${gv.ho_ten}" đã được phân công vào một hội đồng khác trong cùng khung thời gian báo cáo.`,
+        );
+      }
+      throw error;
+    }
   }
 
   async updateBoard(
@@ -3679,32 +4474,16 @@ export class KhoaService implements OnModuleInit {
       board.dot_kien_tap_id = data.dotKienTapId;
     }
 
-    if (data.name) board.ten_hoi_dong = data.name;
-    if (data.date) board.ngay_bao_cao = data.date;
-    if (data.room !== undefined) board.dia_diem = data.room;
+    const effectiveDate = data.date ? new Date(data.date) : board.ngay_bao_cao;
 
-    await this.hdRepo.save(board);
-
-    // 2. Cập nhật thành viên hội đồng nếu có truyền lên
+    // 2. Kiểm tra chuẩn học thuật và xung đột lịch nếu có cập nhật thành viên hoặc ngày giờ
+    let lecturerIdsToCheck: number[] = [];
     if (data.members !== undefined) {
-      const currentMembers = await this.hdTvRepo.find({
-        where: { hoi_dong_id: boardId },
-        relations: { giangVien: true },
-      });
-
-      const currentTvIds = currentMembers.map((m) => m.id);
-      let scoredTvIds: number[] = [];
-      if (currentTvIds.length > 0) {
-        const scores = await this.dataSource.manager.find(DiemHoiDong_ChiTiet, {
-          where: { hoi_dong_thanhvien_id: In(currentTvIds) },
-          select: { hoi_dong_thanhvien_id: true },
-        });
-        scoredTvIds = Array.from(new Set(scores.map((s) => s.hoi_dong_thanhvien_id)));
+      const uniqueLecturerIds = new Set(data.members.map((m) => m.lecturerId));
+      if (uniqueLecturerIds.size !== data.members.length) {
+        throw new BadRequestException('Mỗi giảng viên chỉ có thể đảm nhiệm một vai trò trong cùng một hội đồng.');
       }
 
-      const newLecturerIds = new Set(data.members.map((m) => m.lecturerId));
-
-      // Validation chuẩn học thuật khi cấu hình thành viên hội đồng
       if (data.members.length > 0) {
         const chuTichCount = data.members.filter((m) => m.role === 'ChuTich').length;
         if (chuTichCount !== 1) {
@@ -3726,41 +4505,93 @@ export class KhoaService implements OnModuleInit {
           }
         }
       }
-
-      // Kiểm tra thành viên bị gỡ bỏ
-      for (const curr of currentMembers) {
-        if (!newLecturerIds.has(curr.giang_vien_id)) {
-          if (scoredTvIds.includes(curr.id)) {
-            const gvName = curr.giangVien?.ho_ten || `ID ${curr.giang_vien_id}`;
-            throw new BadRequestException(
-              `Không thể xóa giảng viên "${gvName}" khỏi hội đồng vì đã có điểm chấm chi tiết cho sinh viên.`,
-            );
-          }
-          await this.hdTvRepo.delete(curr.id);
-        }
-      }
-
-      // Cập nhật vai trò hoặc thêm mới
-      for (const item of data.members) {
-        const existing = currentMembers.find((m) => m.giang_vien_id === item.lecturerId);
-        if (existing) {
-          if (existing.vai_tro !== item.role) {
-            existing.vai_tro = item.role;
-            await this.hdTvRepo.save(existing);
-          }
-        } else {
-          const newMember = new HoiDong_ThanhVien();
-          newMember.hoi_dong_id = boardId;
-          newMember.giang_vien_id = item.lecturerId;
-          newMember.vai_tro = item.role;
-          await this.hdTvRepo.save(newMember);
-        }
-      }
+      lecturerIdsToCheck = data.members.map((m) => m.lecturerId);
+    } else if (data.date !== undefined) {
+      const existingMembers = await this.hdTvRepo.find({ where: { hoi_dong_id: boardId } });
+      lecturerIdsToCheck = existingMembers.map((m) => m.giang_vien_id);
     }
 
-    return this.hdRepo.findOne({
-      where: { id: boardId },
-      relations: { dotKienTap: true },
+    if (lecturerIdsToCheck.length > 0) {
+      await this.validateLecturersBoardScheduleConflict(
+        lecturerIdsToCheck,
+        effectiveDate,
+        boardId,
+      );
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      try {
+        if (data.name) board.ten_hoi_dong = data.name;
+        if (data.date) board.ngay_bao_cao = data.date;
+        if (data.room !== undefined) board.dia_diem = data.room;
+
+        await manager.save(HoiDongChamBaoCao, board);
+
+        // Cập nhật thành viên hội đồng nếu có truyền lên
+        if (data.members !== undefined) {
+          const currentMembers = await manager.find(HoiDong_ThanhVien, {
+            where: { hoi_dong_id: boardId },
+            relations: { giangVien: true },
+          });
+
+          const currentTvIds = currentMembers.map((m) => m.id);
+          let scoredTvIds: number[] = [];
+          if (currentTvIds.length > 0) {
+            const scores = await manager.find(DiemHoiDong_ChiTiet, {
+              where: { hoi_dong_thanhvien_id: In(currentTvIds) },
+              select: { hoi_dong_thanhvien_id: true },
+            });
+            scoredTvIds = Array.from(new Set(scores.map((s) => s.hoi_dong_thanhvien_id)));
+          }
+
+          const newLecturerIds = new Set(data.members.map((m) => m.lecturerId));
+
+          // Kiểm tra thành viên bị gỡ bỏ
+          for (const curr of currentMembers) {
+            if (!newLecturerIds.has(curr.giang_vien_id)) {
+              if (scoredTvIds.includes(curr.id)) {
+                const gvName = curr.giangVien?.ho_ten || `ID ${curr.giang_vien_id}`;
+                throw new BadRequestException(
+                  `Không thể xóa giảng viên "${gvName}" khỏi hội đồng vì đã có điểm chấm chi tiết cho sinh viên.`,
+                );
+              }
+              await manager.delete(HoiDong_ThanhVien, curr.id);
+            }
+          }
+
+          // Cập nhật vai trò hoặc thêm mới
+          for (const item of data.members) {
+            const existing = currentMembers.find((m) => m.giang_vien_id === item.lecturerId);
+            if (existing) {
+              if (existing.vai_tro !== item.role) {
+                existing.vai_tro = item.role;
+                await manager.save(HoiDong_ThanhVien, existing);
+              }
+            } else {
+              const newMember = new HoiDong_ThanhVien();
+              newMember.hoi_dong_id = boardId;
+              newMember.giang_vien_id = item.lecturerId;
+              newMember.vai_tro = item.role;
+              await manager.save(HoiDong_ThanhVien, newMember);
+            }
+          }
+        }
+
+        return await manager.findOne(HoiDongChamBaoCao, {
+          where: { id: boardId },
+          relations: { dotKienTap: true },
+        });
+      } catch (error: any) {
+        if (
+          error?.message?.includes('trg_HoiDongThanhVien_ChanTrungLich') ||
+          error?.message?.includes('Giảng viên đã tham gia một hội đồng khác cùng thời gian báo cáo')
+        ) {
+          throw new BadRequestException(
+            'Xung đột lịch bảo vệ: Giảng viên đã được phân công vào một hội đồng khác trong cùng khung thời gian báo cáo. Vui lòng kiểm tra lại lịch phân công.',
+          );
+        }
+        throw error;
+      }
     });
   }
 

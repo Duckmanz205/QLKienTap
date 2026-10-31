@@ -27,8 +27,6 @@ export default function ThongBao_Khoa() {
   const [selectedLoaiThongBao, setSelectedLoaiThongBao] = useState('ThongBao');
   const [attachedFile, setAttachedFile] = useState(null);
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
-  const [isDoiTuongDropdownOpen, setIsDoiTuongDropdownOpen] = useState(false);
-  const [isLoaiDropdownOpen, setIsLoaiDropdownOpen] = useState(false);
   const fileInputRef = useRef(null);
 
   const doiTuongOptions = [
@@ -413,7 +411,7 @@ export default function ThongBao_Khoa() {
 
             {/* Modal Body */}
             <form onSubmit={handleComposeSubmit} className="flex flex-col overflow-hidden">
-              <div className="p-6 space-y-5 overflow-y-auto custom-scrollbar" onClick={() => { setIsDoiTuongDropdownOpen(false); setIsLoaiDropdownOpen(false); }}>
+              <div className="p-6 space-y-5 overflow-y-auto custom-scrollbar">
                 
                 {/* Tiêu đề */}
                 <div>

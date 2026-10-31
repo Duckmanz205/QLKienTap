@@ -30,16 +30,12 @@ export default function ChuyenThamQuan_DSLoc() {
   // Tab 1 filters & pagination
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('ALL');
-  const [isFilterStatusOpen, setIsFilterStatusOpen] = useState(false);
-  const [searchStatusKhoa, setSearchStatusKhoa] = useState('');
   const [currentPageKhoa, setCurrentPageKhoa] = useState(1);
   const [limitKhoa, setLimitKhoa] = useState(15);
 
   // Tab 2 filters & pagination
   const [searchQueryTuDo, setSearchQueryTuDo] = useState('');
   const [filterStatusTuDo, setFilterStatusTuDo] = useState('ALL');
-  const [isFilterStatusTuDoOpen, setIsFilterStatusTuDoOpen] = useState(false);
-  const [searchStatusTuDo, setSearchStatusTuDo] = useState('');
   const [currentPageTuDo, setCurrentPageTuDo] = useState(1);
   const [limitTuDo, setLimitTuDo] = useState(15);
 
@@ -54,16 +50,10 @@ export default function ChuyenThamQuan_DSLoc() {
   const [nhaMayOptions, setNhaMayOptions] = useState([]);
   const [lichOptions, setLichOptions] = useState([]);
 
-  // Dropdown States for Modal
-  const [isNhaMayDropdownOpen, setIsNhaMayDropdownOpen] = useState(false);
+  // Form states for Modal
   const [selectedNhaMay, setSelectedNhaMay] = useState('');
-
-  const [isLichDropdownOpen, setIsLichDropdownOpen] = useState(false);
   const [selectedLich, setSelectedLich] = useState('');
-
-  const [isHinhThucDropdownOpen, setIsHinhThucDropdownOpen] = useState(false);
   const [selectedHinhThuc, setSelectedHinhThuc] = useState('');
-  const hinhThucOptions = ["Trực tiếp", "Trực tuyến"];
 
   // Form states
   const [ngay, setNgay] = useState('');
@@ -236,6 +226,12 @@ export default function ChuyenThamQuan_DSLoc() {
     e.preventDefault();
     if (!selectedNhaMay || !selectedHinhThuc || !ngay || !gioBatDau || !sucChua) {
       showPopup("Vui lòng điền đầy đủ thông tin", "error");
+      return;
+    }
+
+    const chosenFactory = nhaMayOptions.find(o => String(o.id) === String(selectedNhaMay));
+    if (!isEditMode && chosenFactory && chosenFactory.trang_thai === 'NgungHopTac') {
+      showPopup(`Nhà máy "${chosenFactory.ten_nha_may}" đã ngừng hợp tác, không thể tạo chuyến tham quan mới.`, "error");
       return;
     }
 
@@ -452,6 +448,8 @@ export default function ChuyenThamQuan_DSLoc() {
       });
       showPopup(res.data?.message || 'Khoa đã phê duyệt chính thức chuyến tham quan tự do thành công', 'success');
       setIsKhoaConfirmModalOpen(false);
+      setPendingApprovalTripId(null);
+      setPendingApprovalTrip(null);
       fetchTrips();
     } catch (err) {
       console.error(err);
@@ -476,6 +474,11 @@ export default function ChuyenThamQuan_DSLoc() {
         });
         showPopup(res.data?.message || 'Đã gộp đề xuất vào chuyến tham quan thành công', 'success');
         setIsLecturerModalOpen(false);
+        setSelectedMergeTripId(null);
+        setSelectedBatchProposalIds([]);
+        setSelectedLecturerId('');
+        setPendingApprovalTripId(null);
+        setPendingApprovalTrip(null);
         fetchTrips();
       } catch (err) {
         console.error(err);
@@ -504,6 +507,11 @@ export default function ChuyenThamQuan_DSLoc() {
       });
       showPopup(res.data?.message || 'CLB đã duyệt sơ bộ đề xuất thành công', 'success');
       setIsLecturerModalOpen(false);
+      setSelectedMergeTripId(null);
+      setSelectedBatchProposalIds([]);
+      setSelectedLecturerId('');
+      setPendingApprovalTripId(null);
+      setPendingApprovalTrip(null);
       fetchTrips();
     } catch (err) {
       console.error(err);
@@ -516,23 +524,31 @@ export default function ChuyenThamQuan_DSLoc() {
   };
 
   // Close all dropdowns
-  const closeAllDropdowns = () => {
-    setIsNhaMayDropdownOpen(false);
-    setIsLichDropdownOpen(false);
-    setIsHinhThucDropdownOpen(false);
-    setIsFilterStatusOpen(false);
-    setIsFilterStatusTuDoOpen(false);
-    setActiveDropdown(null);
-  };
-
   useEffect(() => {
-    const handleScroll = (e) => {
-      if (activeDropdown && !e.target.closest?.('.dropdown-menu-container')) {
+    if (!activeDropdown) return;
+    const handleOutside = (e) => {
+      if (!e.target.closest?.('.dropdown-menu-container') && !e.target.closest?.('.action-btn-trigger')) {
         setActiveDropdown(null);
       }
     };
+    const handleScroll = (e) => {
+      if (!e.target.closest?.('.dropdown-menu-container')) {
+        setActiveDropdown(null);
+      }
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setActiveDropdown(null);
+    };
+    document.addEventListener('mousedown', handleOutside, true);
+    document.addEventListener('touchstart', handleOutside, true);
+    document.addEventListener('keydown', handleKeyDown, true);
     window.addEventListener('scroll', handleScroll, true);
-    return () => window.removeEventListener('scroll', handleScroll, true);
+    return () => {
+      document.removeEventListener('mousedown', handleOutside, true);
+      document.removeEventListener('touchstart', handleOutside, true);
+      document.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('scroll', handleScroll, true);
+    };
   }, [activeDropdown]);
 
   const handleActionClick = (e, tripId) => {
@@ -555,14 +571,8 @@ export default function ChuyenThamQuan_DSLoc() {
     setActiveDropdown(tripId);
   };
 
-  const handleDropdownClick = (e, setter) => {
-    e.stopPropagation();
-    closeAllDropdowns();
-    setter(true);
-  };
-
   return (
-    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300 relative" onClick={closeAllDropdowns}>
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300 relative">
 
       {/* Custom Popup Toast */}
       {popup.show && (
@@ -653,73 +663,24 @@ export default function ChuyenThamQuan_DSLoc() {
               </div>
 
               {/* Popover Filter Trạng thái Tab 1 */}
-              <div className="relative min-w-[200px]" onClick={e => e.stopPropagation()}>
-                <div
-                  onClick={() => setIsFilterStatusOpen(!isFilterStatusOpen)}
-                  className={`w-full px-4 py-2 bg-white border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isFilterStatusOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-                >
-                  <span className={`truncate pr-2 font-medium ${filterStatus !== 'ALL' ? 'text-slate-800' : 'text-slate-600'}`}>
-                    {filterStatus === 'ALL' ? 'Tất cả trạng thái' :
-                      filterStatus === 'Nhap' ? 'Nháp' :
-                        filterStatus === 'MoDangKy' ? 'Mở đăng ký' :
-                          filterStatus === 'DaChotDanhSach' ? 'Đã chốt danh sách' :
-                            filterStatus === 'DaDienRa' ? 'Đã diễn ra' :
-                              filterStatus === 'DaHuy' ? 'Đã huỷ' : filterStatus}
-                  </span>
-                  <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isFilterStatusOpen ? 'rotate-180 text-[#407F3E]' : ''}`} />
-                </div>
-                {isFilterStatusOpen && (
-                  <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[200px]">
-                    <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
-                      <input
-                        type="text"
-                        placeholder="Tìm trạng thái..."
-                        value={searchStatusKhoa}
-                        onChange={(e) => setSearchStatusKhoa(e.target.value)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
-                      />
-                    </div>
-                    <div className="max-h-60 overflow-y-auto">
-                      {[
-                        { value: 'ALL', label: 'Tất cả trạng thái' },
-                        { value: 'Nhap', label: 'Nháp' },
-                        { value: 'MoDangKy', label: 'Mở đăng ký' },
-                        { value: 'DaChotDanhSach', label: 'Đã chốt danh sách' },
-                        { value: 'DaDienRa', label: 'Đã diễn ra' },
-                        { value: 'DaHuy', label: 'Đã huỷ' },
-                      ]
-                        .filter(opt => opt.label.toLowerCase().includes(searchStatusKhoa.toLowerCase()))
-                        .map(opt => (
-                          <div
-                            key={opt.value}
-                            onClick={() => {
-                              setFilterStatus(opt.value);
-                              setIsFilterStatusOpen(false);
-                              setCurrentPageKhoa(1);
-                              setSearchStatusKhoa('');
-                            }}
-                            className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${filterStatus === opt.value ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50 font-medium'
-                              }`}
-                          >
-                            <span className="truncate pr-2">{opt.label}</span>
-                            {filterStatus === opt.value && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                          </div>
-                        ))}
-                      {[
-                        { value: 'ALL', label: 'Tất cả trạng thái' },
-                        { value: 'Nhap', label: 'Nháp' },
-                        { value: 'MoDangKy', label: 'Mở đăng ký' },
-                        { value: 'DaChotDanhSach', label: 'Đã chốt danh sách' },
-                        { value: 'DaDienRa', label: 'Đã diễn ra' },
-                        { value: 'DaHuy', label: 'Đã huỷ' },
-                      ].filter(opt => opt.label.toLowerCase().includes(searchStatusKhoa.toLowerCase())).length === 0 && searchStatusKhoa && (
-                          <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy</div>
-                        )}
-                    </div>
-                  </div>
-                )}
-              </div>
+              <SearchableDropdown
+                options={[
+                  { value: 'ALL', label: 'Tất cả trạng thái' },
+                  { value: 'Nhap', label: 'Nháp' },
+                  { value: 'MoDangKy', label: 'Mở đăng ký' },
+                  { value: 'DaChotDanhSach', label: 'Đã chốt danh sách' },
+                  { value: 'DaDienRa', label: 'Đã diễn ra' },
+                  { value: 'DaHuy', label: 'Đã huỷ' },
+                ]}
+                value={filterStatus}
+                onChange={(val) => {
+                  setFilterStatus(val);
+                  setCurrentPageKhoa(1);
+                }}
+                placeholder="Tất cả trạng thái"
+                searchPlaceholder="Tìm trạng thái..."
+                className="min-w-[200px]"
+              />
             </div>
 
             {!isAdmin && (
@@ -1014,70 +975,23 @@ export default function ChuyenThamQuan_DSLoc() {
             </div>
 
             {/* Popover Filter Trạng thái Tab 2 */}
-            <div className="relative min-w-[180px]" onClick={e => e.stopPropagation()}>
-              <div
-                onClick={() => setIsFilterStatusTuDoOpen(!isFilterStatusTuDoOpen)}
-                className={`w-full px-4 py-2 bg-white border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isFilterStatusTuDoOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-              >
-                <span className={`truncate pr-2 font-medium ${filterStatusTuDo !== 'ALL' ? 'text-slate-800' : 'text-slate-600'}`}>
-                  {filterStatusTuDo === 'ALL' ? 'Tất cả trạng thái' :
-                    filterStatusTuDo === 'ChoDuyet' ? 'Chờ CLB duyệt' :
-                      filterStatusTuDo === 'ChoKhoaDuyet' ? 'Chờ Khoa duyệt' :
-                        filterStatusTuDo === 'DaDuyet' ? 'Đã duyệt' :
-                          filterStatusTuDo === 'TuChoi' ? 'Từ chối' : filterStatusTuDo}
-                </span>
-                <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isFilterStatusTuDoOpen ? 'rotate-180 text-[#407F3E]' : ''}`} />
-              </div>
-              {isFilterStatusTuDoOpen && (
-                <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[200px]">
-                  <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
-                    <input
-                      type="text"
-                      placeholder="Tìm trạng thái..."
-                      value={searchStatusTuDo}
-                      onChange={(e) => setSearchStatusTuDo(e.target.value)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
-                    />
-                  </div>
-                  <div className="max-h-60 overflow-y-auto">
-                    {[
-                      { value: 'ALL', label: 'Tất cả trạng thái' },
-                      { value: 'ChoDuyet', label: 'Chờ CLB duyệt' },
-                      { value: 'ChoKhoaDuyet', label: 'Chờ Khoa duyệt' },
-                      { value: 'DaDuyet', label: 'Đã duyệt' },
-                      { value: 'TuChoi', label: 'Từ chối' },
-                    ]
-                      .filter(opt => opt.label.toLowerCase().includes(searchStatusTuDo.toLowerCase()))
-                      .map(opt => (
-                        <div
-                          key={opt.value}
-                          onClick={() => {
-                            setFilterStatusTuDo(opt.value);
-                            setIsFilterStatusTuDoOpen(false);
-                            setCurrentPageTuDo(1);
-                            setSearchStatusTuDo('');
-                          }}
-                          className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${filterStatusTuDo === opt.value ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50 font-medium'
-                            }`}
-                        >
-                          <span className="truncate pr-2">{opt.label}</span>
-                          {filterStatusTuDo === opt.value && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                        </div>
-                      ))}
-                    {[
-                      { value: 'ALL', label: 'Tất cả trạng thái' },
-                      { value: 'ChoDuyet', label: 'Chờ CLB duyệt' },
-                      { value: 'ChoKhoaDuyet', label: 'Chờ Khoa duyệt' },
-                      { value: 'DaDuyet', label: 'Đã duyệt' },
-                      { value: 'TuChoi', label: 'Từ chối' },
-                    ].filter(opt => opt.label.toLowerCase().includes(searchStatusTuDo.toLowerCase())).length === 0 && searchStatusTuDo && (
-                        <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy</div>
-                      )}
-                  </div>
-                </div>
-              )}
-            </div>
+            <SearchableDropdown
+              options={[
+                { value: 'ALL', label: 'Tất cả trạng thái' },
+                { value: 'ChoDuyet', label: 'Chờ CLB duyệt' },
+                { value: 'ChoKhoaDuyet', label: 'Chờ Khoa duyệt' },
+                { value: 'DaDuyet', label: 'Đã duyệt' },
+                { value: 'TuChoi', label: 'Từ chối' },
+              ]}
+              value={filterStatusTuDo}
+              onChange={(val) => {
+                setFilterStatusTuDo(val);
+                setCurrentPageTuDo(1);
+              }}
+              placeholder="Tất cả trạng thái"
+              searchPlaceholder="Tìm trạng thái..."
+              className="min-w-[180px]"
+            />
           </div>
 
           {(() => {
@@ -1297,7 +1211,12 @@ export default function ChuyenThamQuan_DSLoc() {
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Nhà máy</label>
                   <SearchableDropdown
-                    options={nhaMayOptions.map(o => ({ value: o.id, label: o.ten_nha_may }))}
+                    options={nhaMayOptions
+                      .filter(o => o.trang_thai === 'HoatDong' || (isEditMode && String(o.id) === String(selectedNhaMay)))
+                      .map(o => ({
+                        value: o.id,
+                        label: o.trang_thai === 'NgungHopTac' ? `${o.ten_nha_may} (Đã ngừng hợp tác)` : o.ten_nha_may
+                      }))}
                     value={selectedNhaMay}
                     onChange={(val) => setSelectedNhaMay(val)}
                     placeholder="Chọn nhà máy"
@@ -1338,32 +1257,19 @@ export default function ChuyenThamQuan_DSLoc() {
               {/* Row 3: Hình thức & Sức chứa */}
               <div className="grid grid-cols-2 gap-5 relative z-30">
                 {/* Hình thức */}
-                <div className="relative">
+                <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Hình thức</label>
-                  <div
-                    onClick={(e) => handleDropdownClick(e, setIsHinhThucDropdownOpen)}
-                    className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-sm flex justify-between items-center cursor-pointer transition-all ${isHinhThucDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-                  >
-                    <span className={`font-medium ${selectedHinhThuc ? 'text-slate-800' : 'text-slate-400'}`}>
-                      {selectedHinhThuc || 'Chọn hình thức'}
-                    </span>
-                    <ChevronDown className="w-4 h-4 text-slate-400" />
-                  </div>
-                  {isHinhThucDropdownOpen && (
-                    <div className="absolute top-[70px] left-0 w-full bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-50 py-1 overflow-hidden animate-in slide-in-from-top-1">
-                      {hinhThucOptions.map(opt => (
-                        <div
-                          key={opt}
-                          onClick={(e) => { e.stopPropagation(); setSelectedHinhThuc(opt); setIsHinhThucDropdownOpen(false); }}
-                          className={`px-4 py-2.5 text-sm cursor-pointer flex justify-between items-center transition-colors ${selectedHinhThuc === opt ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
-                            }`}
-                        >
-                          {opt}
-                          {selectedHinhThuc === opt && <Check className="w-4 h-4 text-[#407F3E]" />}
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <SearchableDropdown
+                    options={[
+                      { value: 'Trực tiếp', label: 'Trực tiếp' },
+                      { value: 'Trực tuyến', label: 'Trực tuyến' },
+                    ]}
+                    value={selectedHinhThuc}
+                    onChange={(val) => setSelectedHinhThuc(val)}
+                    placeholder="Chọn hình thức"
+                    searchPlaceholder="Tìm hình thức..."
+                    className="w-full"
+                  />
                 </div>
 
                 {/* Sức chứa */}

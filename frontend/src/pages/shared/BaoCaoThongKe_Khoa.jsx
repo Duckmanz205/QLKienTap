@@ -10,6 +10,7 @@ import * as XLSX from 'xlsx';
 import { khoaApi } from '../../services/api';
 import { getValidSession } from '../../utils/auth';
 import ConfirmModal from '../../components/ConfirmModal';
+import SearchableDropdown from '../../components/SearchableDropdown';
 import {
   exportDiemQuaTrinh,
   exportDanhSachPhang,
@@ -28,22 +29,18 @@ export default function BaoCaoThongKe_Khoa() {
   const location = useLocation();
   const session = getValidSession();
   const isCLB = location.pathname.startsWith('/clb') || session?.user?.vai_tro === 'QuanLyCLB';
+  const rolePrefix = isCLB ? '/clb' : '/khoa';
 
   // Dropdown States for Filters
-  const [isNamHocDropdownOpen, setIsNamHocDropdownOpen] = useState(false);
   const [selectedNamHoc, setSelectedNamHoc] = useState(() => sessionStorage.getItem('report_selectedNamHoc') || 'Tất cả');
   const [namHocOptions, setNamHocOptions] = useState(["Tất cả"]);
-  const [searchNamHoc, setSearchNamHoc] = useState('');
 
-  const [isKhoaDropdownOpen, setIsKhoaDropdownOpen] = useState(false);
   const [selectedKhoa, setSelectedKhoa] = useState(() => sessionStorage.getItem('report_selectedKhoa') || 'Tất cả');
   const [khoaOptions, setKhoaOptions] = useState(["Tất cả"]);
-  const [searchKhoa, setSearchKhoa] = useState('');
 
   // Đợt kiến tập (Campaigns / Đợt học phần)
   const [campaigns, setCampaigns] = useState([]);
   const [selectedDot, setSelectedDot] = useState(() => sessionStorage.getItem('report_selectedDot') || '');
-  const [isDotDropdownOpen, setIsDotDropdownOpen] = useState(false);
   const [searchDot, setSearchDot] = useState('');
 
   // Alert Modal
@@ -105,18 +102,6 @@ export default function BaoCaoThongKe_Khoa() {
   }, []);
 
   const showAlert = (msg) => setAlertMessage(msg);
-
-  const closeAllDropdowns = () => {
-    setIsNamHocDropdownOpen(false);
-    setIsKhoaDropdownOpen(false);
-    setIsDotDropdownOpen(false);
-  };
-
-  const handleDropdownClick = (e, setter) => {
-    e.stopPropagation();
-    closeAllDropdowns();
-    setter(true);
-  };
 
   // 1. BÁO CÁO DÀNH CHO QUẢN LÝ KHOA (Điểm số & Học vụ)
   const khoaReports = [
@@ -487,7 +472,7 @@ export default function BaoCaoThongKe_Khoa() {
   };
 
   return (
-    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300 relative" onClick={closeAllDropdowns}>
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300 relative">
       {/* Header */}
       <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -521,139 +506,44 @@ export default function BaoCaoThongKe_Khoa() {
       {/* Filter Bar */}
       <div className="bg-white p-4 rounded-2xl shadow-sm border border-[#E7E0C4] flex flex-wrap items-center gap-4 relative z-20 mb-8">
         {/* Năm học Dropdown */}
-        <div className="relative min-w-[200px] flex-1 md:flex-none">
+        <div className="min-w-[200px] flex-1 md:flex-none">
           <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Năm học</label>
-          <div
-            onClick={(e) => handleDropdownClick(e, setIsNamHocDropdownOpen)}
-            className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-sm flex justify-between items-center cursor-pointer transition-all ${
-              isNamHocDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'
-            }`}
-          >
-            <span className={`truncate pr-2 font-medium ${selectedNamHoc ? 'text-slate-700' : 'text-slate-400'}`}>
-              {selectedNamHoc || 'Tất cả năm học'}
-            </span>
-            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-          </div>
-          {isNamHocDropdownOpen && (
-            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col">
-              <div className="px-2 pb-1 border-b border-[#E7E0C4]/50">
-                <input
-                  type="text"
-                  placeholder="Tìm năm học..."
-                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-[#407F3E]"
-                  value={searchNamHoc}
-                  onChange={(e) => setSearchNamHoc(e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              </div>
-              <div className="overflow-y-auto max-h-56">
-                {namHocOptions.filter(opt => opt.toLowerCase().includes(searchNamHoc.toLowerCase())).map(opt => (
-                  <div
-                    key={opt}
-                    onClick={() => { setSelectedNamHoc(opt); setIsNamHocDropdownOpen(false); setSearchNamHoc(''); }}
-                    className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                      selectedNamHoc === opt ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/40 font-medium'
-                    }`}
-                  >
-                    <span className="truncate pr-2">{opt}</span>
-                    {selectedNamHoc === opt && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <SearchableDropdown
+            options={namHocOptions.map(opt => ({ value: opt, label: opt }))}
+            value={selectedNamHoc || 'Tất cả'}
+            onChange={(val) => setSelectedNamHoc(val)}
+            placeholder="Tất cả năm học"
+            searchPlaceholder="Tìm năm học..."
+            className="w-full"
+          />
         </div>
 
         {/* Khóa Dropdown */}
-        <div className="relative min-w-[180px] flex-1 md:flex-none">
+        <div className="min-w-[180px] flex-1 md:flex-none">
           <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Khóa đào tạo</label>
-          <div
-            onClick={(e) => handleDropdownClick(e, setIsKhoaDropdownOpen)}
-            className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-sm flex justify-between items-center cursor-pointer transition-all ${
-              isKhoaDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'
-            }`}
-          >
-            <span className={`truncate pr-2 font-medium ${selectedKhoa ? 'text-slate-700' : 'text-slate-400'}`}>
-              {selectedKhoa || 'Tất cả khóa'}
-            </span>
-            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-          </div>
-          {isKhoaDropdownOpen && (
-            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col">
-              <div className="px-2 pb-1 border-b border-[#E7E0C4]/50">
-                <input
-                  type="text"
-                  placeholder="Tìm khóa..."
-                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-[#407F3E]"
-                  value={searchKhoa}
-                  onChange={(e) => setSearchKhoa(e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              </div>
-              <div className="overflow-y-auto max-h-56">
-                {khoaOptions.filter(opt => opt.toLowerCase().includes(searchKhoa.toLowerCase())).map(opt => (
-                  <div
-                    key={opt}
-                    onClick={() => { setSelectedKhoa(opt); setIsKhoaDropdownOpen(false); setSearchKhoa(''); }}
-                    className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                      selectedKhoa === opt ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/40 font-medium'
-                    }`}
-                  >
-                    <span className="truncate pr-2">{opt}</span>
-                    {selectedKhoa === opt && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <SearchableDropdown
+            options={khoaOptions.map(opt => ({ value: opt, label: opt }))}
+            value={selectedKhoa || 'Tất cả'}
+            onChange={(val) => setSelectedKhoa(val)}
+            placeholder="Tất cả khóa"
+            searchPlaceholder="Tìm khóa..."
+            className="w-full"
+          />
         </div>
 
         {/* Đợt kiến tập Dropdown (Thay thế Lịch kiến tập) */}
-        <div className="relative min-w-[280px] flex-1">
+        <div className="min-w-[280px] flex-1">
           <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">
             {isCLB ? 'Đợt kiến tập (Lọc chuyến)' : 'Đợt kiến tập (Bắt buộc cho báo cáo)'}
           </label>
-          <div
-            onClick={(e) => handleDropdownClick(e, setIsDotDropdownOpen)}
-            className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-sm flex justify-between items-center cursor-pointer transition-all ${
-              isDotDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'
-            }`}
-          >
-            <span className={`truncate pr-2 font-medium ${selectedDot ? 'text-slate-800 font-bold' : 'text-slate-400'}`}>
-              {selectedDot ? campaigns.find(c => String(c.id) === String(selectedDot))?.ten_dot || selectedDot : 'Chọn đợt kiến tập...'}
-            </span>
-            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-          </div>
-          {isDotDropdownOpen && (
-            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col">
-              <div className="px-2 pb-1 border-b border-[#E7E0C4]/50">
-                <input
-                  type="text"
-                  placeholder="Tìm kiếm tên đợt..."
-                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-[#407F3E]"
-                  value={searchDot}
-                  onChange={(e) => setSearchDot(e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              </div>
-              <div className="overflow-y-auto max-h-56">
-                {filteredCampaigns.length > 0 ? filteredCampaigns.map(opt => (
-                  <div
-                    key={opt.id}
-                    onClick={() => { setSelectedDot(opt.id); setIsDotDropdownOpen(false); setSearchDot(''); }}
-                    className={`px-4 py-2.5 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                      String(selectedDot) === String(opt.id) ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/40 font-medium'
-                    }`}
-                  >
-                    <span className="truncate pr-2">{opt.ten_dot}</span>
-                    {String(selectedDot) === String(opt.id) && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                  </div>
-                )) : (
-                  <div className="px-4 py-3 text-sm text-slate-400 italic text-center">Không có đợt kiến tập phù hợp</div>
-                )}
-              </div>
-            </div>
-          )}
+          <SearchableDropdown
+            options={filteredCampaigns.map(opt => ({ value: opt.id, label: opt.ten_dot }))}
+            value={selectedDot}
+            onChange={(val) => setSelectedDot(val)}
+            placeholder="Chọn đợt kiến tập..."
+            searchPlaceholder="Tìm kiếm tên đợt..."
+            className="w-full"
+          />
         </div>
       </div>
 

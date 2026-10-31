@@ -24,8 +24,6 @@ export default function BaoCao_SVChuaThamQuan_Khoa() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClass, setSelectedClass] = useState('All');
-  const [isClassDropdownOpen, setIsClassDropdownOpen] = useState(false);
-  const [searchLopDropdown, setSearchLopDropdown] = useState('');
   const [classes, setClasses] = useState([]);
 
   // Checkbox state for bulk actions
@@ -144,7 +142,7 @@ export default function BaoCao_SVChuaThamQuan_Khoa() {
   };
 
   return (
-    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300" onClick={() => setIsClassDropdownOpen(false)}>
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300">
       
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm font-semibold text-slate-500 mb-6">
@@ -227,49 +225,20 @@ export default function BaoCao_SVChuaThamQuan_Khoa() {
         </div>
 
         {/* Lớp Dropdown */}
-        <div className="relative min-w-[200px] w-full md:w-auto">
-          <div 
-            onClick={(e) => { e.stopPropagation(); setIsClassDropdownOpen(!isClassDropdownOpen); }}
-            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isClassDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-          >
-            <span className="text-slate-700 font-medium">{selectedClass === 'All' ? 'Tất cả lớp' : selectedClass}</span>
-            <ChevronDown className="w-4 h-4 text-slate-400 ml-2" />
-          </div>
-          {isClassDropdownOpen && (
-            <div 
-              onClick={(e) => e.stopPropagation()}
-              className="absolute top-full right-0 w-full md:w-56 mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col"
-            >
-              <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
-                <input 
-                  type="text" 
-                  placeholder="Tìm lớp..." 
-                  value={searchLopDropdown}
-                  onChange={(e) => setSearchLopDropdown(e.target.value)}
-                  className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
-                />
-              </div>
-              <div className="max-h-60 overflow-y-auto">
-                {['All', ...classes]
-                  .filter(opt => opt === 'All' ? 'tất cả lớp'.includes(searchLopDropdown.toLowerCase()) : opt.toLowerCase().includes(searchLopDropdown.toLowerCase()))
-                  .map(opt => (
-                    <div 
-                      key={opt}
-                      onClick={() => { setSelectedClass(opt); setIsClassDropdownOpen(false); setSearchLopDropdown(''); setCurrentPage(1); }}
-                      className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                        selectedClass === opt 
-                          ? 'bg-[#E7E0C4] text-slate-800 font-bold' 
-                          : 'text-slate-700 hover:bg-[#E7E0C4]/50'
-                      }`}
-                    >
-                      <span>{opt === 'All' ? 'Tất cả lớp' : opt}</span>
-                      {selectedClass === opt && <Check className="w-4 h-4 text-[#407F3E]" />}
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
-        </div>
+        <SearchableDropdown
+          options={[
+            { value: 'All', label: 'Tất cả lớp' },
+            ...classes.map(opt => ({ value: opt, label: opt }))
+          ]}
+          value={selectedClass}
+          onChange={(val) => {
+            setSelectedClass(val);
+            setCurrentPage(1);
+          }}
+          placeholder="Tất cả lớp"
+          searchPlaceholder="Tìm lớp..."
+          className="min-w-[200px] w-full md:w-auto"
+        />
 
         <div className="flex items-center gap-3 w-full md:w-auto flex-wrap">
           <button 

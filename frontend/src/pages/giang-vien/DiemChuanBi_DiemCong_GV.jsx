@@ -10,10 +10,8 @@ import SearchableDropdown from '../../components/SearchableDropdown';
 import { exportPrepGradesTemplate } from '../../utils/exportExcel';
 
 export default function DiemChuanBi_DiemCong_GV() {
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [tripSearch, setTripSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [limit, setLimit] = useState(15);
 
@@ -450,7 +448,7 @@ export default function DiemChuanBi_DiemCong_GV() {
   const paginatedStudents = filteredStudents.slice((currentPage - 1) * limit, currentPage * limit);
 
   return (
-    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300 relative" onClick={() => setIsDropdownOpen(false)}>
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300 relative">
 
       {/* Header with Title and Actions */}
       <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -516,54 +514,21 @@ export default function DiemChuanBi_DiemCong_GV() {
           />
         </div>
 
-        {/* Trip Selector Popover */}
-        <div className="relative min-w-[280px] flex-1" onClick={(e) => e.stopPropagation()}>
-          <div
-            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-          >
-            <span className="truncate pr-2 font-medium text-slate-700">
-              {selectedTrip ? selectedTrip.name : 'Đang tải chuyến...'}
-            </span>
-            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-          </div>
-          {isDropdownOpen && trips.length > 0 && (
-            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-50 py-1 overflow-hidden animate-in slide-in-from-top-1 max-h-64 flex flex-col">
-              <div className="p-2 border-b border-[#E7E0C4] sticky top-0 bg-white z-10">
-                <input
-                  type="text"
-                  placeholder="Tìm chuyến đi..."
-                  value={tripSearch}
-                  onChange={(e) => setTripSearch(e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-[#E7E0C4] rounded-lg focus:outline-none focus:border-[#407F3E]"
-                />
-              </div>
-              <div className="overflow-y-auto">
-                {trips
-                  .filter(t => !tripSearch || t.name.toLowerCase().includes(tripSearch.toLowerCase()))
-                  .map(trip => (
-                    <div
-                      key={trip.id}
-                      onClick={() => {
-                        setSelectedTrip(trip);
-                        setIsDropdownOpen(false);
-                        setTripSearch('');
-                      }}
-                      className={`px-4 py-2.5 text-sm cursor-pointer flex justify-between items-center transition-colors ${selectedTrip?.id === trip.id ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50 font-medium'
-                        }`}
-                    >
-                      <span className="truncate pr-2">{trip.name}</span>
-                      {selectedTrip?.id === trip.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                    </div>
-                  ))}
-                {trips.filter(t => !tripSearch || t.name.toLowerCase().includes(tripSearch.toLowerCase())).length === 0 && (
-                  <div className="px-4 py-3 text-xs text-slate-500 text-center">Không tìm thấy chuyến đi</div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+        {/* Trip Selector Dropdown */}
+        <SearchableDropdown
+          options={trips.map(t => ({
+            value: t.id,
+            label: t.name
+          }))}
+          value={selectedTrip?.id || ''}
+          onChange={(val) => {
+            const found = trips.find(t => t.id === val);
+            if (found) setSelectedTrip(found);
+          }}
+          placeholder={trips.length > 0 ? "Chọn chuyến đi..." : "Đang tải chuyến..."}
+          searchPlaceholder="Tìm chuyến đi..."
+          className="min-w-[280px] flex-1"
+        />
 
       </div>
 

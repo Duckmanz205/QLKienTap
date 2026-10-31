@@ -25,7 +25,6 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
 
   // Modal state
   const [showModal, setShowModal] = useState(false);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   // Form states for creating
   const [tenHocKy, setTenHocKy] = useState('');
@@ -72,11 +71,22 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
     try {
       if (activeTab === 'nam-hoc') {
         if (!tenNamHoc) { setToast({ show: true, message: 'Vui lòng nhập tên năm học', type: 'error' }); return; }
+        const yearMatch = tenNamHoc.trim().match(/^(\d{4})-(\d{4})$/);
+        if (!yearMatch) {
+          setToast({ show: true, message: 'Tên năm học phải có định dạng YYYY-YYYY (Ví dụ: 2024-2025)', type: 'error' });
+          return;
+        }
+        const y1 = parseInt(yearMatch[1], 10);
+        const y2 = parseInt(yearMatch[2], 10);
+        if (y2 !== y1 + 1) {
+          setToast({ show: true, message: `Năm kết thúc (${y2}) phải bằng năm bắt đầu (${y1}) + 1 (Ví dụ: ${y1}-${y1 + 1})`, type: 'error' });
+          return;
+        }
         if (!ngayBatDau || !ngayKetThuc) { setToast({ show: true, message: 'Vui lòng chọn ngày bắt đầu và kết thúc', type: 'error' }); return; }
         if (new Date(ngayKetThuc) <= new Date(ngayBatDau)) { setToast({ show: true, message: 'Ngày kết thúc phải lớn hơn ngày bắt đầu', type: 'error' }); return; }
 
         await khoaApi.createYear({
-          ten_nam_hoc: tenNamHoc,
+          ten_nam_hoc: `${y1}-${y2}`,
           ngay_bat_dau: ngayBatDau,
           ngay_ket_thuc: ngayKetThuc
         });
@@ -85,6 +95,23 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
         if (!tenHocKy || !selectedNamHoc) { setToast({ show: true, message: 'Vui lòng nhập tên học kỳ và chọn năm học', type: 'error' }); return; }
         if (!ngayBatDau || !ngayKetThuc) { setToast({ show: true, message: 'Vui lòng chọn ngày bắt đầu và kết thúc', type: 'error' }); return; }
         if (new Date(ngayKetThuc) <= new Date(ngayBatDau)) { setToast({ show: true, message: 'Ngày kết thúc phải lớn hơn ngày bắt đầu', type: 'error' }); return; }
+
+        // Kiểm tra thời gian học kỳ phải nằm trong năm học đã chọn
+        const selectedYearObj = years.find(y => y.id === Number(selectedNamHoc));
+        if (selectedYearObj && selectedYearObj.ngay_bat_dau && selectedYearObj.ngay_ket_thuc) {
+          const yStart = selectedYearObj.ngay_bat_dau.substring(0, 10);
+          const yEnd = selectedYearObj.ngay_ket_thuc.substring(0, 10);
+          if (ngayBatDau < yStart || ngayKetThuc > yEnd) {
+            const sVN = new Date(selectedYearObj.ngay_bat_dau).toLocaleDateString('vi-VN');
+            const eVN = new Date(selectedYearObj.ngay_ket_thuc).toLocaleDateString('vi-VN');
+            setToast({
+              show: true,
+              message: `Thời gian học kỳ phải nằm trong thời gian năm học đã chọn (từ ${sVN} đến ${eVN})`,
+              type: 'error'
+            });
+            return;
+          }
+        }
 
         await khoaApi.createTerm({
           ten_hoc_ky: tenHocKy,
@@ -132,18 +159,53 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
     e.preventDefault();
     try {
       if (editingItem.type === 'nam-hoc') {
+        if (!editFormData.ten_nam_hoc) { setToast({ show: true, message: 'Vui lòng nhập tên năm học', type: 'error' }); return; }
+        const yearMatch = editFormData.ten_nam_hoc.trim().match(/^(\d{4})-(\d{4})$/);
+        if (!yearMatch) {
+          setToast({ show: true, message: 'Tên năm học phải có định dạng YYYY-YYYY (Ví dụ: 2024-2025)', type: 'error' });
+          return;
+        }
+        const y1 = parseInt(yearMatch[1], 10);
+        const y2 = parseInt(yearMatch[2], 10);
+        if (y2 !== y1 + 1) {
+          setToast({ show: true, message: `Năm kết thúc (${y2}) phải bằng năm bắt đầu (${y1}) + 1 (Ví dụ: ${y1}-${y1 + 1})`, type: 'error' });
+          return;
+        }
         if (!editFormData.ngay_bat_dau || !editFormData.ngay_ket_thuc) { setToast({ show: true, message: 'Vui lòng chọn ngày bắt đầu và kết thúc', type: 'error' }); return; }
         if (new Date(editFormData.ngay_ket_thuc) <= new Date(editFormData.ngay_bat_dau)) { setToast({ show: true, message: 'Ngày kết thúc phải lớn hơn ngày bắt đầu', type: 'error' }); return; }
-        await khoaApi.updateYear(editingItem.id, editFormData);
+        await khoaApi.updateYear(editingItem.id, { ...editFormData, ten_nam_hoc: `${y1}-${y2}` });
       } else if (editingItem.type === 'hoc-ky') {
         if (!editFormData.ngay_bat_dau || !editFormData.ngay_ket_thuc) { setToast({ show: true, message: 'Vui lòng chọn ngày bắt đầu và kết thúc', type: 'error' }); return; }
         if (new Date(editFormData.ngay_ket_thuc) <= new Date(editFormData.ngay_bat_dau)) { setToast({ show: true, message: 'Ngày kết thúc phải lớn hơn ngày bắt đầu', type: 'error' }); return; }
+
+        // Kiểm tra thời gian học kỳ phải nằm trong năm học đã chọn
+        const targetYearId = editFormData.nam_hoc_id;
+        const selectedYearObj = years.find(y => y.id === Number(targetYearId));
+        if (selectedYearObj && selectedYearObj.ngay_bat_dau && selectedYearObj.ngay_ket_thuc) {
+          const yStart = selectedYearObj.ngay_bat_dau.substring(0, 10);
+          const yEnd = selectedYearObj.ngay_ket_thuc.substring(0, 10);
+          const tStart = editFormData.ngay_bat_dau.substring(0, 10);
+          const tEnd = editFormData.ngay_ket_thuc.substring(0, 10);
+          if (tStart < yStart || tEnd > yEnd) {
+            const sVN = new Date(selectedYearObj.ngay_bat_dau).toLocaleDateString('vi-VN');
+            const eVN = new Date(selectedYearObj.ngay_ket_thuc).toLocaleDateString('vi-VN');
+            setToast({
+              show: true,
+              message: `Thời gian học kỳ phải nằm trong thời gian năm học đã chọn (từ ${sVN} đến ${eVN})`,
+              type: 'error'
+            });
+            return;
+          }
+        }
+
         await khoaApi.updateTerm(editingItem.id, editFormData);
       } else if (editingItem.type === 'khoa') {
         await khoaApi.updateCourse(editingItem.id, editFormData);
       }
       setToast({ show: true, message: 'Cập nhật thành công!', type: 'success' });
       setShowEditModal(false);
+      setEditingItem(null);
+      setEditFormData({});
       fetchData();
     } catch (err) {
       console.error(err);
@@ -187,7 +249,7 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
   const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
 
   return (
-    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-2" onClick={() => setIsDropdownOpen(false)}>
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-2">
       <Toast show={toast.show} message={toast.message} type={toast.type} onClose={() => setToast({ show: false, message: '', type: 'success' })} />
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-800">Quản lý danh mục</h1>
@@ -482,6 +544,19 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
                       searchPlaceholder="Tìm năm học..."
                       className="w-full"
                     />
+                    {(() => {
+                      const selYear = years.find(y => y.id === Number(selectedNamHoc));
+                      if (selYear && selYear.ngay_bat_dau && selYear.ngay_ket_thuc) {
+                        const sVN = new Date(selYear.ngay_bat_dau).toLocaleDateString('vi-VN');
+                        const eVN = new Date(selYear.ngay_ket_thuc).toLocaleDateString('vi-VN');
+                        return (
+                          <p className="text-xs text-[#407F3E] font-medium mt-1.5 flex items-center gap-1 bg-[#407F3E]/10 px-3 py-1.5 rounded-lg border border-[#407F3E]/20">
+                            <span>ℹ️ Năm học diễn ra từ <strong>{sVN}</strong> đến <strong>{eVN}</strong></span>
+                          </p>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
 
                   <div>
@@ -640,6 +715,19 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
                       searchPlaceholder="Tìm năm học..."
                       className="w-full"
                     />
+                    {(() => {
+                      const selYear = years.find(y => y.id === Number(editFormData.nam_hoc_id));
+                      if (selYear && selYear.ngay_bat_dau && selYear.ngay_ket_thuc) {
+                        const sVN = new Date(selYear.ngay_bat_dau).toLocaleDateString('vi-VN');
+                        const eVN = new Date(selYear.ngay_ket_thuc).toLocaleDateString('vi-VN');
+                        return (
+                          <p className="text-xs text-[#407F3E] font-medium mt-1.5 flex items-center gap-1 bg-[#407F3E]/10 px-3 py-1.5 rounded-lg border border-[#407F3E]/20">
+                            <span>ℹ️ Năm học diễn ra từ <strong>{sVN}</strong> đến <strong>{eVN}</strong></span>
+                          </p>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">Ngày bắt đầu</label>

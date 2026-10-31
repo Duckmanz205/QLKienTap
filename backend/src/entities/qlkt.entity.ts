@@ -216,9 +216,6 @@ export class NhaMay {
   dia_chi: string;
 
   @Column({ nullable: true })
-  nhom_nganh: string;
-
-  @Column({ nullable: true })
   nguoi_lien_he: string;
 
   @Column({ nullable: true })

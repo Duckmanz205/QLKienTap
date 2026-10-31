@@ -8,8 +8,14 @@ import { khoaApi } from '../../services/api';
 import Toast from '../../components/Toast';
 import ConfirmModal from '../../components/ConfirmModal';
 import SearchableDropdown from '../../components/SearchableDropdown';
+import { getValidSession } from '../../utils/auth';
 
 export default function DanhMuc_SinhVien_Khoa() {
+  const session = getValidSession();
+  const userRole = session?.user?.vai_tro;
+  const isCLB = userRole === 'QuanLyCLB';
+  const canModify = !isCLB && (userRole === 'QuanLyKhoa' || userRole === 'QuanTriVienHeThong');
+
   const [students, setStudents] = useState([]);
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   const [confirmModal, setConfirmModal] = useState({ show: false, action: null, stud: null, title: '', message: '' });
@@ -147,7 +153,8 @@ export default function DanhMuc_SinhVien_Khoa() {
     if (action === 'delete') {
       try {
         const res = await khoaApi.deleteStudent(stud.id);
-        setToast({ show: true, message: res.data.message || 'Xóa sinh viên thành công', type: 'success' });
+        const toastType = res.data?.action === 'locked' ? 'warning' : 'success';
+        setToast({ show: true, message: res.data?.message || 'Xóa sinh viên thành công', type: toastType });
         fetchData();
       } catch (err) {
         console.error(err);
@@ -277,30 +284,32 @@ export default function DanhMuc_SinhVien_Khoa() {
       {/* Header section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <h1 className="text-2xl font-bold text-slate-800">Sinh viên</h1>
-        <div className="flex gap-3">
-          <button 
-            onClick={handleOpenImportModal}
-            className="px-4 py-2 border-2 border-[#407F3E] text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors cursor-pointer"
-          >
-            <Upload className="w-4 h-4" />
-            Nhập từ Excel
-          </button>
-          <button 
-            onClick={() => {
-              setEditingStudent(null);
-              setNewMssv('');
-              setNewName('');
-              setNewClass('');
-              setNewEmail('');
-              setNewPhone('');
-              setShowSingleModal(true);
-            }}
-            className="px-4 py-2 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors shadow-sm cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            Thêm sinh viên
-          </button>
-        </div>
+        {canModify && (
+          <div className="flex gap-3">
+            <button 
+              onClick={handleOpenImportModal}
+              className="px-4 py-2 border-2 border-[#407F3E] text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors cursor-pointer"
+            >
+              <Upload className="w-4 h-4" />
+              Nhập từ Excel
+            </button>
+            <button 
+              onClick={() => {
+                setEditingStudent(null);
+                setNewMssv('');
+                setNewName('');
+                setNewClass('');
+                setNewEmail('');
+                setNewPhone('');
+                setShowSingleModal(true);
+              }}
+              className="px-4 py-2 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors shadow-sm cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              Thêm sinh viên
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Filter Bar */}
@@ -368,13 +377,13 @@ export default function DanhMuc_SinhVien_Khoa() {
                 <th className="p-4">Khóa</th>
                 <th className="p-4">Email</th>
                 <th className="p-4 text-center">Trạng thái</th>
-                <th className="p-4 text-right">Thao tác</th>
+                {canModify && <th className="p-4 text-right">Thao tác</th>}
               </tr>
             </thead>
             <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
               {filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-slate-500 font-medium">Không tìm thấy sinh viên nào khớp điều kiện</td>
+                  <td colSpan={canModify ? 7 : 6} className="p-8 text-center text-slate-500 font-medium">Không tìm thấy sinh viên nào khớp điều kiện</td>
                 </tr>
               ) : (
                 filteredStudents.map(stud => {
@@ -395,25 +404,27 @@ export default function DanhMuc_SinhVien_Khoa() {
                           <span className="text-slate-400 font-medium text-xs">-</span>
                         )}
                       </td>
-                      <td className="p-4 text-right">
-                        <div className="flex justify-end gap-2 text-slate-400">
-                          <button 
-                            className="p-1.5 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded transition-colors cursor-pointer" 
-                            title="Sửa thông tin"
-                            onClick={() => handleEditClick(stud)}
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
+                      {canModify && (
+                        <td className="p-4 text-right">
+                          <div className="flex justify-end gap-2 text-slate-400">
+                            <button 
+                              className="p-1.5 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded transition-colors cursor-pointer" 
+                              title="Sửa thông tin"
+                              onClick={() => handleEditClick(stud)}
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
 
-                          <button 
-                            className="p-1.5 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded transition-colors cursor-pointer" 
-                            title="Xóa sinh viên" 
-                            onClick={() => handleDeleteClick(stud)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
+                            <button 
+                              className="p-1.5 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded transition-colors cursor-pointer" 
+                              title="Xóa sinh viên" 
+                              onClick={() => handleDeleteClick(stud)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   )
                 })
@@ -483,7 +494,7 @@ export default function DanhMuc_SinhVien_Khoa() {
       </div>
 
       {/* Single Student Modal */}
-      {showSingleModal && (
+      {canModify && showSingleModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50  animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-xl border border-[#E7E0C4] max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
@@ -578,7 +589,7 @@ export default function DanhMuc_SinhVien_Khoa() {
       )}
 
       {/* Import Modal */}
-      {isImportModalOpen && (
+      {canModify && isImportModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-slate-900/40  animate-in fade-in duration-200" onClick={() => !isImporting && setIsImportModalOpen(false)}></div>
           <div className="bg-white w-full max-w-5xl rounded-2xl shadow-xl relative z-10 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">

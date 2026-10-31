@@ -31,10 +31,6 @@ export default function RegistrationManagement_Khoa() {
   const [searchNhaMay, setSearchNhaMay] = useState('');
   const [filterDot, setFilterDot] = useState('ALL');
   const [filterLich, setFilterLich] = useState('ALL');
-  const [isDotDropdownOpen, setIsDotDropdownOpen] = useState(false);
-  const [isLichDropdownOpen, setIsLichDropdownOpen] = useState(false);
-  const [searchDotDropdown, setSearchDotDropdown] = useState('');
-  const [searchLichDropdown, setSearchLichDropdown] = useState('');
   const [currentPageTrips, setCurrentPageTrips] = useState(1);
   const [limitTrips, setLimitTrips] = useState(15);
 
@@ -45,9 +41,7 @@ export default function RegistrationManagement_Khoa() {
 
   // Search & Filter for Detail Modal Tab 1 (danhsach)
   const [searchRegStudent, setSearchRegStudent] = useState('');
-  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState('');
-  const [searchStatusDropdown, setSearchStatusDropdown] = useState('');
   const statusOptions = ["Tất cả", "Chờ duyệt", "Hợp lệ", "Đã tham gia", "Hoàn thành", "Vắng mặt", "Bị loại", "Đã hủy"];
   const [currentPageRegs, setCurrentPageRegs] = useState(1);
   const [limitRegs, setLimitRegs] = useState(15);
@@ -243,8 +237,13 @@ export default function RegistrationManagement_Khoa() {
       isApproved ? "Bạn có chắc chắn muốn duyệt yêu cầu hủy đăng ký này?" : "Bạn có chắc chắn muốn từ chối yêu cầu hủy đăng ký này?",
       async () => {
         try {
-          await khoaApi.approveCancel({ cancelId, isApproved });
-          showPopup(isApproved ? 'Đã duyệt yêu cầu hủy' : 'Đã từ chối yêu cầu hủy', 'success');
+          await khoaApi.approveCancel({ requestId: cancelId, cancelId, isApproved });
+          showPopup(
+            isApproved
+              ? 'Đã duyệt yêu cầu hủy và miễn trừ án phạt cho sinh viên'
+              : 'Đã từ chối yêu cầu hủy',
+            'success'
+          );
           fetchGlobalCancelRequests();
           // If we are looking at a trip, we might want to refresh registrations
           if (selectedTripForReg) {
@@ -273,15 +272,6 @@ export default function RegistrationManagement_Khoa() {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "DanhSachChot");
     XLSX.writeFile(workbook, `DanhSachSinhVienChot_${selectedTripForReg?.id || 'Trip'}.xlsx`);
-  };
-
-  const closeAllDropdowns = () => {
-    setIsStatusDropdownOpen(false);
-    setIsDotDropdownOpen(false);
-    setIsLichDropdownOpen(false);
-    setSearchDotDropdown('');
-    setSearchLichDropdown('');
-    setSearchStatusDropdown('');
   };
 
 
@@ -437,7 +427,7 @@ export default function RegistrationManagement_Khoa() {
   );
 
   return (
-    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300 relative" onClick={closeAllDropdowns}>
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300 relative">
       {/* ================= MASTER VIEW (LUÔN RENDER) ================= */}
       <>
         <div className="mb-6">
@@ -491,144 +481,37 @@ export default function RegistrationManagement_Khoa() {
                     className="w-full pl-9 pr-4 py-2 bg-white border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#407F3E] focus:border-[#407F3E] transition-shadow"
                   />
                 </div>
-                
-                {/* Popover Filter Đợt */}
-                <div className="relative min-w-[170px]" onClick={e => e.stopPropagation()}>
-                  <div 
-                    onClick={() => {
-                      const next = !isDotDropdownOpen;
-                      closeAllDropdowns();
-                      setIsDotDropdownOpen(next);
-                    }}
-                    className={`w-full px-4 py-2 bg-white border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isDotDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-                  >
-                    <span className={`truncate pr-2 font-medium ${filterDot !== 'ALL' ? 'text-slate-800' : 'text-slate-600'}`}>
-                      {filterDot === 'ALL' ? 'Tất cả đợt' : filterDot}
-                    </span>
-                    <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isDotDropdownOpen ? 'rotate-180 text-[#407F3E]' : ''}`} />
-                  </div>
-                  {isDotDropdownOpen && (
-                    <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[200px]">
-                      <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
-                        <input 
-                          type="text" 
-                          placeholder="Tìm đợt..." 
-                          value={searchDotDropdown}
-                          onChange={(e) => setSearchDotDropdown(e.target.value)}
-                          onClick={(e) => e.stopPropagation()}
-                          className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
-                        />
-                      </div>
-                      <div className="max-h-60 overflow-y-auto">
-                        <div 
-                          onClick={() => {
-                            setFilterDot('ALL');
-                            setIsDotDropdownOpen(false);
-                            setCurrentPageTrips(1);
-                            setSearchDotDropdown('');
-                          }}
-                          className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                            filterDot === 'ALL' ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50 font-medium'
-                          }`}
-                        >
-                          <span className="truncate pr-2">Tất cả đợt</span>
-                          {filterDot === 'ALL' && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                        </div>
-                        {uniqueDots
-                          .filter(dot => dot.toLowerCase().includes(searchDotDropdown.toLowerCase()))
-                          .map(dot => (
-                          <div 
-                            key={dot}
-                            onClick={() => {
-                              setFilterDot(dot);
-                              setIsDotDropdownOpen(false);
-                              setCurrentPageTrips(1);
-                              setSearchDotDropdown('');
-                            }}
-                            className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                              filterDot === dot ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50 font-medium'
-                            }`}
-                          >
-                            <span className="truncate pr-2">{dot}</span>
-                            {filterDot === dot && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                          </div>
-                        ))}
-                        {uniqueDots.filter(dot => dot.toLowerCase().includes(searchDotDropdown.toLowerCase())).length === 0 && searchDotDropdown && (
-                          <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy</div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                {/* Filter Đợt */}
+                <SearchableDropdown
+                  options={[
+                    { value: 'ALL', label: 'Tất cả đợt' },
+                    ...uniqueDots.map(dot => ({ value: dot, label: dot }))
+                  ]}
+                  value={filterDot}
+                  onChange={(val) => {
+                    setFilterDot(val);
+                    setCurrentPageTrips(1);
+                  }}
+                  placeholder="Tất cả đợt"
+                  searchPlaceholder="Tìm đợt..."
+                  className="min-w-[170px]"
+                />
 
-                {/* Popover Filter Lịch */}
-                <div className="relative min-w-[190px]" onClick={e => e.stopPropagation()}>
-                  <div 
-                    onClick={() => {
-                      const next = !isLichDropdownOpen;
-                      closeAllDropdowns();
-                      setIsLichDropdownOpen(next);
-                    }}
-                    className={`w-full px-4 py-2 bg-white border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isLichDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-                  >
-                    <span className={`truncate pr-2 font-medium ${filterLich !== 'ALL' ? 'text-slate-800' : 'text-slate-600'}`}>
-                      {filterLich === 'ALL' ? 'Tất cả lịch' : filterLich}
-                    </span>
-                    <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isLichDropdownOpen ? 'rotate-180 text-[#407F3E]' : ''}`} />
-                  </div>
-                  {isLichDropdownOpen && (
-                    <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[220px]">
-                      <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
-                        <input 
-                          type="text" 
-                          placeholder="Tìm lịch..." 
-                          value={searchLichDropdown}
-                          onChange={(e) => setSearchLichDropdown(e.target.value)}
-                          onClick={(e) => e.stopPropagation()}
-                          className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
-                        />
-                      </div>
-                      <div className="max-h-60 overflow-y-auto">
-                        <div 
-                          onClick={() => {
-                            setFilterLich('ALL');
-                            setIsLichDropdownOpen(false);
-                            setCurrentPageTrips(1);
-                            setSearchLichDropdown('');
-                          }}
-                          className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                            filterLich === 'ALL' ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50 font-medium'
-                          }`}
-                        >
-                          <span className="truncate pr-2">Tất cả lịch</span>
-                          {filterLich === 'ALL' && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                        </div>
-                        {uniqueLichs
-                          .filter(lich => lich.toLowerCase().includes(searchLichDropdown.toLowerCase()))
-                          .map(lich => (
-                          <div 
-                            key={lich}
-                            onClick={() => {
-                              setFilterLich(lich);
-                              setIsLichDropdownOpen(false);
-                              setCurrentPageTrips(1);
-                              setSearchLichDropdown('');
-                            }}
-                            className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                              filterLich === lich ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50 font-medium'
-                            }`}
-                          >
-                            <span className="truncate pr-2">{lich}</span>
-                            {filterLich === lich && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                          </div>
-                        ))}
-                        {uniqueLichs.filter(lich => lich.toLowerCase().includes(searchLichDropdown.toLowerCase())).length === 0 && searchLichDropdown && (
-                          <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy</div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                {/* Filter Lịch */}
+                <SearchableDropdown
+                  options={[
+                    { value: 'ALL', label: 'Tất cả lịch' },
+                    ...uniqueLichs.map(lich => ({ value: lich, label: lich }))
+                  ]}
+                  value={filterLich}
+                  onChange={(val) => {
+                    setFilterLich(val);
+                    setCurrentPageTrips(1);
+                  }}
+                  placeholder="Tất cả lịch"
+                  searchPlaceholder="Tìm lịch..."
+                  className="min-w-[190px]"
+                />
               </div>
             </div>
 
@@ -1069,59 +952,20 @@ export default function RegistrationManagement_Khoa() {
                       />
                     </div>
 
-                    <div className="relative min-w-[200px]" onClick={e => e.stopPropagation()}>
-                      <div 
-                        onClick={() => {
-                          const next = !isStatusDropdownOpen;
-                          closeAllDropdowns();
-                          setIsStatusDropdownOpen(next);
-                        }}
-                        className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isStatusDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-slate-200'}`}
-                      >
-                        <span className={`truncate pr-2 font-medium ${selectedStatus && selectedStatus !== 'Tất cả' ? 'text-slate-800' : 'text-slate-600'}`}>
-                          {selectedStatus || 'Tất cả trạng thái'}
-                        </span>
-                        <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isStatusDropdownOpen ? 'rotate-180 text-[#407F3E]' : ''}`} />
-                      </div>
-                      {isStatusDropdownOpen && (
-                        <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[200px]">
-                          <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
-                            <input 
-                              type="text" 
-                              placeholder="Tìm trạng thái..." 
-                              value={searchStatusDropdown}
-                              onChange={(e) => setSearchStatusDropdown(e.target.value)}
-                              onClick={(e) => e.stopPropagation()}
-                              className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
-                            />
-                          </div>
-                          <div className="max-h-60 overflow-y-auto">
-                            {statusOptions
-                              .filter(opt => opt.toLowerCase().includes(searchStatusDropdown.toLowerCase()))
-                              .map(opt => (
-                              <div 
-                                key={opt}
-                                onClick={() => {
-                                  setSelectedStatus(opt === 'Tất cả' ? '' : opt);
-                                  setIsStatusDropdownOpen(false);
-                                  setCurrentPageRegs(1);
-                                  setSearchStatusDropdown('');
-                                }}
-                                className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                                  (selectedStatus === opt || (!selectedStatus && opt === 'Tất cả')) ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50 font-medium'
-                                }`}
-                              >
-                                <span className="truncate pr-2">{opt}</span>
-                                {(selectedStatus === opt || (!selectedStatus && opt === 'Tất cả')) && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                              </div>
-                            ))}
-                            {statusOptions.filter(opt => opt.toLowerCase().includes(searchStatusDropdown.toLowerCase())).length === 0 && searchStatusDropdown && (
-                              <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy</div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                    <SearchableDropdown
+                      options={statusOptions.map(opt => ({
+                        value: opt === 'Tất cả' ? '' : opt,
+                        label: opt
+                      }))}
+                      value={selectedStatus}
+                      onChange={(val) => {
+                        setSelectedStatus(val);
+                        setCurrentPageRegs(1);
+                      }}
+                      placeholder="Tất cả trạng thái"
+                      searchPlaceholder="Tìm trạng thái..."
+                      className="min-w-[200px]"
+                    />
                   </div>
                 </div>
               )}
