@@ -37,12 +37,19 @@ export default function LichKienTap_Khoa() {
   useEffect(() => {
     if (!openDropdownId) return;
 
-    const handleScroll = () => {
+    const handleScroll = (e) => {
+      if (e?.target?.closest?.('.schedule-dropdown-menu')) return;
       setOpenDropdownId(null);
       setDropdownConfig(null);
     };
 
-    const handleClickOutside = () => {
+    const handleClickOutside = (e) => {
+      if (
+        e.target?.closest?.('.schedule-dropdown-menu') ||
+        e.target?.closest?.('.schedule-dropdown-trigger')
+      ) {
+        return;
+      }
       setOpenDropdownId(null);
       setDropdownConfig(null);
     };
@@ -262,30 +269,32 @@ export default function LichKienTap_Khoa() {
   };
 
   const handleFinalSubmit = async () => {
-    if (!createForm.ten_lich || !createForm.dot_kien_tap_id || !createForm.tg_mo_dang_ky_tu || !createForm.tg_mo_dang_ky_den || !createForm.so_luong_du_kien || !createForm.tai_khoan_thu_huong_id) {
+    if (!createForm.ten_lich || !createForm.tg_mo_dang_ky_tu || !createForm.tg_mo_dang_ky_den || !createForm.so_luong_du_kien || !createForm.tai_khoan_thu_huong_id) {
       showToast('Vui lòng điền đầy đủ các thông tin lịch (có dấu *)', 'error');
       return;
     }
 
-    const selectedDot = campaigns.find(c => Number(c.id) === Number(createForm.dot_kien_tap_id));
-    if (!selectedDot) {
-      showToast('Không tìm thấy đợt kiến tập đã chọn', 'error');
-      return;
-    }
+    if (createForm.dot_kien_tap_id) {
+      const selectedDot = campaigns.find(c => Number(c.id) === Number(createForm.dot_kien_tap_id));
+      if (!selectedDot) {
+        showToast('Không tìm thấy đợt kiến tập đã chọn', 'error');
+        return;
+      }
 
-    const dotMin = formatDateForInput(selectedDot.ngay_bat_dau);
-    const dotMax = formatDateForInput(selectedDot.ngay_ket_thuc);
+      const dotMin = formatDateForInput(selectedDot.ngay_bat_dau);
+      const dotMax = formatDateForInput(selectedDot.ngay_ket_thuc);
 
-    if (createForm.tg_mo_dang_ky_tu < dotMin) {
-      const dotStartStr = selectedDot.ngay_bat_dau ? new Date(selectedDot.ngay_bat_dau).toLocaleDateString('vi-VN') : dotMin;
-      showToast(`Thời gian Mở đăng ký (từ) không được sớm hơn ngày bắt đầu của đợt kiến tập (${dotStartStr})`, 'error');
-      return;
-    }
+      if (createForm.tg_mo_dang_ky_tu < dotMin) {
+        const dotStartStr = selectedDot.ngay_bat_dau ? new Date(selectedDot.ngay_bat_dau).toLocaleDateString('vi-VN') : dotMin;
+        showToast(`Thời gian Mở đăng ký (từ) không được sớm hơn ngày bắt đầu của đợt kiến tập (${dotStartStr})`, 'error');
+        return;
+      }
 
-    if (createForm.tg_mo_dang_ky_den > dotMax) {
-      const dotEndStr = selectedDot.ngay_ket_thuc ? new Date(selectedDot.ngay_ket_thuc).toLocaleDateString('vi-VN') : dotMax;
-      showToast(`Thời gian Mở đăng ký (đến) không được muộn hơn ngày kết thúc của đợt kiến tập (${dotEndStr})`, 'error');
-      return;
+      if (createForm.tg_mo_dang_ky_den > dotMax) {
+        const dotEndStr = selectedDot.ngay_ket_thuc ? new Date(selectedDot.ngay_ket_thuc).toLocaleDateString('vi-VN') : dotMax;
+        showToast(`Thời gian Mở đăng ký (đến) không được muộn hơn ngày kết thúc của đợt kiến tập (${dotEndStr})`, 'error');
+        return;
+      }
     }
 
     const tuString = createForm.tg_mo_dang_ky_tu + 'T00:00:00';
@@ -321,7 +330,7 @@ export default function LichKienTap_Khoa() {
     try {
       const payload = {
         ...createForm,
-        dot_kien_tap_id: Number(createForm.dot_kien_tap_id),
+        dot_kien_tap_id: createForm.dot_kien_tap_id ? Number(createForm.dot_kien_tap_id) : null,
         so_luong_du_kien: Number(createForm.so_luong_du_kien),
         tai_khoan_thu_huong_id: Number(createForm.tai_khoan_thu_huong_id),
         tg_mo_dang_ky_tu: tuString,
@@ -391,7 +400,7 @@ export default function LichKienTap_Khoa() {
 
     return createPortal(
       <div
-        className="fixed bg-white border border-slate-200 rounded-xl shadow-lg z-[100] overflow-hidden animate-in fade-in zoom-in-95"
+        className="schedule-dropdown-menu fixed bg-white border border-slate-200 rounded-xl shadow-lg z-[100] overflow-hidden animate-in fade-in zoom-in-95"
         style={{
           top: dropdownConfig.top,
           left: dropdownConfig.left,
@@ -401,20 +410,20 @@ export default function LichKienTap_Khoa() {
       >
         <div className="py-1">
           <button
-            onClick={(e) => { e.stopPropagation(); handleEditSchedule(s); }}
-            className="w-full px-4 py-2 text-left text-sm text-slate-600 hover:bg-slate-50 flex items-center gap-2"
+            onClick={(e) => { e.stopPropagation(); setOpenDropdownId(null); setDropdownConfig(null); handleEditSchedule(s); }}
+            className="w-full px-4 py-2 text-left text-sm text-slate-600 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
           >
             <Edit className="w-4 h-4" /> Cập nhật
           </button>
           <button
-            onClick={(e) => { e.stopPropagation(); handleDeleteSchedule(s.id); }}
-            className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+            onClick={(e) => { e.stopPropagation(); setOpenDropdownId(null); setDropdownConfig(null); handleDeleteSchedule(s.id); }}
+            className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 cursor-pointer"
           >
             <Trash2 className="w-4 h-4" /> Xóa
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); setOpenDropdownId(null); setDropdownConfig(null); handleSubmitApproval(s.id); }}
-            className="w-full px-4 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2 border-t border-slate-100"
+            className="w-full px-4 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2 border-t border-slate-100 cursor-pointer"
           >
             <Send className="w-4 h-4" /> Gửi duyệt
           </button>
@@ -475,7 +484,8 @@ export default function LichKienTap_Khoa() {
     return {
       id: s.id,
       ten_lich: s.ten_lich,
-      dot_kien_tap: s.dotKienTap?.ten_dot || `Đợt ${s.dot_kien_tap_id}`,
+      dot_kien_tap: s.dotKienTap?.ten_dot || (s.dot_kien_tap_id ? `Đợt ${s.dot_kien_tap_id}` : 'Tự do tích lũy'),
+      dot_kien_tap_id: s.dot_kien_tap_id,
       tg_mo_dang_ky: s.tg_mo_dang_ky_tu && s.tg_mo_dang_ky_den ? `${new Date(s.tg_mo_dang_ky_tu).toLocaleDateString('vi-VN')} - ${new Date(s.tg_mo_dang_ky_den).toLocaleDateString('vi-VN')}` : 'Chưa thiết lập',
       so_luong_du_kien: s.so_luong_du_kien || 0,
       trang_thai: s.trang_thai || 'ChuaXacDinh',
@@ -743,7 +753,15 @@ export default function LichKienTap_Khoa() {
                     onClick={() => handleViewDetail(s)}
                   >
                     <td className="p-4 pl-6 font-bold text-slate-800">{s.ten_lich}</td>
-                    <td className="p-4 font-bold text-slate-600">{s.dot_kien_tap}</td>
+                    <td className="p-4 font-bold text-slate-600">
+                      {s.dot_kien_tap_id ? (
+                        s.dot_kien_tap
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          Tự do tích lũy
+                        </span>
+                      )}
+                    </td>
                     <td className="p-4 text-xs font-medium text-slate-600">{s.tg_mo_dang_ky}</td>
                     <td className="p-4 text-center font-bold text-slate-700">{s.so_luong_du_kien}</td>
                     <td className="p-4 text-center" onClick={(e) => e.stopPropagation()}>
@@ -758,7 +776,7 @@ export default function LichKienTap_Khoa() {
                       <div className="flex items-center justify-end gap-2 relative">
                         {isCLB && s.trang_thai === 'Nhap' && (
                           <button
-                            className="p-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                            className="schedule-dropdown-trigger p-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
                             onClick={(e) => handleDropdownClick(e, s.id)}
                           >
                             <MoreVertical className="w-5 h-5" />
@@ -883,21 +901,27 @@ export default function LichKienTap_Khoa() {
                     />
                   </div>
                   <div className="col-span-2">
-                    <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Đợt kiến tập <span className="text-red-500">*</span></label>
+                    <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Đợt kiến tập (Tùy chọn)</label>
                     <SearchableDropdown
-                      options={campaigns
-                        .filter(c => {
-                          const isCurrentEditing = editingId && Number(createForm.dot_kien_tap_id) === c.id;
-                          return (c.trang_thai === 'DangTrienKhai' || isCurrentEditing) && c.trang_thai !== 'Nhap';
-                        })
-                        .map(c => ({ value: c.id, label: c.ten_dot }))
-                      }
+                      options={[
+                        { value: '', label: 'Tích lũy tự do (Ngoài đợt)' },
+                        ...campaigns
+                          .filter(c => {
+                            const isCurrentEditing = editingId && Number(createForm.dot_kien_tap_id) === c.id;
+                            return (c.trang_thai === 'DangTrienKhai' || isCurrentEditing) && c.trang_thai !== 'Nhap';
+                          })
+                          .map(c => ({ value: c.id, label: c.ten_dot }))
+                      ]}
                       value={createForm.dot_kien_tap_id}
                       onChange={(val) => {
+                        if (!val) {
+                          setCreateForm({ ...createForm, dot_kien_tap_id: '' });
+                          return;
+                        }
                         const c = campaigns.find(item => item.id === Number(val));
                         if (c) handleSelectCampaignInModal(c);
                       }}
-                      placeholder="Chọn đợt kiến tập"
+                      placeholder="Chọn đợt kiến tập (hoặc để trống nếu tự do)"
                       searchPlaceholder="Tìm kiếm đợt..."
                     />
                     {selectedModalCampaign && (
@@ -914,41 +938,30 @@ export default function LichKienTap_Khoa() {
                     <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Mở đăng ký (từ) <span className="text-red-500">*</span></label>
                     <input
                       type="date"
-                      disabled={!createForm.dot_kien_tap_id}
                       min={dotMinDate || undefined}
                       max={createForm.tg_mo_dang_ky_den || dotMaxDate || undefined}
                       value={createForm.tg_mo_dang_ky_tu}
                       onChange={e => setCreateForm({ ...createForm, tg_mo_dang_ky_tu: e.target.value })}
-                      className={`w-full px-4 py-2 border rounded-xl text-sm focus:outline-none focus:border-[#407F3E] disabled:bg-slate-100 disabled:cursor-not-allowed ${isTuOutOfRange ? 'border-amber-400 bg-amber-50/40 text-amber-900 font-medium' : 'border-[#E7E0C4]'
+                      className={`w-full px-4 py-2 border rounded-xl text-sm focus:outline-none focus:border-[#407F3E] ${isTuOutOfRange ? 'border-amber-400 bg-amber-50/40 text-amber-900 font-medium' : 'border-[#E7E0C4]'
                         }`}
                     />
-                    {!createForm.dot_kien_tap_id && (
-                      <p className="text-[11px] text-slate-400 mt-1 italic">Vui lòng chọn đợt kiến tập trước</p>
-                    )}
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Mở đăng ký (đến) <span className="text-red-500">*</span></label>
                     <input
                       type="date"
-                      disabled={!createForm.dot_kien_tap_id}
                       min={createForm.tg_mo_dang_ky_tu || dotMinDate || undefined}
                       max={effectiveMaxRegistrationDate || undefined}
                       value={createForm.tg_mo_dang_ky_den}
                       onChange={e => setCreateForm({ ...createForm, tg_mo_dang_ky_den: e.target.value })}
-                      className={`w-full px-4 py-2 border rounded-xl text-sm focus:outline-none focus:border-[#407F3E] disabled:bg-slate-100 disabled:cursor-not-allowed ${isDenOutOfRange ? 'border-amber-400 bg-amber-50/40 text-amber-900 font-medium' : 'border-[#E7E0C4]'
+                      className={`w-full px-4 py-2 border rounded-xl text-sm focus:outline-none focus:border-[#407F3E] ${isDenOutOfRange ? 'border-amber-400 bg-amber-50/40 text-amber-900 font-medium' : 'border-[#E7E0C4]'
                         }`}
                     />
-                    {!createForm.dot_kien_tap_id && (
-                      <p className="text-[11px] text-slate-400 mt-1 italic">Vui lòng chọn đợt kiến tập trước</p>
-                    )}
                     {earliestTripDate && (
                       <p className="text-[11px] text-[#407F3E] mt-1 font-medium">
                         Hạn đăng ký tối đa: <strong>{new Date(effectiveMaxRegistrationDate).toLocaleDateString('vi-VN')}</strong> (trước chuyến đi sớm nhất ngày {new Date(earliestTripDate).toLocaleDateString('vi-VN')})
                       </p>
                     )}
-                    <p className="text-[11px] text-slate-500 mt-1 italic">
-                      * Có thể chọn trùng ngày với ngày mở đăng ký (hệ thống sẽ mở từ 00:00:00 đến 23:59:59 của ngày đó).
-                    </p>
                   </div>
 
                   {isDenAfterTrips ? (

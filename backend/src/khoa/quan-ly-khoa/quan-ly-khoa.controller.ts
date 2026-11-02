@@ -33,6 +33,8 @@ import {
   ImportStudentsDto,
   CreateTripDto,
   ApproveTripDto,
+  BatchApproveProposalsDto,
+  BatchRejectProposalsDto,
   CancelTripDto,
   ApproveCancelDto,
   FilterAssignStudentsDto,
@@ -392,7 +394,7 @@ export class KhoaController {
   @Roles('QuanLyKhoa', 'QuanLyCLB')
   @Get('proposals')
   async getProposals() {
-    return this.khoaService.getProposals();
+    return this.khoaService.getProposals(true);
   }
 
   @Roles('QuanLyKhoa', 'QuanLyCLB')
@@ -444,7 +446,23 @@ export class KhoaController {
       body.tripId!,
       body.approverId!,
       body.isApproved!,
+      body.gopCacPhieuDeXuatIds,
     );
+  }
+
+  @Roles('QuanLyKhoa')
+  @Post('trips/batch-approve')
+  async batchApproveProposals(@Body() body: BatchApproveProposalsDto) {
+    return this.khoaService.batchApproveProposalsKhoa(
+      body.proposalIds,
+      body.isApproved,
+    );
+  }
+
+  @Roles('QuanLyKhoa')
+  @Post('trips/batch-reject')
+  async batchRejectProposals(@Body() body: BatchRejectProposalsDto) {
+    return this.khoaService.batchApproveProposalsKhoa(body.proposalIds, false);
   }
 
   @Roles('QuanLyCLB', 'QuanLyKhoa')

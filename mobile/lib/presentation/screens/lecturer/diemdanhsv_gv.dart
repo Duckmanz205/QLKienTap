@@ -3,6 +3,7 @@ import '../../../core/network/api_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/app_models.dart';
 import '../../../data/state/app_state.dart';
+import '../shared/pdf_viewer_screen.dart';
 
 class DiemDanhSVGVScreen extends StatefulWidget {
   final LecturerTour? initialTour;
@@ -68,6 +69,18 @@ class _DiemDanhSVGVScreenState extends State<DiemDanhSVGVScreen> {
     final tourId = int.tryParse(_selectedTour!.id) ?? 0;
     if (tourId <= 0) return;
 
+    if (!_selectedTour!.isStarted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Chưa đến thời gian bắt đầu tham quan (${_selectedTour!.formattedStartDateTime}). Không thể lưu điểm danh.',
+          ),
+          backgroundColor: Colors.orange.shade800,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isSaving = true);
     try {
       final records = _students.map((s) {
@@ -94,9 +107,10 @@ class _DiemDanhSVGVScreenState extends State<DiemDanhSVGVScreen> {
       }
     } catch (e) {
       if (mounted) {
+        final cleanMsg = e.toString().replaceFirst('Exception: ', '');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Lỗi khi lưu điểm danh: $e'),
+            content: Text(cleanMsg),
             backgroundColor: AppColors.danger,
           ),
         );
@@ -109,6 +123,18 @@ class _DiemDanhSVGVScreenState extends State<DiemDanhSVGVScreen> {
   }
 
   void _markAllPresent() {
+    if (_selectedTour != null && !_selectedTour!.isStarted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Chưa đến thời gian bắt đầu tham quan (${_selectedTour!.formattedStartDateTime}). Không thể điểm danh.',
+          ),
+          backgroundColor: Colors.orange.shade800,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _students = _students.map((s) => s.copyWith(attendanceStatus: 'CoMat', excuseReason: null)).toList();
     });
@@ -118,6 +144,18 @@ class _DiemDanhSVGVScreenState extends State<DiemDanhSVGVScreen> {
   }
 
   void _updateStudentAttendance(int phieuId, String newStatus, {String? reason}) {
+    if (_selectedTour != null && !_selectedTour!.isStarted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Chưa đến thời gian bắt đầu tham quan (${_selectedTour!.formattedStartDateTime}). Không thể điểm danh.',
+          ),
+          backgroundColor: Colors.orange.shade800,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _students = _students.map((s) {
         if (s.phieuId == phieuId) {
@@ -170,6 +208,7 @@ class _DiemDanhSVGVScreenState extends State<DiemDanhSVGVScreen> {
   Widget build(BuildContext context) {
     final appState = AppStateProvider.of(context).state;
     final tours = appState.lecturerTours;
+    final isTourStarted = _selectedTour?.isStarted ?? true;
 
     final filtered = _students.where((s) {
       final matchQuery = s.hoTen.toLowerCase().contains(_searchQuery.toLowerCase()) ||
@@ -240,6 +279,42 @@ class _DiemDanhSVGVScreenState extends State<DiemDanhSVGVScreen> {
                   const SizedBox(height: 12),
                 ],
 
+                // Warning banner if tour has not started yet
+                if (_selectedTour != null && !isTourStarted) ...[
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.amber.shade400),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.schedule, color: Colors.amber.shade800, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Chưa đến thời gian điểm danh',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.amber.shade900),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Chuyến tham quan bắt đầu lúc ${_selectedTour!.formattedStartDateTime}. Bạn chỉ có thể điểm danh khi chuyến đi đã chính thức bắt đầu.',
+                                style: TextStyle(fontSize: 11, color: Colors.amber.shade900),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
                 // Search Bar
                 TextField(
                   onChanged: (val) => setState(() => _searchQuery = val),
@@ -266,13 +341,20 @@ class _DiemDanhSVGVScreenState extends State<DiemDanhSVGVScreen> {
                     ),
                     const SizedBox(width: 8),
                     TextButton(
-                      onPressed: _markAllPresent,
+                      onPressed: isTourStarted ? _markAllPresent : null,
                       style: TextButton.styleFrom(
                         padding: EdgeInsets.zero,
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
-                      child: const Text('Tất cả có mặt', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                      child: Text(
+                        'Tất cả có mặt',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: isTourStarted ? AppColors.primary : Colors.grey,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -351,6 +433,47 @@ class _DiemDanhSVGVScreenState extends State<DiemDanhSVGVScreen> {
                                                 style: const TextStyle(fontSize: 10, color: AppColors.danger, fontWeight: FontWeight.bold),
                                               ),
                                             ],
+                                            if (student.cachToChuc == 'TuDo') ...[
+                                              const SizedBox(height: 4),
+                                              Row(
+                                                children: [
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.purple.shade50,
+                                                      borderRadius: BorderRadius.circular(4),
+                                                      border: Border.all(color: Colors.purple.shade200),
+                                                    ),
+                                                    child: const Text('Tự túc / Tự do', style: TextStyle(fontSize: 10, color: Colors.purple, fontWeight: FontWeight.bold)),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  if (student.fileXacNhanUrl != null && student.fileXacNhanUrl!.isNotEmpty)
+                                                    InkWell(
+                                                      onTap: () {
+                                                        Navigator.push(
+                                                          context,
+                                                          MaterialPageRoute(
+                                                            builder: (context) => PdfViewerScreen(
+                                                              title: 'Giấy xác nhận - ${student.hoTen}',
+                                                              pdfUrl: student.fileXacNhanUrl!,
+                                                            ),
+                                                          ),
+                                                        );
+                                                      },
+                                                      child: const Row(
+                                                        mainAxisSize: MainAxisSize.min,
+                                                        children: [
+                                                          Icon(Icons.visibility_outlined, size: 13, color: AppColors.primary),
+                                                          SizedBox(width: 2),
+                                                          Text('Xem giấy XN', style: TextStyle(fontSize: 10, color: AppColors.primary, fontWeight: FontWeight.bold, decoration: TextDecoration.underline)),
+                                                        ],
+                                                      ),
+                                                    )
+                                                  else
+                                                    const Text('Chưa nộp giấy XN', style: TextStyle(fontSize: 10, color: AppColors.danger, fontStyle: FontStyle.italic)),
+                                                ],
+                                              ),
+                                            ],
                                           ],
                                         ),
                                       ),
@@ -364,6 +487,7 @@ class _DiemDanhSVGVScreenState extends State<DiemDanhSVGVScreen> {
                                             label: 'Có',
                                             isActive: isPresent,
                                             activeColor: AppColors.secondary,
+                                            isEnabled: isTourStarted,
                                             onTap: () => _updateStudentAttendance(student.phieuId, 'CoMat'),
                                           ),
                                           const SizedBox(width: 6),
@@ -372,6 +496,7 @@ class _DiemDanhSVGVScreenState extends State<DiemDanhSVGVScreen> {
                                             label: 'Vắng',
                                             isActive: isAbsent,
                                             activeColor: AppColors.danger,
+                                            isEnabled: isTourStarted,
                                             onTap: () => _showReasonDialog(student, 'Vang'),
                                           ),
                                           const SizedBox(width: 6),
@@ -380,6 +505,7 @@ class _DiemDanhSVGVScreenState extends State<DiemDanhSVGVScreen> {
                                             label: 'Từ chối',
                                             isActive: isRefused,
                                             activeColor: Colors.orange,
+                                            isEnabled: isTourStarted,
                                             onTap: () => _showReasonDialog(student, 'TuChoiThamGia'),
                                           ),
                                         ],
@@ -418,16 +544,19 @@ class _DiemDanhSVGVScreenState extends State<DiemDanhSVGVScreen> {
             padding: const EdgeInsets.all(16),
             color: Colors.white,
             child: ElevatedButton(
-              onPressed: _isSaving ? null : _saveAttendance,
+              onPressed: (!isTourStarted || _isSaving) ? null : _saveAttendance,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
+                backgroundColor: isTourStarted ? AppColors.primary : Colors.grey.shade400,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               child: _isSaving
                   ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : const Text('LƯU KẾT QUẢ ĐIỂM DANH', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  : Text(
+                      isTourStarted ? 'LƯU KẾT QUẢ ĐIỂM DANH' : 'CHƯA ĐẾN GIỜ ĐIỂM DANH',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
             ),
           ),
         ],
@@ -441,34 +570,38 @@ class _DiemDanhSVGVScreenState extends State<DiemDanhSVGVScreen> {
     required bool isActive,
     required Color activeColor,
     required VoidCallback onTap,
+    bool isEnabled = true,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        decoration: BoxDecoration(
-          color: isActive ? activeColor : Colors.grey.shade100,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isActive ? activeColor : Colors.grey.shade300,
-            width: 1.5,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 14, color: isActive ? Colors.white : Colors.grey.shade600),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: isActive ? Colors.white : Colors.grey.shade700,
-              ),
+    return Opacity(
+      opacity: isEnabled ? 1.0 : 0.4,
+      child: GestureDetector(
+        onTap: isEnabled ? onTap : null,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          decoration: BoxDecoration(
+            color: isActive ? activeColor : Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isActive ? activeColor : Colors.grey.shade300,
+              width: 1.5,
             ),
-          ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 14, color: isActive ? Colors.white : Colors.grey.shade600),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: isActive ? Colors.white : Colors.grey.shade700,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

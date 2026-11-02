@@ -1,8 +1,9 @@
 import toast from 'react-hot-toast';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
-  Info, ChevronDown, Check, Save, Plus, Minus, Search, Lock,
-  FileSpreadsheet, UploadCloud, Download, AlertCircle, CheckCircle2, X
+  Info, Check, Save, Plus, Minus, Search, Lock,
+  FileSpreadsheet, UploadCloud, Download, AlertCircle, CheckCircle2, X,
+  AlertTriangle, RotateCw
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { giangVienApi } from '../../services/api';
@@ -23,11 +24,18 @@ export default function DiemChuanBi_DiemCong_GV() {
   // State cho Modal Nhập nhanh Excel
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importFile, setImportFile] = useState(null);
+  const fileInputRef = useRef(null);
   const [isParsing, setIsParsing] = useState(false);
   const [importPreview, setImportPreview] = useState(null);
   const [isSavingImport, setIsSavingImport] = useState(false);
   const [modifiedStudentIds, setModifiedStudentIds] = useState(new Set());
-  const fileInputRef = useRef(null);
+  const [previewTab, setPreviewTab] = useState('ALL'); // 'ALL' | 'VALID' | 'UNMATCHED' | 'INVALID'
+  const [previewPage, setPreviewPage] = useState(1);
+  const [previewLimit, setPreviewLimit] = useState(10);
+
+  // State cho Modal Popup Xác nhận Khóa & Nộp điểm
+  const [isLockConfirmOpen, setIsLockConfirmOpen] = useState(false);
+  const [isLocking, setIsLocking] = useState(false);
 
   useEffect(() => {
     const userJson = localStorage.getItem('user');
@@ -121,16 +129,27 @@ export default function DiemChuanBi_DiemCong_GV() {
     return s?.ngay_khoa_chuan_bi ? new Date(s.ngay_khoa_chuan_bi).toLocaleDateString('vi-VN') : null;
   }, [students]);
 
-  const handleLockScores = async () => {
+  const missingCount = useMemo(() => {
+    return students.filter(s => s.diemChuanBi === '' || s.diemChuanBi === null || s.diemChuanBi === undefined).length;
+  }, [students]);
+
+  const handleOpenLockConfirm = () => {
+    if (students.length === 0 || !selectedTrip) {
+      toast.error('Chưa có danh sách sinh viên để khóa điểm');
+      return;
+    }
+    setIsLockConfirmOpen(true);
+  };
+
+  const handleConfirmLockScores = async () => {
     if (students.length === 0 || !selectedTrip) return;
-    const missing = students.filter(s => s.diemChuanBi === '' || s.diemChuanBi === null || s.diemChuanBi === undefined);
-    if (missing.length > 0) {
-      toast.error(`Còn ${missing.length} sinh viên chưa có điểm chuẩn bị. Vui lòng nhập điểm trước khi nộp lên Khoa.`);
+    if (missingCount > 0) {
+      toast.error(`Còn ${missingCount} sinh viên chưa có điểm chuẩn bị. Vui lòng nhập điểm trước khi nộp lên Khoa.`);
       return;
     }
 
     try {
-      setLoading(true);
+      setIsLocking(true);
       // Auto save scores first using batch API
       const records = students.map(student => ({
         phieuId: student.id,
@@ -145,12 +164,13 @@ export default function DiemChuanBi_DiemCong_GV() {
       // Call lock API
       const res = await giangVienApi.lockTripPrepGrades({ tripId: selectedTrip.id });
       toast.success(res.data?.message || 'Đã khóa và nộp điểm chuyến đi lên Khoa thành công!');
+      setIsLockConfirmOpen(false);
       fetchStudents(selectedTrip.id);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Lỗi khi nộp điểm lên Khoa');
       console.error(err);
     } finally {
-      setLoading(false);
+      setIsLocking(false);
     }
   };
 
@@ -195,6 +215,8 @@ export default function DiemChuanBi_DiemCong_GV() {
     setImportFile(file);
     setIsParsing(true);
     setImportPreview(null);
+    setPreviewTab('ALL');
+    setPreviewPage(1);
 
     const reader = new FileReader();
     reader.onload = (evt) => {
@@ -447,49 +469,118 @@ export default function DiemChuanBi_DiemCong_GV() {
   const totalPages = Math.ceil(filteredStudents.length / limit) || 1;
   const paginatedStudents = filteredStudents.slice((currentPage - 1) * limit, currentPage * limit);
 
+  // Dữ liệu hợp nhất cho bảng xem trước trong Modal Import Excel
+  const allPreviewRows = useMemo(() => {
+    if (!importPreview) return [];
+    const list = [];
+    (importPreview.matched || []).forEach(m => {
+      list.push({
+        status: 'VALID',
+        mssv: m.mssv,
+        name: m.name,
+        diemChuanBi: m.newDiemChuanBi,
+        oldDiemChuanBi: m.oldDiemChuanBi,
+        diemCong: m.newDiemCong,
+        note: m.oldDiemChuanBi ? `Điểm cũ: ${m.oldDiemChuanBi}` : 'Điểm mới'
+      });
+    });
+    (importPreview.unmatched || []).forEach(u => {
+      list.push({
+        status: 'UNMATCHED',
+        mssv: u.mssv,
+        name: '--',
+        diemChuanBi: u.score !== null && u.score !== undefined ? String(u.score) : '--',
+        oldDiemChuanBi: null,
+        diemCong: 0,
+        note: 'Không có phiếu đăng ký trong chuyến này'
+      });
+    });
+    (importPreview.invalid || []).forEach(inv => {
+      list.push({
+        status: 'INVALID',
+        mssv: inv.mssv,
+        name: '--',
+        diemChuanBi: inv.rawScore !== undefined && inv.rawScore !== null ? String(inv.rawScore) : '--',
+        oldDiemChuanBi: null,
+        diemCong: 0,
+        note: inv.reason || 'Lỗi định dạng điểm'
+      });
+    });
+    return list;
+  }, [importPreview]);
+
+  const filteredPreviewRows = useMemo(() => {
+    if (previewTab === 'VALID') {
+      return allPreviewRows.filter(r => r.status === 'VALID');
+    }
+    if (previewTab === 'UNMATCHED') {
+      return allPreviewRows.filter(r => r.status === 'UNMATCHED');
+    }
+    if (previewTab === 'INVALID') {
+      return allPreviewRows.filter(r => r.status === 'INVALID');
+    }
+    return allPreviewRows;
+  }, [allPreviewRows, previewTab]);
+
+  const previewTotalPages = Math.ceil(filteredPreviewRows.length / previewLimit) || 1;
+  const paginatedPreviewRows = useMemo(() => {
+    const start = (previewPage - 1) * previewLimit;
+    return filteredPreviewRows.slice(start, start + previewLimit);
+  }, [filteredPreviewRows, previewPage, previewLimit]);
+
   return (
     <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300 relative">
 
       {/* Header with Title and Actions */}
-      <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="mb-6 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Điểm chuẩn bị & điểm cộng</h1>
           <p className="text-xs text-slate-500 mt-1 font-medium">Quản lý và nhập điểm chuẩn bị, điểm cộng cho sinh viên tham gia chuyến đi</p>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+        {/* Action Buttons Toolbar */}
+        <div className="flex items-center gap-3 shrink-0 flex-nowrap w-full sm:w-auto">
           {isTripLocked ? (
-            <div className="px-4 py-2.5 bg-emerald-50 text-emerald-800 border border-emerald-300 rounded-xl shadow-xs flex items-center gap-2 text-xs font-bold">
-              <Lock className="w-4 h-4 text-emerald-600" />
+            <div className="px-4 py-2.5 bg-emerald-50 text-emerald-800 border border-emerald-300 rounded-xl shadow-2xs flex items-center gap-2 text-xs font-bold whitespace-nowrap">
+              <Lock className="w-4 h-4 text-emerald-600 shrink-0" />
               <span>Đã nộp điểm lên Khoa {lockDate ? `ngày ${lockDate}` : ''}</span>
             </div>
           ) : (
             <>
+              {/* Nút Nhập từ Excel */}
               <button
+                type="button"
                 onClick={() => setIsImportModalOpen(true)}
                 disabled={loading || students.length === 0}
-                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl shadow-xs hover:shadow-sm transition-all cursor-pointer font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white text-slate-700 hover:bg-slate-50 border border-slate-300 rounded-xl shadow-2xs hover:shadow-xs transition-all font-bold text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap shrink-0"
                 title="Nhập nhanh điểm từ file Excel"
               >
-                <FileSpreadsheet className="w-4 h-4" />
-                Nhập từ Excel
+                <FileSpreadsheet className="w-4 h-4 text-[#407F3E] shrink-0" />
+                <span>Nhập từ Excel</span>
               </button>
+
+              {/* Nút Lưu điểm */}
               <button
+                type="button"
                 onClick={handleSaveScores}
                 disabled={loading || students.length === 0}
-                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-white text-slate-700 hover:bg-slate-50 border border-slate-300 rounded-xl shadow-xs hover:shadow-sm transition-all cursor-pointer font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white text-slate-700 hover:bg-slate-50 border border-slate-300 rounded-xl shadow-2xs hover:shadow-xs transition-all font-bold text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap shrink-0"
+                title="Lưu điểm tạm thời vào hệ thống"
               >
-                <Save className="w-4 h-4 text-slate-500" />
-                Lưu điểm
+                <Save className="w-4 h-4 text-slate-500 shrink-0" />
+                <span>Lưu điểm</span>
               </button>
+
+              {/* Nút Khóa & Nộp điểm (MÀU XANH LÁ HUIT #407F3E) */}
               <button
-                onClick={handleLockScores}
+                type="button"
+                onClick={handleOpenLockConfirm}
                 disabled={loading || students.length === 0}
-                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-rose-600 text-white hover:bg-rose-700 rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#407F3E] text-white hover:bg-[#346732] rounded-xl shadow-2xs hover:shadow-sm transition-all font-bold text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap shrink-0"
+                title="Khóa và nộp điểm chính thức lên Khoa"
               >
-                <Lock className="w-4 h-4" />
-                Khóa & Nộp điểm chuyến đi
+                <Lock className="w-4 h-4 shrink-0" />
+                <span>Khóa & Nộp điểm</span>
               </button>
             </>
           )}
@@ -720,22 +811,24 @@ export default function DiemChuanBi_DiemCong_GV() {
               setIsImportModalOpen(false);
               setImportPreview(null);
               setImportFile(null);
+              setPreviewTab('ALL');
+              setPreviewPage(1);
             }
           }}
         >
           <div
-            className="bg-white rounded-2xl max-w-3xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
+            className="bg-white rounded-2xl max-w-4xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50/70">
+            <div className="p-4 px-6 border-b border-[#E7E0C4] flex items-center justify-between bg-white">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
-                  <FileSpreadsheet className="w-5 h-5 text-emerald-700" />
+                <div className="w-9 h-9 rounded-xl bg-[#407F3E]/10 text-[#407F3E] flex items-center justify-center shrink-0">
+                  <FileSpreadsheet className="w-5 h-5 text-[#407F3E]" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-lg text-slate-800">Nhập nhanh điểm chuẩn bị từ file Excel</h3>
-                  <p className="text-xs text-slate-500 font-medium">Chuyến: {selectedTrip?.name}</p>
+                  <h3 className="font-bold text-base text-slate-800">Nhập nhanh điểm chuẩn bị từ file Excel</h3>
+                  <p className="text-xs text-slate-500 font-medium line-clamp-1">Chuyến: {selectedTrip?.name}</p>
                 </div>
               </div>
               <button
@@ -744,33 +837,34 @@ export default function DiemChuanBi_DiemCong_GV() {
                     setIsImportModalOpen(false);
                     setImportPreview(null);
                     setImportFile(null);
+                    setPreviewTab('ALL');
+                    setPreviewPage(1);
+                    if (fileInputRef.current) fileInputRef.current.value = '';
                   }
                 }}
                 disabled={isSavingImport}
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 transition-colors cursor-pointer"
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer disabled:opacity-50"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Modal Body */}
-            <div className="p-6 overflow-y-auto space-y-6 flex-1">
+            <div className="p-6 overflow-y-auto space-y-4 flex-1 bg-slate-50/40">
               {/* Instructions & Template download */}
-              <div className="bg-[#E7E0C4]/30 border border-[#E7E0C4] rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="bg-[#407F3E]/5 border border-[#407F3E]/20 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div className="flex items-start gap-2.5">
-                  <Info className="w-5 h-5 text-[#407F3E] shrink-0 mt-0.5" />
-                  <div className="text-xs text-slate-700 space-y-1">
-                    <p className="font-bold">Quy chuẩn file Excel:</p>
-                    <p>• Cột bắt buộc: <strong className="text-slate-900">MSSV</strong> (hoặc Mã SV) và <strong className="text-slate-900">Điểm chuẩn bị</strong> (thang điểm 0–10).</p>
-                    <p>• Cột tùy chọn: <strong className="text-slate-900">Điểm cộng</strong> (tối đa 1.0 điểm).</p>
+                  <Info className="w-4 h-4 text-[#407F3E] shrink-0 mt-0.5" />
+                  <div className="text-xs text-slate-700 leading-relaxed">
+                    <span className="font-bold text-slate-800">Quy chuẩn file:</span> Cột bắt buộc <strong className="text-slate-900">MSSV</strong> và <strong className="text-slate-900">Điểm chuẩn bị</strong> (0–10) • Tùy chọn <strong className="text-slate-900">Điểm cộng</strong> (tối đa 1.0 đ).
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={handleDownloadTemplate}
-                  className="shrink-0 flex items-center gap-2 px-3 py-2 bg-white text-emerald-800 hover:bg-emerald-50 border border-emerald-300 rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
+                  className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-white text-[#407F3E] hover:bg-[#407F3E]/10 border border-[#407F3E]/30 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer"
                 >
-                  <Download className="w-4 h-4 text-emerald-600" />
+                  <Download className="w-3.5 h-3.5" />
                   Tải file mẫu Excel
                 </button>
               </div>
@@ -784,144 +878,238 @@ export default function DiemChuanBi_DiemCong_GV() {
                   onChange={handleFileUpload}
                   className="hidden"
                 />
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-slate-300 hover:border-[#407F3E] bg-slate-50/50 hover:bg-[#407F3E]/5 rounded-xl p-6 text-center transition-all cursor-pointer group"
-                >
-                  <UploadCloud className="w-10 h-10 text-slate-400 group-hover:text-[#407F3E] mx-auto mb-2 transition-colors" />
-                  <p className="text-sm font-bold text-slate-700 group-hover:text-[#407F3E] transition-colors">
-                    {importFile ? importFile.name : 'Bấm để chọn file Excel (.xlsx, .xls) từ máy tính'}
-                  </p>
-                  <p className="text-xs text-slate-500 mt-1">
-                    {importFile ? `${(importFile.size / 1024).toFixed(1)} KB — Bấm để chọn tệp khác` : 'Hệ thống tự động so khớp MSSV và cập nhật điểm tương ứng'}
-                  </p>
-                </div>
+                {importFile ? (
+                  <div className="border border-[#E7E0C4] bg-white rounded-xl p-3 px-4 flex items-center justify-between gap-3 shadow-2xs">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
+                        <FileSpreadsheet className="w-4 h-4 text-emerald-700" />
+                      </div>
+                      <div className="overflow-hidden">
+                        <p className="text-xs font-bold text-slate-800 truncate">{importFile.name}</p>
+                        <p className="text-[11px] text-slate-500">{(importFile.size / 1024).toFixed(1)} KB — Đã phân tích xong dữ liệu</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="shrink-0 px-3 py-1.5 text-xs font-bold text-[#407F3E] bg-white border border-[#407F3E]/30 hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer"
+                    >
+                      Đổi file khác
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border-2 border-dashed border-[#E7E0C4] hover:border-[#407F3E] bg-white hover:bg-[#407F3E]/5 rounded-xl p-5 text-center transition-all cursor-pointer group"
+                  >
+                    <UploadCloud className="w-8 h-8 text-slate-400 group-hover:text-[#407F3E] mx-auto mb-1.5 transition-colors" />
+                    <p className="text-xs font-bold text-slate-700 group-hover:text-[#407F3E] transition-colors">
+                      Bấm để chọn file Excel (.xlsx, .xls) từ máy tính
+                    </p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Hệ thống tự động so khớp MSSV và cập nhật điểm tương ứng
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Parsing status */}
               {isParsing && (
-                <div className="p-4 text-center text-slate-500 text-sm font-medium animate-pulse">
+                <div className="p-4 text-center text-slate-500 text-xs font-medium animate-pulse">
                   Đang đọc và phân tích dữ liệu file Excel...
                 </div>
               )}
 
-              {/* Preview result */}
+              {/* Preview result: Dạng Bảng có các Nút Phân Loại */}
               {importPreview && (
-                <div className="space-y-4 animate-in fade-in duration-200">
-                  {/* Summary badges */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center gap-3">
-                      <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
-                      <div>
-                        <div className="text-lg font-black text-emerald-800">
-                          {importPreview.matched.length} / {students.length}
-                        </div>
-                        <div className="text-xs font-medium text-emerald-700">Sinh viên khớp danh sách</div>
-                      </div>
-                    </div>
-
-                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center gap-3">
-                      <AlertCircle className="w-6 h-6 text-amber-600 shrink-0" />
-                      <div>
-                        <div className="text-lg font-black text-amber-800">
-                          {importPreview.unmatched.length}
-                        </div>
-                        <div className="text-xs font-medium text-amber-700">Ngoài danh sách chuyến</div>
-                      </div>
-                    </div>
-
-                    <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 flex items-center gap-3">
-                      <X className="w-6 h-6 text-rose-600 shrink-0" />
-                      <div>
-                        <div className="text-lg font-black text-rose-800">
-                          {importPreview.invalid.length}
-                        </div>
-                        <div className="text-xs font-medium text-rose-700">Dòng có điểm lỗi</div>
-                      </div>
-                    </div>
+                <div className="space-y-3 animate-in fade-in duration-200">
+                  {/* Filter Buttons / Tab bar */}
+                  <div className="flex flex-wrap items-center gap-2 pt-1 border-b border-[#E7E0C4] pb-2.5">
+                    {[
+                      { id: 'ALL', label: 'Tất cả dòng', count: allPreviewRows.length },
+                      { id: 'VALID', label: 'Khớp danh sách (Hợp lệ)', count: importPreview.matched.length, badgeBg: 'bg-emerald-100 text-emerald-800' },
+                      { id: 'UNMATCHED', label: 'Ngoài danh sách', count: importPreview.unmatched.length, badgeBg: 'bg-amber-100 text-amber-800' },
+                      { id: 'INVALID', label: 'Dòng lỗi', count: importPreview.invalid.length, badgeBg: 'bg-rose-100 text-rose-800' },
+                    ].map(tab => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => {
+                          setPreviewTab(tab.id);
+                          setPreviewPage(1);
+                        }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                          previewTab === tab.id
+                            ? 'bg-[#407F3E] text-white shadow-2xs'
+                            : 'bg-white border border-[#E7E0C4] text-slate-600 hover:bg-slate-100'
+                        }`}
+                      >
+                        <span>{tab.label}</span>
+                        <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                          previewTab === tab.id
+                            ? 'bg-white/20 text-white'
+                            : (tab.badgeBg || 'bg-slate-100 text-slate-600')
+                        }`}>
+                          {tab.count}
+                        </span>
+                      </button>
+                    ))}
                   </div>
 
-                  {/* Warning lists if any */}
-                  {importPreview.invalid.length > 0 && (
-                    <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-xs text-rose-800 max-h-28 overflow-y-auto">
-                      <p className="font-bold mb-1">Cảnh báo dòng lỗi (bị bỏ qua):</p>
-                      <ul className="list-disc pl-4 space-y-0.5">
-                        {importPreview.invalid.map((inv, idx) => (
-                          <li key={idx}>Dòng {inv.row} (MSSV: {inv.mssv}): {inv.reason}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {importPreview.unmatched.length > 0 && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 max-h-24 overflow-y-auto">
-                      <p className="font-bold mb-1">MSSV không thuộc chuyến tham quan này (bị bỏ qua):</p>
-                      <p className="text-slate-600">
-                        {importPreview.unmatched.map(u => u.mssv).join(', ')}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Matched Preview Table */}
-                  {importPreview.matched.length > 0 && (
-                    <div>
-                      <h4 className="text-xs font-bold uppercase text-slate-500 mb-2">Xem trước dữ liệu cập nhật:</h4>
-                      <div className="border border-slate-200 rounded-xl overflow-hidden max-h-60 overflow-y-auto">
-                        <table className="w-full text-left text-xs">
-                          <thead className="bg-slate-100 text-slate-700 font-bold sticky top-0">
+                  {/* Preview Table đồng bộ chuẩn dự án */}
+                  <div className="bg-white rounded-xl border border-[#E7E0C4] shadow-xs overflow-hidden flex flex-col">
+                    <div className="overflow-y-auto max-h-[320px]">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead className="sticky top-0 bg-[#E7E0C4] text-slate-800 font-bold uppercase tracking-wider z-10 border-b border-[#E7E0C4]">
+                          <tr>
+                            <th className="p-3 pl-4 text-center w-[50px]">STT</th>
+                            <th className="p-3 w-[120px]">MSSV</th>
+                            <th className="p-3">Họ tên</th>
+                            <th className="p-3 text-center w-[130px]">Điểm chuẩn bị</th>
+                            <th className="p-3 text-center w-[110px]">Điểm cộng</th>
+                            <th className="p-3 pr-4 text-center w-[130px]">Trạng thái</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#E7E0C4]/60 text-slate-700">
+                          {paginatedPreviewRows.length === 0 ? (
                             <tr>
-                              <th className="p-2.5 pl-4">MSSV</th>
-                              <th className="p-2.5">Họ tên</th>
-                              <th className="p-2.5 text-center">Điểm chuẩn bị mới</th>
-                              <th className="p-2.5 text-center">Điểm cộng</th>
-                              <th className="p-2.5 pr-4 text-center">Trạng thái</th>
+                              <td colSpan="6" className="p-8 text-center text-slate-400 font-medium">
+                                Không có dòng nào trong danh mục này.
+                              </td>
                             </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100 font-medium">
-                            {importPreview.matched.map(item => (
-                              <tr key={item.id} className="hover:bg-slate-50">
-                                <td className="p-2.5 pl-4 font-mono font-bold text-slate-700">{item.mssv}</td>
-                                <td className="p-2.5 text-slate-800 font-bold">{item.name}</td>
-                                <td className="p-2.5 text-center">
-                                  <span className="font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded">
-                                    {item.newDiemChuanBi}
+                          ) : (
+                            paginatedPreviewRows.map((row, idx) => (
+                              <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                                <td className="p-3 pl-4 text-center font-mono text-slate-400">
+                                  {(previewPage - 1) * previewLimit + idx + 1}
+                                </td>
+                                <td className="p-3 font-mono font-bold text-slate-700">{row.mssv}</td>
+                                <td className="p-3 font-bold text-slate-800">{row.name}</td>
+                                <td className="p-3 text-center">
+                                  {row.status === 'VALID' ? (
+                                    <div className="inline-flex items-center justify-center gap-1.5">
+                                      <span className="inline-block px-2.5 py-1 bg-white border border-[#E7E0C4] rounded-lg text-[#407F3E] font-bold text-xs shadow-2xs min-w-[42px] text-center">
+                                        {row.diemChuanBi}
+                                      </span>
+                                      {row.oldDiemChuanBi && row.oldDiemChuanBi !== row.diemChuanBi && (
+                                        <span className="text-slate-400 text-[10px] line-through font-mono">
+                                          ({row.oldDiemChuanBi})
+                                        </span>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <span className="font-mono text-slate-500 font-semibold">{row.diemChuanBi}</span>
+                                  )}
+                                </td>
+                                <td className="p-3 text-center font-bold">
+                                  <span className={Number(row.diemCong) > 0 ? "text-[#89B449]" : "text-slate-400"}>
+                                    {Number(row.diemCong) > 0 ? `+${Number(row.diemCong).toFixed(1)}` : '0.0'}
                                   </span>
-                                  {item.oldDiemChuanBi && item.oldDiemChuanBi !== item.newDiemChuanBi && (
-                                    <span className="text-slate-400 text-[10px] ml-1 line-through">
-                                      ({item.oldDiemChuanBi})
+                                </td>
+                                <td className="p-3 pr-4 text-center">
+                                  {row.status === 'VALID' && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Hợp lệ
+                                    </span>
+                                  )}
+                                  {row.status === 'UNMATCHED' && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                                      <AlertCircle className="w-3.5 h-3.5 text-amber-600" /> Ngoài chuyến
+                                    </span>
+                                  )}
+                                  {row.status === 'INVALID' && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
+                                      <X className="w-3.5 h-3.5 text-rose-600" /> Lỗi điểm
                                     </span>
                                   )}
                                 </td>
-                                <td className="p-2.5 text-center font-bold text-slate-600">
-                                  {item.newDiemCong > 0 ? `+${item.newDiemCong}` : '0.0'}
-                                </td>
-                                <td className="p-2.5 pr-4 text-center">
-                                  <span className="inline-flex items-center gap-1 text-[10px] text-emerald-800 font-bold">
-                                    <Check className="w-3 h-3 text-emerald-600" /> Hợp lệ
-                                  </span>
-                                </td>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Pagination Footer Modal */}
+                    <div className="p-3 px-4 border-t border-[#E7E0C4] bg-slate-50/70 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                      <div className="flex items-center gap-2 text-slate-500 font-medium">
+                        <span>Hiển thị</span>
+                        <SearchableDropdown 
+                          options={[
+                            { value: 5, label: '5' },
+                            { value: 10, label: '10' },
+                            { value: 15, label: '15' },
+                            { value: 30, label: '30' },
+                            { value: 50, label: '50' }
+                          ]}
+                          value={previewLimit}
+                          onChange={(newLimit) => {
+                            setPreviewLimit(newLimit);
+                            setPreviewPage(1);
+                          }}
+                          searchPlaceholder="Số dòng..."
+                          className="min-w-[70px]"
+                          direction="up"
+                        />
+                        <span>/ {filteredPreviewRows.length} dòng</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          disabled={previewPage <= 1}
+                          onClick={() => setPreviewPage(1)}
+                          className="px-2.5 py-1 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 text-xs font-semibold transition-colors cursor-pointer"
+                        >
+                          Trang đầu
+                        </button>
+                        <button
+                          type="button"
+                          disabled={previewPage <= 1}
+                          onClick={() => setPreviewPage(p => Math.max(1, p - 1))}
+                          className="px-2.5 py-1 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 text-xs font-semibold transition-colors cursor-pointer"
+                        >
+                          Trước
+                        </button>
+                        <span className="px-3 py-1 rounded-lg bg-[#407F3E] text-white text-xs font-bold shadow-xs cursor-default mx-0.5">
+                          Trang {previewPage} / {previewTotalPages}
+                        </span>
+                        <button
+                          type="button"
+                          disabled={previewPage >= previewTotalPages}
+                          onClick={() => setPreviewPage(p => Math.min(previewTotalPages, p + 1))}
+                          className="px-2.5 py-1 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 text-xs font-semibold transition-colors cursor-pointer"
+                        >
+                          Sau
+                        </button>
+                        <button
+                          type="button"
+                          disabled={previewPage >= previewTotalPages}
+                          onClick={() => setPreviewPage(previewTotalPages)}
+                          className="px-2.5 py-1 rounded-lg border border-[#E7E0C4] bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 text-xs font-semibold transition-colors cursor-pointer"
+                        >
+                          Trang cuối
+                        </button>
                       </div>
                     </div>
-                  )}
+                  </div>
                 </div>
               )}
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 border-t border-slate-200 bg-slate-50 flex flex-wrap items-center justify-between gap-3">
+            <div className="p-4 border-t border-[#E7E0C4] bg-slate-50/70 flex flex-wrap items-center justify-between gap-3">
               <button
                 type="button"
                 onClick={() => {
                   setIsImportModalOpen(false);
                   setImportPreview(null);
                   setImportFile(null);
+                  setPreviewTab('ALL');
+                  setPreviewPage(1);
+                  if (fileInputRef.current) fileInputRef.current.value = '';
                 }}
                 disabled={isSavingImport}
-                className="px-4 py-2 border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-xl cursor-pointer disabled:opacity-50"
+                className="px-4 py-2 border border-[#E7E0C4] bg-white hover:bg-slate-50 text-slate-600 font-bold text-xs rounded-xl cursor-pointer disabled:opacity-50 transition-colors"
               >
                 Đóng
               </button>
@@ -931,7 +1119,7 @@ export default function DiemChuanBi_DiemCong_GV() {
                   type="button"
                   onClick={handleApplyImport}
                   disabled={!importPreview || importPreview.matched.length === 0 || isSavingImport}
-                  className="px-4 py-2 bg-white text-[#407F3E] hover:bg-[#407F3E]/10 border border-[#407F3E] font-bold text-xs rounded-xl shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 bg-white text-[#407F3E] hover:bg-[#407F3E]/10 border border-[#407F3E] font-bold text-xs rounded-xl shadow-2xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 >
                   Áp dụng vào bảng điểm
                 </button>
@@ -939,11 +1127,104 @@ export default function DiemChuanBi_DiemCong_GV() {
                   type="button"
                   onClick={handleApplyAndSaveImmediately}
                   disabled={!importPreview || importPreview.matched.length === 0 || isSavingImport}
-                  className="px-4 py-2 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 font-bold text-xs rounded-xl shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                  className="px-4 py-2 bg-[#407F3E] text-white hover:bg-[#346732] font-bold text-xs rounded-xl shadow-2xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 transition-all"
                 >
                   {isSavingImport ? 'Đang lưu...' : 'Áp dụng & Lưu ngay'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Popup Cảnh báo Khóa & Nộp điểm */}
+      {isLockConfirmOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200"
+          onClick={() => {
+            if (!isLocking) setIsLockConfirmOpen(false);
+          }}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header Icon & Title */}
+            <div className="p-6 text-center border-b border-slate-100">
+              <div className="w-14 h-14 bg-emerald-50 border border-emerald-200 text-[#407F3E] rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-2xs">
+                <Lock className="w-7 h-7 text-[#407F3E]" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-800">
+                Xác nhận Khóa & Nộp điểm chuyến đi
+              </h3>
+              <p className="text-xs text-slate-500 mt-1 font-medium line-clamp-1">
+                {selectedTrip?.name}
+              </p>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4 text-sm text-slate-600">
+              {/* Thống kê sinh viên */}
+              <div className="grid grid-cols-2 gap-3 bg-slate-50 rounded-xl p-3 border border-slate-200/80">
+                <div className="text-center">
+                  <div className="text-xs text-slate-500 font-medium">Tổng sinh viên</div>
+                  <div className="text-lg font-bold text-slate-800 mt-0.5">{students.length}</div>
+                </div>
+                <div className="text-center border-l border-slate-200">
+                  <div className="text-xs text-slate-500 font-medium">Đã có điểm chuẩn bị</div>
+                  <div className={`text-lg font-bold mt-0.5 ${missingCount > 0 ? 'text-amber-600' : 'text-emerald-700'}`}>
+                    {students.length - missingCount} / {students.length}
+                  </div>
+                </div>
+              </div>
+
+              {/* Thông báo tình trạng hoặc Cảnh báo */}
+              {missingCount > 0 ? (
+                <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-2.5 text-xs text-rose-800">
+                  <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold">Chưa thể nộp điểm:</span> Còn{' '}
+                    <strong className="font-bold text-rose-900">{missingCount}</strong> sinh viên chưa có điểm chuẩn bị. Vui lòng nhập đầy đủ điểm cho tất cả sinh viên trước khi nộp lên Khoa.
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3.5 bg-amber-50 border border-amber-200/90 rounded-xl flex items-start gap-2.5 text-xs text-amber-900">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="leading-relaxed">
+                    <span className="font-bold">Lưu ý quan trọng:</span> Sau khi xác nhận, bảng điểm sẽ được chốt chính thức và nộp lên Khoa. Bạn sẽ <strong>không thể chỉnh sửa</strong> điểm chuẩn bị & điểm cộng của chuyến đi này trừ khi được Quản lý Khoa mở khóa.
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="p-4 border-t border-slate-100 bg-slate-50/70 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                disabled={isLocking}
+                onClick={() => setIsLockConfirmOpen(false)}
+                className="px-4 py-2.5 border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-bold text-sm rounded-xl cursor-pointer transition-colors disabled:opacity-50"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                disabled={isLocking || missingCount > 0}
+                onClick={handleConfirmLockScores}
+                className="px-5 py-2.5 bg-[#407F3E] hover:bg-[#346732] text-white font-bold text-sm rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isLocking ? (
+                  <>
+                    <RotateCw className="w-4 h-4 animate-spin" />
+                    <span>Đang nộp điểm...</span>
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-4 h-4" />
+                    <span>Xác nhận Khóa & Nộp</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

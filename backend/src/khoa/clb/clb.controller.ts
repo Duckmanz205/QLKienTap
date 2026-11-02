@@ -31,6 +31,7 @@ import {
   ImportStudentsDto,
   CreateTripDto,
   ApproveTripDto,
+  BatchRejectProposalsDto,
   CancelTripDto,
   ApproveCancelDto,
   FilterAssignStudentsDto,
@@ -190,6 +191,11 @@ export class ClbController {
       body.gopVaoChuyenId,
       body.gopCacPhieuDeXuatIds,
     );
+  }
+
+  @Post('trips/batch-reject')
+  async batchRejectProposals(@Body() body: BatchRejectProposalsDto) {
+    return this.khoaService.batchRejectProposalsCLB(body.proposalIds);
   }
 
   @Get('lecturers')

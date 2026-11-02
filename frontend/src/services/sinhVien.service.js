@@ -39,4 +39,5 @@ export const sinhVienApi = {
   getGrades: (studentId) => api.get(`/sinh-vien/grades/${studentId}`),
   getDashboardStats: (studentId) => api.get(`/sinh-vien/dashboard-stats/${studentId}`),
   getPaymentConfig: () => api.get('/sinh-vien/payment-config'),
+  getProposalPortalStatus: () => api.get('/sinh-vien/proposal-portal-status'),
 };

@@ -25,6 +25,11 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
 
   // Modal state
   const [showModal, setShowModal] = useState(false);
+  const [viewItem, setViewItem] = useState({ isOpen: false, type: '', data: null });
+
+  const handleOpenView = (item, type) => {
+    setViewItem({ isOpen: true, type, data: item });
+  };
 
   // Form states for creating
   const [tenHocKy, setTenHocKy] = useState('');
@@ -333,16 +338,16 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
           </thead>
           <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
             {activeTab === 'nam-hoc' && paginatedYears.map(y => (
-              <tr key={y.id} className="hover:bg-slate-50 transition-colors">
-                <td className="p-4 font-semibold">{y.ten_nam_hoc}</td>
+              <tr key={y.id} onClick={() => handleOpenView(y, 'nam-hoc')} className="hover:bg-slate-50 transition-colors cursor-pointer group">
+                <td className="p-4 font-semibold text-[#407F3E] group-hover:underline">{y.ten_nam_hoc}</td>
                 <td className="p-4 text-slate-600">{y.ngay_bat_dau ? new Date(y.ngay_bat_dau).toLocaleDateString('vi-VN') : '-'}</td>
                 <td className="p-4 text-slate-600">{y.ngay_ket_thuc ? new Date(y.ngay_ket_thuc).toLocaleDateString('vi-VN') : '-'}</td>
-                <td className="p-4 text-right">
+                <td className="p-4 text-right" onClick={(e) => e.stopPropagation()}>
                   <div className="flex justify-end gap-2 text-slate-400">
-                    <button onClick={() => handleOpenEdit(y, 'nam-hoc')} className="p-1.5 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded transition-colors cursor-pointer" title="Sửa">
+                    <button onClick={(e) => { e.stopPropagation(); handleOpenEdit(y, 'nam-hoc'); }} className="p-1.5 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded transition-colors cursor-pointer" title="Sửa">
                       <Edit2 className="w-4 h-4" />
                     </button>
-                    <button onClick={() => handleDelete(y.id, 'nam-hoc')} className="p-1.5 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded transition-colors cursor-pointer" title="Xóa">
+                    <button onClick={(e) => { e.stopPropagation(); handleDelete(y.id, 'nam-hoc'); }} className="p-1.5 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded transition-colors cursor-pointer" title="Xóa">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -354,17 +359,17 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
             )}
 
             {activeTab === 'hoc-ky' && paginatedTerms.map(t => (
-              <tr key={t.id} className="hover:bg-slate-50 transition-colors">
-                <td className="p-4 font-semibold">{t.ten_hoc_ky}</td>
+              <tr key={t.id} onClick={() => handleOpenView(t, 'hoc-ky')} className="hover:bg-slate-50 transition-colors cursor-pointer group">
+                <td className="p-4 font-semibold text-[#407F3E] group-hover:underline">{t.ten_hoc_ky}</td>
                 <td className="p-4 text-slate-600">{t.namHoc?.ten_nam_hoc}</td>
                 <td className="p-4 text-slate-600">{t.ngay_bat_dau ? new Date(t.ngay_bat_dau).toLocaleDateString('vi-VN') : '-'}</td>
                 <td className="p-4 text-slate-600">{t.ngay_ket_thuc ? new Date(t.ngay_ket_thuc).toLocaleDateString('vi-VN') : '-'}</td>
-                <td className="p-4 text-right">
+                <td className="p-4 text-right" onClick={(e) => e.stopPropagation()}>
                   <div className="flex justify-end gap-2 text-slate-400">
-                    <button onClick={() => handleOpenEdit(t, 'hoc-ky')} className="p-1.5 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded transition-colors cursor-pointer" title="Sửa">
+                    <button onClick={(e) => { e.stopPropagation(); handleOpenEdit(t, 'hoc-ky'); }} className="p-1.5 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded transition-colors cursor-pointer" title="Sửa">
                       <Edit2 className="w-4 h-4" />
                     </button>
-                    <button onClick={() => handleDelete(t.id, 'hoc-ky')} className="p-1.5 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded transition-colors cursor-pointer" title="Xóa">
+                    <button onClick={(e) => { e.stopPropagation(); handleDelete(t.id, 'hoc-ky'); }} className="p-1.5 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded transition-colors cursor-pointer" title="Xóa">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -376,16 +381,16 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
             )}
 
             {activeTab === 'khoa' && paginatedCourses.map(c => (
-              <tr key={c.id} className="hover:bg-slate-50 transition-colors">
+              <tr key={c.id} onClick={() => handleOpenView(c, 'khoa')} className="hover:bg-slate-50 transition-colors cursor-pointer group">
                 <td className="p-4 text-slate-600 font-mono font-medium">{c.ma_khoa_hoc || '-'}</td>
-                <td className="p-4 font-semibold">{c.ten_khoa_hoc}</td>
+                <td className="p-4 font-semibold text-[#407F3E] group-hover:underline">{c.ten_khoa_hoc}</td>
                 <td className="p-4 text-slate-600">{c.nam_nhap_hoc}</td>
-                <td className="p-4 text-right">
+                <td className="p-4 text-right" onClick={(e) => e.stopPropagation()}>
                   <div className="flex justify-end gap-2 text-slate-400">
-                    <button onClick={() => handleOpenEdit(c, 'khoa')} className="p-1.5 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded transition-colors cursor-pointer" title="Sửa">
+                    <button onClick={(e) => { e.stopPropagation(); handleOpenEdit(c, 'khoa'); }} className="p-1.5 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded transition-colors cursor-pointer" title="Sửa">
                       <Edit2 className="w-4 h-4" />
                     </button>
-                    <button onClick={() => handleDelete(c.id, 'khoa')} className="p-1.5 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded transition-colors cursor-pointer" title="Xóa">
+                    <button onClick={(e) => { e.stopPropagation(); handleDelete(c.id, 'khoa'); }} className="p-1.5 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded transition-colors cursor-pointer" title="Xóa">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -794,6 +799,144 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+      {/* Read-Only View Detail Modal */}
+      {viewItem.isOpen && viewItem.data && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setViewItem({ isOpen: false, type: '', data: null })}></div>
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl relative z-10 animate-in zoom-in-95 duration-200 flex flex-col overflow-hidden">
+            <div className="px-6 py-4 border-b border-[#E7E0C4] flex items-center justify-between bg-slate-50">
+              <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-[#407F3E]" />
+                {viewItem.type === 'nam-hoc' ? 'Chi tiết năm học' : viewItem.type === 'hoc-ky' ? 'Chi tiết học kỳ' : 'Chi tiết khóa học'}
+              </h2>
+              <button type="button" onClick={() => setViewItem({ isOpen: false, type: '', data: null })} className="p-1.5 text-slate-400 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg transition-colors cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {viewItem.type === 'nam-hoc' && (
+                <>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Tên năm học</label>
+                    <input
+                      type="text"
+                      disabled
+                      value={viewItem.data.ten_nam_hoc || ''}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 font-semibold cursor-not-allowed"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Ngày bắt đầu</label>
+                      <input
+                        type="text"
+                        disabled
+                        value={viewItem.data.ngay_bat_dau ? new Date(viewItem.data.ngay_bat_dau).toLocaleDateString('vi-VN') : '-'}
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 cursor-not-allowed"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Ngày kết thúc</label>
+                      <input
+                        type="text"
+                        disabled
+                        value={viewItem.data.ngay_ket_thuc ? new Date(viewItem.data.ngay_ket_thuc).toLocaleDateString('vi-VN') : '-'}
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 cursor-not-allowed"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {viewItem.type === 'hoc-ky' && (
+                <>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Tên học kỳ</label>
+                    <input
+                      type="text"
+                      disabled
+                      value={viewItem.data.ten_hoc_ky || ''}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 font-semibold cursor-not-allowed"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Năm học</label>
+                    <input
+                      type="text"
+                      disabled
+                      value={viewItem.data.namHoc?.ten_nam_hoc || '-'}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 cursor-not-allowed"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Ngày bắt đầu</label>
+                      <input
+                        type="text"
+                        disabled
+                        value={viewItem.data.ngay_bat_dau ? new Date(viewItem.data.ngay_bat_dau).toLocaleDateString('vi-VN') : '-'}
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 cursor-not-allowed"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Ngày kết thúc</label>
+                      <input
+                        type="text"
+                        disabled
+                        value={viewItem.data.ngay_ket_thuc ? new Date(viewItem.data.ngay_ket_thuc).toLocaleDateString('vi-VN') : '-'}
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 cursor-not-allowed"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {viewItem.type === 'khoa' && (
+                <>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Mã khóa</label>
+                    <input
+                      type="text"
+                      disabled
+                      value={viewItem.data.ma_khoa_hoc || '-'}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 font-mono cursor-not-allowed"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Tên khóa</label>
+                    <input
+                      type="text"
+                      disabled
+                      value={viewItem.data.ten_khoa_hoc || ''}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 font-semibold cursor-not-allowed"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Năm nhập học</label>
+                    <input
+                      type="text"
+                      disabled
+                      value={viewItem.data.nam_nhap_hoc || '-'}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 cursor-not-allowed"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="p-5 border-t border-[#E7E0C4] flex justify-end bg-slate-50/50 rounded-b-2xl">
+              <button
+                type="button"
+                onClick={() => setViewItem({ isOpen: false, type: '', data: null })}
+                className="px-6 py-2.5 rounded-lg text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

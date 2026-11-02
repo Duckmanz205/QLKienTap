@@ -22,7 +22,7 @@ export default function LeaderAssignment_Khoa() {
   // Dropdown States for Filters
   const [selectedLich, setSelectedLich] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
-  const statusOptions = ["Tất cả", "Đã phân công", "Chưa phân công"];
+  const statusOptions = ["Tất cả", "Chưa phân công", "Đã phân công", "Đã từ chối / Đã hủy"];
   const [selectedType, setSelectedType] = useState('');
   const typeOptions = ["Tất cả", "Trường tổ chức", "Sinh viên đề xuất"];
   const [factories, setFactories] = useState([]);
@@ -80,7 +80,12 @@ export default function LeaderAssignment_Khoa() {
     fetchInitialData();
   }, []);
 
+  const isTripRejected = (trip) => {
+    return trip.trang_thai === 'DaHuy' || trip.trang_thai === 'TuChoi';
+  };
+
   const isTripLocked = (trip) => {
+    if (isTripRejected(trip)) return false;
     if (!trip.lichKienTap) return false;
     const tt = trip.lichKienTap.trang_thai;
     return tt !== 'Nhap' && tt !== 'ChoDuyet';
@@ -233,8 +238,10 @@ export default function LeaderAssignment_Khoa() {
     if (selectedFactory && (t.nha_may_id !== selectedFactory && t.nhaMay?.id !== selectedFactory)) return false;
 
     const gvdd = t.giaoVienDanDoan || [];
-    if (selectedStatus === 'Đã phân công' && gvdd.length === 0) return false;
-    if (selectedStatus === 'Chưa phân công' && gvdd.length > 0) return false;
+    const isRejected = isTripRejected(t);
+    if (selectedStatus === 'Đã phân công' && (gvdd.length === 0 || isRejected)) return false;
+    if (selectedStatus === 'Chưa phân công' && (gvdd.length > 0 || isRejected)) return false;
+    if (selectedStatus === 'Đã từ chối / Đã hủy' && !isRejected) return false;
 
     if (selectedLeader) {
       const isLeaderInTrip = gvdd.some(g => g.giang_vien_id === selectedLeader);
@@ -404,13 +411,21 @@ export default function LeaderAssignment_Khoa() {
                 const isKhoa = t.cach_to_chuc === 'DoKhoaToChuc';
                 const hinhThuc = t.hinh_thuc === 'OFFLINE' ? 'Trực tiếp' : 'Trực tuyến';
                 const gvdd = t.giaoVienDanDoan || [];
+                const isRejected = isTripRejected(t);
+                const rejectLabel = t.cach_to_chuc === 'TuDo' ? 'Đã từ chối' : 'Đã hủy';
                 return (
-                  <tr key={t.id} className="hover:bg-slate-50 transition-colors">
+                  <tr key={t.id} className={`transition-colors ${isRejected ? 'bg-slate-50/70 opacity-85' : 'hover:bg-slate-50'}`}>
                     <td className="p-4 pl-6">
                       <div className="font-bold text-slate-800 flex items-center gap-1.5 mb-1">
-                        <MapPin className="w-4 h-4 text-[#407F3E]" />
-                        {t.nhaMay?.ten_nha_may || 'Đang cập nhật'}
-                        {isTripLocked(t) && <span title="Lịch kiến tập đã duyệt, bị khóa phân công" className="text-slate-400"><Lock className="w-3.5 h-3.5" /></span>}
+                        <MapPin className={`w-4 h-4 ${isRejected ? 'text-slate-400' : 'text-[#407F3E]'}`} />
+                        <span className={isRejected ? 'text-slate-600' : 'text-slate-800'}>
+                          {t.nhaMay?.ten_nha_may || 'Đang cập nhật'}
+                        </span>
+                        {!isRejected && isTripLocked(t) && (
+                          <span title="Lịch kiến tập đã duyệt, bị khóa phân công" className="text-slate-400">
+                            <Lock className="w-3.5 h-3.5" />
+                          </span>
+                        )}
                       </div>
                       <div className="text-xs font-medium text-slate-500 flex items-center gap-3">
                         <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> {new Date(t.ngay_tham_quan).toLocaleDateString('vi-VN')}</span>
@@ -425,14 +440,29 @@ export default function LeaderAssignment_Khoa() {
                       </span>
                     </td>
                     <td className="p-4 text-center">
-                      <span className={`inline-flex items-center px-2 py-1 rounded text-[10px] font-bold border whitespace-nowrap ${
-                        isKhoa ? 'bg-[#407F3E]/10 text-[#407F3E] border-[#407F3E]/20' : 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                      }`}>
-                        {isKhoa ? 'Do khoa tổ chức' : 'Tự do'}
-                      </span>
+                      <div className="flex flex-col items-center gap-1">
+                        <span className={`inline-flex items-center px-2 py-1 rounded text-[10px] font-bold border whitespace-nowrap ${
+                          isKhoa ? 'bg-[#407F3E]/10 text-[#407F3E] border-[#407F3E]/20' : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                        }`}>
+                          {isKhoa ? 'Do khoa tổ chức' : 'Tự do'}
+                        </span>
+                        {isRejected && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-200 whitespace-nowrap">
+                            {rejectLabel}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="p-4">
-                      {gvdd.length > 0 ? (
+                      {isRejected ? (
+                        <span
+                          className="inline-flex items-center px-2 py-1 rounded bg-rose-50 text-rose-700 text-xs font-bold border border-rose-200/80 shadow-xs"
+                          title={t.cach_to_chuc === 'TuDo' ? 'Chuyến tham quan tự do đã bị Quản lý Khoa từ chối' : 'Chuyến tham quan đã bị hủy bỏ'}
+                        >
+                          <XCircle className="w-3.5 h-3.5 mr-1 text-rose-500 shrink-0" />
+                          {rejectLabel}
+                        </span>
+                      ) : gvdd.length > 0 ? (
                         <div className="flex flex-col gap-1">
                           {gvdd.map(l => (
                             <div key={l.id} className="flex items-center gap-1.5">
@@ -448,12 +478,18 @@ export default function LeaderAssignment_Khoa() {
                       )}
                     </td>
                     <td className="p-4 text-right pr-6 relative">
-                      {!(userRole === 'QuanLyCLB' && isTripLocked(t)) && (
+                      {isRejected ? (
+                        <div className="flex items-center justify-end">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded text-xs font-medium bg-slate-100 text-slate-400 border border-slate-200 italic">
+                            {rejectLabel}
+                          </span>
+                        </div>
+                      ) : !(userRole === 'QuanLyCLB' && isTripLocked(t)) ? (
                         <div className="flex items-center justify-end gap-2">
                           {gvdd.length === 0 ? (
                             <button 
                               onClick={(e) => toggleInlineDropdown(e, t.id)}
-                              className="assign-leader-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold transition-all shadow-sm bg-[#407F3E] text-white hover:bg-[#346632]"
+                              className="assign-leader-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold transition-all shadow-sm bg-[#407F3E] text-white hover:bg-[#346632] cursor-pointer"
                             >
                               <UserPlus className="w-3.5 h-3.5" />
                               Phân công
@@ -462,7 +498,7 @@ export default function LeaderAssignment_Khoa() {
                             <>
                               <button 
                                 onClick={(e) => toggleInlineDropdown(e, t.id)}
-                                className="assign-leader-btn w-8 h-8 rounded-full flex items-center justify-center bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-colors shadow-sm"
+                                className="assign-leader-btn w-8 h-8 rounded-full flex items-center justify-center bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-colors shadow-sm cursor-pointer"
                                 title="Cập nhật giảng viên"
                               >
                                 <Edit3 className="w-4 h-4" />
@@ -472,13 +508,19 @@ export default function LeaderAssignment_Khoa() {
                                   e.stopPropagation();
                                   handleUnassign(t, gvdd[0].giang_vien_id, gvdd[0].giangVien?.ho_ten);
                                 }}
-                                className="w-8 h-8 rounded-full flex items-center justify-center bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-colors shadow-sm"
+                                className="w-8 h-8 rounded-full flex items-center justify-center bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-colors shadow-sm cursor-pointer"
                                 title="Gỡ phân công"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
                             </>
                           )}
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-end">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium text-slate-400">
+                            <Lock className="w-3 h-3" /> Đã khóa
+                          </span>
                         </div>
                       )}
 

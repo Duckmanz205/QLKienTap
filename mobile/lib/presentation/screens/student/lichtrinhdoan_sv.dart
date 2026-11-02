@@ -318,6 +318,75 @@ class _LichTrinhDoanSVScreenState extends State<LichTrinhDoanSVScreen> {
                         ],
                       ),
                     ),
+
+                    // LIÊN HỆ DOANH NGHIỆP / NHÀ MÁY
+                    if ((_busInfo?.enterpriseContactPerson != null && _busInfo!.enterpriseContactPerson!.isNotEmpty) ||
+                        (_busInfo?.enterpriseContactPhone != null && _busInfo!.enterpriseContactPhone!.isNotEmpty)) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.8),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 38,
+                              height: 38,
+                              decoration: BoxDecoration(
+                                color: AppColors.secondary.withValues(alpha: 0.15),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.business_center, color: AppColors.secondary, size: 20),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'LIÊN HỆ DOANH NGHIỆP',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textMuted,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    _busInfo?.enterpriseContactPerson ?? 'Đang cập nhật',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.darkSlate,
+                                    ),
+                                  ),
+                                  if (_busInfo?.enterpriseContactPhone != null && _busInfo!.enterpriseContactPhone!.isNotEmpty)
+                                    Text(
+                                      _busInfo!.enterpriseContactPhone!,
+                                      style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            if (_busInfo?.enterpriseContactPhone != null && _busInfo!.enterpriseContactPhone!.isNotEmpty)
+                              IconButton(
+                                icon: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: const BoxDecoration(
+                                    color: AppColors.secondary,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.phone, color: Colors.white, size: 16),
+                                ),
+                                onPressed: () => _makePhoneCall(_busInfo!.enterpriseContactPhone!),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

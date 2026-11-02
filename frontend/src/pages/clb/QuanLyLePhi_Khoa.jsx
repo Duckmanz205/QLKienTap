@@ -457,9 +457,13 @@ export default function QuanLyLePhi_Khoa() {
                 else if (currentStatus === 'ChuaDong') displayStatus = 'Chưa đóng';
 
                 return (
-                  <tr key={f.id} className="hover:bg-slate-50 transition-colors">
+                  <tr 
+                    key={f.id} 
+                    onClick={() => setViewingDetail(f)}
+                    className="hover:bg-slate-50 transition-colors cursor-pointer group"
+                  >
                     <td className="p-4 pl-6 font-mono font-bold text-[#407F3E]">{sv.mssv}</td>
-                    <td className="p-4 font-bold text-slate-800">{sv.ho_ten}</td>
+                    <td className="p-4 font-bold text-slate-800 group-hover:text-[#407F3E] group-hover:underline">{sv.ho_ten}</td>
                     <td className="p-4 font-medium text-slate-600">{chuyen}</td>
                     <td className="p-4 font-bold text-[#89B449]">
                       {hoaDon.so_tien ? Number(hoaDon.so_tien).toLocaleString('vi-VN') : '0'} VNĐ
@@ -476,24 +480,26 @@ export default function QuanLyLePhi_Khoa() {
                       {getStatusBadge(displayStatus)}
                     </td>
                     <td className="p-4 text-right pr-6">
-                      <div className="flex flex-col items-end gap-2 w-[105px] ml-auto">
+                      <div className="flex items-center justify-end gap-2 w-auto ml-auto">
                         {currentStatus.startsWith('DaDong') && (
                           <button
-                            className="flex items-center justify-center w-full gap-1.5 px-3 py-1.5 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 border border-red-100 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+                            type="button"
+                            className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 border border-red-100 rounded-lg transition-colors cursor-pointer whitespace-nowrap shadow-xs"
                             title="Tải Hóa đơn PDF"
-                            onClick={() => handleExportPDF(f)}
+                            onClick={(e) => { e.stopPropagation(); handleExportPDF(f); }}
                           >
                             <FileText className="w-4 h-4 shrink-0" />
                             <span>Xuất PDF</span>
                           </button>
                         )}
                         <button
-                          className="flex items-center justify-center w-full gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
-                          title="Xem chi tiết"
-                          onClick={() => setViewingDetail(f)}
+                          type="button"
+                          className="text-xs font-bold text-[#407F3E] hover:text-[#346A32] hover:underline transition-colors cursor-pointer py-1.5 whitespace-nowrap inline-flex items-center gap-1"
+                          title="Xem chi tiết & Xác nhận thu phí"
+                          onClick={(e) => { e.stopPropagation(); setViewingDetail(f); }}
                         >
-                          <Eye className="w-4 h-4 shrink-0" />
                           <span>Chi tiết</span>
+                          <span>&rarr;</span>
                         </button>
                       </div>
                     </td>

@@ -2,13 +2,11 @@ import {
   Controller,
   Get,
   Post,
-  Delete,
   Param,
   ParseIntPipe,
   Query,
   Body,
   BadRequestException,
-  NotFoundException,
   UseGuards,
   UseInterceptors,
   UploadedFile,
@@ -122,45 +120,6 @@ export class QtvController {
   }
 
   /**
-   * Tạo bản sao lưu toàn phần lưu trữ trong thư mục backups/ trên máy chủ
-   */
-  @Roles('QuanTriVienHeThong')
-  @Post('backup/create')
-  async createBackupOnServer() {
-    return this.backupService.createBackupOnServer();
-  }
-
-  /**
-   * Lấy danh sách các tệp sao lưu đang lưu trữ trên máy chủ
-   */
-  @Roles('QuanTriVienHeThong')
-  @Get('backup/list')
-  async listServerBackups() {
-    return this.backupService.listServerBackups();
-  }
-
-  /**
-   * Tải về một tệp sao lưu cụ thể từ máy chủ
-   */
-  @Roles('QuanTriVienHeThong')
-  @Get('backup/download-file/:fileName')
-  async downloadServerBackup(
-    @Param('fileName') fileName: string,
-    @Res() res: Response,
-  ) {
-    return this.backupService.downloadServerBackup(fileName, res);
-  }
-
-  /**
-   * Xóa một tệp sao lưu khỏi máy chủ
-   */
-  @Roles('QuanTriVienHeThong')
-  @Delete('backup/:fileName')
-  async deleteServerBackup(@Param('fileName') fileName: string) {
-    return this.backupService.deleteServerBackup(fileName);
-  }
-
-  /**
    * Phục hồi cơ sở dữ liệu từ tệp .bak được tải lên từ máy tính của Quản trị viên
    */
   @Roles('QuanTriVienHeThong')
@@ -189,26 +148,5 @@ export class QtvController {
         console.error('Lỗi khi xóa file upload tạm:', err);
       }
     }
-  }
-
-  /**
-   * Phục hồi cơ sở dữ liệu từ một bản sao lưu đã có sẵn trên máy chủ
-   */
-  @Roles('QuanTriVienHeThong')
-  @Post('restore/from-server/:fileName')
-  async restoreFromServer(@Param('fileName') fileName: string) {
-    const sanitized = path.basename(fileName);
-    if (!sanitized.toLowerCase().endsWith('.bak')) {
-      throw new BadRequestException('Tên tệp sao lưu không hợp lệ');
-    }
-
-    const backupDir = path.resolve(process.cwd(), 'backups');
-    const targetFilePath = path.join(backupDir, sanitized);
-
-    if (!fs.existsSync(targetFilePath)) {
-      throw new NotFoundException('Không tìm thấy tệp sao lưu trên máy chủ');
-    }
-
-    return this.backupService.restoreDatabase(targetFilePath);
   }
 }

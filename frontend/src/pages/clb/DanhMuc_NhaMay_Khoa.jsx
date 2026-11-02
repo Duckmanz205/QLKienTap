@@ -22,6 +22,7 @@ export default function DanhMuc_NhaMay_Khoa() {
 
   // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [viewingFactory, setViewingFactory] = useState(null);
   const [editData, setEditData] = useState(null); // null means Create
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [draftWarningTarget, setDraftWarningTarget] = useState(null);
@@ -254,10 +255,14 @@ export default function DanhMuc_NhaMay_Khoa() {
                   {paginatedFactories.map((f, index) => {
                     const isHoatDong = f.trang_thai === 'HoatDong';
                     return (
-                      <tr key={f.id} className="hover:bg-slate-50 transition-colors">
+                      <tr 
+                        key={f.id} 
+                        onClick={() => setViewingFactory(f)}
+                        className="hover:bg-slate-50 transition-colors cursor-pointer group"
+                      >
                         <td className="px-3 py-3 text-slate-500 font-mono text-xs text-center">{(page - 1) * limit + index + 1}</td>
                         <td className="px-3 py-3">
-                          <span className="font-bold text-slate-800">{f.ten_nha_may}</span>
+                          <span className="font-bold text-[#407F3E] group-hover:underline">{f.ten_nha_may}</span>
                         </td>
                         <td className="px-3 py-3">
                           <span className="text-xs text-slate-500">{f.dia_chi || '—'}</span>
@@ -282,7 +287,7 @@ export default function DanhMuc_NhaMay_Khoa() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-3 py-3 text-center">
+                        <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                           <div
                             className={`inline-flex whitespace-nowrap items-center px-2.5 py-1 rounded-full text-[10px] font-bold shadow-sm border cursor-pointer hover:opacity-80 transition-colors ${
                               isHoatDong
@@ -290,22 +295,22 @@ export default function DanhMuc_NhaMay_Khoa() {
                                 : 'bg-slate-200 text-slate-500 border-slate-300'
                             }`}
                             title="Nhấn để đổi trạng thái"
-                            onClick={() => toggleStatus(f)}
+                            onClick={(e) => { e.stopPropagation(); toggleStatus(f); }}
                           >
                             {isHoatDong ? 'Hoạt động' : 'Ngưng hợp tác'}
                           </div>
                         </td>
-                        <td className="px-3 py-3 text-center">
+                        <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-center gap-1">
                             <button
-                              onClick={() => handleOpenEditModal(f)}
+                              onClick={(e) => { e.stopPropagation(); handleOpenEditModal(f); }}
                               className="p-1.5 text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer"
                               title="Chỉnh sửa thông tin"
                             >
                               <Edit2 className="w-4 h-4" />
                             </button>
                             <button
-                              onClick={() => setDeleteTarget(f)}
+                              onClick={(e) => { e.stopPropagation(); setDeleteTarget(f); }}
                               className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
                               title="Xóa nhà máy"
                             >
@@ -384,9 +389,9 @@ export default function DanhMuc_NhaMay_Khoa() {
 
       {/* Create / Edit Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200 my-auto flex flex-col max-h-[90vh]">
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
               <h2 className="text-lg font-bold text-slate-800">
                 {editData ? 'Chỉnh sửa doanh nghiệp' : 'Thêm doanh nghiệp mới'}
               </h2>
@@ -398,7 +403,7 @@ export default function DanhMuc_NhaMay_Khoa() {
               </button>
             </div>
             
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1.5">Tên nhà máy / Công ty <span className="text-red-500">*</span></label>
                 <input
@@ -459,11 +464,12 @@ export default function DanhMuc_NhaMay_Khoa() {
                     ]}
                     className="w-full"
                     searchPlaceholder="Tìm trạng thái..."
+                    direction="up"
                   />
                 </div>
               )}
 
-              <div className="pt-4 flex gap-3">
+              <div className="pt-4 flex gap-3 shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
@@ -695,6 +701,89 @@ export default function DanhMuc_NhaMay_Khoa() {
                 className="px-4 py-2.5 rounded-xl bg-[#407F3E] hover:bg-[#407F3E]/90 text-white text-sm font-bold shadow-sm transition-colors cursor-pointer"
               >
                 Đi đến Chuyến tham quan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Read-Only View Factory Detail Modal */}
+      {viewingFactory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+              <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <Users className="w-5 h-5 text-[#407F3E]" />
+                Chi tiết doanh nghiệp / nhà máy
+              </h2>
+              <button 
+                type="button"
+                onClick={() => setViewingFactory(null)}
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-200 text-slate-500 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 overflow-y-auto">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Tên nhà máy / Công ty</label>
+                <input
+                  type="text"
+                  disabled
+                  value={viewingFactory.ten_nha_may || ''}
+                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-800 cursor-not-allowed"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Địa chỉ</label>
+                <textarea
+                  disabled
+                  rows={3}
+                  value={viewingFactory.dia_chi || '—'}
+                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 cursor-not-allowed resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Khả năng hỗ trợ tham quan</label>
+                <div className="flex flex-wrap gap-4">
+                  <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium ${
+                    viewingFactory.ho_tro_truc_tiep ? 'bg-green-50 border-green-200 text-green-700' : 'bg-slate-50 border-slate-200 text-slate-400 line-through'
+                  }`}>
+                    <Users className="w-4 h-4 shrink-0" />
+                    <span>Trực tiếp (Offline)</span>
+                  </div>
+                  <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium ${
+                    viewingFactory.ho_tro_truc_tuyen ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-slate-50 border-slate-200 text-slate-400 line-through'
+                  }`}>
+                    <Wifi className="w-4 h-4 shrink-0" />
+                    <span>Trực tuyến (Online)</span>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Trạng thái hợp tác</label>
+                <div>
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold shadow-sm border ${
+                    viewingFactory.trang_thai === 'HoatDong'
+                      ? 'bg-[#89B449] text-white border-[#407F3E]/20'
+                      : 'bg-slate-200 text-slate-500 border-slate-300'
+                  }`}>
+                    {viewingFactory.trang_thai === 'HoatDong' ? 'Đang hoạt động' : 'Ngưng hợp tác'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-slate-100 flex justify-end bg-slate-50 shrink-0">
+              <button
+                type="button"
+                onClick={() => setViewingFactory(null)}
+                className="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-bold transition-colors cursor-pointer"
+              >
+                Đóng
               </button>
             </div>
           </div>

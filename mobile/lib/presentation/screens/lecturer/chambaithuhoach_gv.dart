@@ -120,6 +120,16 @@ class _ChamBaiThuHoachGVScreenState extends State<ChamBaiThuHoachGVScreen> {
   }
 
   Future<void> _saveGrade() async {
+    if (widget.student.isScoreLocked) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Điểm bài thu hoạch đã bị khóa bởi khoa/bộ môn, không thể chỉnh sửa.'),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+      return;
+    }
+
     final gradeText = _gradeController.text.trim();
     final grade = double.tryParse(gradeText);
     if (grade == null || grade < 0 || grade > 10) {
@@ -172,6 +182,7 @@ class _ChamBaiThuHoachGVScreenState extends State<ChamBaiThuHoachGVScreen> {
   Widget build(BuildContext context) {
     final hasReportFile = widget.student.reportFileUrl != null && widget.student.reportFileUrl!.isNotEmpty;
     final hasConfirmFile = widget.student.confirmationFileUrl != null && widget.student.confirmationFileUrl!.isNotEmpty;
+    final isLocked = widget.student.isScoreLocked;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -383,18 +394,42 @@ class _ChamBaiThuHoachGVScreenState extends State<ChamBaiThuHoachGVScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text('Đánh giá & Chấm điểm', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.darkSlate)),
-                    if (_aiGrade != null)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          'AI đề xuất: ${_aiGrade!.toStringAsFixed(1)}',
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary),
-                        ),
-                      ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isLocked) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade50,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.red.shade200),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.lock, size: 12, color: AppColors.danger),
+                                SizedBox(width: 4),
+                                Text('Đã khóa điểm', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.danger)),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                        ],
+                        if (_aiGrade != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              'AI đề xuất: ${_aiGrade!.toStringAsFixed(1)}',
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary),
+                            ),
+                          ),
+                      ],
+                    ),
                   ],
                 ),
                 const SizedBox(height: 14),
@@ -403,7 +438,7 @@ class _ChamBaiThuHoachGVScreenState extends State<ChamBaiThuHoachGVScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: _isAIGrading || !hasReportFile ? null : _handleAIGrading,
+                    onPressed: _isAIGrading || !hasReportFile || isLocked ? null : _handleAIGrading,
                     icon: _isAIGrading
                         ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                         : const Icon(Icons.auto_awesome, size: 16),
@@ -412,7 +447,7 @@ class _ChamBaiThuHoachGVScreenState extends State<ChamBaiThuHoachGVScreen> {
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
+                      backgroundColor: isLocked ? Colors.grey.shade400 : AppColors.primary,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -427,7 +462,8 @@ class _ChamBaiThuHoachGVScreenState extends State<ChamBaiThuHoachGVScreen> {
                 Container(
                   height: 48,
                   decoration: BoxDecoration(
-                    border: Border.all(color: AppColors.primary),
+                    color: isLocked ? Colors.grey.shade100 : Colors.white,
+                    border: Border.all(color: isLocked ? Colors.grey.shade300 : AppColors.primary),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -435,9 +471,14 @@ class _ChamBaiThuHoachGVScreenState extends State<ChamBaiThuHoachGVScreen> {
                       Expanded(
                         child: TextField(
                           controller: _gradeController,
+                          enabled: !isLocked,
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.primary),
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: isLocked ? Colors.grey.shade700 : AppColors.primary,
+                          ),
                           decoration: const InputDecoration(
                             border: InputBorder.none,
                             hintText: '0.0',
@@ -458,12 +499,16 @@ class _ChamBaiThuHoachGVScreenState extends State<ChamBaiThuHoachGVScreen> {
                 const SizedBox(height: 6),
                 TextField(
                   controller: _commentController,
+                  enabled: !isLocked,
                   maxLines: 4,
                   decoration: InputDecoration(
                     hintText: 'Nhập nhận xét chi tiết về bài thu hoạch của sinh viên...',
                     hintStyle: const TextStyle(fontSize: 12, color: Colors.grey),
+                    fillColor: isLocked ? Colors.grey.shade100 : null,
+                    filled: isLocked,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.beigeBorder)),
                     enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.beigeBorder)),
+                    disabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.grey.shade300)),
                   ),
                 ),
               ],
@@ -473,13 +518,16 @@ class _ChamBaiThuHoachGVScreenState extends State<ChamBaiThuHoachGVScreen> {
 
           // Save Grade Button
           ElevatedButton.icon(
-            onPressed: _isSaving ? null : _saveGrade,
+            onPressed: (_isSaving || isLocked) ? null : _saveGrade,
             icon: _isSaving
                 ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                : const Icon(Icons.save, size: 16),
-            label: const Text('LƯU ĐIỂM BÀI THU HOẠCH', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                : Icon(isLocked ? Icons.lock : Icons.save, size: 16),
+            label: Text(
+              isLocked ? 'ĐÃ KHÓA ĐIỂM (CHỈ XEM)' : 'LƯU ĐIỂM BÀI THU HOẠCH',
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+            ),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
+              backgroundColor: isLocked ? Colors.grey.shade400 : AppColors.primary,
               foregroundColor: Colors.white,
               minimumSize: const Size.fromHeight(46),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),

@@ -357,49 +357,6 @@ class _KetQuaDiemSVScreenState extends State<KetQuaDiemSVScreen> {
                 ),
               ],
             ),
-
-            // Comments from Lecturer or Council if any
-            if ((trip.nhanXetGvhd != null && trip.nhanXetGvhd!.isNotEmpty) ||
-                (trip.nhanXetHoiDong != null && trip.nhanXetHoiDong!.isNotEmpty)) ...[
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.shade200),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (trip.nhanXetGvhd != null && trip.nhanXetGvhd!.isNotEmpty) ...[
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('GVHD: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppColors.primary)),
-                          Expanded(
-                            child: Text(trip.nhanXetGvhd!, style: const TextStyle(fontSize: 11, color: AppColors.darkSlate)),
-                          ),
-                        ],
-                      ),
-                    ],
-                    if (trip.nhanXetHoiDong != null && trip.nhanXetHoiDong!.isNotEmpty) ...[
-                      if (trip.nhanXetGvhd != null && trip.nhanXetGvhd!.isNotEmpty)
-                        const SizedBox(height: 6),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Hội đồng: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppColors.secondary)),
-                          Expanded(
-                            child: Text(trip.nhanXetHoiDong!, style: const TextStyle(fontSize: 11, color: AppColors.darkSlate)),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
           ],
         ),
       ),

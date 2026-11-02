@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Upload, Plus, Search, ChevronDown, Check,
-  Edit2, Key, Trash2, X, CloudUpload, FileSpreadsheet, Download
+  Edit2, Key, Trash2, X, CloudUpload, FileSpreadsheet, Download, Users
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { khoaApi } from '../../services/api';
@@ -34,6 +34,7 @@ export default function DanhMuc_SinhVien_Khoa() {
 
   // Modal States
   const [showSingleModal, setShowSingleModal] = useState(false);
+  const [viewingStudent, setViewingStudent] = useState(null);
   const [editingStudent, setEditingStudent] = useState(null);
   const [newMssv, setNewMssv] = useState('');
   const [newClass, setNewClass] = useState('');
@@ -389,9 +390,13 @@ export default function DanhMuc_SinhVien_Khoa() {
                 filteredStudents.map(stud => {
                   const khoa = extractKhoa(stud.ten_lop);
                   return (
-                    <tr key={stud.id} className="hover:bg-slate-50 transition-colors">
+                    <tr 
+                      key={stud.id} 
+                      onClick={() => setViewingStudent(stud)}
+                      className="hover:bg-slate-50 transition-colors cursor-pointer group"
+                    >
                       <td className="p-4 font-mono text-slate-600 text-xs">{stud.mssv}</td>
-                      <td className="p-4 font-bold text-slate-800">{stud.ho_ten}</td>
+                      <td className="p-4 font-bold text-[#407F3E] group-hover:underline">{stud.ho_ten}</td>
                       <td className="p-4 font-semibold text-slate-700">{stud.ten_lop}</td>
                       <td className="p-4 text-slate-600">{khoa}</td>
                       <td className="p-4 text-slate-500">{stud.email}</td>
@@ -405,12 +410,12 @@ export default function DanhMuc_SinhVien_Khoa() {
                         )}
                       </td>
                       {canModify && (
-                        <td className="p-4 text-right">
+                        <td className="p-4 text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex justify-end gap-2 text-slate-400">
                             <button 
                               className="p-1.5 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded transition-colors cursor-pointer" 
                               title="Sửa thông tin"
-                              onClick={() => handleEditClick(stud)}
+                              onClick={(e) => { e.stopPropagation(); handleEditClick(stud); }}
                             >
                               <Edit2 className="w-4 h-4" />
                             </button>
@@ -418,7 +423,7 @@ export default function DanhMuc_SinhVien_Khoa() {
                             <button 
                               className="p-1.5 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded transition-colors cursor-pointer" 
                               title="Xóa sinh viên" 
-                              onClick={() => handleDeleteClick(stud)}
+                              onClick={(e) => { e.stopPropagation(); handleDeleteClick(stud); }}
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -703,6 +708,112 @@ export default function DanhMuc_SinhVien_Khoa() {
                 ) : (
                   'Xác nhận Import'
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Read-Only View Student Detail Modal */}
+      {viewingStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setViewingStudent(null)}></div>
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl relative z-10 animate-in zoom-in-95 duration-200 flex flex-col overflow-hidden">
+            <div className="px-6 py-4 border-b border-[#E7E0C4] flex items-center justify-between bg-slate-50">
+              <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <Users className="w-5 h-5 text-[#407F3E]" />
+                Chi tiết thông tin sinh viên
+              </h2>
+              <button type="button" onClick={() => setViewingStudent(null)} className="p-1.5 text-slate-400 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg transition-colors cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Mã số sinh viên (MSSV)</label>
+                  <input 
+                    type="text" 
+                    disabled
+                    value={viewingStudent.mssv || ''}
+                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-mono text-slate-800 font-bold cursor-not-allowed"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Mã Lớp</label>
+                  <input 
+                    type="text" 
+                    disabled
+                    value={viewingStudent.ten_lop || ''}
+                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 font-bold cursor-not-allowed"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Họ và Tên</label>
+                <input 
+                  type="text" 
+                  disabled
+                  value={viewingStudent.ho_ten || ''}
+                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 font-semibold cursor-not-allowed"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Khóa học</label>
+                  <input 
+                    type="text" 
+                    disabled
+                    value={extractKhoa(viewingStudent.ten_lop) || viewingStudent.ten_khoa_hoc || '-'}
+                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 cursor-not-allowed"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Trạng thái học tập</label>
+                  <div className="py-2">
+                    {viewingStudent.hoc_lai ? (
+                      <span className="bg-[#DBD468] text-[#191d17] px-3 py-1 rounded-full text-xs font-bold shadow-sm">
+                        Học lại
+                      </span>
+                    ) : (
+                      <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-full text-xs font-bold shadow-sm">
+                        Bình thường
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Email</label>
+                <input 
+                  type="email" 
+                  disabled
+                  value={viewingStudent.email || '-'}
+                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-mono text-slate-700 cursor-not-allowed"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Số điện thoại</label>
+                <input 
+                  type="text" 
+                  disabled
+                  value={viewingStudent.sdt || '-'}
+                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-mono text-slate-700 cursor-not-allowed"
+                />
+              </div>
+            </div>
+
+            <div className="p-5 border-t border-[#E7E0C4] flex justify-end bg-slate-50/50 rounded-b-2xl">
+              <button 
+                type="button" 
+                onClick={() => setViewingStudent(null)}
+                className="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-bold transition-colors cursor-pointer"
+              >
+                Đóng
               </button>
             </div>
           </div>

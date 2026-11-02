@@ -16,6 +16,7 @@ export default function DanhMuc_GiangVien_Khoa() {
     setTimeout(() => setPopup({ show: false, message: '', type: 'success' }), 3500);
   };
   const [editingLecturer, setEditingLecturer] = useState(null);
+  const [viewingLecturer, setViewingLecturer] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   
   // Import States
@@ -301,13 +302,17 @@ export default function DanhMuc_GiangVien_Khoa() {
                 </tr>
               ) : (
                 paginatedLecturers.map(gv => (
-                  <tr key={gv.id} className="hover:bg-slate-50 transition-colors">
+                  <tr 
+                    key={gv.id} 
+                    onClick={() => setViewingLecturer(gv)}
+                    className="hover:bg-slate-50 transition-colors cursor-pointer group"
+                  >
                     <td className="p-4 font-mono font-bold text-slate-800">{gv.ma_gv}</td>
-                    <td className="p-4 font-bold text-[#407F3E]">{gv.ho_ten}</td>
+                    <td className="p-4 font-bold text-[#407F3E] group-hover:underline">{gv.ho_ten}</td>
                     <td className="p-4 text-slate-600">{gv.email}</td>
-                    <td className="p-4 text-center">
+                    <td className="p-4 text-center" onClick={(e) => e.stopPropagation()}>
                       <button 
-                        onClick={() => toggleHoiDongStatus(gv.id, gv.du_dk_hoi_dong)}
+                        onClick={(e) => { e.stopPropagation(); toggleHoiDongStatus(gv.id, gv.du_dk_hoi_dong); }}
                         className={`w-10 h-6 rounded-full relative transition-colors cursor-pointer inline-block align-middle ${gv.du_dk_hoi_dong ? 'bg-[#89B449]' : 'bg-slate-300'}`}
                         title={gv.du_dk_hoi_dong ? "Đủ điều kiện" : "Chưa đủ điều kiện"}
                       >
@@ -321,9 +326,9 @@ export default function DanhMuc_GiangVien_Khoa() {
                         <span className="px-2 py-1 bg-slate-100 text-slate-400 font-medium text-[10px] uppercase tracking-wider rounded-md border border-slate-200">Chưa cấu hình</span>
                       )}
                     </td>
-                    <td className="p-4 text-right">
+                    <td className="p-4 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex justify-end gap-2 text-slate-400">
-                        <button onClick={() => handleOpenModal(gv)} className="p-1.5 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded transition-colors cursor-pointer" title="Sửa thông tin">
+                        <button onClick={(e) => { e.stopPropagation(); handleOpenModal(gv); }} className="p-1.5 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded transition-colors cursor-pointer" title="Sửa thông tin">
                           <Edit2 className="w-4 h-4" />
                         </button>
 
@@ -586,6 +591,102 @@ export default function DanhMuc_GiangVien_Khoa() {
                 ) : (
                   'Xác nhận Import'
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Read-Only View Lecturer Detail Modal */}
+      {viewingLecturer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setViewingLecturer(null)}></div>
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl relative z-10 animate-in zoom-in-95 duration-200 flex flex-col overflow-hidden">
+            <div className="px-6 py-4 border-b border-[#E7E0C4] flex items-center justify-between bg-slate-50">
+              <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-[#407F3E]" />
+                Chi tiết thông tin giảng viên
+              </h2>
+              <button type="button" onClick={() => setViewingLecturer(null)} className="p-1.5 text-slate-400 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg transition-colors cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Mã Giảng Viên</label>
+                <input
+                  type="text"
+                  disabled
+                  value={viewingLecturer.ma_gv || ''}
+                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono font-bold text-slate-800 cursor-not-allowed"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Họ và tên</label>
+                <input
+                  type="text"
+                  disabled
+                  value={viewingLecturer.ho_ten || ''}
+                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 cursor-not-allowed"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Email</label>
+                  <input
+                    type="email"
+                    disabled
+                    value={viewingLecturer.email || '-'}
+                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono text-slate-700 cursor-not-allowed"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Số điện thoại</label>
+                  <input
+                    type="text"
+                    disabled
+                    value={viewingLecturer.sdt || '-'}
+                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono text-slate-700 cursor-not-allowed"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Số SV tối đa hướng dẫn</label>
+                  <input
+                    type="text"
+                    disabled
+                    value={viewingLecturer.so_sv_toi_da_huong_dan || 'Chưa cấu hình'}
+                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 cursor-not-allowed"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Đủ ĐK hội đồng</label>
+                  <div className="py-2">
+                    {viewingLecturer.du_dk_hoi_dong ? (
+                      <span className="bg-[#89B449]/15 text-[#407F3E] border border-[#89B449]/30 px-3 py-1 rounded-full text-xs font-bold shadow-sm inline-flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Đủ điều kiện
+                      </span>
+                    ) : (
+                      <span className="bg-slate-100 text-slate-500 border border-slate-200 px-3 py-1 rounded-full text-xs font-bold shadow-sm inline-flex items-center gap-1.5">
+                        <X className="w-3.5 h-3.5" /> Chưa đủ điều kiện
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-[#E7E0C4] bg-slate-50/50 flex justify-end rounded-b-2xl">
+              <button 
+                type="button" 
+                onClick={() => setViewingLecturer(null)}
+                className="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-bold transition-colors cursor-pointer"
+              >
+                Đóng
               </button>
             </div>
           </div>

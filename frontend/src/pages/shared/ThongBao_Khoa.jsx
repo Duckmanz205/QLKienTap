@@ -266,9 +266,13 @@ export default function ThongBao_Khoa() {
                 const fileUrl = n.file_url || (n.files?.[0]?.duong_dan);
 
                 return (
-                  <tr key={n.id} className="hover:bg-slate-50 transition-colors">
+                  <tr 
+                    key={n.id} 
+                    onClick={() => setViewingDetail(n)}
+                    className="hover:bg-slate-50 transition-colors cursor-pointer group"
+                  >
                     <td className="p-4 pl-6 max-w-[380px]">
-                      <div className="font-bold text-slate-800 flex items-start gap-2">
+                      <div className="font-bold text-slate-800 group-hover:text-[#407F3E] group-hover:underline flex items-start gap-2">
                         <MessageSquare className="w-4 h-4 text-[#407F3E] mt-0.5 shrink-0" />
                         <span className="line-clamp-2 leading-relaxed">{n.tieu_de}</span>
                       </div>
@@ -303,14 +307,10 @@ export default function ThongBao_Khoa() {
                         hour: '2-digit', minute: '2-digit'
                       })}
                     </td>
-                    <td className="p-4 text-right pr-6">
-                      <button 
-                        className="p-1.5 text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer" 
-                        title="Xem chi tiết"
-                        onClick={() => setViewingDetail(n)}
-                      >
-                        <ChevronRight className="w-5 h-5" />
-                      </button>
+                    <td className="p-4 text-right pr-6" onClick={(e) => e.stopPropagation()}>
+                      <span className="text-xs text-slate-400 group-hover:text-[#407F3E] font-medium transition-colors">
+                        Chi tiết &rarr;
+                      </span>
                     </td>
                   </tr>
                 );

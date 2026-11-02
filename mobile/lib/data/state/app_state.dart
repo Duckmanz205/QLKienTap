@@ -737,9 +737,32 @@ class AppStateProviderState extends State<AppStateContainer> {
           ));
           
           if (isCompleted || regStatus == 'HopLe' || regStatus == 'DaThamGia') {
-             final bth = reg['baiThuHoach'];
+             final bth = reg['baiThuHoach'] ?? reg['phieuThamQuan']?['baiThuHoach'];
+             final diemPhieu = reg['phieuThamQuan']?['diemPhieuThamQuan'];
              final rawNgayThamQuan = reg['chuyenThamQuan']?['ngay_tham_quan'];
              final tripDate = rawNgayThamQuan != null ? DateTime.tryParse(rawNgayThamQuan.toString()) : null;
+
+             final rawScore = diemPhieu?['diem_thu_hoach'];
+             final double? reportScore = rawScore != null ? double.tryParse(rawScore.toString()) : null;
+             final String? gvhdComment = diemPhieu?['nhan_xet_gvhd']?.toString();
+             final String? gvhdName = (diemPhieu?['giangVienHD']?['ho_ten'] ?? diemPhieu?['giangVien']?['ho_ten'])?.toString();
+             final bool isScoreLocked = diemPhieu?['da_khoa_thu_hoach'] == true || diemPhieu?['da_khoa'] == true;
+
+             final rawGradedAt = diemPhieu?['ngay_cham_thu_hoach'] ?? diemPhieu?['updated_at'];
+             String? gradedAtText;
+             if (rawGradedAt != null) {
+               final dt = DateTime.tryParse(rawGradedAt.toString())?.toLocal();
+               if (dt != null) {
+                 gradedAtText = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+               }
+             }
+
+             String? deadlineText;
+             if (tripDate != null) {
+               final dline = tripDate.add(const Duration(days: 10));
+               deadlineText = '${dline.day.toString().padLeft(2, '0')}/${dline.month.toString().padLeft(2, '0')}/${dline.year}';
+             }
+
              realSubmissions.add(Submission(
                id: reg['id'].toString(),
                registrationId: reg['id'],
@@ -759,6 +782,12 @@ class AppStateProviderState extends State<AppStateContainer> {
                confirmationFileName: bth?['file_xac_nhan_tham_quan']?.split('/').last,
                fileBaoCaoUrl: bth?['file_bao_cao'],
                fileXacNhanUrl: bth?['file_xac_nhan_tham_quan'],
+               reportScore: reportScore,
+               gvhdComment: gvhdComment,
+               gvhdName: gvhdName,
+               isScoreLocked: isScoreLocked,
+               gradedAt: gradedAtText,
+               deadlineText: deadlineText,
              ));
           }
         }
@@ -889,6 +918,7 @@ class AppStateProviderState extends State<AppStateContainer> {
               dateText: dateText,
               amountText: '$amountFormatted đ',
               status: mappedStatus,
+              lyDoTuChoi: ref['ly_do_tu_choi'] ?? ref['ghi_chu'] ?? ref['ly_do'],
             );
           }).toList();
           } else {
@@ -1014,7 +1044,8 @@ class AppStateProviderState extends State<AppStateContainer> {
           final phieu = phieuTQ['phieuDangKy'] ?? {};
           final sv = phieu['sinhVien'] ?? {};
           final chuyen = phieu['chuyenThamQuan'] ?? {};
-          final diem = phieuTQ['diemPhieuThamQuan'] ?? {};
+          final diem = phieuTQ['diemPhieuThamQuan'] ?? r['diemPhieuThamQuan'] ?? {};
+          final diemDanh = phieuTQ['diemDanh'] ?? r['diemDanh'] ?? {};
           
           final mssv = sv['mssv'] ?? sv['id']?.toString() ?? 'SV';
           final uniqueId = r['id'] != null ? '${mssv}_${r['id']}' : mssv;
@@ -1030,9 +1061,9 @@ class AppStateProviderState extends State<AppStateContainer> {
             papersLeft: 0,
             avatar: sv['avatar'] ?? '',
             submittedDate: r['ngay_nop'] != null ? (_safeSub(DateTime.tryParse(r['ngay_nop'].toString())?.toLocal().toString(), 10).isNotEmpty ? _safeSub(DateTime.tryParse(r['ngay_nop'].toString())?.toLocal().toString(), 10) : 'N/A') : 'N/A',
-            dotKienTapId: chuyen['dot_kien_tap_id'] ?? chuyen['dotId'],
-            attendanceStatus: phieuTQ['diemDanh']?['trang_thai'] == 'CoMat' ? 'present' : (phieuTQ['diemDanh']?['trang_thai'] == 'Vang' ? 'absent' : 'none'),
-            excuseReason: phieuTQ['diemDanh']?['ghi_chu'] ?? phieuTQ['diemDanh']?['ly_do_vang'],
+            dotKienTapId: chuyen['lichKienTap']?['dot_kien_tap_id'] ?? chuyen['dot_kien_tap_id'] ?? chuyen['dotId'],
+            attendanceStatus: diemDanh['trang_thai'] == 'CoMat' ? 'present' : (diemDanh['trang_thai'] == 'Vang' ? 'absent' : 'none'),
+            excuseReason: diemDanh['ghi_chu'] ?? diemDanh['ly_do_vang'],
             prelimGrade: double.tryParse(diem['diem_chuan_bi']?.toString() ?? '0') ?? 0,
             extraGrade: double.tryParse(diem['diem_cong']?.toString() ?? '0') ?? 0,
             gvhdGrade: double.tryParse(r['diem_thu_hoach']?.toString() ?? '0') ?? 0,
@@ -1042,6 +1073,7 @@ class AppStateProviderState extends State<AppStateContainer> {
             tourId: chuyen['id']?.toString() ?? '',
             reportFileUrl: r['file_bao_cao'],
             confirmationFileUrl: r['file_xac_nhan_tham_quan'],
+            isScoreLocked: diem['da_khoa_thu_hoach'] == true || diem['da_khoa'] == true,
           );
         }).toList();
       });
@@ -1049,14 +1081,29 @@ class AppStateProviderState extends State<AppStateContainer> {
       final List<dynamic> tripsJson = await ApiService.getLedTrips(lecturerId);
       setState(() {
         _state.lecturerTours = tripsJson.map((t) {
+          final rawDate = t['ngay_tham_quan'] ?? t['ngay_khoi_hanh'];
+          final rawStart = t['gio_bat_dau'];
+          final parsedDate = rawDate != null ? DateTime.tryParse(rawDate.toString()) : null;
+          final company = t['nhaMay']?['ten_nha_may'] ?? t['ten_nha_may'];
+          final tourName = company ?? t['ten_chuyen_di'] ?? 'Chuyến tham quan';
+
+          String formattedDate = 'N/A';
+          if (parsedDate != null) {
+            formattedDate = '${parsedDate.day.toString().padLeft(2, '0')}/${parsedDate.month.toString().padLeft(2, '0')}/${parsedDate.year}';
+          }
+
           return LecturerTour(
             id: t['id'].toString(),
-            name: t['ten_chuyen_di'] ?? 'Chuyến tham quan',
-            date: t['ngay_tham_quan'] != null ? (_safeSub(t['ngay_tham_quan'], 10).isNotEmpty ? _safeSub(t['ngay_tham_quan'], 10) : 'N/A') : 'N/A',
+            name: tourName,
+            date: formattedDate,
             timeRange: '${t['gio_bat_dau'] ?? '08:00'} - ${t['gio_ket_thuc'] ?? '12:00'}',
-            registeredCount: t['so_luong_dang_ky'] ?? 0,
-            maxCount: t['so_luong_toi_da'] ?? 0,
-            status: t['trang_thai'] == 'HoanThanh' ? 'completed' : 'upcoming',
+            registeredCount: t['so_luong_dang_ky_hien_tai'] ?? t['so_luong_dang_ky'] ?? 0,
+            maxCount: t['so_luong_sinh_vien_toi_da'] ?? t['suc_chua'] ?? t['so_luong_toi_da'] ?? 0,
+            status: t['trang_thai'] == 'HoanThanh' || t['trang_thai'] == 'DaDienRa' ? 'completed' : 'upcoming',
+            rawTripDate: parsedDate,
+            rawStartTime: rawStart?.toString(),
+            rawStatus: t['trang_thai']?.toString(),
+            companyName: company?.toString(),
           );
         }).toList();
       });
@@ -1617,6 +1664,7 @@ class AppStateProviderState extends State<AppStateContainer> {
               trangThai: p['trang_thai_duyet'] ?? p['trang_thai'] ?? 'ChoDuyet',
               lyDo: p['ly_do'],
               phanHoi: p['phan_hoi'],
+              lyDoTuChoi: p['ly_do_tu_choi'] ?? p['phan_hoi'] ?? p['ly_do'],
             );
           }).toList();
         });
@@ -1644,8 +1692,6 @@ class AppStateProviderState extends State<AppStateContainer> {
             diemCong: t['diem_cong'] != null ? double.tryParse(t['diem_cong'].toString()) : null,
             diemTongChuyen: t['diem_tong_chuyen'] != null ? double.tryParse(t['diem_tong_chuyen'].toString()) : null,
             ketQua: t['ket_qua'],
-            nhanXetGvhd: t['nhan_xet_gvhd'],
-            nhanXetHoiDong: t['nhan_xet_hoi_dong'],
             daKhoaChuanBi: t['da_khoa_chuan_bi'] == true,
             daKhoaThuHoach: t['da_khoa_thu_hoach'] == true,
             daKhoaHoiDong: t['da_khoa_hoi_dong'] == true,
@@ -1682,10 +1728,10 @@ class AppStateProviderState extends State<AppStateContainer> {
             isLockedByKhoa: res['isLockedByKhoa'] == true,
             lockReason: res['lockReason'] as String?,
             canEdit: res['canEdit'] ?? !(res['isLockedByKhoa'] == true),
-            councilSessionName: council?['ten_hoi_dong'] ?? council?['tenHoiDong'] ?? council?['ten_buoi'],
-            councilRoom: council?['diaDiem'] ?? council?['phong'] ?? 'Chưa xếp phòng',
+            councilSessionName: council?['tenHoiDong'] ?? council?['ten_hoi_dong'] ?? council?['ten_buoi'],
+            councilRoom: council?['diaDiem'] ?? council?['dia_diem'] ?? council?['phong'] ?? 'Chưa xếp phòng',
             councilTime: council?['ngayBaoCao'] ?? council?['thoi_gian'] ?? council?['ngayCham'] ?? 'Chưa có lịch',
-            councilMembers: members.map((m) => (m['ho_ten'] ?? m['giangVien']?['ho_ten'])?.toString() ?? '').where((m) => m.isNotEmpty).toList(),
+            councilMembers: members.map((m) => (m['hoTen'] ?? m['ho_ten'] ?? m['giangVien']?['ho_ten'])?.toString() ?? '').where((m) => m.isNotEmpty).toList(),
           );
         });
       }
@@ -1706,8 +1752,8 @@ class AppStateProviderState extends State<AppStateContainer> {
         final list = res.map((r) {
           final sv = r['sinhVien'] ?? {};
           final phieuTQ = r['phieuThamQuan'] ?? {};
-          final diemDanh = phieuTQ['diemDanh'] ?? {};
-          final diem = phieuTQ['diemPhieuThamQuan'] ?? {};
+          final diemDanh = r['diemDanh'] ?? phieuTQ['diemDanh'] ?? {};
+          final diem = r['diemPhieuThamQuan'] ?? phieuTQ['diemPhieuThamQuan'] ?? {};
           final hoaDon = r['hoaDon'] ?? {};
 
           return TripRegistrationStudent(
@@ -1716,15 +1762,17 @@ class AppStateProviderState extends State<AppStateContainer> {
             mssv: sv['mssv'] ?? '',
             hoTen: sv['ho_ten'] ?? 'Sinh viên',
             className: sv['lop'] ?? 'N/A',
-            soDienThoai: sv['so_dien_thoai'],
+            soDienThoai: sv['so_dien_thoai'] ?? sv['sdt'],
             email: sv['email'],
             avatar: sv['avatar'] ?? '',
-            feeStatus: hoaDon['trang_thai'] ?? 'ChuaDong',
+            feeStatus: hoaDon['trang_thai'] ?? (r['trang_thai'] == 'HopLe' || r['trang_thai'] == 'DaThamGia' ? 'DaDongDungHan' : 'ChuaDong'),
             attendanceStatus: diemDanh['trang_thai'] ?? 'ChuaDiemDanh',
             excuseReason: diemDanh['ghi_chu'] ?? diemDanh['ly_do_vang'],
             prelimGrade: double.tryParse(diem['diem_chuan_bi']?.toString() ?? '0') ?? 0.0,
-            extraGrade: double.tryParse(diem['diem_cong']?.toString() ?? '0') ?? 0.0,
-            isLockedPrep: phieuTQ['is_locked_prep'] == true || phieuTQ['trang_thai_khoa_diem_chuan_bi'] == true,
+            extraGrade: double.tryParse((diem['diem_cong_final'] ?? diem['diem_cong'])?.toString() ?? '0') ?? 0.0,
+            isLockedPrep: diem['da_khoa_chuan_bi'] == true || diem['da_khoa'] == true || phieuTQ['is_locked_prep'] == true,
+            fileXacNhanUrl: r['file_xac_nhan_tham_quan'],
+            cachToChuc: r['cach_to_chuc'],
           );
         }).toList();
 
@@ -1757,6 +1805,9 @@ class AppStateProviderState extends State<AppStateContainer> {
         )).toList();
 
         final leadGv = rawLecturers.isNotEmpty ? rawLecturers[0] : null;
+        final enterpriseContact = res['enterpriseContact'] is Map ? res['enterpriseContact'] : null;
+        final enterprisePerson = enterpriseContact?['nguoi_lien_he']?.toString();
+        final enterprisePhone = enterpriseContact?['sdt_lien_he']?.toString();
 
         return TripBusInfo(
           tripId: tripId,
@@ -1767,6 +1818,8 @@ class AppStateProviderState extends State<AppStateContainer> {
           lecturerName: leadGv?['ho_ten'],
           lecturerPhone: leadGv?['so_dien_thoai'],
           students: students,
+          enterpriseContactPerson: enterprisePerson,
+          enterpriseContactPhone: enterprisePhone,
         );
       }
     } catch (e) {
@@ -1825,11 +1878,12 @@ class AppStateProviderState extends State<AppStateContainer> {
                 st['da_khoa_hoi_dong'] == true ||
                 st['isGradeLocked'] == true;
 
+            final sv = st['sinhVien'] is Map ? st['sinhVien'] : st;
             return CouncilStudentItem(
-              studentId: st['id'] ?? 0,
-              mssv: st['mssv'] ?? '',
-              hoTen: st['ho_ten'] ?? st['name'] ?? 'Sinh viên',
-              className: st['lop'] ?? 'N/A',
+              studentId: sv['id'] ?? st['id'] ?? 0,
+              mssv: sv['mssv'] ?? st['mssv'] ?? '',
+              hoTen: sv['ho_ten'] ?? sv['name'] ?? st['ho_ten'] ?? st['name'] ?? 'Sinh viên',
+              className: sv['lop'] ?? st['lop'] ?? 'N/A',
               topic: st['de_tai'] ?? st['topic'],
               trips: trips,
               isGradeLocked: isStudentLocked,
@@ -1878,7 +1932,7 @@ class AppStateProviderState extends State<AppStateContainer> {
   Future<void> lockCouncilGrade({required int boardId, int? boChuyenId}) async {
     await ApiService.lockCouncilGrade({
       'boardId': boardId,
-      'boChuyenId': ?boChuyenId,
+      if (boChuyenId != null) 'boChuyenId': boChuyenId,
     });
     if (ApiService.userId != null) {
       await fetchBoardSessions(ApiService.userId!);

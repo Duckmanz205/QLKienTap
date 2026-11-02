@@ -29,6 +29,7 @@ import {
   TaiKhoanThuHuong,
   HoiDongChamBaoCao,
   HoiDong_ThanhVien,
+  NamHoc,
 } from '../entities/qlkt.entity';
 import { R2StorageService } from '../upload/r2-storage.service';
 import { CompanyMatcher } from '../common/company-matcher.util';
@@ -84,6 +85,7 @@ export class SinhVienService {
     @InjectRepository(DanhSachDen)
     private blackListRepo: Repository<DanhSachDen>,
     @InjectRepository(LichKienTap) private lichRepo: Repository<LichKienTap>,
+    @InjectRepository(DotKienTap) private dotRepo: Repository<DotKienTap>,
     @InjectRepository(TaiKhoanThuHuong)
     private taiKhoanThuHuongRepo: Repository<TaiKhoanThuHuong>,
     private readonly r2Storage: R2StorageService,
@@ -293,7 +295,10 @@ export class SinhVienService {
       where: { sinh_vien_id: studentId },
       relations: {
         chuyenThamQuan: { nhaMay: true },
-        phieuThamQuan: { baiThuHoach: true },
+        phieuThamQuan: {
+          baiThuHoach: true,
+          diemPhieuThamQuan: { giangVienHD: true },
+        },
         hoaDon: true,
         yeuCauHuy: true,
       },
@@ -385,9 +390,32 @@ export class SinhVienService {
         throw new BadRequestException('Chuyến đi này hiện đang đóng đăng ký');
       }
 
-      const startYearStr =
-        trip.lichKienTap.dotKienTap.hocKy.namHoc.ten_nam_hoc.split('-')[0];
-      const startYear = parseInt(startYearStr, 10);
+      let startYear: number;
+      const namHocFromDot =
+        trip.lichKienTap?.dotKienTap?.hocKy?.namHoc;
+      if (namHocFromDot?.ten_nam_hoc) {
+        const startYearStr = namHocFromDot.ten_nam_hoc.split('-')[0];
+        startYear = parseInt(startYearStr, 10);
+      } else {
+        // Lịch ngoài đợt (dot_kien_tap_id IS NULL): Tìm trong bảng NamHoc theo ngay_tham_quan hoặc mốc tháng 9
+        const tripDate = new Date(trip.ngay_tham_quan);
+        const namHocDb = await manager
+          .createQueryBuilder(NamHoc, 'nh')
+          .where(':tripDate >= nh.ngay_bat_dau AND :tripDate <= nh.ngay_ket_thuc', {
+            tripDate,
+          })
+          .getOne();
+
+        if (namHocDb?.ten_nam_hoc) {
+          startYear = parseInt(namHocDb.ten_nam_hoc.split('-')[0], 10);
+        } else {
+          startYear =
+            tripDate.getMonth() + 1 >= 9
+              ? tripDate.getFullYear()
+              : tripDate.getFullYear() - 1;
+        }
+      }
+
       const studyYear = startYear - student.khoaHoc.nam_nhap_hoc + 1;
       if (studyYear < 2) {
         throw new BadRequestException(
@@ -599,9 +627,84 @@ export class SinhVienService {
 
     const saved = await this.deXuatRepo.save(deXuat);
 
+    const portalStatus = await this.getProposalPortalStatus(studentId);
+    let msg = 'Đề xuất chuyến đi tự do thành công, đang chờ CLB duyệt sơ bộ';
+    if (portalStatus.mode === 'FREE_ACCUMULATION') {
+      msg =
+        'Đề xuất chuyến đi tự do thành công (diện tích lũy ngoài đợt, bảo lưu 18 tháng), đang chờ CLB duyệt sơ bộ';
+    }
+
     return {
-      message: 'Đề xuất chuyến đi tự do thành công, đang chờ Khoa duyệt',
+      message: msg,
       chuyen: saved,
+      portalMode: portalStatus.mode,
+    };
+  }
+
+  async getProposalPortalStatus(studentId?: number) {
+    let studentDot: DotKienTap | null = null;
+
+    if (studentId) {
+      const enrollment = await this.dksvRepo.findOne({
+        where: { sinh_vien_id: studentId },
+        relations: { dotKienTap: true },
+        order: { id: 'DESC' },
+      });
+      if (enrollment?.dotKienTap) {
+        studentDot = enrollment.dotKienTap;
+      }
+    }
+
+    if (!studentDot) {
+      studentDot = await this.dotRepo.findOne({
+        where: { trang_thai: In(['DangTrienKhai', 'DangDienRa', 'Nhap']) },
+        order: { ngay_bat_dau: 'DESC' },
+      });
+    }
+
+    const isDotActive =
+      studentDot &&
+      ['DangTrienKhai', 'DangDienRa', 'Nhap'].includes(studentDot.trang_thai) &&
+      !studentDot.is_bo_chuyen_locked;
+
+    if (studentDot && isDotActive) {
+      const dotLich = await this.lichRepo.findOne({
+        where: {
+          dot_kien_tap_id: studentDot.id,
+          ten_lich: 'Lịch tiếp nhận đề xuất tự do',
+        },
+      });
+
+      if (
+        !dotLich ||
+        (dotLich.trang_thai !== 'DaKhoa' && dotLich.trang_thai !== 'DaKetThuc')
+      ) {
+        return {
+          isOpen: true,
+          mode: 'CAMPAIGN' as const,
+          dotKienTap: {
+            id: studentDot.id,
+            ten_dot: studentDot.ten_dot,
+            trang_thai: studentDot.trang_thai,
+          },
+          message: `Đang tiếp nhận đề xuất chuyến đi tự do vào ${studentDot.ten_dot}. Chuyến đi sau khi được phê duyệt sẽ được tính điểm và báo cáo trong đợt này.`,
+        };
+      }
+    }
+
+    return {
+      isOpen: true,
+      mode: 'FREE_ACCUMULATION' as const,
+      dotKienTap: studentDot
+        ? {
+            id: studentDot.id,
+            ten_dot: studentDot.ten_dot,
+            trang_thai: studentDot.trang_thai,
+          }
+        : null,
+      message: studentDot
+        ? `Lịch tiếp nhận đề xuất tự do của ${studentDot.ten_dot} đã khóa sổ. Đề xuất gửi lúc này sẽ được ghi nhận vào diện Tích lũy tự do (Ngoài đợt - Bảo lưu 18 tháng). Bạn có thể gán chuyến này vào các đợt kiến tập tương lai!`
+        : 'Hiện không có đợt kiến tập nào đang mở tiếp nhận. Đề xuất gửi lúc này sẽ được ghi nhận vào diện Tích lũy tự do (Ngoài đợt - Bảo lưu 18 tháng).',
     };
   }
 
@@ -1321,10 +1424,12 @@ export class SinhVienService {
       diem &&
       (diem.diem_chuan_bi != null ||
         diem.diem_thu_hoach != null ||
-        diem.diem_hoi_dong_final != null)
+        diem.diem_hoi_dong_final != null ||
+        diem.da_khoa_thu_hoach ||
+        diem.da_khoa)
     ) {
       throw new BadRequestException(
-        'Bài thu hoạch này đã được chấm điểm, không thể xóa để nộp lại.',
+        'Bài thu hoạch này đã được chấm điểm hoặc đã khóa sổ điểm, không thể xóa để nộp lại.',
       );
     }
 

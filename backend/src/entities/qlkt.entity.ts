@@ -383,12 +383,12 @@ export class LichKienTap {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => DotKienTap)
+  @ManyToOne(() => DotKienTap, { nullable: true })
   @JoinColumn({ name: 'dot_kien_tap_id' })
-  dotKienTap: DotKienTap;
+  dotKienTap?: DotKienTap | null;
 
-  @Column()
-  dot_kien_tap_id: number;
+  @Column({ nullable: true })
+  dot_kien_tap_id?: number | null;
 
   @ManyToOne(() => TaiKhoanThuHuong, { nullable: true })
   @JoinColumn({ name: 'tai_khoan_thu_huong_id' })

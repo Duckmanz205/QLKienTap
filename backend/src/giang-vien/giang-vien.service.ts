@@ -37,6 +37,35 @@ import { RoleDataSourceService } from '../common/role-datasource.service';
 import * as fs from 'fs';
 import * as path from 'path';
 
+function getTripStartDateTime(ngayThamQuan: Date | string, gioBatDau: any): Date {
+  const dateStr =
+    typeof ngayThamQuan === 'string'
+      ? ngayThamQuan.split('T')[0]
+      : ngayThamQuan instanceof Date
+        ? ngayThamQuan.toISOString().split('T')[0]
+        : String(ngayThamQuan);
+
+  let timeStr = '00:00:00';
+  if (typeof gioBatDau === 'string') {
+    timeStr = gioBatDau.includes('T')
+      ? gioBatDau.split('T')[1].substring(0, 8)
+      : gioBatDau;
+  } else if (gioBatDau instanceof Date) {
+    const hours = gioBatDau.getUTCHours().toString().padStart(2, '0');
+    const mins = gioBatDau.getUTCMinutes().toString().padStart(2, '0');
+    const secs = gioBatDau.getUTCSeconds().toString().padStart(2, '0');
+    timeStr = `${hours}:${mins}:${secs}`;
+  }
+
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const timeParts = timeStr.split(':').map(Number);
+  const hours = timeParts[0] || 0;
+  const minutes = timeParts[1] || 0;
+  const seconds = timeParts[2] || 0;
+
+  return new Date(year, month - 1, day, hours, minutes, seconds);
+}
+
 @Injectable()
 export class GiangVienService implements OnModuleInit {
   constructor(
@@ -160,7 +189,7 @@ export class GiangVienService implements OnModuleInit {
     const phieus = await this.phieuRepo.find({
       where: {
         chuyen_tham_quan_id: tripId,
-        trang_thai: In(['HopLe', 'ChoDuyet', 'DaThamGia', 'VangMat']),
+        trang_thai: In(['HopLe', 'DaThamGia', 'VangMat']),
       },
       relations: { sinhVien: true },
     });
@@ -282,6 +311,20 @@ export class GiangVienService implements OnModuleInit {
         throw new BadRequestException('Không thể điểm danh chuyến tham quan đã bị hủy');
       }
 
+      // Kiểm tra thời gian bắt đầu của chuyến tham quan
+      const tripStartDate = getTripStartDateTime(trip.ngay_tham_quan, trip.gio_bat_dau);
+      const now = new Date();
+      if (now < tripStartDate) {
+        const dayStr = tripStartDate.getDate().toString().padStart(2, '0');
+        const monthStr = (tripStartDate.getMonth() + 1).toString().padStart(2, '0');
+        const yearStr = tripStartDate.getFullYear();
+        const hoursStr = tripStartDate.getHours().toString().padStart(2, '0');
+        const minsStr = tripStartDate.getMinutes().toString().padStart(2, '0');
+        throw new BadRequestException(
+          `Chưa đến thời gian bắt đầu chuyến tham quan (${hoursStr}:${minsStr} ngày ${dayStr}/${monthStr}/${yearStr}). Không thể thực hiện điểm danh.`,
+        );
+      }
+
       // 3b. Kiểm tra quyền giảng viên dẫn đoàn trong transaction
       const isLead = await manager.findOne(PhanCongGiangVienDanDoan, {
         where: { chuyen_tham_quan_id: tripId, giang_vien_id: lecturerId },
@@ -306,6 +349,11 @@ export class GiangVienService implements OnModuleInit {
         if (phieu.chuyen_tham_quan_id !== tripId) {
           throw new BadRequestException(
             `Phiếu đăng ký #${phieu.id} không thuộc chuyến tham quan này`,
+          );
+        }
+        if (!['HopLe', 'DaThamGia', 'VangMat'].includes(phieu.trang_thai)) {
+          throw new BadRequestException(
+            `Phiếu đăng ký #${phieu.id} chưa được duyệt tham gia chuyến tham quan`,
           );
         }
         phieuMap.set(phieu.id, phieu);
@@ -670,7 +718,7 @@ export class GiangVienService implements OnModuleInit {
     const phieus = await this.phieuRepo.find({
       where: {
         chuyen_tham_quan_id: tripId,
-        trang_thai: In(['HopLe', 'ChoDuyet', 'DaThamGia', 'VangMat']),
+        trang_thai: In(['HopLe', 'DaThamGia', 'VangMat']),
       },
       relations: { sinhVien: true },
     });
@@ -1910,21 +1958,38 @@ export class GiangVienService implements OnModuleInit {
       );
     }
 
-    const reports = await this.baiThuRepo
+    const qb = this.baiThuRepo
       .createQueryBuilder('baiThu')
       .leftJoinAndSelect('baiThu.phieuThamQuan', 'phieuTQ')
       .leftJoinAndSelect('phieuTQ.phieuDangKy', 'phieu')
+      .leftJoinAndSelect('phieu.chuyenThamQuan', 'chuyen')
+      .leftJoinAndSelect('chuyen.lichKienTap', 'lich')
+      .leftJoinAndSelect('phieuTQ.boChuyenBaoCao', 'bo')
+      .leftJoinAndSelect('bo.dotKienTapSinhVien', 'dksvBo')
       .leftJoinAndSelect('phieuTQ.diemPhieuThamQuan', 'diem')
-      .where('phieu.sinh_vien_id IN (:...guidedSvIds)', { guidedSvIds })
-      .getMany();
+      .where('phieu.sinh_vien_id IN (:...guidedSvIds)', { guidedSvIds });
 
-    if (reports.length === 0) {
+    const allReports = await qb.getMany();
+
+    if (allReports.length === 0) {
       throw new BadRequestException(
         'Chưa có bài thu hoạch nào được nộp bởi các sinh viên bạn hướng dẫn',
       );
     }
 
-    const unGraded = reports.filter(
+    // 1. Lọc danh sách bài thu hoạch BẮT BUỘC phải chấm trong đợt này:
+    // Thuộc lịch của đợt này HOẶC đã được sinh viên đưa vào BoChuyenBaoCao của đợt này
+    const mandatoryReports = dotKienTapId
+      ? allReports.filter((r) => {
+          const tripDotId =
+            r.phieuThamQuan?.phieuDangKy?.chuyenThamQuan?.lichKienTap?.dot_kien_tap_id;
+          const boDotId =
+            r.phieuThamQuan?.boChuyenBaoCao?.dotKienTapSinhVien?.dot_kien_tap_id;
+          return tripDotId === dotKienTapId || boDotId === dotKienTapId;
+        })
+      : allReports;
+
+    const unGraded = mandatoryReports.filter(
       (r) =>
         !r.phieuThamQuan?.diemPhieuThamQuan ||
         r.phieuThamQuan.diemPhieuThamQuan.diem_thu_hoach === null ||
@@ -1933,23 +1998,34 @@ export class GiangVienService implements OnModuleInit {
 
     if (unGraded.length > 0) {
       throw new BadRequestException(
-        `Còn ${unGraded.length} bài thu hoạch chưa được chấm điểm. Vui lòng chấm hết trước khi nộp lên Khoa.`,
+        `Còn ${unGraded.length} bài thu hoạch thuộc đợt/bộ chuyến báo cáo chưa được chấm điểm. Vui lòng chấm hết trước khi nộp lên Khoa.`,
       );
     }
 
+    // 2. Khóa điểm: Khóa TẤT CẢ các bài bắt buộc trong đợt,
+    // ĐỒNG THỜI nếu có bài ngoài đợt mà GVHD ĐÃ chấm (diem_thu_hoach IS NOT NULL),
+    // cũng khóa luôn da_khoa_thu_hoach = true theo yêu cầu.
     const now = new Date();
     const toSave: DiemPhieuThamQuan[] = [];
 
-    for (const r of reports) {
-      let d = r.phieuThamQuan?.diemPhieuThamQuan;
-      if (!d) {
-        d = new DiemPhieuThamQuan();
-        d.phieu_tham_quan_id = r.phieu_tham_quan_id;
-        d.giang_vien_hd_id = lecturerId;
+    for (const r of allReports) {
+      const isMandatory = mandatoryReports.includes(r);
+      const isGraded =
+        r.phieuThamQuan?.diemPhieuThamQuan &&
+        r.phieuThamQuan.diemPhieuThamQuan.diem_thu_hoach !== null &&
+        r.phieuThamQuan.diemPhieuThamQuan.diem_thu_hoach !== undefined;
+
+      if (isMandatory || isGraded) {
+        let d = r.phieuThamQuan?.diemPhieuThamQuan;
+        if (!d) {
+          d = new DiemPhieuThamQuan();
+          d.phieu_tham_quan_id = r.phieu_tham_quan_id;
+          d.giang_vien_hd_id = lecturerId;
+        }
+        d.da_khoa_thu_hoach = true;
+        d.ngay_khoa_thu_hoach = now;
+        toSave.push(d);
       }
-      d.da_khoa_thu_hoach = true;
-      d.ngay_khoa_thu_hoach = now;
-      toSave.push(d);
     }
 
     await this.diemPhieuRepo.save(toSave);

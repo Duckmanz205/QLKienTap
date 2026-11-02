@@ -991,21 +991,21 @@ export default function RegistrationManagement_Khoa() {
                           <tr><td colSpan="5" className="text-center py-8 text-slate-500 font-medium">Không tìm thấy đăng ký nào phù hợp.</td></tr>
                         ) : (
                           paginatedRegs.map(r => (
-                            <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
+                            <tr 
+                              key={r.id} 
+                              onClick={() => setViewingDetail(r)}
+                              className="hover:bg-slate-50 transition-colors cursor-pointer group"
+                            >
                               <td className="p-4 pl-6 font-mono font-bold text-[#407F3E]">{r.sinhVien?.mssv}</td>
-                              <td className="p-4 font-bold text-slate-800">{r.sinhVien?.ho_ten}</td>
+                              <td className="p-4 font-bold text-slate-800 group-hover:text-[#407F3E] group-hover:underline">{r.sinhVien?.ho_ten}</td>
                               <td className="p-4 font-medium text-slate-500">{new Date(r.ngay_dang_ky).toLocaleDateString('vi-VN')}</td>
                               <td className="p-4 text-center">
                                 {getStatusBadge(statusMap[r.trang_thai] || r.trang_thai)}
                               </td>
-                              <td className="p-4 text-right pr-6">
-                                <button 
-                                  className="p-1.5 text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer" 
-                                  title="Chi tiết"
-                                  onClick={() => setViewingDetail(r)}
-                                >
-                                  <ChevronRight className="w-5 h-5" />
-                                </button>
+                              <td className="p-4 text-right pr-6" onClick={(e) => e.stopPropagation()}>
+                                <span className="text-xs text-slate-400 group-hover:text-[#407F3E] font-medium transition-colors">
+                                  Chi tiết &rarr;
+                                </span>
                               </td>
                             </tr>
                           ))
@@ -1231,14 +1231,18 @@ export default function RegistrationManagement_Khoa() {
                               const isAccepted = selectedStudentIds.has(studentId);
 
                               return (
-                                <tr key={r.id} className="hover:bg-slate-50/70 transition-colors">
+                                <tr 
+                                  key={r.id} 
+                                  onClick={() => setViewingDetail(r)}
+                                  className="hover:bg-slate-50/70 transition-colors cursor-pointer group"
+                                >
                                   <td className="py-3 pl-4 pr-2 text-center text-slate-500 font-medium">
                                     {(validCurrentPageChot - 1) * limitChot + idx + 1}
                                   </td>
                                   <td className="py-3 px-3 font-mono font-bold text-[#407F3E] whitespace-nowrap">
                                     {r.sinhVien?.mssv}
                                   </td>
-                                  <td className="py-3 px-3 font-bold text-slate-800 whitespace-nowrap">
+                                  <td className="py-3 px-3 font-bold text-slate-800 group-hover:text-[#407F3E] group-hover:underline whitespace-nowrap">
                                     {r.sinhVien?.ho_ten}
                                   </td>
                                   <td className="py-3 px-3 font-medium text-slate-600 whitespace-nowrap">
@@ -1268,11 +1272,11 @@ export default function RegistrationManagement_Khoa() {
                                   <td className="py-3 px-3 font-medium text-slate-500 text-center text-xs whitespace-nowrap">
                                     {r.ngay_dang_ky ? new Date(r.ngay_dang_ky).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }) : '--'}
                                   </td>
-                                  <td className="py-3 pr-6 pl-3 text-right">
+                                  <td className="py-3 pr-6 pl-3 text-right" onClick={(e) => e.stopPropagation()}>
                                     {selectedTripForReg?.trang_thai !== 'DaDienRa' && (
                                       isAccepted ? (
                                         <button 
-                                          onClick={() => moveStudent(studentId, false)}
+                                          onClick={(e) => { e.stopPropagation(); moveStudent(studentId, false); }}
                                           className="px-3 py-1.5 bg-[#E68A8C]/10 text-[#E68A8C] hover:bg-[#E68A8C]/20 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1 ml-auto cursor-pointer"
                                           title="Chuyển sang danh sách bị loại"
                                         >
@@ -1280,7 +1284,7 @@ export default function RegistrationManagement_Khoa() {
                                         </button>
                                       ) : (
                                         <button 
-                                          onClick={() => moveStudent(studentId, true)}
+                                          onClick={(e) => { e.stopPropagation(); moveStudent(studentId, true); }}
                                           className="px-3 py-1.5 bg-[#407F3E]/10 text-[#407F3E] hover:bg-[#407F3E]/20 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1 ml-auto cursor-pointer"
                                           title="Chuyển vào danh sách hợp lệ"
                                         >

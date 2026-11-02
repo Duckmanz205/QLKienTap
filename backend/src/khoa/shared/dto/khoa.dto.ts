@@ -208,9 +208,10 @@ export class CreateScheduleDto {
   @IsNotEmpty({ message: 'Tên lịch không được để trống' })
   ten_lich: string;
 
+  @IsOptional()
   @IsInt()
   @Min(1)
-  dot_kien_tap_id: number;
+  dot_kien_tap_id?: number | null;
 
   @IsInt()
   @Min(1)
@@ -379,6 +380,30 @@ export class ApproveTripDto {
   @IsArray()
   gopCacPhieuDeXuatIds?: number[];
 }
+
+export class BatchApproveProposalsDto {
+  @IsArray()
+  @IsInt({ each: true })
+  proposalIds: number[];
+
+  @IsBoolean()
+  isApproved: boolean;
+
+  @IsOptional()
+  @IsInt()
+  approverId?: number;
+}
+
+export class BatchRejectProposalsDto {
+  @IsArray()
+  @IsInt({ each: true })
+  proposalIds: number[];
+
+  @IsOptional()
+  @IsInt()
+  approverId?: number;
+}
+
 
 export class ApproveCancelDto {
   @IsOptional()

@@ -217,6 +217,186 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
     }
   }
 
+  void _showFeedbackDialog(BuildContext context, Submission sub) {
+    final score = sub.reportScore;
+    final isPassed = score != null && score >= 5.0;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.rate_review_outlined, color: AppColors.primary, size: 24),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Nhận xét từ Giảng viên HD',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.darkSlate),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        sub.tripName,
+                        style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            
+            // Score Banner
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isPassed ? const Color(0xFFF0FDF4) : const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isPassed ? const Color(0xFFBBF7D0) : const Color(0xFFFECACA),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('ĐIỂM BÀI THU HOẠCH', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textMuted)),
+                      const SizedBox(height: 4),
+                      Text(
+                        score != null ? score.toStringAsFixed(1) : '--',
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w900,
+                          color: isPassed ? const Color(0xFF16A34A) : AppColors.danger,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: isPassed ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      isPassed ? 'Đạt yêu cầu' : 'Chưa đạt yêu cầu',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: isPassed ? const Color(0xFF15803D) : AppColors.danger,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Detailed comment box
+            const Text('Lời phê / Góp ý chi tiết:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.darkSlate)),
+            const SizedBox(height: 8),
+            Container(
+              constraints: const BoxConstraints(minHeight: 90),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Text(
+                (sub.gvhdComment != null && sub.gvhdComment!.trim().isNotEmpty)
+                    ? sub.gvhdComment!
+                    : 'Giảng viên không để lại lời phê văn bản cho bài thu hoạch này.',
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.4,
+                  fontStyle: (sub.gvhdComment != null && sub.gvhdComment!.trim().isNotEmpty) ? FontStyle.normal : FontStyle.italic,
+                  color: (sub.gvhdComment != null && sub.gvhdComment!.trim().isNotEmpty) ? AppColors.darkSlate : Colors.grey.shade500,
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // Grader info & date
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.person_outline, size: 14, color: AppColors.textMuted),
+                    const SizedBox(width: 4),
+                    Text(
+                      sub.gvhdName ?? 'Giảng viên hướng dẫn',
+                      style: const TextStyle(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+                if (sub.gradedAt != null)
+                  Row(
+                    children: [
+                      const Icon(Icons.event_available, size: 14, color: AppColors.textMuted),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Chấm ngày: ${sub.gradedAt}',
+                        style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text('ĐÓNG', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final appStateProvider = AppStateProvider.of(context);
@@ -490,6 +670,8 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
 
         final isUploadingReport = _uploadingReports[sub.id] ?? false;
         final isUploadingConfirm = _uploadingConfirms[sub.id] ?? false;
+        final isGraded = sub.isGraded;
+        final canDelete = isUploaded && !sub.isScoreLocked && !isGraded;
 
         return Card(
           margin: const EdgeInsets.only(bottom: 16),
@@ -507,28 +689,103 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        sub.status,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: statusColor == AppColors.warning ? AppColors.darkSlate : statusColor,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isGraded) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            margin: const EdgeInsets.only(right: 6),
+                            decoration: BoxDecoration(
+                              color: (sub.reportScore! >= 5.0 ? AppColors.secondary : AppColors.danger).withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '${sub.reportScore!.toStringAsFixed(1)} đ',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                                color: sub.reportScore! >= 5.0 ? AppColors.secondary : AppColors.danger,
+                              ),
+                            ),
+                          ),
+                        ],
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            sub.status,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: statusColor == AppColors.warning ? AppColors.darkSlate : statusColor,
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ],
                 ),
                 const SizedBox(height: 6),
-                Text(
-                  '${sub.typeText} • ${sub.dateText}',
-                  style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${sub.typeText} • ${sub.dateText}',
+                        style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                      ),
+                    ),
+                    if (sub.deadlineText != null) ...[
+                      const Icon(Icons.schedule, size: 12, color: AppColors.textMuted),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Hạn: ${sub.deadlineText}',
+                        style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ],
                 ),
+
+                if (isGraded || (sub.gvhdComment != null && sub.gvhdComment!.isNotEmpty)) ...[
+                  const SizedBox(height: 10),
+                  InkWell(
+                    onTap: () => _showFeedbackDialog(context, sub),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.rate_review_outlined, size: 16, color: AppColors.primary),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              sub.gvhdComment != null && sub.gvhdComment!.isNotEmpty
+                                  ? 'Lời phê GV: "${sub.gvhdComment}"'
+                                  : 'Đã có điểm bài thu hoạch. Bấm để xem chi tiết.',
+                              style: const TextStyle(fontSize: 11, color: AppColors.darkSlate),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          const Text(
+                            'Xem nhận xét >',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+
                 const Divider(height: 24),
 
                 _buildUploadDropzone(
@@ -545,9 +802,15 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
                           }
                         }
                       : null,
-                  onDeleteTap: isUploaded ? () => _confirmDeleteReport(sub) : null,
+                  onDeleteTap: canDelete ? () => _confirmDeleteReport(sub) : null,
                   onTap: () async {
                     if (isUploadingReport) return;
+                    if (sub.isScoreLocked || isGraded) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Bài thu hoạch đã được chấm/khóa, không thể tải lên tệp mới.')),
+                      );
+                      return;
+                    }
                     try {
                       final pickerResult = await FilePicker.pickFiles(
                         type: FileType.custom,

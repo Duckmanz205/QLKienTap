@@ -469,13 +469,14 @@ export default function HoiDongChamBaoCao_Khoa() {
   };
 
   const loadAvailableStudents = async (dotKienTapId) => {
-    if (!dotKienTapId) return;
+    if (!dotKienTapId || isFetchingStudents) return;
     setIsFetchingStudents(true);
     try {
       const res = await khoaApi.getAvailableStudentsForBoard(dotKienTapId);
       setAvailableStudents(res.data || []);
     } catch (err) {
-      console.error(err);
+      console.error('Lỗi tải sinh viên khả dụng:', err);
+      toast.error('Lỗi khi tải danh sách sinh viên khả dụng cho hội đồng');
     } finally {
       setIsFetchingStudents(false);
     }
@@ -1806,7 +1807,7 @@ export default function HoiDongChamBaoCao_Khoa() {
                   type="button"
                   onClick={() => {
                     setDetailActiveTab('assign');
-                    if (availableStudents.length === 0 && viewingDetail?.dot_kien_tap_id) {
+                    if (!isFetchingStudents && availableStudents.length === 0 && viewingDetail?.dot_kien_tap_id) {
                       loadAvailableStudents(viewingDetail.dot_kien_tap_id);
                     }
                   }}
@@ -1856,7 +1857,7 @@ export default function HoiDongChamBaoCao_Khoa() {
                         type="button"
                         onClick={() => {
                           setDetailActiveTab('assign');
-                          if (availableStudents.length === 0 && viewingDetail?.dot_kien_tap_id) {
+                          if (!isFetchingStudents && availableStudents.length === 0 && viewingDetail?.dot_kien_tap_id) {
                             loadAvailableStudents(viewingDetail.dot_kien_tap_id);
                           }
                         }}
@@ -2054,15 +2055,25 @@ export default function HoiDongChamBaoCao_Khoa() {
                       <Users className="w-10 h-10 text-slate-300 mx-auto mb-2" />
                       <p className="text-slate-700 font-bold text-sm">Không còn sinh viên nào chưa được phân công</p>
                       <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
-                        Tất cả sinh viên có bộ 3 chuyến trong đợt này đã được phân công vào các hội đồng chấm báo cáo.
+                        Tất cả sinh viên có bộ 3 chuyến trong đợt này đã được phân công vào các hội đồng chấm báo cáo, hoặc chưa có sinh viên nào chọn đủ bộ 3 chuyến.
                       </p>
-                      <button
-                        type="button"
-                        onClick={() => setDetailActiveTab('list')}
-                        className="mt-4 px-4 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold transition-all cursor-pointer"
-                      >
-                        Quay lại danh sách hội đồng
-                      </button>
+                      <div className="flex items-center justify-center gap-2 mt-4">
+                        <button
+                          type="button"
+                          onClick={() => loadAvailableStudents(viewingDetail?.dot_kien_tap_id)}
+                          className="px-4 py-2 border border-[#407F3E] text-[#407F3E] bg-emerald-50/50 hover:bg-emerald-50 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 transition-all cursor-pointer"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          <span>Tải lại danh sách</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDetailActiveTab('list')}
+                          className="px-4 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+                        >
+                          Quay lại danh sách hội đồng
+                        </button>
+                      </div>
                     </div>
                   ) : filteredAvailableStudents.length === 0 ? (
                     <div className="text-center py-10 px-4 border border-dashed border-slate-200 rounded-xl bg-slate-50/50">

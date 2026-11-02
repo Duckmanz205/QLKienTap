@@ -63,6 +63,14 @@ export default function ChuyenThamQuan_DSLoc() {
   const [diaDiemTapTrung, setDiaDiemTapTrung] = useState('');
   const [hanDongLePhi, setHanDongLePhi] = useState('');
 
+  const getTodayStr = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   // Toast Popup State
   const [popup, setPopup] = useState({ show: false, message: '', type: 'success' });
   const showPopup = (message, type = 'success') => {
@@ -109,6 +117,14 @@ export default function ChuyenThamQuan_DSLoc() {
   const [approvalMode, setApprovalMode] = useState('new'); // 'new' | 'merge_existing'
   const [selectedMergeTripId, setSelectedMergeTripId] = useState(null);
   const [selectedBatchProposalIds, setSelectedBatchProposalIds] = useState([]);
+
+  // State Quản lý Khoa phê duyệt gộp chuyến (Cơ chế 2)
+  const [isKhoaMergeModalOpen, setIsKhoaMergeModalOpen] = useState(false);
+  const [pendingKhoaMergeProposal, setPendingKhoaMergeProposal] = useState(null);
+  const [selectedKhoaBatchProposalIds, setSelectedKhoaBatchProposalIds] = useState([]);
+
+  // State chọn hàng loạt đề xuất tự do (Tab 2)
+  const [selectedProposalIds, setSelectedProposalIds] = useState([]);
 
   const isLecturerBusyOnDate = useCallback((lecturerId, dateStr) => {
     if (!dateStr || !lecturerId) return false;
@@ -226,6 +242,15 @@ export default function ChuyenThamQuan_DSLoc() {
     e.preventDefault();
     if (!selectedNhaMay || !selectedHinhThuc || !ngay || !gioBatDau || !sucChua) {
       showPopup("Vui lòng điền đầy đủ thông tin", "error");
+      return;
+    }
+
+    const selectedTripDate = new Date(ngay);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tripDay = new Date(selectedTripDate.getFullYear(), selectedTripDate.getMonth(), selectedTripDate.getDate());
+    if (tripDay < today) {
+      showPopup("Ngày tham quan không được là ngày trong quá khứ!", "error");
       return;
     }
 
@@ -450,11 +475,68 @@ export default function ChuyenThamQuan_DSLoc() {
       setIsKhoaConfirmModalOpen(false);
       setPendingApprovalTripId(null);
       setPendingApprovalTrip(null);
+      setSelectedProposalIds([]);
       fetchTrips();
     } catch (err) {
       console.error(err);
       showPopup(err.response?.data?.message || 'Có lỗi xảy ra khi xử lý yêu cầu phê duyệt', 'error');
     }
+  };
+
+  // Quản lý Khoa: Phê duyệt gộp chuyến tham quan tự do (Cơ chế 2)
+  const otherMergeProposalsForKhoa = useMemo(() => {
+    if (!pendingKhoaMergeProposal || !pendingKhoaMergeProposal.chuyen_tham_quan_id) return [];
+    return tripsTuDo.filter(p => 
+      p.id !== pendingKhoaMergeProposal.id &&
+      p.chuyen_tham_quan_id === pendingKhoaMergeProposal.chuyen_tham_quan_id &&
+      p.trang_thai_duyet === 'ChoKhoaDuyetGop'
+    );
+  }, [pendingKhoaMergeProposal, tripsTuDo]);
+
+  const handleOpenKhoaMergeModal = (proposal) => {
+    setPendingKhoaMergeProposal(proposal);
+    setSelectedKhoaBatchProposalIds([]);
+    setIsKhoaMergeModalOpen(true);
+  };
+
+  const submitKhoaMergeApprove = async () => {
+    if (!pendingKhoaMergeProposal) return;
+    try {
+      const res = await khoaApi.approveTrip({
+        tripId: pendingKhoaMergeProposal.id,
+        approverId: currentUser.id,
+        isApproved: true,
+        gopCacPhieuDeXuatIds: selectedKhoaBatchProposalIds.length > 0 ? selectedKhoaBatchProposalIds : undefined,
+      });
+      showPopup(res.data?.message || 'Khoa đã phê duyệt gộp sinh viên vào chuyến tham quan thành công', 'success');
+      setIsKhoaMergeModalOpen(false);
+      setPendingKhoaMergeProposal(null);
+      setSelectedKhoaBatchProposalIds([]);
+      setSelectedProposalIds([]);
+      fetchTrips();
+    } catch (err) {
+      console.error(err);
+      showPopup(err.response?.data?.message || 'Có lỗi xảy ra khi duyệt gộp chuyến', 'error');
+    }
+  };
+
+  const handleRejectKhoaMerge = (proposal) => {
+    const action = async () => {
+      try {
+        const res = await khoaApi.approveTrip({
+          tripId: proposal.id,
+          approverId: currentUser.id,
+          isApproved: false,
+        });
+        showPopup(res.data?.message || 'Khoa đã từ chối gộp đề xuất vào chuyến tham quan', 'success');
+        if (isKhoaMergeModalOpen) setIsKhoaMergeModalOpen(false);
+        fetchTrips();
+      } catch (err) {
+        console.error(err);
+        showPopup(err.response?.data?.message || 'Có lỗi xảy ra khi từ chối gộp', 'error');
+      }
+    };
+    showConfirm('Xác nhận từ chối gộp', `Bạn có chắc chắn muốn từ chối gộp đề xuất của sinh viên ${proposal.sinhVien?.ho_ten || ''}?`, action);
   };
 
   // Xác nhận Duyệt Sơ Bộ từ CLB (Hỗ trợ Tạo mới hoặc Gộp vào chuyến tự do đã có)
@@ -476,6 +558,7 @@ export default function ChuyenThamQuan_DSLoc() {
         setIsLecturerModalOpen(false);
         setSelectedMergeTripId(null);
         setSelectedBatchProposalIds([]);
+        setSelectedProposalIds([]);
         setSelectedLecturerId('');
         setPendingApprovalTripId(null);
         setPendingApprovalTrip(null);
@@ -509,6 +592,7 @@ export default function ChuyenThamQuan_DSLoc() {
       setIsLecturerModalOpen(false);
       setSelectedMergeTripId(null);
       setSelectedBatchProposalIds([]);
+      setSelectedProposalIds([]);
       setSelectedLecturerId('');
       setPendingApprovalTripId(null);
       setPendingApprovalTrip(null);
@@ -521,6 +605,101 @@ export default function ChuyenThamQuan_DSLoc() {
       }
       showPopup(errMsg || 'Có lỗi xảy ra khi xử lý yêu cầu', 'error');
     }
+  };
+
+  // Batch Actions cho CLB
+  const handleOpenCLBBatchApproveModal = () => {
+    if (selectedProposalIds.length === 0) return;
+    const selectedProposals = tripsTuDo.filter(t => selectedProposalIds.includes(t.id));
+    if (selectedProposals.length === 0) return;
+
+    const first = selectedProposals[0];
+    const remainingIds = selectedProposalIds.filter(id => id !== first.id);
+
+    setPendingApprovalTrip(first);
+    setPendingApprovalTripId(first.id);
+
+    const initialGvId = first?.giang_vien_id || first?.giangVien?.id;
+    const isInitialBusy = initialGvId && isLecturerBusyOnDate(initialGvId, first?.ngay_tham_quan_de_xuat);
+    setSelectedLecturerId(isInitialBusy ? '' : (initialGvId ? String(initialGvId) : ''));
+    setLecturerSearchTerm('');
+    setApprovalMode('new');
+    setSelectedMergeTripId(null);
+    setSelectedBatchProposalIds(remainingIds);
+    setMatchingTripsData([]);
+    setOtherPendingProposalsData([]);
+    fetchMatchingTrips(first.id);
+    setIsLecturerModalOpen(true);
+  };
+
+  const handleCLBBatchReject = () => {
+    if (selectedProposalIds.length === 0) return;
+    const count = selectedProposalIds.length;
+    const action = async () => {
+      try {
+        const res = await khoaApi.batchRejectProposals({ proposalIds: selectedProposalIds });
+        showPopup(res.data?.message || `CLB đã từ chối thành công ${count} đề xuất`, 'success');
+        setSelectedProposalIds([]);
+        fetchTrips();
+      } catch (err) {
+        console.error(err);
+        showPopup(err.response?.data?.message || 'Có lỗi xảy ra khi từ chối hàng loạt', 'error');
+      }
+    };
+    showConfirm(
+      'Xác nhận từ chối hàng loạt',
+      `Bạn có chắc chắn muốn từ chối ${count} đề xuất chuyến tham quan tự do đã chọn?`,
+      action
+    );
+  };
+
+  // Batch Actions cho Quản lý Khoa
+  const handleKhoaBatchApprove = () => {
+    if (selectedProposalIds.length === 0) return;
+    const count = selectedProposalIds.length;
+    const action = async () => {
+      try {
+        const res = await khoaApi.batchApproveProposals({
+          proposalIds: selectedProposalIds,
+          isApproved: true,
+        });
+        showPopup(res.data?.message || `Khoa đã phê duyệt thành công ${count} đề xuất`, 'success');
+        setSelectedProposalIds([]);
+        fetchTrips();
+      } catch (err) {
+        console.error(err);
+        showPopup(err.response?.data?.message || 'Có lỗi xảy ra khi phê duyệt hàng loạt', 'error');
+      }
+    };
+    showConfirm(
+      'Xác nhận phê duyệt hàng loạt',
+      `Bạn có chắc chắn muốn phê duyệt chính thức ${count} đề xuất chuyến tham quan tự do đã chọn? Hệ thống sẽ kích hoạt chuyến và cấp vé tham quan cho sinh viên.`,
+      action
+    );
+  };
+
+  const handleKhoaBatchReject = () => {
+    if (selectedProposalIds.length === 0) return;
+    const count = selectedProposalIds.length;
+    const action = async () => {
+      try {
+        const res = await khoaApi.batchApproveProposals({
+          proposalIds: selectedProposalIds,
+          isApproved: false,
+        });
+        showPopup(res.data?.message || `Khoa đã từ chối thành công ${count} đề xuất`, 'success');
+        setSelectedProposalIds([]);
+        fetchTrips();
+      } catch (err) {
+        console.error(err);
+        showPopup(err.response?.data?.message || 'Có lỗi xảy ra khi từ chối hàng loạt', 'error');
+      }
+    };
+    showConfirm(
+      'Xác nhận từ chối hàng loạt',
+      `Bạn có chắc chắn muốn từ chối ${count} đề xuất chuyến tham quan tự do đã chọn?`,
+      action
+    );
   };
 
   // Close all dropdowns
@@ -634,7 +813,7 @@ export default function ChuyenThamQuan_DSLoc() {
           Đề xuất chuyến tự do
           <span className="bg-[#DBD468] text-slate-800 text-[10px] px-1.5 py-0.5 rounded-full font-bold shadow-sm">
             {isAdmin
-              ? tripsTuDo.filter(t => t.trang_thai_duyet === 'ChoKhoaDuyet').length
+              ? tripsTuDo.filter(t => (t.trang_thai_duyet === 'ChoKhoaDuyet' || t.trang_thai_duyet === 'ChoKhoaDuyetGop') && t.trang_thai_duyet !== 'ChoDuyet').length
               : tripsTuDo.filter(t => t.trang_thai_duyet === 'ChoDuyet').length}
           </span>
           {activeTab === 'tudo' && (
@@ -976,13 +1155,22 @@ export default function ChuyenThamQuan_DSLoc() {
 
             {/* Popover Filter Trạng thái Tab 2 */}
             <SearchableDropdown
-              options={[
-                { value: 'ALL', label: 'Tất cả trạng thái' },
-                { value: 'ChoDuyet', label: 'Chờ CLB duyệt' },
-                { value: 'ChoKhoaDuyet', label: 'Chờ Khoa duyệt' },
-                { value: 'DaDuyet', label: 'Đã duyệt' },
-                { value: 'TuChoi', label: 'Từ chối' },
-              ]}
+              options={
+                isAdmin
+                  ? [
+                      { value: 'ALL', label: 'Tất cả trạng thái' },
+                      { value: 'ChoKhoaDuyet', label: 'Chờ Khoa duyệt chuyến mới' },
+                      { value: 'ChoKhoaDuyetGop', label: 'Chờ Khoa duyệt gộp' },
+                      { value: 'DaDuyet', label: 'Đã duyệt' },
+                      { value: 'TuChoi', label: 'Từ chối' },
+                    ]
+                  : [
+                      { value: 'ALL', label: 'Tất cả trạng thái' },
+                      { value: 'ChoDuyet', label: 'Chờ CLB duyệt' },
+                      { value: 'DaDuyet', label: 'Đã duyệt' },
+                      { value: 'TuChoi', label: 'Từ chối' },
+                    ]
+              }
               value={filterStatusTuDo}
               onChange={(val) => {
                 setFilterStatusTuDo(val);
@@ -995,7 +1183,11 @@ export default function ChuyenThamQuan_DSLoc() {
           </div>
 
           {(() => {
-            const filteredTripsTuDo = tripsTuDo.filter(t => {
+            const baseTripsTuDo = isAdmin
+              ? tripsTuDo.filter(t => t.trang_thai_duyet !== 'ChoDuyet')
+              : tripsTuDo;
+
+            const filteredTripsTuDo = baseTripsTuDo.filter(t => {
               const sv = t.sinhVien || {};
               const factory = t.ten_nha_may_de_xuat || t.nhaMay?.ten_nha_may || '';
               const matchSearch = (sv.ho_ten || '').toLowerCase().includes(searchQueryTuDo.toLowerCase()) ||
@@ -1009,29 +1201,147 @@ export default function ChuyenThamQuan_DSLoc() {
             const validCurrentPageTuDo = Math.min(currentPageTuDo, totalPagesTuDo);
             const paginatedTripsTuDo = filteredTripsTuDo.slice((validCurrentPageTuDo - 1) * limitTuDo, validCurrentPageTuDo * limitTuDo);
 
+            const isProposalSelectable = (t) => {
+              if (isAdmin) {
+                return t.trang_thai_duyet === 'ChoKhoaDuyet' || t.trang_thai_duyet === 'ChoKhoaDuyetGop';
+              }
+              return t.trang_thai_duyet === 'ChoDuyet';
+            };
+
+            const selectableOnPage = paginatedTripsTuDo.filter(isProposalSelectable);
+            const isAllPageSelected = selectableOnPage.length > 0 && selectableOnPage.every(t => selectedProposalIds.includes(t.id));
+            const isSomePageSelected = selectableOnPage.some(t => selectedProposalIds.includes(t.id));
+
             return (
-              <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse min-w-[900px]">
-                    <thead>
-                      <tr className="bg-[#E7E0C4] text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
-                        <th className="p-4 pl-6">Sinh viên đề xuất</th>
-                        <th className="p-4">Nhà máy đề xuất</th>
-                        <th className="p-4">Ngày tham quan</th>
-                        <th className="p-4">Trạng thái</th>
-                        <th className="p-4 text-right pr-6">Thao tác</th>
-                      </tr>
-                    </thead>
-                    <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
-                      {paginatedTripsTuDo.map(t => (
-                        <tr key={t.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="p-4 pl-6">
-                            <div className="flex items-center gap-3">
-                              <div>
-                                <div className="font-bold text-slate-800">{t.sinhVien?.ho_ten}</div>
-                                <div className="text-xs font-mono text-slate-500">{t.sinhVien?.mssv}</div>
+              <div className="space-y-3">
+                {/* Batch Action Bar */}
+                {selectedProposalIds.length > 0 && (
+                  <div className="bg-[#89B449]/10 border border-[#89B449]/30 rounded-xl p-3 px-4 flex flex-wrap items-center justify-between gap-3 shadow-2xs animate-in fade-in duration-200">
+                    <div className="flex items-center gap-3">
+                      <span className="inline-flex items-center gap-1.5 bg-[#407F3E] text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-2xs">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Đã chọn {selectedProposalIds.length} đề xuất
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedProposalIds([])}
+                        className="text-xs text-slate-500 hover:text-slate-800 underline font-medium cursor-pointer"
+                      >
+                        Bỏ chọn tất cả
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {/* Thao tác hàng loạt phía CLB */}
+                      {!isAdmin && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={handleOpenCLBBatchApproveModal}
+                            className="px-3.5 py-1.5 bg-[#89B449] hover:bg-[#89B449]/90 text-white rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <CheckCircle2 className="w-4 h-4" />
+                            Duyệt sơ bộ hàng loạt ({selectedProposalIds.length})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleCLBBatchReject}
+                            className="px-3.5 py-1.5 border border-[#E68A8C] text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <XCircle className="w-4 h-4" />
+                            Từ chối hàng loạt ({selectedProposalIds.length})
+                          </button>
+                        </>
+                      )}
+
+                      {/* Thao tác hàng loạt phía Quản lý Khoa */}
+                      {isAdmin && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={handleKhoaBatchApprove}
+                            className="px-3.5 py-1.5 bg-[#407F3E] hover:bg-[#407F3E]/90 text-white rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <CheckCircle2 className="w-4 h-4" />
+                            Phê duyệt hàng loạt ({selectedProposalIds.length})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleKhoaBatchReject}
+                            className="px-3.5 py-1.5 border border-[#E68A8C] text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <XCircle className="w-4 h-4" />
+                            Từ chối hàng loạt ({selectedProposalIds.length})
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse min-w-[900px]">
+                      <thead>
+                        <tr className="bg-[#E7E0C4] text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
+                          <th className="p-4 pl-4 w-12 text-center" onClick={(e) => e.stopPropagation()}>
+                            {selectableOnPage.length > 0 && (
+                              <input
+                                type="checkbox"
+                                checked={isAllPageSelected}
+                                ref={el => {
+                                  if (el) el.indeterminate = !isAllPageSelected && isSomePageSelected;
+                                }}
+                                onChange={() => {
+                                  if (isAllPageSelected) {
+                                    const ids = selectableOnPage.map(t => t.id);
+                                    setSelectedProposalIds(prev => prev.filter(id => !ids.includes(id)));
+                                  } else {
+                                    const ids = selectableOnPage.map(t => t.id);
+                                    setSelectedProposalIds(prev => Array.from(new Set([...prev, ...ids])));
+                                  }
+                                }}
+                                className="w-4 h-4 text-[#407F3E] rounded border-slate-300 focus:ring-[#89B449] cursor-pointer"
+                              />
+                            )}
+                          </th>
+                          <th className="p-4">Sinh viên đề xuất</th>
+                          <th className="p-4">Nhà máy đề xuất</th>
+                          <th className="p-4">Ngày tham quan</th>
+                          <th className="p-4">Trạng thái</th>
+                          <th className="p-4 text-right pr-6">Thao tác</th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
+                        {paginatedTripsTuDo.map(t => (
+                          <tr 
+                            key={t.id} 
+                            onClick={() => setViewingDetail(t)}
+                            className="hover:bg-slate-50 transition-colors cursor-pointer group"
+                          >
+                            <td className="p-4 pl-4 w-12 text-center" onClick={(e) => e.stopPropagation()}>
+                              {isProposalSelectable(t) ? (
+                                <input
+                                  type="checkbox"
+                                  checked={selectedProposalIds.includes(t.id)}
+                                  onChange={() => {
+                                    setSelectedProposalIds(prev =>
+                                      prev.includes(t.id) ? prev.filter(id => id !== t.id) : [...prev, t.id]
+                                    );
+                                  }}
+                                  className="w-4 h-4 text-[#407F3E] rounded border-slate-300 focus:ring-[#89B449] cursor-pointer"
+                                />
+                              ) : (
+                                <span className="text-slate-300 text-xs">-</span>
+                              )}
+                            </td>
+                            <td className="p-4">
+                              <div className="flex items-center gap-3">
+                                <div>
+                                  <div className="font-bold text-[#407F3E] group-hover:underline">{t.sinhVien?.ho_ten}</div>
+                                  <div className="text-xs font-mono text-slate-500">{t.sinhVien?.mssv}</div>
+                                </div>
                               </div>
-                            </div>
                           </td>
                           <td className="p-4 font-bold text-slate-800">{t.ten_nha_may_de_xuat || t.nhaMay?.ten_nha_may || 'N/A'}</td>
                           <td className="p-4 font-medium text-slate-600">
@@ -1048,6 +1358,11 @@ export default function ChuyenThamQuan_DSLoc() {
                                 Chờ Khoa duyệt
                               </span>
                             )}
+                            {t.trang_thai_duyet === 'ChoKhoaDuyetGop' && (
+                              <span className="inline-flex items-center px-2 py-1 rounded bg-amber-50 text-amber-700 text-[10px] font-bold border border-amber-200 whitespace-nowrap shadow-xs">
+                                🔗 Chờ Khoa duyệt gộp
+                              </span>
+                            )}
                             {t.trang_thai_duyet === 'DaDuyet' && (
                               <span className="inline-flex items-center px-2 py-1 rounded bg-[#89B449]/15 text-[#407F3E] text-[10px] font-bold border border-[#89B449]/30 whitespace-nowrap">
                                 Đã duyệt
@@ -1058,41 +1373,51 @@ export default function ChuyenThamQuan_DSLoc() {
                                 Đã từ chối
                               </span>
                             )}
-                            {!['ChoDuyet', 'ChoKhoaDuyet', 'DaDuyet', 'TuChoi'].includes(t.trang_thai_duyet) && (
+                            {!['ChoDuyet', 'ChoKhoaDuyet', 'ChoKhoaDuyetGop', 'DaDuyet', 'TuChoi'].includes(t.trang_thai_duyet) && (
                               <span className="inline-flex items-center px-2 py-1 rounded bg-slate-100 text-slate-500 text-[10px] font-bold border border-slate-200 whitespace-nowrap">
                                 {t.trang_thai_duyet}
                               </span>
                             )}
 
                           </td>
-                          <td className="p-4 text-right pr-6">
+                          <td className="p-4 text-right pr-6" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center justify-end gap-2">
-                              <button onClick={() => setViewingDetail(t)} className="p-1.5 text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer" title="Chi tiết">
-                                <ChevronRight className="w-5 h-5" />
-                              </button>
-
                               {/* CLB Duyệt sơ bộ */}
                               {!isAdmin && t.trang_thai_duyet === 'ChoDuyet' && (
                                 <>
-                                  <button onClick={() => handleApproveTrip(t, true)} className="px-3 py-1.5 bg-[#89B449] hover:bg-[#89B449]/90 text-white rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center gap-1 cursor-pointer">
+                                  <button onClick={(e) => { e.stopPropagation(); handleApproveTrip(t, true); }} className="px-3 py-1.5 bg-[#89B449] hover:bg-[#89B449]/90 text-white rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center gap-1 cursor-pointer">
                                     <CheckCircle2 className="w-4 h-4" />
                                     Duyệt sơ bộ
                                   </button>
-                                  <button onClick={() => handleApproveTrip(t, false)} className="px-3 py-1.5 border border-[#E68A8C] text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer">
+                                  <button onClick={(e) => { e.stopPropagation(); handleApproveTrip(t, false); }} className="px-3 py-1.5 border border-[#E68A8C] text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer">
                                     <XCircle className="w-4 h-4" />
                                     Từ chối
                                   </button>
                                 </>
                               )}
 
-                              {/* Khoa Phê duyệt chính thức */}
+                              {/* Khoa Phê duyệt chính thức chuyến mới */}
                               {isAdmin && t.trang_thai_duyet === 'ChoKhoaDuyet' && (
                                 <>
-                                  <button onClick={() => handleApproveTrip(t, true)} className="px-3 py-1.5 bg-[#407F3E] hover:bg-[#407F3E]/90 text-white rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center gap-1 cursor-pointer">
+                                  <button onClick={(e) => { e.stopPropagation(); handleApproveTrip(t, true); }} className="px-3 py-1.5 bg-[#407F3E] hover:bg-[#407F3E]/90 text-white rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center gap-1 cursor-pointer">
                                     <CheckCircle2 className="w-4 h-4" />
                                     Phê duyệt
                                   </button>
-                                  <button onClick={() => handleApproveTrip(t, false)} className="px-3 py-1.5 border border-[#E68A8C] text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer">
+                                  <button onClick={(e) => { e.stopPropagation(); handleApproveTrip(t, false); }} className="px-3 py-1.5 border border-[#E68A8C] text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer">
+                                    <XCircle className="w-4 h-4" />
+                                    Từ chối
+                                  </button>
+                                </>
+                              )}
+
+                              {/* Khoa Phê duyệt gộp vào chuyến tự do đã có (Cơ chế 2) */}
+                              {isAdmin && t.trang_thai_duyet === 'ChoKhoaDuyetGop' && (
+                                <>
+                                  <button onClick={(e) => { e.stopPropagation(); handleOpenKhoaMergeModal(t); }} className="px-3 py-1.5 bg-[#407F3E] hover:bg-[#407F3E]/90 text-white rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center gap-1 cursor-pointer">
+                                    <CheckCircle2 className="w-4 h-4" />
+                                    Duyệt gộp
+                                  </button>
+                                  <button onClick={(e) => { e.stopPropagation(); handleRejectKhoaMerge(t); }} className="px-3 py-1.5 border border-[#E68A8C] text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer">
                                     <XCircle className="w-4 h-4" />
                                     Từ chối
                                   </button>
@@ -1104,7 +1429,7 @@ export default function ChuyenThamQuan_DSLoc() {
                       ))}
                       {paginatedTripsTuDo.length === 0 && (
                         <tr>
-                          <td colSpan="5" className="text-center py-8 text-slate-500 font-medium">Không có đề xuất tự do nào</td>
+                          <td colSpan="6" className="text-center py-8 text-slate-500 font-medium">Không có đề xuất tự do nào</td>
                         </tr>
                       )}
                     </tbody>
@@ -1169,7 +1494,8 @@ export default function ChuyenThamQuan_DSLoc() {
                   </div>
                 </div>
               </div>
-            );
+            </div>
+          );
           })()}
         </div>
       )}
@@ -1234,6 +1560,7 @@ export default function ChuyenThamQuan_DSLoc() {
                     <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
                       type="date"
+                      min={getTodayStr()}
                       value={ngay}
                       onChange={(e) => setNgay(e.target.value)}
                       className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-[#E7E0C4] rounded-xl text-sm focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all text-slate-800 font-medium cursor-pointer"
@@ -2451,6 +2778,194 @@ export default function ChuyenThamQuan_DSLoc() {
                 <CheckCircle2 className="w-4 h-4" />
                 Xác nhận phê duyệt
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Khoa Phê Duyệt Gộp Đề Xuất Vào Chuyến Tham Quan Tự Do Đã Có (Cơ chế 2) */}
+      {isAdmin && isKhoaMergeModalOpen && pendingKhoaMergeProposal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl w-full max-w-xl shadow-2xl flex flex-col border border-slate-200 overflow-hidden max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-slate-50/70">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#407F3E]/15 border border-[#407F3E]/30 flex items-center justify-center text-[#407F3E]">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-slate-800">
+                    Khoa phê duyệt Gộp Đề xuất vào Chuyến tự do
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Thẩm định bổ sung sinh viên vào chuyến tham quan đã chốt, hỗ trợ gom nhiều bạn cùng lúc
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsKhoaMergeModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4 text-xs overflow-y-auto min-h-0">
+              {/* Card 1: Chuyến tham quan đích */}
+              <div className="rounded-xl p-3.5 border border-[#407F3E]/30 bg-emerald-50/40 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[#407F3E] text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5" />
+                    Chuyến tham quan được gộp vào #{pendingKhoaMergeProposal.chuyen_tham_quan_id}
+                  </span>
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                    Đã duyệt trước đó
+                  </span>
+                </div>
+
+                <div className="font-bold text-slate-900 text-sm">
+                  {pendingKhoaMergeProposal.ten_nha_may_de_xuat || pendingKhoaMergeProposal.nhaMay?.ten_nha_may || 'Doanh nghiệp tiếp nhận'}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-slate-600 pt-1">
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Thời gian tham quan:</span>
+                    <span className="font-semibold text-slate-800">
+                      {pendingKhoaMergeProposal.ngay_tham_quan_de_xuat ? new Date(pendingKhoaMergeProposal.ngay_tham_quan_de_xuat).toLocaleDateString('vi-VN') : '--'}
+                      {pendingKhoaMergeProposal.gio_bat_dau_de_xuat && ` (${String(pendingKhoaMergeProposal.gio_bat_dau_de_xuat).substring(0, 5)})`}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Hình thức:</span>
+                    <span className="font-semibold text-slate-800">
+                      {pendingKhoaMergeProposal.hinh_thuc === 'TrucTiep' ? 'Trực tiếp (Offline)' : 'Trực tuyến (Online)'}
+                    </span>
+                  </div>
+                </div>
+
+                {pendingKhoaMergeProposal.giangVien && (
+                  <div className="pt-1.5 border-t border-emerald-200/60 text-slate-600 flex items-center gap-2">
+                    <UserCheck className="w-3.5 h-3.5 text-[#407F3E]" />
+                    <span>Giảng viên dẫn đoàn: <strong>{pendingKhoaMergeProposal.giangVien.ho_ten}</strong> ({pendingKhoaMergeProposal.giangVien.ma_gv || '--'})</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Card 2: Sinh viên đề xuất xin gộp chính */}
+              <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200/80 space-y-1.5">
+                <span className="text-slate-400 block text-[11px] uppercase tracking-wider font-semibold">
+                  Sinh viên xin gộp
+                </span>
+                <div className="font-bold text-slate-800 text-sm">
+                  {pendingKhoaMergeProposal.sinhVien?.ho_ten || 'Sinh viên'}
+                </div>
+                <div className="text-slate-500 font-mono text-xs">
+                  {pendingKhoaMergeProposal.sinhVien?.mssv || '--'} • Lớp: {pendingKhoaMergeProposal.sinhVien?.ten_lop || pendingKhoaMergeProposal.sinhVien?.lop || '--'}
+                  {pendingKhoaMergeProposal.sinhVien?.sdt && ` • SĐT: ${pendingKhoaMergeProposal.sinhVien.sdt}`}
+                </div>
+              </div>
+
+              {/* Card 3: Gom thêm các đề xuất cùng xin gộp vào chuyến này (Hỗ trợ tổng hợp duyệt tương tự Cơ chế 1) */}
+              {otherMergeProposalsForKhoa.length > 0 && (
+                <div className="bg-amber-50/50 border border-amber-200/80 rounded-xl p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-amber-800 text-xs flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5 text-amber-600" />
+                      Gom thêm đề xuất xin gộp cùng vào chuyến này ({otherMergeProposalsForKhoa.length})
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (selectedKhoaBatchProposalIds.length === otherMergeProposalsForKhoa.length) {
+                          setSelectedKhoaBatchProposalIds([]);
+                        } else {
+                          setSelectedKhoaBatchProposalIds(otherMergeProposalsForKhoa.map(p => p.id));
+                        }
+                      }}
+                      className="text-[11px] text-amber-700 hover:underline font-semibold cursor-pointer"
+                    >
+                      {selectedKhoaBatchProposalIds.length === otherMergeProposalsForKhoa.length ? 'Bỏ chọn' : 'Chọn tất cả'}
+                    </button>
+                  </div>
+
+                  <div className="max-h-[140px] overflow-y-auto space-y-1.5 pr-1">
+                    {otherMergeProposalsForKhoa.map((p) => {
+                      const isChecked = selectedKhoaBatchProposalIds.includes(p.id);
+                      return (
+                        <div
+                          key={p.id}
+                          onClick={() => {
+                            setSelectedKhoaBatchProposalIds(prev => 
+                              isChecked ? prev.filter(id => id !== p.id) : [...prev, p.id]
+                            );
+                          }}
+                          className={`p-2 rounded-lg border text-xs cursor-pointer transition-colors flex items-center justify-between ${
+                            isChecked
+                              ? 'bg-white border-amber-400 shadow-xs'
+                              : 'bg-white/70 border-slate-200 hover:bg-white text-slate-700'
+                          }`}
+                        >
+                          <div className="min-w-0 pr-2">
+                            <div className="font-bold text-slate-800 truncate">
+                              {p.sinhVien?.ho_ten || 'Sinh viên'}
+                            </div>
+                            <div className="text-[11px] text-slate-500 font-mono">
+                              {p.sinhVien?.mssv || '--'} • {p.sinhVien?.ten_lop || p.sinhVien?.lop || '--'}
+                            </div>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => {}}
+                            className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 accent-amber-600 cursor-pointer"
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Ghi chú hệ thống */}
+              <div className="p-2.5 bg-blue-50/70 border border-blue-200/80 rounded-xl text-[11px] text-blue-800 flex items-start gap-2">
+                <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                <span>
+                  Khi Khoa phê duyệt: Hệ thống sẽ tự động tăng sức chứa của chuyến tham quan và cấp <strong>Phiếu đăng ký</strong> & <strong>Phiếu tham quan</strong> hợp lệ cho tất cả sinh viên được duyệt gộp.
+                </span>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-3.5 border-t border-slate-100 bg-slate-50/50 flex justify-between items-center shrink-0">
+              <div className="text-xs text-slate-500">
+                Sẽ gộp: <strong className="text-slate-800">{1 + selectedKhoaBatchProposalIds.length}</strong> sinh viên vào Chuyến #{pendingKhoaMergeProposal.chuyen_tham_quan_id}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleRejectKhoaMerge(pendingKhoaMergeProposal)}
+                  className="px-4 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-xl transition-colors cursor-pointer"
+                >
+                  Từ chối gộp
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsKhoaMergeModalOpen(false)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200 bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  onClick={submitKhoaMergeApprove}
+                  className="px-5 py-2 text-xs font-bold text-white bg-[#407F3E] hover:bg-[#407F3E]/90 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  Xác nhận duyệt gộp ({1 + selectedKhoaBatchProposalIds.length})
+                </button>
+              </div>
             </div>
           </div>
         </div>
