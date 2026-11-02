@@ -18,6 +18,7 @@ class SinhVienHuongDanGVScreen extends StatefulWidget {
 
 class _SinhVienHuongDanGVScreenState extends State<SinhVienHuongDanGVScreen> {
   String _filter = 'all'; // 'all', 'graded', 'ungraded'
+  String _filterCompany = 'Tất cả';
   bool _isLocking = false;
 
   Future<void> _lockAllGuidedReports(int dotKienTapId) async {
@@ -80,6 +81,21 @@ class _SinhVienHuongDanGVScreenState extends State<SinhVienHuongDanGVScreen> {
     final appState = appStateProvider.state;
 
     final allStudents = appState.lecturerStudents;
+    final uniqueClasses = allStudents
+        .map((s) => s.className.trim())
+        .where((c) => c.isNotEmpty && c != '--')
+        .toSet()
+        .toList()
+      ..sort();
+    final classOptions = ['Tất cả lớp', ...uniqueClasses];
+
+    final uniqueCompanies = allStudents
+        .map((s) => s.company.trim())
+        .where((c) => c.isNotEmpty && c != '--')
+        .toSet()
+        .toList()
+      ..sort();
+
     final filtered = allStudents.where((s) {
       if (_filter == 'graded') return s.papersLeft == 0;
       if (_filter == 'ungraded') return s.papersLeft > 0;
@@ -131,14 +147,54 @@ class _SinhVienHuongDanGVScreenState extends State<SinhVienHuongDanGVScreen> {
           child: PaginatedList<LecturerStudent>(
             items: filtered,
             searchHint: 'Tìm theo MSSV/họ tên',
-            dropdownTitle: 'Trạng thái',
-            dropdownOptions: const ['Tất cả'],
+            dropdownTitle: 'Lớp',
+            dropdownOptions: classOptions,
             itemName: 'sinh viên',
             verticalFilters: false,
-            filter: (student, query, dot) {
+            headerWidgetBuilder: (items) {
+              if (uniqueCompanies.isEmpty) return const SizedBox.shrink();
+              final companyList = ['Tất cả', ...uniqueCompanies];
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                child: SizedBox(
+                  height: 34,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: companyList.length,
+                    separatorBuilder: (context, index) => const SizedBox(width: 8),
+                    itemBuilder: (context, idx) {
+                      final comp = companyList[idx];
+                      final isSelected = _filterCompany == comp;
+                      return ChoiceChip(
+                        label: Text(
+                          comp,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            color: isSelected ? Colors.white : AppColors.darkSlate,
+                          ),
+                        ),
+                        selected: isSelected,
+                        selectedColor: AppColors.primary,
+                        backgroundColor: Colors.white,
+                        side: BorderSide(
+                          color: isSelected ? AppColors.primary : AppColors.beigeBorder,
+                        ),
+                        onSelected: (val) {
+                          if (val) setState(() => _filterCompany = comp);
+                        },
+                      );
+                    },
+                  ),
+                ),
+              );
+            },
+            filter: (student, query, selectedClass) {
               final matchQuery = student.name.toLowerCase().contains(query.toLowerCase()) ||
                   student.id.toLowerCase().contains(query.toLowerCase());
-              return matchQuery;
+              final matchClass = selectedClass == 'Tất cả lớp' || student.className == selectedClass;
+              final matchCompany = _filterCompany == 'Tất cả' || student.company == _filterCompany;
+              return matchQuery && matchClass && matchCompany;
             },
             itemBuilder: (student) {
               final parts = student.completedTours.split('/');

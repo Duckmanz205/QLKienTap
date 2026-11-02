@@ -93,6 +93,12 @@ export class SinhVienController {
     return this.svService.getTripInfo(student.id, tripId);
   }
 
+  @Get('proposal-portal-status')
+  async getProposalPortalStatus(@CurrentUser() user: JwtPayloadUser) {
+    const student = await this.svService.getStudentByAccountId(user.sub);
+    return this.svService.getProposalPortalStatus(student?.id);
+  }
+
   @Get('proposals')
   async getMyProposals(@CurrentUser() user: JwtPayloadUser) {
     const student = await this.svService.getStudentByAccountId(user.sub);

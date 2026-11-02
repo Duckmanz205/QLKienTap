@@ -48,6 +48,7 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
   const [ngayThamQuan, setNgayThamQuan] = useState('');
   const [gioBatDau, setGioBatDau] = useState('');
   const [hinhThuc, setHinhThuc] = useState('TrucTiep');
+  const [portalStatus, setPortalStatus] = useState(null);
 
   // Popup state
   const [popup, setPopup] = useState({ show: false, message: '', type: 'success' });
@@ -142,26 +143,36 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
 
   const fetchData = async (svId) => {
     try {
-      const [availRes, regRes, propRes] = await Promise.all([
+      const [availRes, regRes, propRes, portalRes] = await Promise.all([
         sinhVienApi.getAvailableTrips(svId),
         sinhVienApi.getRegisteredTrips(svId),
-        sinhVienApi.getProposals()
+        sinhVienApi.getProposals(),
+        sinhVienApi.getProposalPortalStatus().catch(() => ({ data: null })),
       ]);
       setAvailableTrips(availRes.data || []);
       setRegisteredTrips(regRes.data || []);
       setProposals(propRes.data || []);
+      if (portalRes?.data) {
+        setPortalStatus(portalRes.data);
+      }
     } catch (err) {
       console.error(err);
     }
   };
 
-  const handleRegister = (tripId) => {
+  const handleRegister = (tripOrId) => {
+    let trip = typeof tripOrId === 'object' ? tripOrId : availableTrips.find(t => t.id === tripOrId);
+    if (trip?.bi_trung_ngay) {
+      showPopup(trip.thong_tin_trung_ngay || 'Chuyến đi này bị trùng ngày với một chuyến khác bạn đã đăng ký!', 'error');
+      return;
+    }
+    const targetId = typeof tripOrId === 'object' ? tripOrId.id : tripOrId;
     setConfirmModal({
       isOpen: true,
       title: 'Xác nhận đăng ký',
       message: 'Bạn có chắc chắn muốn đăng ký chuyến kiến tập này?',
       type: 'register',
-      targetId: tripId,
+      targetId: targetId,
       reason: ''
     });
   };
@@ -258,8 +269,8 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
       if (selectedPartnerFactory?.id) {
         payload.nhaMayId = selectedPartnerFactory.id;
       }
-      await sinhVienApi.proposeTrip(payload);
-      showPopup('Đã gửi đề xuất chuyến đi tự do thành công!', 'success');
+      const res = await sinhVienApi.proposeTrip(payload);
+      showPopup(res.data?.message || 'Đã gửi đề xuất chuyến đi tự do thành công!', 'success');
       setSelectedPartnerFactory(null);
       setCustomFactory({
         tenNhaMayDeXuat: '',
@@ -478,6 +489,12 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                   </div>
                 </div>
               )}
+
+              {viewingTrip.bi_trung_ngay && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs font-semibold flex items-center gap-2">
+                  <span>⚠️ {viewingTrip.thong_tin_trung_ngay || 'Chuyến đi này trùng ngày với một chuyến khác bạn đã đăng ký.'}</span>
+                </div>
+              )}
             </div>
 
             {/* Modal Footer */}
@@ -489,15 +506,25 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                 Đóng
               </button>
               {availableTrips.some(t => t.id === viewingTrip.id) && (
-                <button
-                  onClick={() => {
-                    handleRegister(viewingTrip.id);
-                    setViewingTrip(null);
-                  }}
-                  className="px-6 py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl text-sm font-bold transition-colors cursor-pointer shadow-sm"
-                >
-                  Đăng ký ngay
-                </button>
+                viewingTrip.bi_trung_ngay ? (
+                  <button
+                    disabled
+                    title={viewingTrip.thong_tin_trung_ngay || 'Trùng ngày với chuyến đã đăng ký'}
+                    className="px-6 py-2.5 bg-slate-100 border border-slate-200 text-slate-400 rounded-xl text-sm font-bold cursor-not-allowed shadow-sm"
+                  >
+                    Trùng ngày tham quan
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      handleRegister(viewingTrip);
+                      setViewingTrip(null);
+                    }}
+                    className="px-6 py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl text-sm font-bold transition-colors cursor-pointer shadow-sm"
+                  >
+                    Đăng ký ngay
+                  </button>
+                )
               )}
             </div>
           </div>
@@ -695,6 +722,14 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                                     <RotateCcw className="w-3 h-3" /> Đợt bổ sung
                                   </span>
                                 )}
+                                {trip.bi_trung_ngay && (
+                                  <span
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-200"
+                                    title={trip.thong_tin_trung_ngay}
+                                  >
+                                    Trùng ngày
+                                  </span>
+                                )}
                                 <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider shrink-0 ${isOnline ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-[#E7E0C4]/50 text-slate-800'
                                   }`}>
                                   {isOnline ? <Laptop className="w-3.5 h-3.5" /> : <MapPin className="w-3.5 h-3.5" />}
@@ -733,19 +768,30 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                               </div>
                             </div>
 
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleRegister(trip.id);
-                              }}
-                              className={`w-full py-2.5 rounded-xl text-sm font-bold uppercase tracking-wider transition-colors shadow-sm cursor-pointer mt-4 flex items-center justify-center gap-2 ${trip.da_tung_dang_ky
-                                ? 'bg-orange-600 hover:bg-orange-700 text-white'
-                                : 'bg-[#407F3E] text-white hover:bg-[#407F3E]/90'
-                                }`}
-                            >
-                              {trip.da_tung_dang_ky && <RotateCcw className="w-4 h-4" />}
-                              {trip.da_tung_dang_ky ? 'Đăng ký lại' : 'Đăng ký'}
-                            </button>
+                            {trip.bi_trung_ngay ? (
+                              <button
+                                disabled
+                                onClick={(e) => e.stopPropagation()}
+                                title={trip.thong_tin_trung_ngay || 'Trùng ngày với chuyến đã đăng ký'}
+                                className="w-full py-2.5 rounded-xl text-sm font-bold uppercase tracking-wider bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed mt-4 flex items-center justify-center gap-2"
+                              >
+                                Trùng ngày tham quan
+                              </button>
+                            ) : (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRegister(trip);
+                                }}
+                                className={`w-full py-2.5 rounded-xl text-sm font-bold uppercase tracking-wider transition-colors shadow-sm cursor-pointer mt-4 flex items-center justify-center gap-2 ${trip.da_tung_dang_ky
+                                  ? 'bg-orange-600 hover:bg-orange-700 text-white'
+                                  : 'bg-[#407F3E] text-white hover:bg-[#407F3E]/90'
+                                  }`}
+                              >
+                                {trip.da_tung_dang_ky && <RotateCcw className="w-4 h-4" />}
+                                {trip.da_tung_dang_ky ? 'Đăng ký lại' : 'Đăng ký'}
+                              </button>
+                            )}
                           </div>
                         );
                       })
@@ -1113,6 +1159,49 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                 Nhập tên nhà máy bạn muốn đi kiến tập tự do. Nếu nhà máy đã liên kết với trường, thông tin sẽ tự động được gợi ý.
               </p>
             </div>
+
+            {/* Smart Banner: Hiển thị trạng thái tiếp nhận đợt hoặc tích lũy tự do */}
+            {portalStatus?.mode === 'CAMPAIGN' && (
+              <div className="mb-6 p-4 rounded-xl border border-emerald-200 bg-emerald-50/70 text-emerald-900 flex items-start gap-3.5 shadow-xs">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0 text-emerald-700 mt-0.5">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+                <div className="flex-1 text-sm">
+                  <div className="font-bold flex items-center gap-2">
+                    <span>Đang tiếp nhận đề xuất vào: {portalStatus.dotKienTap?.ten_dot || 'Đợt kiến tập'}</span>
+                    <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-200/80 font-bold text-emerald-800">
+                      Tính điểm đợt này
+                    </span>
+                  </div>
+                  <p className="text-xs text-emerald-700/90 mt-1 leading-relaxed">
+                    {portalStatus.message}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {portalStatus?.mode === 'FREE_ACCUMULATION' && (
+              <div className="mb-6 p-4 rounded-xl border border-sky-200 bg-gradient-to-r from-sky-50/90 to-blue-50/70 text-slate-800 flex items-start gap-3.5 shadow-xs">
+                <div className="w-8 h-8 rounded-lg bg-sky-100 flex items-center justify-center shrink-0 text-sky-700 mt-0.5">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <div className="flex-1 text-sm">
+                  <div className="font-bold text-sky-950 flex flex-wrap items-center gap-2">
+                    <span>Tiếp nhận theo diện Tích lũy tự do (Ngoài đợt)</span>
+                    <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-sky-200 font-bold text-sky-800">
+                      Bảo lưu 18 tháng
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
+                    {portalStatus.message}
+                  </p>
+                  <div className="mt-2 text-[11px] text-sky-700 font-medium flex items-center gap-1.5">
+                    <span>💡</span>
+                    <span>Bạn vẫn có thể nộp đề xuất và tham gia chuyến đi bình thường. Kết quả sẽ được tích lũy và bảo lưu để gán nộp bài khi các đợt kiến tập mở.</span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <form onSubmit={handleProposalSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

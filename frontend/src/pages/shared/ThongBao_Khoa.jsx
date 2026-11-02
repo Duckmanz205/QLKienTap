@@ -27,8 +27,6 @@ export default function ThongBao_Khoa() {
   const [selectedLoaiThongBao, setSelectedLoaiThongBao] = useState('ThongBao');
   const [attachedFile, setAttachedFile] = useState(null);
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
-  const [isDoiTuongDropdownOpen, setIsDoiTuongDropdownOpen] = useState(false);
-  const [isLoaiDropdownOpen, setIsLoaiDropdownOpen] = useState(false);
   const fileInputRef = useRef(null);
 
   const doiTuongOptions = [
@@ -268,9 +266,13 @@ export default function ThongBao_Khoa() {
                 const fileUrl = n.file_url || (n.files?.[0]?.duong_dan);
 
                 return (
-                  <tr key={n.id} className="hover:bg-slate-50 transition-colors">
+                  <tr 
+                    key={n.id} 
+                    onClick={() => setViewingDetail(n)}
+                    className="hover:bg-slate-50 transition-colors cursor-pointer group"
+                  >
                     <td className="p-4 pl-6 max-w-[380px]">
-                      <div className="font-bold text-slate-800 flex items-start gap-2">
+                      <div className="font-bold text-slate-800 group-hover:text-[#407F3E] group-hover:underline flex items-start gap-2">
                         <MessageSquare className="w-4 h-4 text-[#407F3E] mt-0.5 shrink-0" />
                         <span className="line-clamp-2 leading-relaxed">{n.tieu_de}</span>
                       </div>
@@ -305,14 +307,10 @@ export default function ThongBao_Khoa() {
                         hour: '2-digit', minute: '2-digit'
                       })}
                     </td>
-                    <td className="p-4 text-right pr-6">
-                      <button 
-                        className="p-1.5 text-slate-400 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded-lg transition-colors cursor-pointer" 
-                        title="Xem chi tiết"
-                        onClick={() => setViewingDetail(n)}
-                      >
-                        <ChevronRight className="w-5 h-5" />
-                      </button>
+                    <td className="p-4 text-right pr-6" onClick={(e) => e.stopPropagation()}>
+                      <span className="text-xs text-slate-400 group-hover:text-[#407F3E] font-medium transition-colors">
+                        Chi tiết &rarr;
+                      </span>
                     </td>
                   </tr>
                 );
@@ -413,7 +411,7 @@ export default function ThongBao_Khoa() {
 
             {/* Modal Body */}
             <form onSubmit={handleComposeSubmit} className="flex flex-col overflow-hidden">
-              <div className="p-6 space-y-5 overflow-y-auto custom-scrollbar" onClick={() => { setIsDoiTuongDropdownOpen(false); setIsLoaiDropdownOpen(false); }}>
+              <div className="p-6 space-y-5 overflow-y-auto custom-scrollbar">
                 
                 {/* Tiêu đề */}
                 <div>

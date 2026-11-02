@@ -9,12 +9,8 @@ import SearchableDropdown from '../../components/SearchableDropdown';
 
 export default function DiemDanhSV_GV() {
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
-  const [isTripDropdownOpen, setIsTripDropdownOpen] = useState(false);
-  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState('ALL');
-  const [searchStatusDropdown, setSearchStatusDropdown] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [tripSearch, setTripSearch] = useState('');
   const [loading, setLoading] = useState(false);
   
   const [currentPage, setCurrentPage] = useState(1);
@@ -37,11 +33,6 @@ export default function DiemDanhSV_GV() {
   const [zoom, setZoom] = useState(100);
   const [rotation, setRotation] = useState(0);
 
-  const closeAllDropdowns = () => {
-    setIsTripDropdownOpen(false);
-    setIsStatusDropdownOpen(false);
-  };
-
   useEffect(() => {
     const userJson = localStorage.getItem('user');
     if (userJson) {
@@ -61,6 +52,10 @@ export default function DiemDanhSV_GV() {
         id: t.id,
         name: `${t.nhaMay?.ten_nha_may || 'Chuyến đi'} (${new Date(t.ngay_tham_quan || t.ngay_khoi_hanh || Date.now()).toLocaleDateString('vi-VN')})`,
         cachToChuc: t.cach_to_chuc,
+        ngayThamQuan: t.ngay_tham_quan,
+        gioBatDau: t.gio_bat_dau,
+        trangThai: t.trang_thai,
+        rawTrip: t,
       }));
       setTrips(formattedTrips);
       if (formattedTrips.length > 0) {
@@ -70,6 +65,46 @@ export default function DiemDanhSV_GV() {
       console.error(err);
     }
   };
+
+  const tripTimeInfo = useMemo(() => {
+    if (!selectedTrip?.ngayThamQuan) return { isStarted: true, formattedDateTime: '', trangThai: '' };
+
+    const dateStr = typeof selectedTrip.ngayThamQuan === 'string'
+      ? selectedTrip.ngayThamQuan.split('T')[0]
+      : new Date(selectedTrip.ngayThamQuan).toISOString().split('T')[0];
+
+    let timeStr = '00:00:00';
+    if (typeof selectedTrip.gioBatDau === 'string') {
+      timeStr = selectedTrip.gioBatDau.includes('T')
+        ? selectedTrip.gioBatDau.split('T')[1].substring(0, 8)
+        : selectedTrip.gioBatDau;
+    } else if (selectedTrip.gioBatDau instanceof Date) {
+      const hours = selectedTrip.gioBatDau.getUTCHours().toString().padStart(2, '0');
+      const mins = selectedTrip.gioBatDau.getUTCMinutes().toString().padStart(2, '0');
+      const secs = selectedTrip.gioBatDau.getUTCSeconds().toString().padStart(2, '0');
+      timeStr = `${hours}:${mins}:${secs}`;
+    }
+
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const timeParts = timeStr.split(':').map(Number);
+    const hours = timeParts[0] || 0;
+    const minutes = timeParts[1] || 0;
+    const seconds = timeParts[2] || 0;
+
+    const startDateTime = new Date(year, month - 1, day, hours, minutes, seconds);
+    const now = new Date();
+    const isStarted = now >= startDateTime;
+
+    const formattedDate = `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
+    const formattedTime = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+
+    return {
+      isStarted,
+      startDateTime,
+      formattedDateTime: `${formattedTime} ngày ${formattedDate}`,
+      trangThai: selectedTrip.trangThai,
+    };
+  }, [selectedTrip]);
 
   useEffect(() => {
     if (selectedTrip) {
@@ -149,6 +184,14 @@ export default function DiemDanhSV_GV() {
   };
 
   const handleStatusChange = (studentId, newStatus) => {
+    if (!tripTimeInfo.isStarted) {
+      setToast({
+        show: true,
+        message: `Chưa đến thời gian bắt đầu chuyến tham quan (${tripTimeInfo.formattedDateTime}). Không thể thay đổi trạng thái điểm danh.`,
+        type: 'error'
+      });
+      return;
+    }
     setStudents(prev => prev.map(s => {
       if (s.id === studentId) {
         return { ...s, status: newStatus, note: newStatus === 'TuChoiThamGia' ? s.note : '' };
@@ -162,11 +205,27 @@ export default function DiemDanhSV_GV() {
   };
 
   const handleMarkAllPresent = () => {
+    if (!tripTimeInfo.isStarted) {
+      setToast({
+        show: true,
+        message: `Chưa đến thời gian bắt đầu chuyến tham quan (${tripTimeInfo.formattedDateTime}). Không thể điểm danh.`,
+        type: 'error'
+      });
+      return;
+    }
     setStudents(prev => prev.map(s => ({ ...s, status: 'CoMat', note: '' })));
   };
 
   const handleSaveAttendance = async () => {
     if (!selectedTrip || students.length === 0) return;
+    if (!tripTimeInfo.isStarted) {
+      setToast({
+        show: true,
+        message: `Chưa đến thời gian bắt đầu chuyến tham quan (${tripTimeInfo.formattedDateTime}). Không thể lưu điểm danh.`,
+        type: 'error'
+      });
+      return;
+    }
     try {
       setLoading(true);
       const records = students.map(s => ({
@@ -182,10 +241,18 @@ export default function DiemDanhSV_GV() {
       setToast({ show: true, message: 'Đã lưu điểm danh thành công!', type: 'success' });
       await fetchStudents(selectedTrip.id);
     } catch (err) {
-      const errorMsg = err.response?.data?.message || err.message || 'Có lỗi xảy ra khi lưu điểm danh';
+      const serverMsg = err.response?.data?.message;
+      let errorMsg = 'Có lỗi xảy ra khi lưu điểm danh';
+      if (Array.isArray(serverMsg)) {
+        errorMsg = serverMsg.join(', ');
+      } else if (typeof serverMsg === 'string' && serverMsg.trim()) {
+        errorMsg = serverMsg;
+      } else if (err.message) {
+        errorMsg = err.message;
+      }
       setToast({ 
         show: true, 
-        message: Array.isArray(errorMsg) ? errorMsg.join(', ') : (typeof errorMsg === 'string' ? errorMsg : 'Có lỗi xảy ra khi lưu điểm danh'), 
+        message: errorMsg, 
         type: 'error' 
       });
       console.error('Lỗi khi lưu điểm danh:', err);
@@ -215,7 +282,7 @@ export default function DiemDanhSV_GV() {
   const totalCount = students.length;
 
   return (
-    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300 relative" onClick={closeAllDropdowns}>
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300 relative">
       <Toast 
         message={toast.show ? toast.message : ''} 
         type={toast.type} 
@@ -243,149 +310,78 @@ export default function DiemDanhSV_GV() {
           />
         </div>
 
-        {/* Trip Selector Popover */}
-        <div className="relative min-w-[260px] flex-1" onClick={(e) => e.stopPropagation()}>
-          <div 
-            onClick={() => {
-              setIsTripDropdownOpen(!isTripDropdownOpen);
-              setIsStatusDropdownOpen(false);
-            }}
-            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isTripDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-          >
-            <span className="truncate pr-2 font-medium text-slate-700 flex items-center gap-2">
-              {selectedTrip?.cachToChuc === 'TuDo' && (
-                <span className="px-1.5 py-0.5 rounded text-[10px] bg-indigo-100 text-indigo-700 font-bold shrink-0">
-                  Tự do
-                </span>
-              )}
-              <span className="truncate">{selectedTrip ? selectedTrip.name : 'Đang tải chuyến...'}</span>
-            </span>
-            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-          </div>
-          {isTripDropdownOpen && trips.length > 0 && (
-            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-50 py-1 overflow-hidden animate-in slide-in-from-top-1 max-h-64 flex flex-col">
-              <div className="p-2 border-b border-[#E7E0C4] sticky top-0 bg-white z-10">
-                <input
-                  type="text"
-                  placeholder="Tìm chuyến đi..."
-                  value={tripSearch}
-                  onChange={(e) => setTripSearch(e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-[#E7E0C4] rounded-lg focus:outline-none focus:border-[#407F3E]"
-                />
-              </div>
-              <div className="overflow-y-auto">
-                {trips
-                  .filter(t => !tripSearch || t.name.toLowerCase().includes(tripSearch.toLowerCase()))
-                  .map(trip => (
-                    <div 
-                      key={trip.id}
-                      onClick={() => {
-                        setSelectedTrip(trip);
-                        setIsTripDropdownOpen(false);
-                        setTripSearch('');
-                      }}
-                      className={`px-4 py-2.5 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                        selectedTrip?.id === trip.id ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50 font-medium'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 truncate pr-2">
-                        {trip.cachToChuc === 'TuDo' && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-indigo-100 text-indigo-700 font-bold shrink-0">
-                            Tự do
-                          </span>
-                        )}
-                        <span className="truncate">{trip.name}</span>
-                      </div>
-                      {selectedTrip?.id === trip.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                    </div>
-                  ))}
-                {trips.filter(t => !tripSearch || t.name.toLowerCase().includes(tripSearch.toLowerCase())).length === 0 && (
-                  <div className="px-4 py-3 text-xs text-slate-500 text-center">Không tìm thấy chuyến đi</div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+        {/* Trip Selector Dropdown */}
+        <SearchableDropdown
+          options={trips.map(t => ({
+            value: t.id,
+            label: `${t.cachToChuc === 'TuDo' ? '[Tự do] ' : ''}${t.name}`
+          }))}
+          value={selectedTrip?.id || ''}
+          onChange={(val) => {
+            const found = trips.find(t => t.id === val);
+            if (found) setSelectedTrip(found);
+          }}
+          placeholder={trips.length > 0 ? "Chọn chuyến đi..." : "Đang tải chuyến..."}
+          searchPlaceholder="Tìm chuyến đi..."
+          className="min-w-[260px] flex-1"
+        />
 
-        {/* Status Filter Popover */}
-        <div className="relative min-w-[200px]" onClick={(e) => e.stopPropagation()}>
-          <div 
-            onClick={() => {
-              setIsStatusDropdownOpen(!isStatusDropdownOpen);
-              setIsTripDropdownOpen(false);
-            }}
-            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isStatusDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-          >
-            <span className="truncate pr-2 font-medium text-slate-700">
-              {statusFilter === 'ALL' && 'Tất cả trạng thái'}
-              {statusFilter === 'CoMat' && 'Có mặt'}
-              {statusFilter === 'Vang' && 'Vắng'}
-              {statusFilter === 'TuChoiThamGia' && 'Từ chối tham gia'}
-              {statusFilter === 'ChuaDiemDanh' && 'Chưa điểm danh'}
-            </span>
-            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-          </div>
-          {isStatusDropdownOpen && (
-            <div className="absolute top-full right-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-xl z-50 py-1 overflow-hidden animate-in slide-in-from-top-1">
-              <div className="p-2 border-b border-[#E7E0C4]">
-                <input
-                  type="text"
-                  placeholder="Tìm trạng thái..."
-                  value={searchStatusDropdown}
-                  onChange={(e) => setSearchStatusDropdown(e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-[#E7E0C4] rounded-lg focus:outline-none focus:border-[#407F3E]"
-                />
-              </div>
-              <div className="max-h-60 overflow-y-auto">
-                {[
-                  { id: 'ALL', label: 'Tất cả trạng thái' },
-                  { id: 'CoMat', label: 'Có mặt' },
-                  { id: 'Vang', label: 'Vắng' },
-                  { id: 'TuChoiThamGia', label: 'Từ chối tham gia' },
-                  { id: 'ChuaDiemDanh', label: 'Chưa điểm danh' },
-                ]
-                  .filter(opt => !searchStatusDropdown || opt.label.toLowerCase().includes(searchStatusDropdown.toLowerCase()))
-                  .map(opt => (
-                    <div 
-                      key={opt.id}
-                      onClick={() => {
-                        setStatusFilter(opt.id);
-                        setIsStatusDropdownOpen(false);
-                        setSearchStatusDropdown('');
-                        setCurrentPage(1);
-                      }}
-                      className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                        statusFilter === opt.id ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-slate-50 font-medium'
-                      }`}
-                    >
-                      <span>{opt.label}</span>
-                      {statusFilter === opt.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                    </div>
-                  ))}
-                {[
-                  { id: 'ALL', label: 'Tất cả trạng thái' },
-                  { id: 'CoMat', label: 'Có mặt' },
-                  { id: 'Vang', label: 'Vắng' },
-                  { id: 'TuChoiThamGia', label: 'Từ chối tham gia' },
-                  { id: 'ChuaDiemDanh', label: 'Chưa điểm danh' },
-                ].filter(opt => !searchStatusDropdown || opt.label.toLowerCase().includes(searchStatusDropdown.toLowerCase())).length === 0 && (
-                  <div className="px-4 py-3 text-xs text-slate-500 text-center">Không tìm thấy trạng thái</div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+        {/* Status Filter Dropdown */}
+        <SearchableDropdown
+          options={[
+            { value: 'ALL', label: 'Tất cả trạng thái' },
+            { value: 'CoMat', label: 'Có mặt' },
+            { value: 'Vang', label: 'Vắng' },
+            { value: 'TuChoiThamGia', label: 'Từ chối tham gia' },
+            { value: 'ChuaDiemDanh', label: 'Chưa điểm danh' }
+          ]}
+          value={statusFilter}
+          onChange={(val) => {
+            setStatusFilter(val);
+            setCurrentPage(1);
+          }}
+          placeholder="Tất cả trạng thái"
+          searchPlaceholder="Tìm trạng thái..."
+          className="min-w-[200px]"
+        />
 
       </div>
+
+      {/* Warning Banner khi chưa đến giờ tham quan */}
+      {selectedTrip && !tripTimeInfo.isStarted && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 flex items-start gap-3.5 shadow-xs animate-in fade-in duration-300">
+          <div className="p-2 bg-amber-100 rounded-lg text-amber-700 shrink-0 mt-0.5">
+            <AlertCircle className="w-5 h-5 text-amber-600" />
+          </div>
+          <div className="flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h4 className="text-sm font-bold text-amber-900">
+                Chưa đến thời gian bắt đầu chuyến tham quan
+              </h4>
+              <span className="px-2 py-0.5 text-[11px] font-bold bg-amber-200/70 text-amber-800 rounded-md">
+                Chưa diễn ra
+              </span>
+            </div>
+            <p className="text-xs text-amber-800 mt-1 leading-relaxed">
+              Chuyến tham quan dự kiến khởi hành lúc <span className="font-bold text-amber-950 underline decoration-amber-400">{tripTimeInfo.formattedDateTime}</span>. 
+              Giảng viên chỉ có thể thực hiện và lưu điểm danh khi chuyến tham quan đã chính thức bắt đầu.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Quick Action Row */}
       <div className="flex flex-col sm:flex-row justify-between items-center bg-white p-4 rounded-xl border border-[#E7E0C4] shadow-sm mb-6 gap-3">
         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
           <button 
             onClick={handleMarkAllPresent}
-            className="w-full sm:w-auto px-5 py-2 border-2 border-[#89B449] text-[#89B449] hover:bg-[#89B449] hover:text-white rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2 cursor-pointer"
+            disabled={!tripTimeInfo.isStarted}
+            title={!tripTimeInfo.isStarted ? `Chưa đến thời gian tham quan (${tripTimeInfo.formattedDateTime})` : undefined}
+            className={`w-full sm:w-auto px-5 py-2 border-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+              !tripTimeInfo.isStarted
+                ? 'border-slate-300 text-slate-400 bg-slate-50 cursor-not-allowed opacity-60'
+                : 'border-[#89B449] text-[#89B449] hover:bg-[#89B449] hover:text-white cursor-pointer'
+            }`}
           >
             <CheckCircle2 className="w-4 h-4" /> Đánh dấu tất cả Có mặt
           </button>
@@ -396,7 +392,8 @@ export default function DiemDanhSV_GV() {
 
         <button 
           onClick={handleSaveAttendance}
-          disabled={loading || students.length === 0}
+          disabled={loading || students.length === 0 || !tripTimeInfo.isStarted}
+          title={!tripTimeInfo.isStarted ? `Chưa đến thời gian tham quan (${tripTimeInfo.formattedDateTime})` : undefined}
           className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl shadow-sm hover:shadow-md transition-all cursor-pointer font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Save className="w-4 h-4" />
@@ -461,37 +458,43 @@ export default function DiemDanhSV_GV() {
 
                     <td className="p-4">
                       {/* Segmented Toggle Buttons */}
-                      <div className="flex justify-center bg-slate-100 p-1 rounded-lg border border-slate-200 w-fit mx-auto">
+                      <div className={`flex justify-center bg-slate-100 p-1 rounded-lg border border-slate-200 w-fit mx-auto ${!tripTimeInfo.isStarted ? 'opacity-60' : ''}`}>
                         
                         <button 
                           onClick={() => handleStatusChange(student.id, 'CoMat')}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                          disabled={!tripTimeInfo.isStarted}
+                          title={!tripTimeInfo.isStarted ? `Chưa đến thời gian tham quan (${tripTimeInfo.formattedDateTime})` : undefined}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-bold transition-all ${
                             student.status === 'CoMat' 
                               ? 'bg-[#89B449] text-white shadow-sm' 
                               : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
-                          }`}
+                          } ${!tripTimeInfo.isStarted ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                         >
                           <CheckCircle2 className="w-3.5 h-3.5" /> Có mặt
                         </button>
                         
                         <button 
                           onClick={() => handleStatusChange(student.id, 'Vang')}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-bold transition-all mx-1 cursor-pointer ${
+                          disabled={!tripTimeInfo.isStarted}
+                          title={!tripTimeInfo.isStarted ? `Chưa đến thời gian tham quan (${tripTimeInfo.formattedDateTime})` : undefined}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-bold transition-all mx-1 ${
                             student.status === 'Vang' 
                               ? 'bg-[#E68A8C] text-white shadow-sm' 
                               : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
-                          }`}
+                          } ${!tripTimeInfo.isStarted ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                         >
                           <XCircle className="w-3.5 h-3.5" /> Vắng
                         </button>
                         
                         <button 
                           onClick={() => handleStatusChange(student.id, 'TuChoiThamGia')}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                          disabled={!tripTimeInfo.isStarted}
+                          title={!tripTimeInfo.isStarted ? `Chưa đến thời gian tham quan (${tripTimeInfo.formattedDateTime})` : undefined}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-bold transition-all ${
                             student.status === 'TuChoiThamGia' 
                               ? 'bg-white border-2 border-[#E68A8C] text-[#E68A8C] shadow-sm' 
                               : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50 border-2 border-transparent'
-                          }`}
+                          } ${!tripTimeInfo.isStarted ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                         >
                           <FileWarning className="w-3.5 h-3.5" /> Từ chối tham gia
                         </button>

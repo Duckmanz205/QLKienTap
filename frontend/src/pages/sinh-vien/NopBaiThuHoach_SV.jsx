@@ -4,7 +4,7 @@ import {
   UploadCloud, FileText, CheckCircle2, AlertCircle, ChevronRight, Lock, Unlock,
   ArrowLeft, Search, ZoomIn, ZoomOut, AlertTriangle, Send, Maximize2, Minimize2,
   Star, Check, Building2, Monitor, RefreshCw, Calendar, MapPin, Users, Award, ShieldAlert,
-  FileCheck, ExternalLink, Image as ImageIcon, RotateCcw, Layers
+  FileCheck, ExternalLink, Image as ImageIcon, RotateCcw, Layers, MessageSquareQuote, Quote, X, Clock
 } from 'lucide-react';
 import { sinhVienApi } from '../../services/api';
 import Toast from '../../components/Toast';
@@ -23,6 +23,7 @@ export default function NopBaiThuHoach_SV() {
   const confirmationFileInputRef = useRef(null);
   const [popup, setPopup] = useState({ show: false, message: '', type: 'success' });
   const [confirmDelete, setConfirmDelete] = useState({ show: false, tripId: null });
+  const [feedbackModal, setFeedbackModal] = useState({ show: false, trip: null });
 
   // State quản lý Bộ 3 chuyến báo cáo & Hội đồng
   const [repStatus, setRepStatus] = useState(null);
@@ -73,6 +74,7 @@ export default function NopBaiThuHoach_SV() {
       setTrips(validTrips.map(trip => {
         let status = 'Chưa nộp';
         const baiThuHoach = trip.phieuThamQuan?.baiThuHoach;
+        const diemPhieu = trip.phieuThamQuan?.diemPhieuThamQuan;
         const isTuDo = trip.chuyenThamQuan?.cach_to_chuc === 'TuDo' || trip.chuyenThamQuan?.loai_chuyen === 'tu_do';
         const diemDanhStatus = trip.phieuThamQuan?.diemDanh?.trang_thai;
 
@@ -93,6 +95,12 @@ export default function NopBaiThuHoach_SV() {
           hanNopStr = dateObj.toLocaleDateString('vi-VN');
         }
 
+        const isGradedAndLocked = Boolean(
+          (diemPhieu?.da_khoa_thu_hoach === true || diemPhieu?.da_khoa === true) &&
+          diemPhieu?.diem_thu_hoach !== null && 
+          diemPhieu?.diem_thu_hoach !== undefined
+        );
+
         return {
           id: trip.id,
           nhaMay: trip.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Chưa xác định',
@@ -105,7 +113,18 @@ export default function NopBaiThuHoach_SV() {
           cachToChuc: trip.chuyenThamQuan?.cach_to_chuc,
           hoaDonStatus: trip.hoaDon?.trang_thai,
           hasPhieuThamQuan: !!trip.phieuThamQuan,
-          diemDanhStatus: diemDanhStatus
+          diemDanhStatus: diemDanhStatus,
+          isGradedAndLocked,
+          diemPhieuThamQuan: diemPhieu,
+          diemThuHoach: diemPhieu?.diem_thu_hoach !== null && diemPhieu?.diem_thu_hoach !== undefined ? Number(diemPhieu.diem_thu_hoach) : null,
+          nhanXetThuHoach: diemPhieu?.nhan_xet_thu_hoach || '',
+          giangVienHD: diemPhieu?.giangVienHD?.ho_ten || '',
+          ngayCham: diemPhieu?.ngay_cham_thu_hoach || null,
+          ngayKhoa: diemPhieu?.ngay_khoa_thu_hoach || diemPhieu?.ngay_khoa || null,
+          diemAI: diemPhieu?.diem_ai_de_xuat !== null && diemPhieu?.diem_ai_de_xuat !== undefined ? Number(diemPhieu.diem_ai_de_xuat) : null,
+          nhanXetAI: diemPhieu?.nhan_xet_ai_de_xuat || '',
+          diemChuanBi: diemPhieu?.diem_chuan_bi !== null && diemPhieu?.diem_chuan_bi !== undefined ? Number(diemPhieu.diem_chuan_bi) : null,
+          diemCong: diemPhieu?.diem_cong_final !== null && diemPhieu?.diem_cong_final !== undefined ? Number(diemPhieu.diem_cong_final) : 0,
         };
       }));
     } catch (err) {
@@ -117,7 +136,16 @@ export default function NopBaiThuHoach_SV() {
   const completedTrips = trips.filter(t => t.trangThai === 'Đã nộp');
   const hasEnoughTrips = completedTrips.length >= 3; 
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (tripOrStatus) => {
+    if (typeof tripOrStatus === 'object' && tripOrStatus?.isGradedAndLocked) {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-[#407F3E] text-white shadow-xs border border-[#407F3E]/20">
+          <CheckCircle2 className="w-3.5 h-3.5" />
+          Đã chấm: {tripOrStatus.diemThuHoach}/10
+        </span>
+      );
+    }
+    const status = typeof tripOrStatus === 'string' ? tripOrStatus : tripOrStatus?.trangThai;
     switch (status) {
       case 'Đã nộp':
         return <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold bg-[#89B449] text-white shadow-sm border border-[#89B449]/20"><CheckCircle2 className="w-3.5 h-3.5" />{status}</span>;
@@ -264,6 +292,95 @@ export default function NopBaiThuHoach_SV() {
     }
   };
 
+  // Hàm mở xem lại bài nộp đã lưu trên hệ thống
+  const handlePreviewTripReport = async (trip) => {
+    setSelectedTrip(trip);
+    setUploadedConfirmationFile(null);
+    setActivePreviewTab(trip.baiThuHoach?.file_bao_cao ? 'report' : 'confirmation');
+    if (trip.baiThuHoach) {
+      const dbPath = trip.baiThuHoach.file_bao_cao;
+      let apiPath = '';
+      if (dbPath) {
+        if (dbPath.startsWith('/api/')) {
+          apiPath = dbPath;
+        } else if (dbPath.startsWith('reports/')) {
+          apiPath = `/upload/file/${dbPath}`;
+        } else {
+          apiPath = `/upload/file/reports/${dbPath}`;
+        }
+      }
+
+      let blobUrl = '';
+      let extractedText = 'Đây là nội dung bài làm đã nộp (đã được lưu trên hệ thống).';
+
+      try {
+        const { default: api } = await import('../../services/axiosClient');
+        if (apiPath) {
+          const cleanPath = apiPath.startsWith('/') ? apiPath : `/${apiPath}`;
+          const respPdf = await api.get(cleanPath, { responseType: 'blob' });
+          if (respPdf.data) {
+            blobUrl = URL.createObjectURL(respPdf.data);
+          }
+
+          const txtApiPath = cleanPath.replace(/\.\w+$/, '.txt');
+          try {
+            const respTxt = await api.get(txtApiPath, { responseType: 'text' });
+            if (respTxt.data) {
+              extractedText = respTxt.data;
+            }
+          } catch (txtErr) {
+            if (trip.baiThuHoach.noi_dung_trich_xuat) {
+              extractedText = trip.baiThuHoach.noi_dung_trich_xuat;
+            }
+          }
+        }
+
+        const xacNhanPath = trip.baiThuHoach.file_xac_nhan_tham_quan;
+        if (xacNhanPath) {
+          let xnApiPath = '';
+          if (xacNhanPath.startsWith('/api/')) {
+            xnApiPath = xacNhanPath;
+          } else if (xacNhanPath.startsWith('attachments/') || xacNhanPath.startsWith('payments/')) {
+            xnApiPath = `/upload/file/${xacNhanPath}`;
+          } else {
+            xnApiPath = `/upload/file/attachments/${xacNhanPath}`;
+          }
+
+          try {
+            const cleanXnPath = xnApiPath.startsWith('/') ? xnApiPath : `/${xnApiPath}`;
+            const respXn = await api.get(cleanXnPath, { responseType: 'blob' });
+            if (respXn.data) {
+              const xnBlobUrl = URL.createObjectURL(respXn.data);
+              const cType = respXn.headers['content-type'] || '';
+              const isImage = cType.startsWith('image/') || /\.(png|jpe?g)$/i.test(xacNhanPath);
+              const isPdf = cType.includes('pdf') || /\.pdf$/i.test(xacNhanPath);
+              setUploadedConfirmationFile({
+                name: xacNhanPath.split('/').pop() || 'Giay_xac_nhan_DN',
+                size: 'Đã nộp',
+                previewUrl: xnBlobUrl,
+                isImage,
+                isPdf,
+                url: cleanXnPath
+              });
+            }
+          } catch (xnErr) {
+            console.warn('Không tải được file xác nhận preview:', xnErr);
+          }
+        }
+      } catch (err) {
+        console.error('Lỗi tải file preview:', err);
+      }
+      
+      setUploadedFile({
+        name: trip.baiThuHoach.file_bao_cao_url || 'BaoCao_ThuHoach.pdf',
+        size: 'Đã nộp',
+        text: extractedText,
+        previewUrl: blobUrl,
+        url: apiPath
+      });
+    }
+  };
+
   // ---------------------------------------------------------
   // VIEW 1: LIST OF TRIPS
   // ---------------------------------------------------------
@@ -297,138 +414,144 @@ export default function NopBaiThuHoach_SV() {
               }
               
               return (
-                <div key={trip.id} className="bg-white rounded-2xl border border-[#E7E0C4] shadow-sm overflow-hidden flex flex-col transition-all hover:border-[#407F3E]/50 group">
-                  <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-black text-slate-800 truncate mb-1 group-hover:text-[#407F3E] transition-colors">{trip.nhaMay}</h3>
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-medium text-slate-500">
-                        <span>Ngày đi: <strong>{trip.ngayThamQuan}</strong></span>
-                        <span>Hạn nộp: <strong>{trip.hanNop}</strong></span>
-                        <span className="inline-block px-1.5 py-0.5 rounded border border-slate-200 bg-slate-50 text-[10px] uppercase tracking-wider">{trip.hinhThuc}</span>
-                        {isTuDo && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-indigo-200 bg-indigo-50 text-indigo-700 text-[10px] uppercase tracking-wider font-bold">
-                            <Building2 className="w-3 h-3 text-indigo-600" />
-                            Chuyến tự do • Kèm giấy xác nhận tham quan
-                          </span>
-                        )}
-                        {repStatus?.selectedRegistrationIds?.includes(trip.id) && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-amber-300 bg-amber-50 text-amber-700 text-[10px] uppercase tracking-wider font-extrabold shadow-xs">
-                            <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
-                            Bộ 3 báo cáo
+                <div 
+                  key={trip.id} 
+                  className="bg-white rounded-2xl border border-[#E7E0C4] shadow-xs hover:shadow-md hover:border-[#407F3E]/40 transition-all duration-200 overflow-hidden flex flex-col md:flex-row group"
+                >
+                  {/* CỘT TRÁI (LEFT CONTENT): Thông tin chuyến đi, thời gian & File bài nộp */}
+                  <div className="flex-1 p-4 sm:p-4.5 flex flex-col justify-between gap-2.5 min-w-0">
+                    <div>
+                      {/* 1. Header: Icon + Tên nhà máy (cho phép xuống dòng tự nhiên, không bao giờ bị cắt cụt) + Badges */}
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-[#407F3E]/10 text-[#407F3E] flex items-center justify-center shrink-0 mt-0.5 group-hover:scale-105 transition-transform">
+                          {trip.hinhThuc === 'Trực tuyến' ? (
+                            <Monitor className="w-5 h-5 text-[#407F3E]" />
+                          ) : isTuDo ? (
+                            <Building2 className="w-5 h-5 text-indigo-600" />
+                          ) : (
+                            <Building2 className="w-5 h-5 text-[#407F3E]" />
+                          )}
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-base sm:text-lg font-black text-slate-800 leading-snug line-clamp-2 group-hover:text-[#407F3E] transition-colors mb-1.5">
+                            {trip.nhaMay}
+                          </h3>
+
+                          {/* Badges / Chips */}
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md border border-slate-200 bg-slate-50 text-slate-700 text-[11px] font-bold">
+                              {trip.hinhThuc === 'Trực tuyến' ? <Monitor className="w-3 h-3 text-purple-600" /> : <MapPin className="w-3 h-3 text-[#407F3E]" />}
+                              {trip.hinhThuc}
+                            </span>
+                            {isTuDo ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md border border-indigo-200 bg-indigo-50 text-indigo-700 text-[11px] font-bold">
+                                <Building2 className="w-3 h-3 text-indigo-600" />
+                                Chuyến tự do
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 text-[11px] font-medium">
+                                Khoa tổ chức
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Meta thời gian: Ngày tham quan & Hạn nộp */}
+                      <div className="mt-2.5 pt-2 border-t border-slate-100 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-slate-500">
+                        <div className="flex items-center gap-1.5 font-medium">
+                          <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span>Ngày đi: <strong className="text-slate-700 font-bold">{trip.ngayThamQuan}</strong></span>
+                        </div>
+                        <div className="flex items-center gap-1.5 font-medium">
+                          <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span>Hạn nộp: <strong className="text-slate-700 font-bold">{trip.hanNop}</strong></span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 2. Khối thông tin file bài nộp (Submission File Snippet) */}
+                    {trip.baiThuHoach?.file_bao_cao ? (
+                      <div className="bg-slate-50/90 border border-slate-200 rounded-xl p-2 px-3 flex items-center justify-between gap-3 text-xs mt-1">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-8 h-8 rounded-lg bg-red-100 text-red-700 flex items-center justify-center shrink-0">
+                            <FileText className="w-4 h-4 text-red-600" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-bold text-slate-800 truncate text-xs">
+                              {trip.baiThuHoach.file_bao_cao_url || trip.baiThuHoach.file_bao_cao.split('/').pop() || 'BaoCao_ThuHoach.pdf'}
+                            </p>
+                            <p className="text-[11px] text-slate-500">
+                              {trip.trangThai === 'Chờ duyệt điểm danh' ? 'Đã nộp bài • Đang chờ duyệt điểm danh' : 'Đã nộp thành công lên hệ thống'}
+                            </p>
+                          </div>
+                        </div>
+                        {trip.baiThuHoach.file_xac_nhan_tham_quan && (
+                          <span className="shrink-0 text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md">
+                            + Giấy XN
                           </span>
                         )}
                       </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-4 shrink-0">
-                      {getStatusBadge(trip.trangThai)}
-                      {trip.trangThai === 'Đã nộp' || trip.trangThai === 'Chờ duyệt điểm danh' ? (
-                        <div className="flex gap-2">
-                          <button 
-                            onClick={() => setConfirmDelete({ show: true, tripId: trip.id })}
-                            className="px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-1.5 bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer shadow-sm border border-red-100"
-                          >
-                            {trip.trangThai === 'Đã nộp' ? 'Nộp lại' : 'Gửi lại'} <UploadCloud className="w-4 h-4" />
-                          </button>
-                          <button 
-                            onClick={async () => {
-                              setSelectedTrip(trip);
-                              setUploadedConfirmationFile(null);
-                              setActivePreviewTab(trip.baiThuHoach?.file_bao_cao ? 'report' : 'confirmation');
-                              if (trip.baiThuHoach) {
-                                const dbPath = trip.baiThuHoach.file_bao_cao;
-                                let apiPath = '';
-                                if (dbPath) {
-                                  if (dbPath.startsWith('/api/')) {
-                                    apiPath = dbPath;
-                                  } else if (dbPath.startsWith('reports/')) {
-                                    apiPath = `/upload/file/${dbPath}`;
-                                  } else {
-                                    apiPath = `/upload/file/reports/${dbPath}`;
-                                  }
-                                }
+                    ) : (
+                      <div className="bg-amber-50/70 border border-amber-200/90 rounded-xl p-2.5 px-3 flex items-center gap-2 text-xs text-amber-800 mt-1">
+                        <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span className="text-[11px] font-medium">
+                          Chưa nộp file báo cáo. Vui lòng nộp bài trước hạn chót <strong>{trip.hanNop}</strong>.
+                        </span>
+                      </div>
+                    )}
+                  </div>
 
-                                // Fetch PDF and TXT via axiosClient (auto-attaches JWT)
-                                let blobUrl = '';
-                                let extractedText = 'Đây là nội dung bài làm đã nộp (đã được lưu trên hệ thống).';
-
-                                try {
-                                  const { default: api } = await import('../../services/axiosClient');
-                                  
-                                  if (apiPath) {
-                                    const cleanPath = apiPath.startsWith('/') ? apiPath : `/${apiPath}`;
-                                    // 1. Fetch PDF
-                                    const respPdf = await api.get(cleanPath, { responseType: 'blob' });
-                                    if (respPdf.data) {
-                                      blobUrl = URL.createObjectURL(respPdf.data);
-                                    }
-
-                                    // 2. Fetch Text File (.txt)
-                                    const txtApiPath = cleanPath.replace(/\.\w+$/, '.txt');
-                                    try {
-                                      const respTxt = await api.get(txtApiPath, { responseType: 'text' });
-                                      if (respTxt.data) {
-                                        extractedText = respTxt.data;
-                                      }
-                                    } catch (txtErr) {
-                                      console.warn('Không tìm thấy file text trích xuất:', txtErr);
-                                      if (trip.baiThuHoach.noi_dung_trich_xuat) {
-                                        extractedText = trip.baiThuHoach.noi_dung_trich_xuat;
-                                      }
-                                    }
-                                  }
-
-                                  // 3. Fetch Confirmation File nếu có
-                                  const xacNhanPath = trip.baiThuHoach.file_xac_nhan_tham_quan;
-                                  if (xacNhanPath) {
-                                    let xnApiPath = '';
-                                    if (xacNhanPath.startsWith('/api/')) {
-                                      xnApiPath = xacNhanPath;
-                                    } else if (xacNhanPath.startsWith('attachments/') || xacNhanPath.startsWith('payments/')) {
-                                      xnApiPath = `/upload/file/${xacNhanPath}`;
-                                    } else {
-                                      xnApiPath = `/upload/file/attachments/${xacNhanPath}`;
-                                    }
-
-                                    try {
-                                      const cleanXnPath = xnApiPath.startsWith('/') ? xnApiPath : `/${xnApiPath}`;
-                                      const respXn = await api.get(cleanXnPath, { responseType: 'blob' });
-                                      if (respXn.data) {
-                                        const xnBlobUrl = URL.createObjectURL(respXn.data);
-                                        const cType = respXn.headers['content-type'] || '';
-                                        const isImage = cType.startsWith('image/') || /\.(png|jpe?g)$/i.test(xacNhanPath);
-                                        const isPdf = cType.includes('pdf') || /\.pdf$/i.test(xacNhanPath);
-                                        setUploadedConfirmationFile({
-                                          name: xacNhanPath.split('/').pop() || 'Giay_xac_nhan_DN',
-                                          size: 'Đã nộp',
-                                          previewUrl: xnBlobUrl,
-                                          isImage,
-                                          isPdf,
-                                          url: cleanXnPath
-                                        });
-                                      }
-                                    } catch (xnErr) {
-                                      console.warn('Không tải được file xác nhận preview:', xnErr);
-                                    }
-                                  }
-                                } catch (err) {
-                                  console.error('Lỗi tải file preview:', err);
-                                }
-                                
-                                setUploadedFile({
-                                  name: trip.baiThuHoach.file_bao_cao_url || 'BaoCao_ThuHoach.pdf',
-                                  size: 'Đã nộp',
-                                  text: extractedText,
-                                  previewUrl: blobUrl,
-                                  url: apiPath
-                                });
-                              }
-                            }}
-                            className="px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
-                          >
-                            Xem lại <FileText className="w-4 h-4" />
-                          </button>
+                  {/* CỘT PHẢI (RIGHT METRIC & ACTIONS SIDEBAR): Điểm số + Nút thao tác dạng Stack */}
+                  <div className={`w-full md:w-44 shrink-0 border-t md:border-t-0 md:border-l border-[#E7E0C4] flex flex-col justify-between p-3.5 ${
+                    trip.isGradedAndLocked 
+                      ? 'bg-gradient-to-b from-emerald-50/50 to-white' 
+                      : 'bg-slate-50/50'
+                  }`}>
+                    {/* Phần trên: Điểm số gọn gàng hoặc Trạng thái */}
+                    <div className="flex flex-col items-center justify-center text-center py-0.5">
+                      {trip.isGradedAndLocked ? (
+                        <div className="flex items-baseline justify-center gap-0.5">
+                          <span className="text-3xl font-black text-[#407F3E] tracking-tight">
+                            {trip.diemThuHoach}
+                          </span>
+                          <span className="text-xs font-bold text-slate-400">/10</span>
                         </div>
+                      ) : (
+                        <div className="py-1">
+                          {getStatusBadge(trip)}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Phần dưới: Cụm nút hành động dạng Stack */}
+                    <div className="pt-3 border-t border-slate-200/60 flex flex-col gap-2">
+                      {trip.trangThai === 'Đã nộp' || trip.trangThai === 'Chờ duyệt điểm danh' ? (
+                        <>
+                          {trip.isGradedAndLocked ? (
+                            <button 
+                              onClick={() => setFeedbackModal({ show: true, trip })}
+                              className="w-full py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 bg-[#407F3E] text-white hover:bg-[#346732] transition-colors cursor-pointer shadow-2xs"
+                            >
+                              <MessageSquareQuote className="w-3.5 h-3.5" /> Xem nhận xét
+                            </button>
+                          ) : (
+                            <button 
+                              onClick={() => setConfirmDelete({ show: true, tripId: trip.id })}
+                              className="w-full py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 transition-colors cursor-pointer shadow-2xs"
+                            >
+                              <UploadCloud className="w-3.5 h-3.5" /> {trip.trangThai === 'Đã nộp' ? 'Nộp lại bài' : 'Gửi lại bài'}
+                            </button>
+                          )}
+
+                          <button 
+                            onClick={() => handlePreviewTripReport(trip)}
+                            className="w-full py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 bg-white text-slate-700 hover:bg-slate-100 border border-slate-200 transition-colors cursor-pointer shadow-2xs"
+                          >
+                            <FileText className="w-3.5 h-3.5 text-slate-500" /> Xem lại file
+                          </button>
+                        </>
                       ) : (
                         canSubmit ? (
                           <button 
@@ -438,16 +561,16 @@ export default function NopBaiThuHoach_SV() {
                               setUploadedConfirmationFile(null);
                               setActivePreviewTab('report');
                             }}
-                            className="px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-1.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 shadow-sm transition-colors cursor-pointer"
+                            className="w-full py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 bg-[#407F3E] text-white hover:bg-[#346732] shadow-xs transition-all cursor-pointer"
                           >
-                            Nộp bài <ChevronRight className="w-4 h-4" />
+                            Nộp bài ngay <ChevronRight className="w-3.5 h-3.5" />
                           </button>
                         ) : (
-                          <div className="flex flex-col items-end">
-                            <button disabled className="px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-1.5 bg-slate-200 text-slate-400 cursor-not-allowed">
-                              Nộp bài <ChevronRight className="w-4 h-4" />
+                          <div className="flex flex-col items-center">
+                            <button disabled className="w-full py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 bg-slate-200 text-slate-400 cursor-not-allowed">
+                              Nộp bài <ChevronRight className="w-3.5 h-3.5" />
                             </button>
-                            <span className="text-[10px] text-red-500 font-bold mt-1 uppercase tracking-wide">{disabledReason}</span>
+                            <span className="text-[10px] text-red-500 font-bold mt-1 text-center">{disabledReason}</span>
                           </div>
                         )
                       )}
@@ -988,10 +1111,22 @@ export default function NopBaiThuHoach_SV() {
           {/* Right Action Buttons */}
           <div className="shrink-0 flex items-center gap-2">
             {isSubmitted ? (
-              <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                Bài nộp đã được ghi nhận
-              </span>
+              <div className="flex items-center gap-2">
+                {selectedTrip.isGradedAndLocked && (
+                  <button
+                    type="button"
+                    onClick={() => setFeedbackModal({ show: true, trip: selectedTrip })}
+                    className="px-3.5 py-1.5 bg-[#407F3E]/10 hover:bg-[#407F3E]/20 text-[#407F3E] border border-[#407F3E]/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                  >
+                    <MessageSquareQuote className="w-3.5 h-3.5" />
+                    <span>Xem nhận xét ({selectedTrip.diemThuHoach}/10)</span>
+                  </button>
+                )}
+                <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  {selectedTrip.isGradedAndLocked ? 'Đã khóa sổ điểm' : 'Bài nộp đã được ghi nhận'}
+                </span>
+              </div>
             ) : (
               <div className="flex items-center gap-2">
                 {(uploadedFile || uploadedConfirmationFile) && (
@@ -1439,6 +1574,146 @@ export default function NopBaiThuHoach_SV() {
                 className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-red-500 hover:bg-red-600 transition-colors cursor-pointer shadow-sm"
               >
                 Xác nhận xóa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Popup: Xem nhận xét bài thu hoạch của Giảng viên */}
+      {feedbackModal.show && feedbackModal.trip && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200"
+          onClick={() => setFeedbackModal({ show: false, trip: null })}
+        >
+          <div 
+            className="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="p-5 px-6 border-b border-[#E7E0C4] flex items-center justify-between bg-white shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-[#407F3E]/10 text-[#407F3E] flex items-center justify-center shrink-0">
+                  <MessageSquareQuote className="w-5 h-5 text-[#407F3E]" />
+                </div>
+                <div>
+                  <h3 className="font-black text-base text-slate-800">Đánh giá & Nhận xét bài thu hoạch</h3>
+                  <p className="text-xs text-slate-500 font-medium line-clamp-1">{feedbackModal.trip.nhaMay}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFeedbackModal({ show: false, trip: null })}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto space-y-5 bg-slate-50/50 flex-1">
+              {/* Score Showcase Card */}
+              <div className="bg-gradient-to-br from-[#407F3E]/10 via-[#407F3E]/5 to-white border border-[#407F3E]/30 rounded-2xl p-5 shadow-2xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#407F3E] block mb-1">
+                      Điểm bài thu hoạch (Hệ số 30%)
+                    </span>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-4xl font-black text-[#407F3E] tracking-tight">
+                        {feedbackModal.trip.diemThuHoach !== null ? feedbackModal.trip.diemThuHoach : '--'}
+                      </span>
+                      <span className="text-base font-bold text-slate-400">/ 10</span>
+                    </div>
+                  </div>
+
+                  <div className="sm:text-right space-y-1">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#407F3E] text-white text-[11px] font-bold rounded-full shadow-2xs">
+                      <Lock className="w-3 h-3" />
+                      <span>Đã nộp & khóa sổ điểm</span>
+                    </div>
+                    {feedbackModal.trip.ngayKhoa && (
+                      <p className="text-[11px] text-slate-500 font-medium">
+                        Khóa ngày: {new Date(feedbackModal.trip.ngayKhoa).toLocaleDateString('vi-VN')}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Lecturer info row */}
+                <div className="mt-4 pt-3 border-t border-[#407F3E]/15 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
+                  <div className="flex items-center gap-1.5">
+                    <Award className="w-4 h-4 text-[#407F3E]" />
+                    <span>Giảng viên chấm: <strong>{feedbackModal.trip.giangVienHD || 'Giảng viên hướng dẫn'}</strong></span>
+                  </div>
+                  {feedbackModal.trip.ngayCham && (
+                    <div className="text-slate-500">
+                      Chấm ngày: <strong>{new Date(feedbackModal.trip.ngayCham).toLocaleDateString('vi-VN')}</strong>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Lecturer's Comment Section */}
+              <div className="bg-white border border-[#E7E0C4] rounded-2xl p-5 shadow-2xs space-y-3">
+                <div className="flex items-center gap-2 text-[#407F3E] font-bold text-xs uppercase tracking-wider">
+                  <Quote className="w-4 h-4 text-[#407F3E]" />
+                  <span>Lời nhận xét của Giảng viên hướng dẫn</span>
+                </div>
+
+                {feedbackModal.trip.nhanXetThuHoach ? (
+                  <div className="p-4 bg-emerald-50/50 border border-emerald-100 rounded-xl text-slate-700 text-sm leading-relaxed whitespace-pre-line font-medium">
+                    "{feedbackModal.trip.nhanXetThuHoach}"
+                  </div>
+                ) : (
+                  <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-xl text-slate-500 text-xs italic">
+                    Giảng viên không để lại nhận xét thêm bằng văn bản cho bài nộp này. Điểm số bài thu hoạch đã được ghi nhận chính thức vào hệ thống.
+                  </div>
+                )}
+              </div>
+
+              {/* AI Criteria Feedback (if available) */}
+              {feedbackModal.trip.nhanXetAI && (
+                <div className="bg-white border border-[#E7E0C4] rounded-2xl p-5 shadow-2xs space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                      <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                      Chi tiết đánh giá tiêu chí báo cáo
+                    </span>
+                    {feedbackModal.trip.diemAI !== null && (
+                      <span className="text-[11px] font-bold text-slate-500">
+                        Điểm đối sánh tiêu chuẩn: {feedbackModal.trip.diemAI}/10
+                      </span>
+                    )}
+                  </div>
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 leading-relaxed whitespace-pre-line">
+                    {feedbackModal.trip.nhanXetAI}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 px-6 border-t border-[#E7E0C4] bg-white flex items-center justify-between gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  const targetTrip = feedbackModal.trip;
+                  setFeedbackModal({ show: false, trip: null });
+                  handlePreviewTripReport(targetTrip);
+                }}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <FileText className="w-4 h-4 text-slate-500" />
+                <span>Xem lại file PDF bài nộp</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFeedbackModal({ show: false, trip: null })}
+                className="px-5 py-2 bg-[#407F3E] hover:bg-[#346732] text-white font-bold text-xs rounded-xl shadow-2xs transition-all cursor-pointer"
+              >
+                Đóng
               </button>
             </div>
           </div>

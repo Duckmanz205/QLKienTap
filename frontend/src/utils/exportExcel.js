@@ -949,3 +949,60 @@ export const exportPrepGradesTemplate = (tripName = '', students = []) => {
   const cleanTripName = sanitizeFileName(tripName || 'ChuyenDi');
   XLSX.writeFile(wb, `Mau_Nhap_Diem_Chuan_Bi_${cleanTripName}.xlsx`);
 };
+
+/**
+ * MẪU: Phân công sinh viên thực hiện học phần kiến tập (GVHD)
+ * Thiết kế chuẩn 6 cột: STT, Mã HS-SV, Họ đệm, Tên, Lớp học, Giảng viên Hướng dẫn
+ */
+export const exportPhanCongGVHD = (enrollments = [], tenDot = '') => {
+  const rows = [
+    ['BỘ CÔNG THƯƠNG', '', '', 'CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM', '', ''],
+    ['TRƯỜNG ĐẠI HỌC CÔNG THƯƠNG TP.HCM', '', '', 'Độc lập - Tự do - Hạnh phúc', '', ''],
+    [],
+    ['PHÂN CÔNG SINH VIÊN THỰC HIỆN HỌC PHẦN KIẾN TẬP', '', '', '', '', ''],
+    [],
+    ['STT', 'Mã HS-SV', 'Họ đệm', 'Tên', 'Lớp học', 'Giảng viên Hướng dẫn']
+  ];
+
+  enrollments.forEach((e, idx) => {
+    const sv = e.sinhVien || {};
+    const { hoDem, ten } = getHoDemAndTen(sv.ho_ten || e.ho_ten || '');
+    const gvhd = sv.details?.giangVienHuongDan?.ho_ten || e.giangVienHuongDan?.ho_ten || e.gvhd || 'Chưa phân công';
+    const lop = sv.ten_lop || sv.lop || e.ten_lop || '';
+
+    rows.push([
+      idx + 1,
+      sv.mssv || e.mssv || '',
+      hoDem,
+      ten,
+      lop,
+      gvhd
+    ]);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+
+  // Merge tiêu đề theo chuẩn 6 cột (A đến F: index 0 đến 5)
+  ws['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 2 } }, // BỘ CÔNG THƯƠNG (A1:C1)
+    { s: { r: 0, c: 3 }, e: { r: 0, c: 5 } }, // CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM (D1:F1)
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 2 } }, // TRƯỜNG ĐẠI HỌC CÔNG THƯƠNG TP.HCM (A2:C2)
+    { s: { r: 1, c: 3 }, e: { r: 1, c: 5 } }, // Độc lập - Tự do - Hạnh phúc (D2:F2)
+    { s: { r: 3, c: 0 }, e: { r: 3, c: 5 } }  // PHÂN CÔNG SINH VIÊN THỰC HIỆN HỌC PHẦN KIẾN TẬP (A4:F4)
+  ];
+
+  // Độ rộng 6 cột
+  ws['!cols'] = [
+    { wch: 8 },  // STT
+    { wch: 16 }, // Mã HS-SV
+    { wch: 24 }, // Họ đệm
+    { wch: 12 }, // Tên
+    { wch: 16 }, // Lớp học
+    { wch: 28 }  // Giảng viên Hướng dẫn
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Phan mem');
+  XLSX.writeFile(wb, `PhanCong_GVHD_${sanitizeFileName(tenDot || 'DanhSach')}.xlsx`);
+};
+

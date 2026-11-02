@@ -372,7 +372,7 @@ class ApiService {
   static Future<dynamic> selectRepresentativeTrips(
       List<int> registrationIds, {int? termStudentId}) async {
     return await post('sinh-vien/select-representative-trips', {
-      'termStudentId': ?termStudentId,
+      if (termStudentId != null) 'termStudentId': termStudentId,
       'registrationIds': registrationIds,
     });
   }
@@ -445,6 +445,11 @@ class ApiService {
       'gioBatDau': gioBatDau,
       'hinhThuc': hinhThuc,
     });
+  }
+
+  // Student proposal portal status
+  static Future<dynamic> getProposalPortalStatus() async {
+    return await get('sinh-vien/proposal-portal-status');
   }
 
   // Lecturer profile

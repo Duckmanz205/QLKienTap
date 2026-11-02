@@ -184,6 +184,7 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
   
   List<Map<String, dynamic>> _factories = [];
   String _filterFactory = 'Tất cả';
+  Map<String, dynamic>? _portalStatus;
 
   List<Map<String, dynamic>> _factorySuggestions = [];
   bool _isSearchingFactory = false;
@@ -202,6 +203,15 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
       if (res is List && mounted) {
         setState(() {
           _factories = res.map((f) => Map<String, dynamic>.from(f as Map)).toList();
+        });
+      }
+    } catch (_) {}
+
+    try {
+      final pStatus = await ApiService.getProposalPortalStatus();
+      if (pStatus is Map && mounted) {
+        setState(() {
+          _portalStatus = Map<String, dynamic>.from(pStatus);
         });
       }
     } catch (_) {}
@@ -884,6 +894,152 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Smart Banner: Trạng thái tiếp nhận đợt hoặc tích lũy tự do
+          if (_portalStatus != null) ...[
+            if (_portalStatus!['mode'] == 'CAMPAIGN' || _portalStatus!['mode'] == 'CURRENT_DOT') ...[
+              Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFECFDF5),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFA7F3D0)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF059669).withValues(alpha: 0.06),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD1FAE5),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.check_circle_outline, color: Color(0xFF059669), size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Đang tiếp nhận vào: ${_portalStatus!['dotKienTap']?['ten_dot'] ?? 'Đợt kiến tập'}',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF065F46)),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFA7F3D0),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Text(
+                                  'Tính điểm đợt này',
+                                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF065F46)),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _portalStatus!['message']?.toString() ?? 'Chuyến đi sau khi được phê duyệt sẽ được tính điểm và báo cáo trong đợt này.',
+                            style: const TextStyle(fontSize: 11.5, color: Color(0xFF047857), height: 1.35),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ] else if (_portalStatus!['mode'] == 'FREE_ACCUMULATION') ...[
+              Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0F9FF),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFBAE6FD)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF0284C7).withValues(alpha: 0.06),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE0F2FE),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.access_time_rounded, color: Color(0xFF0284C7), size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Expanded(
+                                child: Text(
+                                  'Tiếp nhận diện Tích lũy tự do (Ngoài đợt)',
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF075985)),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFBAE6FD),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Text(
+                                  'Bảo lưu 18 tháng',
+                                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF0369A1)),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _portalStatus!['message']?.toString() ?? 'Đề xuất gửi lúc này sẽ được ghi nhận vào diện tích lũy tự do.',
+                            style: const TextStyle(fontSize: 11.5, color: Color(0xFF0369A1), height: 1.35),
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: const [
+                              Text('💡 ', style: TextStyle(fontSize: 11)),
+                              Expanded(
+                                child: Text(
+                                  'Bạn vẫn có thể tham gia chuyến đi bình thường. Kết quả sẽ được tích lũy để nộp bài khi các đợt kiến tập mở.',
+                                  style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Color(0xFF0284C7)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+
           // Proposal Form Card
           Card(
             shape: RoundedRectangleBorder(
@@ -1383,7 +1539,30 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
                           ],
                         ],
                       ),
-                      if (prop.phanHoi != null && prop.phanHoi!.isNotEmpty) ...[
+                      if (prop.isRejected && ((prop.lyDoTuChoi != null && prop.lyDoTuChoi!.isNotEmpty) || (prop.phanHoi != null && prop.phanHoi!.isNotEmpty))) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: AppColors.danger.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(Icons.cancel_outlined, size: 16, color: AppColors.danger),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Lý do từ chối: ${prop.lyDoTuChoi ?? prop.phanHoi}',
+                                  style: const TextStyle(fontSize: 11.5, color: AppColors.danger, fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ] else if (prop.phanHoi != null && prop.phanHoi!.isNotEmpty) ...[
                         const SizedBox(height: 8),
                         Container(
                           padding: const EdgeInsets.all(8),

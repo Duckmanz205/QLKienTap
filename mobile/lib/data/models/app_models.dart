@@ -247,6 +247,12 @@ class Submission {
   final String? fileBaoCaoUrl;
   final String? fileXacNhanUrl;
   final DateTime? tripDate;
+  final double? reportScore;
+  final String? gvhdComment;
+  final String? gvhdName;
+  final bool isScoreLocked;
+  final String? gradedAt;
+  final String? deadlineText;
 
   Submission({
     required this.id,
@@ -263,7 +269,15 @@ class Submission {
     this.fileBaoCaoUrl,
     this.fileXacNhanUrl,
     this.tripDate,
+    this.reportScore,
+    this.gvhdComment,
+    this.gvhdName,
+    this.isScoreLocked = false,
+    this.gradedAt,
+    this.deadlineText,
   });
+
+  bool get isGraded => reportScore != null;
 
   Submission copyWith({
     int? registrationId,
@@ -276,6 +290,12 @@ class Submission {
     String? fileBaoCaoUrl,
     String? fileXacNhanUrl,
     DateTime? tripDate,
+    double? reportScore,
+    String? gvhdComment,
+    String? gvhdName,
+    bool? isScoreLocked,
+    String? gradedAt,
+    String? deadlineText,
   }) {
     return Submission(
       id: id,
@@ -292,6 +312,12 @@ class Submission {
       fileBaoCaoUrl: fileBaoCaoUrl ?? this.fileBaoCaoUrl,
       fileXacNhanUrl: fileXacNhanUrl ?? this.fileXacNhanUrl,
       tripDate: tripDate ?? this.tripDate,
+      reportScore: reportScore ?? this.reportScore,
+      gvhdComment: gvhdComment ?? this.gvhdComment,
+      gvhdName: gvhdName ?? this.gvhdName,
+      isScoreLocked: isScoreLocked ?? this.isScoreLocked,
+      gradedAt: gradedAt ?? this.gradedAt,
+      deadlineText: deadlineText ?? this.deadlineText,
     );
   }
 }
@@ -352,6 +378,7 @@ class RefundRequest {
   final String dateText;
   final String amountText;
   final String status; // 'Chờ xử lý', 'Đã hoàn tiền', 'Từ chối'
+  final String? lyDoTuChoi;
 
   RefundRequest({
     required this.id,
@@ -359,6 +386,7 @@ class RefundRequest {
     required this.dateText,
     required this.amountText,
     required this.status,
+    this.lyDoTuChoi,
   });
 }
 
@@ -373,6 +401,7 @@ class TripProposal {
   final String trangThai; // 'ChoDuyet', 'ChoKhoaDuyet', 'DaDuyet', 'TuChoi'
   final String? lyDo;
   final String? phanHoi;
+  final String? lyDoTuChoi;
 
   TripProposal({
     required this.id,
@@ -384,6 +413,7 @@ class TripProposal {
     required this.trangThai,
     this.lyDo,
     this.phanHoi,
+    this.lyDoTuChoi,
   });
 
   bool get isPending => trangThai == 'ChoDuyet' || trangThai == 'ChoKhoaDuyet';
@@ -403,8 +433,6 @@ class TripGradeItem {
   final double? diemCong;
   final double? diemTongChuyen;
   final String? ketQua; // 'Dat', 'KhongDat', 'ChoDiem'
-  final String? nhanXetGvhd;
-  final String? nhanXetHoiDong;
   final bool daKhoaChuanBi;
   final bool daKhoaThuHoach;
   final bool daKhoaHoiDong;
@@ -420,8 +448,6 @@ class TripGradeItem {
     this.diemCong,
     this.diemTongChuyen,
     this.ketQua,
-    this.nhanXetGvhd,
-    this.nhanXetHoiDong,
     this.daKhoaChuanBi = false,
     this.daKhoaThuHoach = false,
     this.daKhoaHoiDong = false,
@@ -517,6 +543,8 @@ class TripBusInfo {
   final String? lecturerName;
   final String? lecturerPhone;
   final List<TripBusMember> students;
+  final String? enterpriseContactPerson;
+  final String? enterpriseContactPhone;
 
   TripBusInfo({
     required this.tripId,
@@ -527,6 +555,8 @@ class TripBusInfo {
     this.lecturerName,
     this.lecturerPhone,
     required this.students,
+    this.enterpriseContactPerson,
+    this.enterpriseContactPhone,
   });
 }
 
@@ -546,6 +576,8 @@ class TripRegistrationStudent {
   final double prelimGrade; // Điểm chuẩn bị
   final double extraGrade;  // Điểm cộng
   final bool isLockedPrep;
+  final String? fileXacNhanUrl;
+  final String? cachToChuc;
 
   TripRegistrationStudent({
     required this.phieuId,
@@ -562,6 +594,8 @@ class TripRegistrationStudent {
     this.prelimGrade = 0.0,
     this.extraGrade = 0.0,
     this.isLockedPrep = false,
+    this.fileXacNhanUrl,
+    this.cachToChuc,
   });
 
   TripRegistrationStudent copyWith({
@@ -570,6 +604,8 @@ class TripRegistrationStudent {
     double? prelimGrade,
     double? extraGrade,
     bool? isLockedPrep,
+    String? fileXacNhanUrl,
+    String? cachToChuc,
   }) {
     return TripRegistrationStudent(
       phieuId: phieuId,
@@ -586,6 +622,8 @@ class TripRegistrationStudent {
       prelimGrade: prelimGrade ?? this.prelimGrade,
       extraGrade: extraGrade ?? this.extraGrade,
       isLockedPrep: isLockedPrep ?? this.isLockedPrep,
+      fileXacNhanUrl: fileXacNhanUrl ?? this.fileXacNhanUrl,
+      cachToChuc: cachToChuc ?? this.cachToChuc,
     );
   }
 }
@@ -708,6 +746,7 @@ class LecturerStudent {
   final int? dotKienTapId;
   final String? reportFileUrl;
   final String? confirmationFileUrl;
+  final bool isScoreLocked;
 
   LecturerStudent({
     required this.id,
@@ -732,6 +771,7 @@ class LecturerStudent {
     this.dotKienTapId,
     this.reportFileUrl,
     this.confirmationFileUrl,
+    this.isScoreLocked = false,
   });
 
   LecturerStudent copyWith({
@@ -746,6 +786,7 @@ class LecturerStudent {
     bool? isGraded,
     String? reportFileUrl,
     String? confirmationFileUrl,
+    bool? isScoreLocked,
   }) {
     return LecturerStudent(
       id: id,
@@ -769,6 +810,7 @@ class LecturerStudent {
       tourId: tourId,
       reportFileUrl: reportFileUrl ?? this.reportFileUrl,
       confirmationFileUrl: confirmationFileUrl ?? this.confirmationFileUrl,
+      isScoreLocked: isScoreLocked ?? this.isScoreLocked,
     );
   }
 }
@@ -781,6 +823,10 @@ class LecturerTour {
   final int registeredCount;
   final int maxCount;
   final String status; // 'upcoming', 'ongoing', 'completed'
+  final DateTime? rawTripDate;
+  final String? rawStartTime;
+  final String? rawStatus;
+  final String? companyName;
 
   LecturerTour({
     required this.id,
@@ -790,7 +836,42 @@ class LecturerTour {
     required this.registeredCount,
     required this.maxCount,
     required this.status,
+    this.rawTripDate,
+    this.rawStartTime,
+    this.rawStatus,
+    this.companyName,
   });
+
+  bool get isStarted {
+    if (rawTripDate == null) return true;
+    final d = rawTripDate!;
+    int hours = 0;
+    int minutes = 0;
+    if (rawStartTime != null && rawStartTime!.isNotEmpty) {
+      final cleanTime = rawStartTime!.contains('T')
+          ? rawStartTime!.split('T')[1].substring(0, 8)
+          : rawStartTime!;
+      final parts = cleanTime.split(':');
+      if (parts.isNotEmpty) hours = int.tryParse(parts[0]) ?? 0;
+      if (parts.length > 1) minutes = int.tryParse(parts[1]) ?? 0;
+    }
+    final start = DateTime(d.year, d.month, d.day, hours, minutes);
+    return DateTime.now().isAfter(start) || DateTime.now().isAtSameMomentAs(start);
+  }
+
+  String get formattedStartDateTime {
+    if (rawTripDate == null) return date;
+    final d = rawTripDate!;
+    final dateStr = '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+    String timeStr = '08:00';
+    if (rawStartTime != null && rawStartTime!.isNotEmpty) {
+      final cleanTime = rawStartTime!.contains('T')
+          ? rawStartTime!.split('T')[1].substring(0, 5)
+          : rawStartTime!;
+      timeStr = cleanTime.length >= 5 ? cleanTime.substring(0, 5) : cleanTime;
+    }
+    return '$timeStr ngày $dateStr';
+  }
 }
 
 class CouncilSession {

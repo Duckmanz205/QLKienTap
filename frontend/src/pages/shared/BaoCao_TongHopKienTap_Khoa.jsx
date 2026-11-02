@@ -18,15 +18,8 @@ export default function BaoCao_TongHopKienTap_Khoa() {
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClass, setSelectedClass] = useState('All');
-  const [isClassDropdownOpen, setIsClassDropdownOpen] = useState(false);
-  const [searchClassInput, setSearchClassInput] = useState('');
-
   const [selectedGVHD, setSelectedGVHD] = useState('All');
-  const [isGVHDDropdownOpen, setIsGVHDDropdownOpen] = useState(false);
-  const [searchGVHDInput, setSearchGVHDInput] = useState('');
-
   const [progressFilter, setProgressFilter] = useState('All'); // 'All' | 'DuDieuKien' | 'ThieuOffline' | 'ThieuBaoCao'
-  const [isProgressDropdownOpen, setIsProgressDropdownOpen] = useState(false);
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -158,14 +151,10 @@ export default function BaoCao_TongHopKienTap_Khoa() {
     navigate(isCLB ? '/clb/reports' : '/khoa/reports');
   };
 
-  const closeDropdowns = () => {
-    setIsClassDropdownOpen(false);
-    setIsGVHDDropdownOpen(false);
-    setIsProgressDropdownOpen(false);
-  };
+
 
   return (
-    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300" onClick={closeDropdowns}>
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm font-semibold text-slate-500 mb-6 print:hidden">
         <span className="cursor-pointer hover:text-[#407F3E] transition-colors" onClick={handleBack}>
@@ -273,80 +262,36 @@ export default function BaoCao_TongHopKienTap_Khoa() {
         </div>
 
         {/* Lớp filter */}
-        <div className="relative min-w-[170px]">
-          <div 
-            onClick={(e) => { e.stopPropagation(); setIsClassDropdownOpen(!isClassDropdownOpen); setIsGVHDDropdownOpen(false); setIsProgressDropdownOpen(false); }}
-            className={`w-full px-3.5 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isClassDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-          >
-            <span className="text-slate-700 font-medium truncate">{selectedClass === 'All' ? 'Tất cả lớp' : selectedClass}</span>
-            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0 ml-1" />
-          </div>
-          {isClassDropdownOpen && (
-            <div onClick={(e) => e.stopPropagation()} className="absolute top-full left-0 w-56 mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1">
-              <div className="p-2 border-b border-[#E7E0C4]">
-                <input 
-                  type="text" 
-                  placeholder="Tìm lớp..." 
-                  value={searchClassInput} 
-                  onChange={(e) => setSearchClassInput(e.target.value)}
-                  className="w-full px-2 py-1 bg-slate-50 border border-[#E7E0C4] rounded text-xs focus:outline-none focus:border-[#407F3E]"
-                />
-              </div>
-              <div className="max-h-56 overflow-y-auto">
-                {['All', ...classes]
-                  .filter(c => c === 'All' ? 'tất cả lớp'.includes(searchClassInput.toLowerCase()) : c.toLowerCase().includes(searchClassInput.toLowerCase()))
-                  .map(c => (
-                    <div 
-                      key={c}
-                      onClick={() => { setSelectedClass(c); setIsClassDropdownOpen(false); setSearchClassInput(''); setCurrentPage(1); }}
-                      className={`px-3.5 py-2 text-xs cursor-pointer flex justify-between items-center hover:bg-[#E7E0C4]/40 ${selectedClass === c ? 'bg-[#E7E0C4] font-bold text-slate-800' : 'text-slate-700'}`}
-                    >
-                      <span>{c === 'All' ? 'Tất cả lớp' : c}</span>
-                      {selectedClass === c && <Check className="w-3.5 h-3.5 text-[#407F3E]" />}
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
-        </div>
+        <SearchableDropdown
+          options={[
+            { value: 'All', label: 'Tất cả lớp' },
+            ...classes.map(c => ({ value: c, label: c }))
+          ]}
+          value={selectedClass}
+          onChange={(val) => {
+            setSelectedClass(val);
+            setCurrentPage(1);
+          }}
+          placeholder="Tất cả lớp"
+          searchPlaceholder="Tìm lớp..."
+          className="min-w-[170px]"
+        />
 
         {/* GVHD filter */}
-        <div className="relative min-w-[200px]">
-          <div 
-            onClick={(e) => { e.stopPropagation(); setIsGVHDDropdownOpen(!isGVHDDropdownOpen); setIsClassDropdownOpen(false); setIsProgressDropdownOpen(false); }}
-            className={`w-full px-3.5 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isGVHDDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-          >
-            <span className="text-slate-700 font-medium truncate">{selectedGVHD === 'All' ? 'Tất cả GVHD' : selectedGVHD}</span>
-            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0 ml-1" />
-          </div>
-          {isGVHDDropdownOpen && (
-            <div onClick={(e) => e.stopPropagation()} className="absolute top-full left-0 w-64 mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1">
-              <div className="p-2 border-b border-[#E7E0C4]">
-                <input 
-                  type="text" 
-                  placeholder="Tìm GVHD..." 
-                  value={searchGVHDInput} 
-                  onChange={(e) => setSearchGVHDInput(e.target.value)}
-                  className="w-full px-2 py-1 bg-slate-50 border border-[#E7E0C4] rounded text-xs focus:outline-none focus:border-[#407F3E]"
-                />
-              </div>
-              <div className="max-h-56 overflow-y-auto">
-                {['All', ...gvhdList]
-                  .filter(g => g === 'All' ? 'tất cả gvhd'.includes(searchGVHDInput.toLowerCase()) : g.toLowerCase().includes(searchGVHDInput.toLowerCase()))
-                  .map(g => (
-                    <div 
-                      key={g}
-                      onClick={() => { setSelectedGVHD(g); setIsGVHDDropdownOpen(false); setSearchGVHDInput(''); setCurrentPage(1); }}
-                      className={`px-3.5 py-2 text-xs cursor-pointer flex justify-between items-center hover:bg-[#E7E0C4]/40 ${selectedGVHD === g ? 'bg-[#E7E0C4] font-bold text-slate-800' : 'text-slate-700'}`}
-                    >
-                      <span className="truncate">{g === 'All' ? 'Tất cả GVHD' : g}</span>
-                      {selectedGVHD === g && <Check className="w-3.5 h-3.5 text-[#407F3E]" />}
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
-        </div>
+        <SearchableDropdown
+          options={[
+            { value: 'All', label: 'Tất cả GVHD' },
+            ...gvhdList.map(g => ({ value: g, label: g }))
+          ]}
+          value={selectedGVHD}
+          onChange={(val) => {
+            setSelectedGVHD(val);
+            setCurrentPage(1);
+          }}
+          placeholder="Tất cả GVHD"
+          searchPlaceholder="Tìm GVHD..."
+          className="min-w-[200px]"
+        />
 
         {/* Tình trạng tiến độ */}
         <div className="min-w-[210px]">

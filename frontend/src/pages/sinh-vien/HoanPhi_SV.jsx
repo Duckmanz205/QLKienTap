@@ -88,7 +88,7 @@ export default function HoanPhi_SV() {
   const handleRefundSubmit = async (e) => {
     e.preventDefault();
     if (!selectedInvoiceId) {
-      toast.success('Vui lòng chọn hóa đơn liên quan.');
+      toast.error('Vui lòng chọn hóa đơn liên quan.');
       return;
     }
 
@@ -101,14 +101,17 @@ export default function HoanPhi_SV() {
         fileScanUrl: fileName
       });
 
-      setMessage(res.data.message);
+      toast.success(res.data?.message || 'Gửi yêu cầu hoàn phí thành công!');
+      setMessage(res.data?.message || 'Gửi yêu cầu hoàn phí thành công!');
       setIsModalOpen(false);
       setSelectedInvoiceId('');
       setFileScanUrl('');
       setUploadedFileName('');
       fetchData(student.id);
     } catch (err) {
-      setError(err.response?.data?.message || 'Gửi yêu cầu hoàn phí thất bại.');
+      const errMsg = err.response?.data?.message || 'Gửi yêu cầu hoàn phí thất bại.';
+      setError(errMsg);
+      toast.error(errMsg);
     }
   };
 
@@ -146,7 +149,7 @@ export default function HoanPhi_SV() {
   );
 
   return (
-    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300 relative" onClick={() => setIsStatusDropdownOpen(false)}>
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300 relative">
       
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-800">Tài chính</h1>

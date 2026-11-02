@@ -95,7 +95,7 @@ export default function ThanhToan_SV() {
   const paginatedInvoices = filteredInvoices.slice((currentPage - 1) * limit, currentPage * limit);
 
   return (
-    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300 relative" onClick={() => setIsStatusDropdownOpen(false)}>
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300 relative">
       
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-800">Tài chính</h1>

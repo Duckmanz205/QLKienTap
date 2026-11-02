@@ -79,6 +79,8 @@ const SearchableDropdown = ({
 
   // Xử lý click ra ngoài để đóng dropdown & phím Escape
   useEffect(() => {
+    if (!isOpen) return;
+
     const handleClickOutside = (event) => {
       if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
         setIsOpen(false);
@@ -86,15 +88,17 @@ const SearchableDropdown = ({
     };
 
     const handleKeyDown = (event) => {
-      if (event.key === 'Escape' && isOpen) {
+      if (event.key === 'Escape') {
         setIsOpen(false);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('mousedown', handleClickOutside, true);
+    document.addEventListener('touchstart', handleClickOutside, true);
     document.addEventListener('keydown', handleKeyDown);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('mousedown', handleClickOutside, true);
+      document.removeEventListener('touchstart', handleClickOutside, true);
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [isOpen]);

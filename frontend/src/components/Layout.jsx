@@ -40,6 +40,7 @@ import { sinhVienApi, authApi, qtvApi } from '../services/api';
 
 import { getValidSession, clearSession } from '../utils/auth';
 import ChangePasswordModal from './ChangePasswordModal';
+import useClickOutside from '../hooks/useClickOutside';
 
 export default function Layout() {
   const navigate = useNavigate();
@@ -47,6 +48,7 @@ export default function Layout() {
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const userMenuRef = useClickOutside(() => setIsUserMenuOpen(false), isUserMenuOpen);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState({
@@ -624,7 +626,7 @@ export default function Layout() {
             <div className="w-px h-6 bg-[#E7E0C4]"></div>
 
             {/* User Dropdown Pill */}
-            <div className="relative">
+            <div className="relative" ref={userMenuRef}>
               <div 
                 className="flex items-center gap-3 cursor-pointer py-1 px-2 rounded-full hover:bg-slate-50 transition-colors"
                 onClick={(e) => { e.stopPropagation(); setIsUserMenuOpen(!isUserMenuOpen); }}

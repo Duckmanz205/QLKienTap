@@ -19,18 +19,20 @@ import {
 export class CreateYearDto {
   @IsString()
   @IsNotEmpty({ message: 'Tên năm học không được để trống' })
-  @Length(1, 50)
+  @Matches(/^\d{4}-\d{4}$/, {
+    message: 'Tên năm học phải có định dạng YYYY-YYYY (Ví dụ: 2024-2025)',
+  })
   ten_nam_hoc: string;
 
-  @IsOptional()
+  @IsNotEmpty({ message: 'Ngày bắt đầu không được để trống' })
   @Type(() => Date)
-  @IsDate()
-  ngay_bat_dau?: Date;
+  @IsDate({ message: 'Ngày bắt đầu không hợp lệ' })
+  ngay_bat_dau: Date;
 
-  @IsOptional()
+  @IsNotEmpty({ message: 'Ngày kết thúc không được để trống' })
   @Type(() => Date)
-  @IsDate()
-  ngay_ket_thuc?: Date;
+  @IsDate({ message: 'Ngày kết thúc không hợp lệ' })
+  ngay_ket_thuc: Date;
 }
 
 export class CreateTermDto {
@@ -40,18 +42,18 @@ export class CreateTermDto {
   ten_hoc_ky: string;
 
   @IsInt()
-  @Min(1)
+  @Min(1, { message: 'Năm học không hợp lệ' })
   nam_hoc_id: number;
 
-  @IsOptional()
+  @IsNotEmpty({ message: 'Ngày bắt đầu không được để trống' })
   @Type(() => Date)
-  @IsDate()
-  ngay_bat_dau?: Date;
+  @IsDate({ message: 'Ngày bắt đầu không hợp lệ' })
+  ngay_bat_dau: Date;
 
-  @IsOptional()
+  @IsNotEmpty({ message: 'Ngày kết thúc không được để trống' })
   @Type(() => Date)
-  @IsDate()
-  ngay_ket_thuc?: Date;
+  @IsDate({ message: 'Ngày kết thúc không hợp lệ' })
+  ngay_ket_thuc: Date;
 }
 
 // (v11) Đổi tên trường: ma_khoa → ma_khoa_hoc, ten_khoa → ten_khoa_hoc
@@ -80,10 +82,6 @@ export class CreateFactoryDto {
   @IsOptional()
   @IsString()
   dia_chi?: string;
-
-  @IsOptional()
-  @IsString()
-  nhom_nganh?: string;
 
   @IsOptional()
   @IsString()
@@ -116,10 +114,6 @@ export class UpdateFactoryDto {
   @IsOptional()
   @IsString()
   dia_chi?: string;
-
-  @IsOptional()
-  @IsString()
-  nhom_nganh?: string;
 
   @IsOptional()
   @IsString()
@@ -214,9 +208,10 @@ export class CreateScheduleDto {
   @IsNotEmpty({ message: 'Tên lịch không được để trống' })
   ten_lich: string;
 
+  @IsOptional()
   @IsInt()
   @Min(1)
-  dot_kien_tap_id: number;
+  dot_kien_tap_id?: number | null;
 
   @IsInt()
   @Min(1)
@@ -386,14 +381,45 @@ export class ApproveTripDto {
   gopCacPhieuDeXuatIds?: number[];
 }
 
-export class ApproveCancelDto {
-  @IsInt()
-  @Min(1)
-  requestId: number;
+export class BatchApproveProposalsDto {
+  @IsArray()
+  @IsInt({ each: true })
+  proposalIds: number[];
 
+  @IsBoolean()
+  isApproved: boolean;
+
+  @IsOptional()
+  @IsInt()
+  approverId?: number;
+}
+
+export class BatchRejectProposalsDto {
+  @IsArray()
+  @IsInt({ each: true })
+  proposalIds: number[];
+
+  @IsOptional()
+  @IsInt()
+  approverId?: number;
+}
+
+
+export class ApproveCancelDto {
+  @IsOptional()
   @IsInt()
   @Min(1)
-  approverId: number;
+  requestId?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  cancelId?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  approverId?: number;
 
   @IsBoolean()
   isApproved: boolean;
@@ -444,6 +470,12 @@ export class CreateBoardDto {
   @IsString()
   @IsNotEmpty({ message: 'Phòng hội đồng không được để trống' })
   room: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => UpdateBoardMemberDto)
+  members?: UpdateBoardMemberDto[];
 }
 
 export class AddBoardMemberDto {

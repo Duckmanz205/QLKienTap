@@ -14,8 +14,6 @@ export default function DuyetHoanPhi_Khoa() {
   // Search & Filter & Pagination States
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
-  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
-  const [statusSearchTerm, setStatusSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [limit, setLimit] = useState(15);
 
@@ -100,10 +98,6 @@ export default function DuyetHoanPhi_Khoa() {
     { value: 'TuChoi', label: 'Từ chối' },
   ];
 
-  const filteredStatusOptions = statusOptions.filter(opt =>
-    opt.label.toLowerCase().includes(statusSearchTerm.toLowerCase())
-  );
-
   const filteredRefunds = refunds.filter(r => {
     const sv = r.hoaDon?.phieuDangKy?.sinhVien || {};
     const maHd = r.hoaDon?.ma_hoa_don || '';
@@ -126,13 +120,7 @@ export default function DuyetHoanPhi_Khoa() {
   const paginatedRefunds = filteredRefunds.slice((validCurrentPage - 1) * limit, validCurrentPage * limit);
 
   return (
-    <div 
-      className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300"
-      onClick={() => {
-        setIsStatusDropdownOpen(false);
-        setStatusSearchTerm('');
-      }}
-    >
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-800">Duyệt hoàn phí</h1>
@@ -156,53 +144,17 @@ export default function DuyetHoanPhi_Khoa() {
         </div>
 
         {/* Trạng thái Dropdown */}
-        <div className="relative min-w-[200px]" onClick={e => e.stopPropagation()}>
-          <div 
-            onClick={() => {
-              setIsStatusDropdownOpen(!isStatusDropdownOpen);
-              setStatusSearchTerm('');
-            }}
-            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isStatusDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-          >
-            <span className={`truncate pr-2 font-medium ${selectedStatus ? 'text-slate-700' : 'text-slate-400'}`}>
-              {selectedStatus === 'Pending' ? 'Chờ xử lý' :
-               selectedStatus === 'Approved' ? 'Đã hoàn tiền' :
-               selectedStatus === 'Rejected' ? 'Từ chối' : 'Tất cả trạng thái'}
-            </span>
-            <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isStatusDropdownOpen ? 'rotate-180 text-[#407F3E]' : ''}`} />
-          </div>
-          {isStatusDropdownOpen && (
-            <div className="absolute top-full right-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[200px]">
-              <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
-                <input 
-                  type="text" 
-                  placeholder="Tìm trạng thái..." 
-                  value={statusSearchTerm}
-                  onChange={(e) => setStatusSearchTerm(e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
-                />
-              </div>
-              <div className="max-h-60 overflow-y-auto">
-                {filteredStatusOptions.map(opt => (
-                  <div 
-                    key={opt.value}
-                    onClick={() => { setSelectedStatus(opt.value); setIsStatusDropdownOpen(false); setCurrentPage(1); }}
-                    className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                      selectedStatus === opt.value ? 'bg-[#E7E0C4]/40 text-[#407F3E] font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/30 font-medium'
-                    }`}
-                  >
-                    <span className="truncate pr-2">{opt.label}</span>
-                    {selectedStatus === opt.value && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                  </div>
-                ))}
-                {filteredStatusOptions.length === 0 && (
-                  <div className="px-4 py-2 text-xs text-slate-400 text-center">Không tìm thấy trạng thái</div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+        <SearchableDropdown
+          options={statusOptions}
+          value={selectedStatus}
+          onChange={(val) => {
+            setSelectedStatus(val);
+            setCurrentPage(1);
+          }}
+          placeholder="Tất cả trạng thái"
+          searchPlaceholder="Tìm trạng thái..."
+          className="min-w-[200px]"
+        />
       </div>
 
       {/* Main Table */}

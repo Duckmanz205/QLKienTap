@@ -23,11 +23,7 @@ export default function ChamBaiThuHoach_GV() {
   const [searchTerm, setSearchTerm] = useState(location.state?.filterMssv || '');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [selectedDotId, setSelectedDotId] = useState('ALL');
-  const [isDotDropdownOpen, setIsDotDropdownOpen] = useState(false);
-  const [searchDotDropdown, setSearchDotDropdown] = useState('');
   const [selectedTripId, setSelectedTripId] = useState('ALL');
-  const [isTripDropdownOpen, setIsTripDropdownOpen] = useState(false);
-  const [searchTripDropdown, setSearchTripDropdown] = useState('');
 
   // Bulk AI Grading states (Background Progress)
   const [selectedReportIds, setSelectedReportIds] = useState([]);
@@ -387,15 +383,6 @@ TRANG 38
     }
   };
 
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target)) {
-        setIsStatusDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   // Grading states
   const [score, setScore] = useState('');
@@ -788,110 +775,37 @@ TRANG 38
             />
           </div>
           {/* Dot Kien Tap Dropdown */}
-          <div className="relative min-w-[160px] w-full sm:w-48" onClick={(e) => e.stopPropagation()}>
-            <div
-              onClick={() => { setIsDotDropdownOpen(!isDotDropdownOpen); setIsTripDropdownOpen(false); }}
-              className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isDotDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-            >
-              <span className="truncate pr-2 font-medium text-slate-700">
-                {selectedDotId === 'ALL' ? 'Tất cả đợt' : uniqueDots.find(d => d.id === selectedDotId)?.name || 'Đợt kiến tập'}
-              </span>
-              <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-            </div>
-            {isDotDropdownOpen && (
-              <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[220px]">
-                <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
-                  <input
-                    type="text"
-                    placeholder="Tìm đợt..."
-                    value={searchDotDropdown}
-                    onChange={(e) => setSearchDotDropdown(e.target.value)}
-                    onClick={(e) => e.stopPropagation()}
-                    className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
-                  />
-                </div>
-                <div className="max-h-60 overflow-y-auto">
-                  <div
-                    onClick={() => { setSelectedDotId('ALL'); setSelectedTripId('ALL'); setIsDotDropdownOpen(false); setSearchDotDropdown(''); setCurrentPage(1); }}
-                    className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${selectedDotId === 'ALL' ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
-                      }`}
-                  >
-                    <span>Tất cả đợt</span>
-                    {selectedDotId === 'ALL' && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                  </div>
-                  {uniqueDots
-                    .filter(d => d.name.toLowerCase().includes(searchDotDropdown.toLowerCase()))
-                    .map(d => (
-                      <div
-                        key={d.id}
-                        onClick={() => { setSelectedDotId(d.id); setSelectedTripId('ALL'); setIsDotDropdownOpen(false); setSearchDotDropdown(''); setCurrentPage(1); }}
-                        className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${selectedDotId === d.id ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
-                          }`}
-                      >
-                        <span className="truncate pr-2">{d.name}</span>
-                        {selectedDotId === d.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                      </div>
-                    ))}
-                  {uniqueDots.filter(d => d.name.toLowerCase().includes(searchDotDropdown.toLowerCase())).length === 0 && (
-                    <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy đợt</div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
+          <SearchableDropdown
+            options={[
+              { value: 'ALL', label: 'Tất cả đợt' },
+              ...uniqueDots.map(d => ({ value: d.id, label: d.name }))
+            ]}
+            value={selectedDotId}
+            onChange={(val) => {
+              setSelectedDotId(val);
+              setSelectedTripId('ALL');
+              setCurrentPage(1);
+            }}
+            placeholder="Tất cả đợt"
+            searchPlaceholder="Tìm đợt..."
+            className="min-w-[160px] w-full sm:w-48"
+          />
 
           {/* Trip Dropdown */}
-          <div className="relative min-w-[200px] w-full sm:w-56" onClick={(e) => e.stopPropagation()}>
-            <div
-              onClick={() => { setIsTripDropdownOpen(!isTripDropdownOpen); setIsDotDropdownOpen(false); }}
-              className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isTripDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-            >
-              <span className="truncate pr-2 font-medium text-slate-700">
-                {selectedTripId === 'ALL' ? 'Tất cả chuyến đi' : uniqueTrips.find(t => t.id === selectedTripId)?.name || 'Chuyến đi'}
-              </span>
-              <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-            </div>
-            {isTripDropdownOpen && (
-              <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1 flex flex-col min-w-[250px]">
-                <div className="px-2 pb-1 border-b border-[#E7E0C4] mb-1">
-                  <input
-                    type="text"
-                    placeholder="Tìm chuyến đi..."
-                    value={searchTripDropdown}
-                    onChange={(e) => setSearchTripDropdown(e.target.value)}
-                    onClick={(e) => e.stopPropagation()}
-                    className="w-full px-2 py-1.5 bg-slate-50 border border-[#E7E0C4] rounded-md text-xs focus:outline-none focus:border-[#407F3E] transition-colors"
-                  />
-                </div>
-                <div className="max-h-60 overflow-y-auto">
-                  <div
-                    onClick={() => { setSelectedTripId('ALL'); setIsTripDropdownOpen(false); setSearchTripDropdown(''); setCurrentPage(1); }}
-                    className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${selectedTripId === 'ALL' ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
-                      }`}
-                  >
-                    <span>Tất cả chuyến đi</span>
-                    {selectedTripId === 'ALL' && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                  </div>
-                  {uniqueTrips
-                    .filter(t => t.name.toLowerCase().includes(searchTripDropdown.toLowerCase()))
-                    .map(t => (
-                      <div
-                        key={t.id}
-                        onClick={() => { setSelectedTripId(t.id); setIsTripDropdownOpen(false); setSearchTripDropdown(''); setCurrentPage(1); }}
-                        className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${selectedTripId === t.id ? 'bg-[#E7E0C4] text-slate-800 font-bold' : 'text-slate-700 hover:bg-[#E7E0C4]/50 font-medium'
-                          }`}
-                      >
-                        <span className="truncate pr-2">{t.name}</span>
-                        {selectedTripId === t.id && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                      </div>
-                    ))}
-                  {uniqueTrips.filter(t => t.name.toLowerCase().includes(searchTripDropdown.toLowerCase())).length === 0 && (
-                    <div className="px-4 py-2 text-xs text-slate-500 text-center">Không tìm thấy chuyến đi</div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
+          <SearchableDropdown
+            options={[
+              { value: 'ALL', label: 'Tất cả chuyến đi' },
+              ...uniqueTrips.map(t => ({ value: t.id, label: t.name }))
+            ]}
+            value={selectedTripId}
+            onChange={(val) => {
+              setSelectedTripId(val);
+              setCurrentPage(1);
+            }}
+            placeholder="Tất cả chuyến đi"
+            searchPlaceholder="Tìm chuyến đi..."
+            className="min-w-[200px] w-full sm:w-56"
+          />
         </div>
         <div className="flex items-center gap-4 shrink-0">
           {selectedReportIds.length > 0 && (
@@ -1395,7 +1309,6 @@ TRANG 38
   return (
     <div
       className={selectedReport ? '' : 'bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300'}
-      onClick={() => { setIsTripDropdownOpen(false); setIsDotDropdownOpen(false); }}
     >
       {selectedReport ? renderGradingView() : renderReportList()}
 

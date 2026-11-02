@@ -16,12 +16,7 @@ export default function TaiKhoanNguoiDung_Khoa() {
   // Filter States
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('Tất cả vai trò');
-  const [searchRoleDropdown, setSearchRoleDropdown] = useState('');
-  const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
-  
   const [filterTrangThai, setFilterTrangThai] = useState('Tất cả');
-  const [searchTrangThaiDropdown, setSearchTrangThaiDropdown] = useState('');
-  const [isTrangThaiDropdownOpen, setIsTrangThaiDropdownOpen] = useState(false);
 
   // Pagination States
   const [page, setPage] = useState(1);
@@ -128,108 +123,24 @@ export default function TaiKhoanNguoiDung_Khoa() {
         </div>
 
         {/* Vai trò Dropdown */}
-        <div className="relative min-w-[200px]" onClick={(e) => e.stopPropagation()}>
-          <div 
-            onClick={() => { setIsRoleDropdownOpen(!isRoleDropdownOpen); setIsTrangThaiDropdownOpen(false); }}
-            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isRoleDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-          >
-            <span className="text-slate-700 font-medium truncate pr-2">
-              {roleOptions.find(o => o.value === filterRole)?.label || filterRole}
-            </span>
-            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-          </div>
-          {isRoleDropdownOpen && (
-            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1">
-              <div className="p-2 border-b border-[#E7E0C4]">
-                <input
-                  type="text"
-                  placeholder="Tìm vai trò..."
-                  value={searchRoleDropdown}
-                  onChange={(e) => setSearchRoleDropdown(e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="w-full px-2.5 py-1 text-xs bg-slate-50 border border-[#E7E0C4] rounded-md focus:outline-none focus:border-[#407F3E]"
-                />
-              </div>
-              <div className="max-h-60 overflow-y-auto">
-                {roleOptions
-                  .filter(opt => !searchRoleDropdown || opt.label.toLowerCase().includes(searchRoleDropdown.toLowerCase()))
-                  .map(opt => (
-                    <div 
-                      key={opt.value}
-                      onClick={() => { 
-                        setFilterRole(opt.value); 
-                        setIsRoleDropdownOpen(false);
-                        setSearchRoleDropdown('');
-                      }}
-                      className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                        (filterRole === opt.value) 
-                          ? 'bg-[#E7E0C4] text-slate-800 font-bold' 
-                          : 'text-slate-700 hover:bg-[#E7E0C4]/50'
-                      }`}
-                    >
-                      <span className="truncate pr-2">{opt.label}</span>
-                      {filterRole === opt.value && <Check className="w-4 h-4 text-[#407F3E] shrink-0" />}
-                    </div>
-                  ))}
-                {roleOptions.filter(opt => !searchRoleDropdown || opt.label.toLowerCase().includes(searchRoleDropdown.toLowerCase())).length === 0 && (
-                  <div className="px-4 py-3 text-xs text-slate-500 text-center">Không tìm thấy vai trò</div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+        <SearchableDropdown
+          options={roleOptions}
+          value={filterRole}
+          onChange={(val) => setFilterRole(val)}
+          placeholder="Tất cả vai trò"
+          searchPlaceholder="Tìm vai trò..."
+          className="min-w-[200px]"
+        />
 
         {/* Trạng thái Dropdown */}
-        <div className="relative min-w-[180px]" onClick={(e) => e.stopPropagation()}>
-          <div 
-            onClick={() => { setIsTrangThaiDropdownOpen(!isTrangThaiDropdownOpen); setIsRoleDropdownOpen(false); }}
-            className={`w-full px-4 py-2 bg-slate-50 border rounded-lg text-sm flex justify-between items-center cursor-pointer transition-all ${isTrangThaiDropdownOpen ? 'border-[#407F3E] ring-1 ring-[#407F3E]' : 'border-[#E7E0C4]'}`}
-          >
-            <span className="text-slate-700 font-medium">
-              {trangThaiOptions.find(o => o.value === filterTrangThai)?.label || filterTrangThai}
-            </span>
-            <ChevronDown className="w-4 h-4 text-slate-400" />
-          </div>
-          {isTrangThaiDropdownOpen && (
-            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#E7E0C4] rounded-lg shadow-lg z-30 py-1 overflow-hidden animate-in slide-in-from-top-1">
-              <div className="p-2 border-b border-[#E7E0C4]">
-                <input
-                  type="text"
-                  placeholder="Tìm trạng thái..."
-                  value={searchTrangThaiDropdown}
-                  onChange={(e) => setSearchTrangThaiDropdown(e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="w-full px-2.5 py-1 text-xs bg-slate-50 border border-[#E7E0C4] rounded-md focus:outline-none focus:border-[#407F3E]"
-                />
-              </div>
-              <div className="max-h-60 overflow-y-auto">
-                {trangThaiOptions
-                  .filter(opt => !searchTrangThaiDropdown || opt.label.toLowerCase().includes(searchTrangThaiDropdown.toLowerCase()))
-                  .map(opt => (
-                    <div 
-                      key={opt.value}
-                      onClick={() => { 
-                        setFilterTrangThai(opt.value); 
-                        setIsTrangThaiDropdownOpen(false);
-                        setSearchTrangThaiDropdown('');
-                      }}
-                      className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center transition-colors ${
-                        (filterTrangThai === opt.value) 
-                          ? 'bg-[#E7E0C4] text-slate-800 font-bold' 
-                          : 'text-slate-700 hover:bg-[#E7E0C4]/50'
-                      }`}
-                    >
-                      {opt.label}
-                      {filterTrangThai === opt.value && <Check className="w-4 h-4 text-[#407F3E]" />}
-                    </div>
-                  ))}
-                {trangThaiOptions.filter(opt => !searchTrangThaiDropdown || opt.label.toLowerCase().includes(searchTrangThaiDropdown.toLowerCase())).length === 0 && (
-                  <div className="px-4 py-3 text-xs text-slate-500 text-center">Không tìm thấy trạng thái</div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+        <SearchableDropdown
+          options={trangThaiOptions}
+          value={filterTrangThai}
+          onChange={(val) => setFilterTrangThai(val)}
+          placeholder="Tất cả trạng thái"
+          searchPlaceholder="Tìm trạng thái..."
+          className="min-w-[180px]"
+        />
       </div>
 
       {/* Main Table */}

@@ -1113,22 +1113,79 @@ class _TaiChinhSVScreenState extends State<TaiChinhSVScreen> {
             if (ref.status == 'Đã hoàn tiền') statusColor = AppColors.secondary;
             if (ref.status == 'Từ chối') statusColor = AppColors.danger;
 
+            final isRejected = ref.status == 'Từ chối';
+            final hasRejectionReason = ref.lyDoTuChoi != null && ref.lyDoTuChoi!.trim().isNotEmpty;
+
             return Card(
               margin: const EdgeInsets.only(bottom: 12),
-              child: ListTile(
-                title: Text(ref.invoiceName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                subtitle: Text('Ngày nộp: ${ref.dateText} • Số tiền: ${ref.amountText}', style: const TextStyle(fontSize: 11)),
-                trailing: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-                  child: Text(
-                    ref.status,
-                    style: TextStyle(
-                      fontSize: 10, 
-                      fontWeight: FontWeight.bold, 
-                      color: statusColor == AppColors.warning ? AppColors.darkSlate : statusColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(
+                  color: isRejected ? AppColors.danger.withValues(alpha: 0.3) : const Color(0xFFE7E0C4),
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(ref.invoiceName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.darkSlate)),
+                              const SizedBox(height: 4),
+                              Text('Ngày nộp: ${ref.dateText} • Số tiền: ${ref.amountText}', style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+                          ),
+                          child: Text(
+                            ref.status,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: statusColor == AppColors.warning ? AppColors.darkSlate : statusColor,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
+                    if (isRejected && hasRejectionReason) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppColors.danger.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.danger.withValues(alpha: 0.25)),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.error_outline, size: 16, color: AppColors.danger),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Lý do từ chối: ${ref.lyDoTuChoi}',
+                                style: const TextStyle(fontSize: 11.5, color: AppColors.danger, fontWeight: FontWeight.w500),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             );

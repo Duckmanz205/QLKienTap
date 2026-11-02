@@ -29,9 +29,31 @@ import {
   TaiKhoanThuHuong,
   HoiDongChamBaoCao,
   HoiDong_ThanhVien,
+  NamHoc,
 } from '../entities/qlkt.entity';
 import { R2StorageService } from '../upload/r2-storage.service';
 import { CompanyMatcher } from '../common/company-matcher.util';
+
+function toDateOnlyString(date: Date | string | null | undefined): string {
+  if (!date) return '';
+  if (typeof date === 'string') {
+    return date.split('T')[0].trim();
+  }
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function formatDateVN(dateStr: string): string {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  return dateStr;
+}
 
 @Injectable()
 export class SinhVienService {
@@ -63,6 +85,7 @@ export class SinhVienService {
     @InjectRepository(DanhSachDen)
     private blackListRepo: Repository<DanhSachDen>,
     @InjectRepository(LichKienTap) private lichRepo: Repository<LichKienTap>,
+    @InjectRepository(DotKienTap) private dotRepo: Repository<DotKienTap>,
     @InjectRepository(TaiKhoanThuHuong)
     private taiKhoanThuHuongRepo: Repository<TaiKhoanThuHuong>,
     private readonly r2Storage: R2StorageService,
@@ -188,7 +211,7 @@ export class SinhVienService {
     // Lay danh sach cac chuyen SV da dang ky de loai bo khoi ket qua
     const studentPhieus = await this.phieuRepo.find({
       where: { sinh_vien_id: studentId },
-      relations: { chuyenThamQuan: true },
+      relations: { chuyenThamQuan: { nhaMay: true } },
     });
     // Chi loai bo neu SV dang co phieu ChoDuyet, HopLe, DaThamGia, HoanThanh
     const activeRegisteredTripIds = new Set(
@@ -206,6 +229,24 @@ export class SinhVienService {
         .filter(id => id != null)
     );
 
+    // Xac dinh cac ngay da co chuyen dang ky con hieu luc (ChoDuyet, HopLe, ChoHuy, DaThamGia, HoanThanh)
+    const activeDateMap = new Map<string, { tenNhaMay: string; trangThai: string }>();
+    studentPhieus
+      .filter((p) =>
+        ['ChoDuyet', 'HopLe', 'ChoHuy', 'DaThamGia', 'HoanThanh'].includes(
+          p.trang_thai,
+        ),
+      )
+      .forEach((p) => {
+        const dStr = toDateOnlyString(p.chuyenThamQuan?.ngay_tham_quan);
+        if (dStr) {
+          activeDateMap.set(dStr, {
+            tenNhaMay: p.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Chuyến đi khác',
+            trangThai: p.trang_thai,
+          });
+        }
+      });
+
     // Dem so SV da dang ky tung chuyen va chi hien thi cac chuyen hop le
     const results: any[] = [];
     for (const trip of trips) {
@@ -213,6 +254,10 @@ export class SinhVienService {
       if (activeRegisteredTripIds.has(trip.id)) continue;
       // Bo qua neu da co 1 dang ky khac (dang cho duyet hoac hop le) trong cung lich
       if (trip.lich_kien_tap_id && activeLichIds.has(trip.lich_kien_tap_id)) continue;
+
+      const tripDateStr = toDateOnlyString(trip.ngay_tham_quan);
+      const dateConflict = tripDateStr ? activeDateMap.get(tripDateStr) : null;
+
       const count = await this.phieuRepo.count({
         where: {
           chuyen_tham_quan_id: trip.id,
@@ -226,6 +271,18 @@ export class SinhVienService {
         con_trong: trip.suc_chua - count,
         da_tung_dang_ky: !!oldPhieu,
         trang_thai_cu: oldPhieu ? oldPhieu.trang_thai : null,
+        bi_trung_ngay: !!dateConflict,
+        thong_tin_trung_ngay: dateConflict
+          ? `Trùng ngày với chuyến "${dateConflict.tenNhaMay}" (${
+              dateConflict.trangThai === 'HopLe'
+                ? 'đã duyệt chính thức'
+                : dateConflict.trangThai === 'ChoDuyet'
+                ? 'đang chờ duyệt'
+                : dateConflict.trangThai === 'ChoHuy'
+                ? 'đang chờ duyệt hủy'
+                : 'đã tham gia'
+            })`
+          : null,
       });
     }
 
@@ -238,7 +295,10 @@ export class SinhVienService {
       where: { sinh_vien_id: studentId },
       relations: {
         chuyenThamQuan: { nhaMay: true },
-        phieuThamQuan: { baiThuHoach: true },
+        phieuThamQuan: {
+          baiThuHoach: true,
+          diemPhieuThamQuan: { giangVienHD: true },
+        },
         hoaDon: true,
         yeuCauHuy: true,
       },
@@ -330,9 +390,32 @@ export class SinhVienService {
         throw new BadRequestException('Chuyến đi này hiện đang đóng đăng ký');
       }
 
-      const startYearStr =
-        trip.lichKienTap.dotKienTap.hocKy.namHoc.ten_nam_hoc.split('-')[0];
-      const startYear = parseInt(startYearStr, 10);
+      let startYear: number;
+      const namHocFromDot =
+        trip.lichKienTap?.dotKienTap?.hocKy?.namHoc;
+      if (namHocFromDot?.ten_nam_hoc) {
+        const startYearStr = namHocFromDot.ten_nam_hoc.split('-')[0];
+        startYear = parseInt(startYearStr, 10);
+      } else {
+        // Lịch ngoài đợt (dot_kien_tap_id IS NULL): Tìm trong bảng NamHoc theo ngay_tham_quan hoặc mốc tháng 9
+        const tripDate = new Date(trip.ngay_tham_quan);
+        const namHocDb = await manager
+          .createQueryBuilder(NamHoc, 'nh')
+          .where(':tripDate >= nh.ngay_bat_dau AND :tripDate <= nh.ngay_ket_thuc', {
+            tripDate,
+          })
+          .getOne();
+
+        if (namHocDb?.ten_nam_hoc) {
+          startYear = parseInt(namHocDb.ten_nam_hoc.split('-')[0], 10);
+        } else {
+          startYear =
+            tripDate.getMonth() + 1 >= 9
+              ? tripDate.getFullYear()
+              : tripDate.getFullYear() - 1;
+        }
+      }
+
       const studyYear = startYear - student.khoaHoc.nam_nhap_hoc + 1;
       if (studyYear < 2) {
         throw new BadRequestException(
@@ -356,22 +439,49 @@ export class SinhVienService {
         }
       }
 
-      // Kiem tra khong duoc dang ky qua 1 chuyen trong cung 1 lich kien tap
-      const existingInLich = await manager.find(PhieuDangKy, {
+      // Kiem tra cac dang ky dang co hieu luc cua sinh vien
+      const activePhieus = await manager.find(PhieuDangKy, {
         where: {
           sinh_vien_id: studentId,
-          trang_thai: In(['ChoDuyet', 'HopLe']),
+          trang_thai: In(['ChoDuyet', 'HopLe', 'ChoHuy', 'DaThamGia', 'HoanThanh']),
         },
-        relations: { chuyenThamQuan: true },
+        relations: { chuyenThamQuan: { nhaMay: true } },
       });
-      const hasSameLich = existingInLich.some(
+
+      // 1. Kiem tra khong duoc dang ky qua 1 chuyen trong cung 1 lich kien tap
+      const hasSameLich = activePhieus.some(
         (p) =>
           p.chuyen_tham_quan_id !== tripId &&
+          p.chuyenThamQuan?.lich_kien_tap_id != null &&
           p.chuyenThamQuan?.lich_kien_tap_id === trip.lich_kien_tap_id,
       );
       if (hasSameLich) {
         throw new BadRequestException(
           'Bạn chỉ được phép đăng ký tối đa 1 chuyến trong cùng một Lịch kiến tập.',
+        );
+      }
+
+      // 2. Kiem tra khong duoc dang ky cac chuyen tham quan trung ngay (du khac lich kien tap)
+      const targetTripDateStr = toDateOnlyString(trip.ngay_tham_quan);
+      const conflictSameDay = activePhieus.find(
+        (p) =>
+          p.chuyen_tham_quan_id !== tripId &&
+          toDateOnlyString(p.chuyenThamQuan?.ngay_tham_quan) === targetTripDateStr,
+      );
+      if (conflictSameDay) {
+        const otherTripName =
+          conflictSameDay.chuyenThamQuan?.nhaMay?.ten_nha_may || 'chuyến khác';
+        const statusLabel =
+          conflictSameDay.trang_thai === 'HopLe'
+            ? 'đã được duyệt chính thức'
+            : conflictSameDay.trang_thai === 'ChoDuyet'
+            ? 'đang chờ xét duyệt'
+            : conflictSameDay.trang_thai === 'ChoHuy'
+            ? 'đang chờ duyệt hủy'
+            : 'đã tham gia';
+        const dateVN = formatDateVN(targetTripDateStr);
+        throw new BadRequestException(
+          `Bạn đã có chuyến tham quan "${otherTripName}" vào cùng ngày ${dateVN} (${statusLabel}). Mỗi sinh viên chỉ được tham gia tối đa 1 chuyến trong cùng một ngày.`,
         );
       }
 
@@ -461,6 +571,43 @@ export class SinhVienService {
       }
     }
 
+    // Kiem tra xem sinh vien da co chuyen tham quan hoac de xuat nao vao ngay nay chua
+    const targetDateStr = toDateOnlyString(ngayThamQuan);
+    const existingActivePhieus = await this.phieuRepo.find({
+      where: {
+        sinh_vien_id: studentId,
+        trang_thai: In(['ChoDuyet', 'HopLe', 'ChoHuy', 'DaThamGia', 'HoanThanh']),
+      },
+      relations: { chuyenThamQuan: { nhaMay: true } },
+    });
+    const conflictPhieu = existingActivePhieus.find(
+      (p) => toDateOnlyString(p.chuyenThamQuan?.ngay_tham_quan) === targetDateStr,
+    );
+    if (conflictPhieu) {
+      const conflictName =
+        conflictPhieu.chuyenThamQuan?.nhaMay?.ten_nha_may || 'chuyến đi khác';
+      const dateVN = formatDateVN(targetDateStr);
+      throw new BadRequestException(
+        `Bạn đã có chuyến tham quan "${conflictName}" vào cùng ngày ${dateVN}. Mỗi sinh viên chỉ được tham gia tối đa 1 chuyến trong cùng một ngày.`,
+      );
+    }
+
+    const existingPendingProposals = await this.deXuatRepo.find({
+      where: {
+        sinh_vien_id: studentId,
+        trang_thai_duyet: In(['ChoDuyet', 'ChoKhoaDuyet']),
+      },
+    });
+    const conflictProposal = existingPendingProposals.find(
+      (p) => toDateOnlyString(p.ngay_tham_quan_de_xuat) === targetDateStr,
+    );
+    if (conflictProposal) {
+      const dateVN = formatDateVN(targetDateStr);
+      throw new BadRequestException(
+        `Bạn đã có một đề xuất chuyến đi khác vào cùng ngày ${dateVN} đang chờ phê duyệt.`,
+      );
+    }
+
     const deXuat = new PhieuDeXuatChuyenThamQuan();
     deXuat.nha_may_id = nhaMayId || null;
     deXuat.ten_nha_may_de_xuat = tenNhaMayDeXuat || null;
@@ -480,9 +627,84 @@ export class SinhVienService {
 
     const saved = await this.deXuatRepo.save(deXuat);
 
+    const portalStatus = await this.getProposalPortalStatus(studentId);
+    let msg = 'Đề xuất chuyến đi tự do thành công, đang chờ CLB duyệt sơ bộ';
+    if (portalStatus.mode === 'FREE_ACCUMULATION') {
+      msg =
+        'Đề xuất chuyến đi tự do thành công (diện tích lũy ngoài đợt, bảo lưu 18 tháng), đang chờ CLB duyệt sơ bộ';
+    }
+
     return {
-      message: 'Đề xuất chuyến đi tự do thành công, đang chờ Khoa duyệt',
+      message: msg,
       chuyen: saved,
+      portalMode: portalStatus.mode,
+    };
+  }
+
+  async getProposalPortalStatus(studentId?: number) {
+    let studentDot: DotKienTap | null = null;
+
+    if (studentId) {
+      const enrollment = await this.dksvRepo.findOne({
+        where: { sinh_vien_id: studentId },
+        relations: { dotKienTap: true },
+        order: { id: 'DESC' },
+      });
+      if (enrollment?.dotKienTap) {
+        studentDot = enrollment.dotKienTap;
+      }
+    }
+
+    if (!studentDot) {
+      studentDot = await this.dotRepo.findOne({
+        where: { trang_thai: In(['DangTrienKhai', 'DangDienRa', 'Nhap']) },
+        order: { ngay_bat_dau: 'DESC' },
+      });
+    }
+
+    const isDotActive =
+      studentDot &&
+      ['DangTrienKhai', 'DangDienRa', 'Nhap'].includes(studentDot.trang_thai) &&
+      !studentDot.is_bo_chuyen_locked;
+
+    if (studentDot && isDotActive) {
+      const dotLich = await this.lichRepo.findOne({
+        where: {
+          dot_kien_tap_id: studentDot.id,
+          ten_lich: 'Lịch tiếp nhận đề xuất tự do',
+        },
+      });
+
+      if (
+        !dotLich ||
+        (dotLich.trang_thai !== 'DaKhoa' && dotLich.trang_thai !== 'DaKetThuc')
+      ) {
+        return {
+          isOpen: true,
+          mode: 'CAMPAIGN' as const,
+          dotKienTap: {
+            id: studentDot.id,
+            ten_dot: studentDot.ten_dot,
+            trang_thai: studentDot.trang_thai,
+          },
+          message: `Đang tiếp nhận đề xuất chuyến đi tự do vào ${studentDot.ten_dot}. Chuyến đi sau khi được phê duyệt sẽ được tính điểm và báo cáo trong đợt này.`,
+        };
+      }
+    }
+
+    return {
+      isOpen: true,
+      mode: 'FREE_ACCUMULATION' as const,
+      dotKienTap: studentDot
+        ? {
+            id: studentDot.id,
+            ten_dot: studentDot.ten_dot,
+            trang_thai: studentDot.trang_thai,
+          }
+        : null,
+      message: studentDot
+        ? `Lịch tiếp nhận đề xuất tự do của ${studentDot.ten_dot} đã khóa sổ. Đề xuất gửi lúc này sẽ được ghi nhận vào diện Tích lũy tự do (Ngoài đợt - Bảo lưu 18 tháng). Bạn có thể gán chuyến này vào các đợt kiến tập tương lai!`
+        : 'Hiện không có đợt kiến tập nào đang mở tiếp nhận. Đề xuất gửi lúc này sẽ được ghi nhận vào diện Tích lũy tự do (Ngoài đợt - Bảo lưu 18 tháng).',
     };
   }
 
@@ -1202,10 +1424,12 @@ export class SinhVienService {
       diem &&
       (diem.diem_chuan_bi != null ||
         diem.diem_thu_hoach != null ||
-        diem.diem_hoi_dong_final != null)
+        diem.diem_hoi_dong_final != null ||
+        diem.da_khoa_thu_hoach ||
+        diem.da_khoa)
     ) {
       throw new BadRequestException(
-        'Bài thu hoạch này đã được chấm điểm, không thể xóa để nộp lại.',
+        'Bài thu hoạch này đã được chấm điểm hoặc đã khóa sổ điểm, không thể xóa để nộp lại.',
       );
     }
 
