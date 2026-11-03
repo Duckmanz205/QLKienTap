@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/app_models.dart';
 import '../../../data/state/app_state.dart';
+import '../../../core/network/api_service.dart';
 import '../../widgets/paginated_list.dart';
 
 class SinhVienHuongDanGVScreen extends StatefulWidget {
@@ -20,6 +21,17 @@ class _SinhVienHuongDanGVScreenState extends State<SinhVienHuongDanGVScreen> {
   String _filter = 'all'; // 'all', 'graded', 'ungraded'
   String _filterCompany = 'Tất cả';
   bool _isLocking = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final activeId = ApiService.profileId ?? ApiService.userId;
+      if (activeId != null && mounted) {
+        AppStateProvider.of(context).fetchLecturerDataFromApi(activeId);
+      }
+    });
+  }
 
   Future<void> _lockAllGuidedReports(int dotKienTapId) async {
     final appStateProvider = AppStateProvider.of(context);
@@ -102,8 +114,15 @@ class _SinhVienHuongDanGVScreenState extends State<SinhVienHuongDanGVScreen> {
       return true;
     }).toList();
 
-    return Column(
-      children: [
+    return RefreshIndicator(
+      onRefresh: () async {
+        final activeId = ApiService.profileId ?? ApiService.userId;
+        if (activeId != null) {
+          await appStateProvider.fetchLecturerDataFromApi(activeId);
+        }
+      },
+      child: Column(
+        children: [
         // Filter Chips Row & Lock Button
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -300,6 +319,7 @@ class _SinhVienHuongDanGVScreenState extends State<SinhVienHuongDanGVScreen> {
           ),
         ),
       ],
+      ),
     );
   }
 
