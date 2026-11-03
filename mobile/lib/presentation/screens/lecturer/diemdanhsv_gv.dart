@@ -435,44 +435,46 @@ class _DiemDanhSVGVScreenState extends State<DiemDanhSVGVScreen> {
                                             ],
                                             if (student.cachToChuc == 'TuDo') ...[
                                               const SizedBox(height: 4),
-                                              Row(
-                                                children: [
-                                                  Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                    decoration: BoxDecoration(
-                                                      color: Colors.purple.shade50,
-                                                      borderRadius: BorderRadius.circular(4),
-                                                      border: Border.all(color: Colors.purple.shade200),
-                                                    ),
-                                                    child: const Text('Tự túc / Tự do', style: TextStyle(fontSize: 10, color: Colors.purple, fontWeight: FontWeight.bold)),
-                                                  ),
-                                                  const SizedBox(width: 8),
-                                                  if (student.fileXacNhanUrl != null && student.fileXacNhanUrl!.isNotEmpty)
-                                                    InkWell(
-                                                      onTap: () {
-                                                        Navigator.push(
-                                                          context,
-                                                          MaterialPageRoute(
-                                                            builder: (context) => PdfViewerScreen(
-                                                              title: 'Giấy xác nhận - ${student.hoTen}',
-                                                              pdfUrl: student.fileXacNhanUrl!,
-                                                            ),
-                                                          ),
-                                                        );
-                                                      },
-                                                      child: const Row(
-                                                        mainAxisSize: MainAxisSize.min,
-                                                        children: [
-                                                          Icon(Icons.visibility_outlined, size: 13, color: AppColors.primary),
-                                                          SizedBox(width: 2),
-                                                          Text('Xem giấy XN', style: TextStyle(fontSize: 10, color: AppColors.primary, fontWeight: FontWeight.bold, decoration: TextDecoration.underline)),
-                                                        ],
+                                                Wrap(
+                                                  spacing: 8,
+                                                  runSpacing: 4,
+                                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                                  children: [
+                                                    Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.purple.shade50,
+                                                        borderRadius: BorderRadius.circular(4),
+                                                        border: Border.all(color: Colors.purple.shade200),
                                                       ),
-                                                    )
-                                                  else
-                                                    const Text('Chưa nộp giấy XN', style: TextStyle(fontSize: 10, color: AppColors.danger, fontStyle: FontStyle.italic)),
-                                                ],
-                                              ),
+                                                      child: const Text('Tự túc / Tự do', style: TextStyle(fontSize: 10, color: Colors.purple, fontWeight: FontWeight.bold)),
+                                                    ),
+                                                    if (student.fileXacNhanUrl != null && student.fileXacNhanUrl!.isNotEmpty)
+                                                      InkWell(
+                                                        onTap: () {
+                                                          Navigator.push(
+                                                            context,
+                                                            MaterialPageRoute(
+                                                              builder: (context) => PdfViewerScreen(
+                                                                title: 'Giấy xác nhận - ${student.hoTen}',
+                                                                pdfUrl: student.fileXacNhanUrl!,
+                                                              ),
+                                                            ),
+                                                          );
+                                                        },
+                                                        child: const Row(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          children: [
+                                                            Icon(Icons.visibility_outlined, size: 13, color: AppColors.primary),
+                                                            SizedBox(width: 2),
+                                                            Text('Xem giấy XN', style: TextStyle(fontSize: 10, color: AppColors.primary, fontWeight: FontWeight.bold, decoration: TextDecoration.underline)),
+                                                          ],
+                                                        ),
+                                                      )
+                                                    else
+                                                      const Text('Chưa nộp giấy XN', style: TextStyle(fontSize: 10, color: AppColors.danger, fontStyle: FontStyle.italic)),
+                                                  ],
+                                                ),
                                             ],
                                           ],
                                         ),

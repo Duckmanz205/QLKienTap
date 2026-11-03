@@ -9,7 +9,7 @@ import '../../core/network/api_service.dart';
 class AppState {
   String? currentRole; // 'student', 'lecturer', or null
   bool? phaiDoiMatKhau;
-  
+
   // Student state
   StudentProfile studentProfile;
   StudentDashboardStats? studentDashboardStats;
@@ -21,7 +21,7 @@ class AppState {
   List<TripProposal> proposals;
   StudentTermGrade? termGrade;
   RepresentativeTripsStatus? repStatus;
-  
+
   // Lecturer state
   LecturerProfile lecturerProfile;
   LecturerDashboardStats? lecturerDashboardStats;
@@ -81,7 +81,8 @@ class AppState {
       currentRole: currentRole ?? this.currentRole,
       phaiDoiMatKhau: phaiDoiMatKhau ?? this.phaiDoiMatKhau,
       studentProfile: studentProfile ?? this.studentProfile,
-      studentDashboardStats: studentDashboardStats ?? this.studentDashboardStats,
+      studentDashboardStats:
+          studentDashboardStats ?? this.studentDashboardStats,
       studentTrips: studentTrips ?? this.studentTrips,
       studentNotifications: studentNotifications ?? this.studentNotifications,
       submissions: submissions ?? this.submissions,
@@ -91,11 +92,13 @@ class AppState {
       termGrade: termGrade ?? this.termGrade,
       repStatus: repStatus ?? this.repStatus,
       lecturerProfile: lecturerProfile ?? this.lecturerProfile,
-      lecturerDashboardStats: lecturerDashboardStats ?? this.lecturerDashboardStats,
+      lecturerDashboardStats:
+          lecturerDashboardStats ?? this.lecturerDashboardStats,
       lecturerStudents: lecturerStudents ?? this.lecturerStudents,
       lecturerTours: lecturerTours ?? this.lecturerTours,
       councilSessions: councilSessions ?? this.councilSessions,
-      lecturerNotifications: lecturerNotifications ?? this.lecturerNotifications,
+      lecturerNotifications:
+          lecturerNotifications ?? this.lecturerNotifications,
       tripStudentsCache: tripStudentsCache ?? this.tripStudentsCache,
       councilBoards: councilBoards ?? this.councilBoards,
     );
@@ -109,7 +112,10 @@ class AppState {
 
     // 1. Chuyen di khoi hanh trong vong 48h (Hom nay hoac Ngay mai)
     for (var trip in studentTrips) {
-      if (trip.isRegistered && !trip.isCompleted && (trip.registrationStatus == null || ['HopLe', 'ChoDuyet'].contains(trip.registrationStatus))) {
+      if (trip.isRegistered &&
+          !trip.isCompleted &&
+          (trip.registrationStatus == null ||
+              ['HopLe', 'ChoDuyet'].contains(trip.registrationStatus))) {
         DateTime? tripDt;
         final rawDate = trip.date.trim();
         if (rawDate.isNotEmpty && rawDate != 'N/A') {
@@ -117,7 +123,9 @@ class AppState {
           if (tripDt == null && rawDate.contains('/')) {
             final parts = rawDate.split('/');
             if (parts.length == 3) {
-              tripDt = DateTime.tryParse('${parts[2]}-${parts[1].padLeft(2, '0')}-${parts[0].padLeft(2, '0')}');
+              tripDt = DateTime.tryParse(
+                '${parts[2]}-${parts[1].padLeft(2, '0')}-${parts[0].padLeft(2, '0')}',
+              );
             }
           }
         }
@@ -125,80 +133,104 @@ class AppState {
           final tripDateOnly = DateTime(tripDt.year, tripDt.month, tripDt.day);
           final diffDays = tripDateOnly.difference(today).inDays;
           if (diffDays == 0 || diffDays == 1) {
-            reminders.add(SmartReminderItem(
-              id: 'trip-${trip.id}',
-              title: diffDays == 0 ? 'Khởi hành HÔM NAY: ${trip.name}' : 'Khởi hành NGÀY MAI: ${trip.name}',
-              message: 'Khởi hành lúc ${trip.time}. Vui lòng có mặt đúng giờ, trang phục chỉnh tề và mang theo thẻ sinh viên!',
-              severity: ReminderSeverity.urgent,
-              icon: Icons.directions_bus,
-              actionLabel: 'Xem chuyến',
-              actionType: 'trip',
-              targetId: trip.id,
-              deadline: tripDt,
-            ));
+            reminders.add(
+              SmartReminderItem(
+                id: 'trip-${trip.id}',
+                title: diffDays == 0
+                    ? 'Khởi hành HÔM NAY: ${trip.name}'
+                    : 'Khởi hành NGÀY MAI: ${trip.name}',
+                message:
+                    'Khởi hành lúc ${trip.time}. Vui lòng có mặt đúng giờ, trang phục chỉnh tề và mang theo thẻ sinh viên!',
+                severity: ReminderSeverity.urgent,
+                icon: Icons.directions_bus,
+                actionLabel: 'Xem chuyến',
+                actionType: 'trip',
+                targetId: trip.id,
+                deadline: tripDt,
+              ),
+            );
           }
         }
       }
     }
 
     // 2. Nhac nho Le phi chua thanh toan
-    final unpaidInvoices = payments.where((p) => p.rawStatus == 'ChuaDong' || p.status == 'Chưa đóng').toList();
+    final unpaidInvoices = payments
+        .where((p) => p.rawStatus == 'ChuaDong' || p.status == 'Chưa đóng')
+        .toList();
     if (unpaidInvoices.isNotEmpty) {
       final firstUnpaid = unpaidInvoices.first;
-      reminders.add(SmartReminderItem(
-        id: 'payment-${firstUnpaid.id}',
-        title: 'Nhắc nhở đóng lệ phí kiến tập',
-        message: 'Bạn có ${unpaidInvoices.length} khoản lệ phí chưa thanh toán (Hạn: ${firstUnpaid.dueDate}). Vui lòng hoàn tất đúng hạn!',
-        severity: ReminderSeverity.warning,
-        icon: Icons.account_balance_wallet,
-        actionLabel: 'Đóng lệ phí',
-        actionType: 'finance',
-        targetId: firstUnpaid.id,
-      ));
+      reminders.add(
+        SmartReminderItem(
+          id: 'payment-${firstUnpaid.id}',
+          title: 'Nhắc nhở đóng lệ phí kiến tập',
+          message:
+              'Bạn có ${unpaidInvoices.length} khoản lệ phí chưa thanh toán (Hạn: ${firstUnpaid.dueDate}). Vui lòng hoàn tất đúng hạn!',
+          severity: ReminderSeverity.warning,
+          icon: Icons.account_balance_wallet,
+          actionLabel: 'Đóng lệ phí',
+          actionType: 'finance',
+          targetId: firstUnpaid.id,
+        ),
+      );
     }
 
     // 3. Nhac nho Nop bai thu hoach
     for (var sub in submissions) {
       if (sub.status == 'Chưa nộp' || sub.status == 'ChuaNop') {
-        reminders.add(SmartReminderItem(
-          id: 'sub-${sub.id}',
-          title: 'Nhắc nhở nộp bài thu hoạch',
-          message: 'Bạn chưa nộp bài thu hoạch cho chuyến "${sub.tripName}". Hãy nộp file sớm để giảng viên chấm điểm!',
-          severity: ReminderSeverity.warning,
-          icon: Icons.upload_file,
-          actionLabel: 'Nộp bài ngay',
-          actionType: 'report',
-          targetId: sub.id,
-        ));
+        reminders.add(
+          SmartReminderItem(
+            id: 'sub-${sub.id}',
+            title: 'Nhắc nhở nộp bài thu hoạch',
+            message:
+                'Bạn chưa nộp bài thu hoạch cho chuyến "${sub.tripName}". Hãy nộp file sớm để giảng viên chấm điểm!',
+            severity: ReminderSeverity.warning,
+            icon: Icons.upload_file,
+            actionLabel: 'Nộp bài ngay',
+            actionType: 'report',
+            targetId: sub.id,
+          ),
+        );
       }
     }
 
     // 4. Nhac nho Lich bao cao Hoi dong
-    if (repStatus != null && repStatus!.councilTime != null && repStatus!.councilTime != 'Chưa có lịch') {
-      reminders.add(SmartReminderItem(
-        id: 'council-rep',
-        title: 'Lịch bảo vệ Hội đồng kiến tập',
-        message: 'Hội đồng: ${repStatus!.councilSessionName ?? "Hội đồng khoa"} - Phòng: ${repStatus!.councilRoom ?? "Chưa xếp"} - Thời gian: ${repStatus!.councilTime}',
-        severity: ReminderSeverity.info,
-        icon: Icons.gavel,
-        actionLabel: 'Xem lịch',
-        actionType: 'council',
-      ));
+    if (repStatus != null &&
+        repStatus!.councilTime != null &&
+        repStatus!.councilTime != 'Chưa có lịch') {
+      reminders.add(
+        SmartReminderItem(
+          id: 'council-rep',
+          title: 'Lịch bảo vệ Hội đồng kiến tập',
+          message:
+              'Hội đồng: ${repStatus!.councilSessionName ?? "Hội đồng khoa"} - Phòng: ${repStatus!.councilRoom ?? "Chưa xếp"} - Thời gian: ${repStatus!.councilTime}',
+          severity: ReminderSeverity.info,
+          icon: Icons.gavel,
+          actionLabel: 'Xem lịch',
+          actionType: 'council',
+        ),
+      );
     }
 
     // 5. Thong bao co loai "NhacNho" hoac "CanhBao" tu Backend
     for (var notif in studentNotifications) {
       if (notif.type == 'NhacNho' || notif.type == 'CanhBao') {
-        reminders.add(SmartReminderItem(
-          id: 'notif-${notif.id}',
-          title: notif.title,
-          message: notif.content,
-          severity: notif.type == 'CanhBao' ? ReminderSeverity.urgent : ReminderSeverity.warning,
-          icon: notif.type == 'CanhBao' ? Icons.warning_amber_rounded : Icons.alarm_on,
-          actionLabel: 'Xem chi tiết',
-          actionType: 'notifications',
-          targetId: notif.id,
-        ));
+        reminders.add(
+          SmartReminderItem(
+            id: 'notif-${notif.id}',
+            title: notif.title,
+            message: notif.content,
+            severity: notif.type == 'CanhBao'
+                ? ReminderSeverity.urgent
+                : ReminderSeverity.warning,
+            icon: notif.type == 'CanhBao'
+                ? Icons.warning_amber_rounded
+                : Icons.alarm_on,
+            actionLabel: 'Xem chi tiết',
+            actionType: 'notifications',
+            targetId: notif.id,
+          ),
+        );
       }
     }
 
@@ -211,17 +243,22 @@ class AppState {
     final today = DateTime(now.year, now.month, now.day);
 
     // 1. Nhac nho Bai thu hoach can cham
-    final ungradedStudents = lecturerStudents.where((s) => !s.isGraded).toList();
+    final ungradedStudents = lecturerStudents
+        .where((s) => !s.isGraded)
+        .toList();
     if (ungradedStudents.isNotEmpty) {
-      reminders.add(SmartReminderItem(
-        id: 'gv-grade-pending',
-        title: 'Nhắc nhở chấm bài thu hoạch',
-        message: 'Thầy/Cô hiện có ${ungradedStudents.length} bài thu hoạch của sinh viên đang chờ chấm điểm!',
-        severity: ReminderSeverity.warning,
-        icon: Icons.assignment_late,
-        actionLabel: 'Chấm bài ngay',
-        actionType: 'grading',
-      ));
+      reminders.add(
+        SmartReminderItem(
+          id: 'gv-grade-pending',
+          title: 'Nhắc nhở chấm bài thu hoạch',
+          message:
+              'Thầy/Cô hiện có ${ungradedStudents.length} bài thu hoạch của sinh viên đang chờ chấm điểm!',
+          severity: ReminderSeverity.warning,
+          icon: Icons.assignment_late,
+          actionLabel: 'Chấm bài ngay',
+          actionType: 'grading',
+        ),
+      );
     }
 
     // 2. Nhac nho Chuyen dan doan sap toi (Hom nay hoac Ngay mai)
@@ -234,7 +271,9 @@ class AppState {
           if (tourDt == null && rawDate.contains('/')) {
             final parts = rawDate.split('/');
             if (parts.length == 3) {
-              tourDt = DateTime.tryParse('${parts[2]}-${parts[1].padLeft(2, '0')}-${parts[0].padLeft(2, '0')}');
+              tourDt = DateTime.tryParse(
+                '${parts[2]}-${parts[1].padLeft(2, '0')}-${parts[0].padLeft(2, '0')}',
+              );
             }
           }
         }
@@ -242,16 +281,21 @@ class AppState {
           final tourDateOnly = DateTime(tourDt.year, tourDt.month, tourDt.day);
           final diffDays = tourDateOnly.difference(today).inDays;
           if (diffDays == 0 || diffDays == 1) {
-            reminders.add(SmartReminderItem(
-              id: 'tour-${tour.id}',
-              title: diffDays == 0 ? 'Dẫn đoàn HÔM NAY: ${tour.name}' : 'Dẫn đoàn NGÀY MAI: ${tour.name}',
-              message: 'Khởi hành: ${tour.timeRange}. Sĩ số: ${tour.registeredCount}/${tour.maxCount} sinh viên.',
-              severity: ReminderSeverity.urgent,
-              icon: Icons.groups,
-              actionLabel: 'Xem đoàn',
-              actionType: 'tour',
-              targetId: tour.id,
-            ));
+            reminders.add(
+              SmartReminderItem(
+                id: 'tour-${tour.id}',
+                title: diffDays == 0
+                    ? 'Dẫn đoàn HÔM NAY: ${tour.name}'
+                    : 'Dẫn đoàn NGÀY MAI: ${tour.name}',
+                message:
+                    'Khởi hành: ${tour.timeRange}. Sĩ số: ${tour.registeredCount}/${tour.maxCount} sinh viên.',
+                severity: ReminderSeverity.urgent,
+                icon: Icons.groups,
+                actionLabel: 'Xem đoàn',
+                actionType: 'tour',
+                targetId: tour.id,
+              ),
+            );
           }
         }
       }
@@ -260,32 +304,41 @@ class AppState {
     // 3. Nhac nho Buoi cham Hoi dong
     for (var board in councilBoards) {
       if (!board.isBoardLocked && board.status != 'completed') {
-        reminders.add(SmartReminderItem(
-          id: 'board-${board.sessionId}',
-          title: 'Buổi chấm Hội đồng: ${board.sessionName}',
-          message: 'Phòng: ${board.room} - Thời gian: ${board.date} (${board.timeRange}). Vai trò: ${board.role}.',
-          severity: ReminderSeverity.info,
-          icon: Icons.gavel,
-          actionLabel: 'Vào hội đồng',
-          actionType: 'board',
-          targetId: board.sessionId.toString(),
-        ));
+        reminders.add(
+          SmartReminderItem(
+            id: 'board-${board.sessionId}',
+            title: 'Buổi chấm Hội đồng: ${board.sessionName}',
+            message:
+                'Phòng: ${board.room} - Thời gian: ${board.date} (${board.timeRange}). Vai trò: ${board.role}.',
+            severity: ReminderSeverity.info,
+            icon: Icons.gavel,
+            actionLabel: 'Vào hội đồng',
+            actionType: 'board',
+            targetId: board.sessionId.toString(),
+          ),
+        );
       }
     }
 
     // 4. Thong bao loai NhacNho hoac CanhBao gui cho GV
     for (var notif in lecturerNotifications) {
       if (notif.type == 'NhacNho' || notif.type == 'CanhBao') {
-        reminders.add(SmartReminderItem(
-          id: 'gv-notif-${notif.id}',
-          title: notif.title,
-          message: notif.body,
-          severity: notif.type == 'CanhBao' ? ReminderSeverity.urgent : ReminderSeverity.warning,
-          icon: notif.type == 'CanhBao' ? Icons.warning_amber_rounded : Icons.alarm_on,
-          actionLabel: 'Xem chi tiết',
-          actionType: 'notifications',
-          targetId: notif.id,
-        ));
+        reminders.add(
+          SmartReminderItem(
+            id: 'gv-notif-${notif.id}',
+            title: notif.title,
+            message: notif.body,
+            severity: notif.type == 'CanhBao'
+                ? ReminderSeverity.urgent
+                : ReminderSeverity.warning,
+            icon: notif.type == 'CanhBao'
+                ? Icons.warning_amber_rounded
+                : Icons.alarm_on,
+            actionLabel: 'Xem chi tiết',
+            actionType: 'notifications',
+            targetId: notif.id,
+          ),
+        );
       }
     }
 
@@ -305,7 +358,8 @@ class AppStateProvider extends InheritedWidget {
   });
 
   static AppStateProviderState of(BuildContext context) {
-    final provider = context.dependOnInheritedWidgetOfExactType<AppStateProvider>();
+    final provider = context
+        .dependOnInheritedWidgetOfExactType<AppStateProvider>();
     if (provider == null) {
       throw Exception('AppStateProvider not found in context');
     }
@@ -336,7 +390,7 @@ class AppStateProviderState extends State<AppStateContainer> {
   void initState() {
     super.initState();
     _resetToDefaults(notify: false);
-    
+
     // Bind 401 Unauthorized handler
     ApiService.onUnauthorized = () {
       logout();
@@ -420,28 +474,32 @@ class AppStateProviderState extends State<AppStateContainer> {
 
   // --- Hybrid API Helpers ---
 
-
-
   static const String _cachedStudentNotifsKey = 'qlkt_cached_student_notifs';
   static const String _cachedLecturerNotifsKey = 'qlkt_cached_lecturer_notifs';
 
-  Future<void> _saveStudentNotificationsCache(List<StudentNotification> notifs) async {
+  Future<void> _saveStudentNotificationsCache(
+    List<StudentNotification> notifs,
+  ) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final jsonList = notifs.map((n) => {
-        'id': n.id,
-        'title': n.title,
-        'content': n.content,
-        'timeText': n.timeText,
-        'isRead': n.isRead,
-        'type': n.type,
-        'attachment': n.attachment,
-        'fileUrl': n.fileUrl,
-        'senderName': n.senderName,
-        'targetAudience': n.targetAudience,
-        'isEdited': n.isEdited,
-        'editedAt': n.editedAt,
-      }).toList();
+      final jsonList = notifs
+          .map(
+            (n) => {
+              'id': n.id,
+              'title': n.title,
+              'content': n.content,
+              'timeText': n.timeText,
+              'isRead': n.isRead,
+              'type': n.type,
+              'attachment': n.attachment,
+              'fileUrl': n.fileUrl,
+              'senderName': n.senderName,
+              'targetAudience': n.targetAudience,
+              'isEdited': n.isEdited,
+              'editedAt': n.editedAt,
+            },
+          )
+          .toList();
       await prefs.setString(_cachedStudentNotifsKey, jsonEncode(jsonList));
     } catch (e) {
       debugPrint('Error saving student notifications cache: $e');
@@ -454,20 +512,24 @@ class AppStateProviderState extends State<AppStateContainer> {
       final cachedStr = prefs.getString(_cachedStudentNotifsKey);
       if (cachedStr != null && cachedStr.isNotEmpty) {
         final List<dynamic> list = jsonDecode(cachedStr);
-        return list.map((item) => StudentNotification(
-          id: item['id']?.toString() ?? '',
-          title: item['title'] ?? 'Thông báo',
-          content: item['content'] ?? '',
-          timeText: item['timeText'] ?? 'Ngoại tuyến',
-          isRead: item['isRead'] == true,
-          type: item['type'] ?? 'ThongBao',
-          attachment: item['attachment'],
-          fileUrl: item['fileUrl'],
-          senderName: item['senderName'] ?? 'Ban Chủ nhiệm Khoa',
-          targetAudience: item['targetAudience'] ?? 'STUDENT',
-          isEdited: item['isEdited'] == true,
-          editedAt: item['editedAt'],
-        )).toList();
+        return list
+            .map(
+              (item) => StudentNotification(
+                id: item['id']?.toString() ?? '',
+                title: item['title'] ?? 'Thông báo',
+                content: item['content'] ?? '',
+                timeText: item['timeText'] ?? 'Ngoại tuyến',
+                isRead: item['isRead'] == true,
+                type: item['type'] ?? 'ThongBao',
+                attachment: item['attachment'],
+                fileUrl: item['fileUrl'],
+                senderName: item['senderName'] ?? 'Ban Chủ nhiệm Khoa',
+                targetAudience: item['targetAudience'] ?? 'STUDENT',
+                isEdited: item['isEdited'] == true,
+                editedAt: item['editedAt'],
+              ),
+            )
+            .toList();
       }
     } catch (e) {
       debugPrint('Error loading student notifications cache: $e');
@@ -475,23 +537,29 @@ class AppStateProviderState extends State<AppStateContainer> {
     return [];
   }
 
-  Future<void> _saveLecturerNotificationsCache(List<LecturerNotification> notifs) async {
+  Future<void> _saveLecturerNotificationsCache(
+    List<LecturerNotification> notifs,
+  ) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final jsonList = notifs.map((n) => {
-        'id': n.id,
-        'title': n.title,
-        'body': n.body,
-        'time': n.time,
-        'isUnread': n.isUnread,
-        'type': n.type,
-        'attachment': n.attachment,
-        'fileUrl': n.fileUrl,
-        'senderName': n.senderName,
-        'targetAudience': n.targetAudience,
-        'isEdited': n.isEdited,
-        'editedAt': n.editedAt,
-      }).toList();
+      final jsonList = notifs
+          .map(
+            (n) => {
+              'id': n.id,
+              'title': n.title,
+              'body': n.body,
+              'time': n.time,
+              'isUnread': n.isUnread,
+              'type': n.type,
+              'attachment': n.attachment,
+              'fileUrl': n.fileUrl,
+              'senderName': n.senderName,
+              'targetAudience': n.targetAudience,
+              'isEdited': n.isEdited,
+              'editedAt': n.editedAt,
+            },
+          )
+          .toList();
       await prefs.setString(_cachedLecturerNotifsKey, jsonEncode(jsonList));
     } catch (e) {
       debugPrint('Error saving lecturer notifications cache: $e');
@@ -504,20 +572,24 @@ class AppStateProviderState extends State<AppStateContainer> {
       final cachedStr = prefs.getString(_cachedLecturerNotifsKey);
       if (cachedStr != null && cachedStr.isNotEmpty) {
         final List<dynamic> list = jsonDecode(cachedStr);
-        return list.map((item) => LecturerNotification(
-          id: item['id']?.toString() ?? '',
-          title: item['title'] ?? 'Thông báo',
-          body: item['body'] ?? '',
-          time: item['time'] ?? 'Ngoại tuyến',
-          isUnread: item['isUnread'] == true,
-          type: item['type'] ?? 'ThongBao',
-          attachment: item['attachment'],
-          fileUrl: item['fileUrl'],
-          senderName: item['senderName'] ?? 'Ban Chủ nhiệm Khoa',
-          targetAudience: item['targetAudience'] ?? 'LECTURER',
-          isEdited: item['isEdited'] == true,
-          editedAt: item['editedAt'],
-        )).toList();
+        return list
+            .map(
+              (item) => LecturerNotification(
+                id: item['id']?.toString() ?? '',
+                title: item['title'] ?? 'Thông báo',
+                body: item['body'] ?? '',
+                time: item['time'] ?? 'Ngoại tuyến',
+                isUnread: item['isUnread'] == true,
+                type: item['type'] ?? 'ThongBao',
+                attachment: item['attachment'],
+                fileUrl: item['fileUrl'],
+                senderName: item['senderName'] ?? 'Ban Chủ nhiệm Khoa',
+                targetAudience: item['targetAudience'] ?? 'LECTURER',
+                isEdited: item['isEdited'] == true,
+                editedAt: item['editedAt'],
+              ),
+            )
+            .toList();
       }
     } catch (e) {
       debugPrint('Error loading lecturer notifications cache: $e');
@@ -544,7 +616,8 @@ class AppStateProviderState extends State<AppStateContainer> {
             final parts = rawDate.split('/');
             if (parts.length == 3) {
               tripDt = DateTime.tryParse(
-                  '${parts[2]}-${parts[1].padLeft(2, '0')}-${parts[0].padLeft(2, '0')}');
+                '${parts[2]}-${parts[1].padLeft(2, '0')}-${parts[0].padLeft(2, '0')}',
+              );
             }
           }
         }
@@ -554,16 +627,18 @@ class AppStateProviderState extends State<AppStateContainer> {
           if (diffDays == 0 || diffDays == 1) {
             final whenStr = diffDays == 0 ? 'HÔM NAY' : 'NGÀY MAI';
             final timeTag = diffDays == 0 ? 'Hôm nay' : 'Ngày mai';
-            autoReminders.add(StudentNotification(
-              id: 'auto-trip-${trip.id}',
-              title: '[Nhắc nhở] Khởi hành $whenStr: ${trip.name}',
-              content:
-                  'Chuyến tham quan "${trip.name}" sẽ khởi hành $timeTag lúc ${trip.time}. Địa điểm: ${trip.location}. Bạn vui lòng có mặt đúng giờ, mặc trang phục chỉnh tề và mang theo thẻ sinh viên!',
-              timeText: timeTag,
-              type: 'NhacNho',
-              senderName: 'Hệ thống tự động',
-              targetAudience: 'STUDENT',
-            ));
+            autoReminders.add(
+              StudentNotification(
+                id: 'auto-trip-${trip.id}',
+                title: '[Nhắc nhở] Khởi hành $whenStr: ${trip.name}',
+                content:
+                    'Chuyến tham quan "${trip.name}" sẽ khởi hành $timeTag lúc ${trip.time}. Địa điểm: ${trip.location}. Bạn vui lòng có mặt đúng giờ, mặc trang phục chỉnh tề và mang theo thẻ sinh viên!',
+                timeText: timeTag,
+                type: 'NhacNho',
+                senderName: 'Hệ thống tự động',
+                targetAudience: 'STUDENT',
+              ),
+            );
           }
         }
       }
@@ -571,37 +646,43 @@ class AppStateProviderState extends State<AppStateContainer> {
 
     // 2. Nhac nho Dong le phi kien tap
     final unpaidPayments = _state.payments
-        .where((p) =>
-            p.rawStatus == 'ChuaDong' ||
-            p.status == 'Chưa đóng' ||
-            p.status == 'Chưa thanh toán')
+        .where(
+          (p) =>
+              p.rawStatus == 'ChuaDong' ||
+              p.status == 'Chưa đóng' ||
+              p.status == 'Chưa thanh toán',
+        )
         .toList();
     for (var unpaid in unpaidPayments) {
-      autoReminders.add(StudentNotification(
-        id: 'auto-fee-${unpaid.id}',
-        title: '[Nhắc nhở] Đóng lệ phí: ${unpaid.name}',
-        content:
-            'Bạn có khoản lệ phí ${unpaid.amount.toInt()} đ cho hóa đơn "${unpaid.name}" chưa thanh toán (Hạn chót: ${unpaid.dueDate}). Vui lòng hoàn tất đúng hạn!',
-        timeText: 'Chưa đóng',
-        type: 'TaiChinh',
-        senderName: 'Hệ thống tự động',
-        targetAudience: 'STUDENT',
-      ));
+      autoReminders.add(
+        StudentNotification(
+          id: 'auto-fee-${unpaid.id}',
+          title: '[Nhắc nhở] Đóng lệ phí: ${unpaid.name}',
+          content:
+              'Bạn có khoản lệ phí ${unpaid.amount.toInt()} đ cho hóa đơn "${unpaid.name}" chưa thanh toán (Hạn chót: ${unpaid.dueDate}). Vui lòng hoàn tất đúng hạn!',
+          timeText: 'Chưa đóng',
+          type: 'TaiChinh',
+          senderName: 'Hệ thống tự động',
+          targetAudience: 'STUDENT',
+        ),
+      );
     }
 
     // 3. Nhac nho Nop bai thu hoach
     for (var sub in _state.submissions) {
       if (sub.status == 'Chưa nộp' || sub.status == 'ChuaNop') {
-        autoReminders.add(StudentNotification(
-          id: 'auto-sub-${sub.id}',
-          title: '[Nhắc nhở] Nộp bài thu hoạch: ${sub.tripName}',
-          content:
-              'Bạn chưa nộp bài thu hoạch cho chuyến "${sub.tripName}". Hãy nộp file báo cáo sớm trên ứng dụng để giảng viên chấm điểm!',
-          timeText: 'Cần nộp',
-          type: 'NhacNho',
-          senderName: 'Hệ thống tự động',
-          targetAudience: 'STUDENT',
-        ));
+        autoReminders.add(
+          StudentNotification(
+            id: 'auto-sub-${sub.id}',
+            title: '[Nhắc nhở] Nộp bài thu hoạch: ${sub.tripName}',
+            content:
+                'Bạn chưa nộp bài thu hoạch cho chuyến "${sub.tripName}". Hãy nộp file báo cáo sớm trên ứng dụng để giảng viên chấm điểm!',
+            timeText: 'Cần nộp',
+            type: 'NhacNho',
+            senderName: 'Hệ thống tự động',
+            targetAudience: 'STUDENT',
+          ),
+        );
       }
     }
 
@@ -609,16 +690,18 @@ class AppStateProviderState extends State<AppStateContainer> {
     if (_state.repStatus != null &&
         _state.repStatus!.councilTime != null &&
         _state.repStatus!.councilTime != 'Chưa có lịch') {
-      autoReminders.add(StudentNotification(
-        id: 'auto-council-rep',
-        title: '[Nhắc nhở] Lịch bảo vệ Hội đồng kiến tập',
-        content:
-            'Hội đồng: ${_state.repStatus!.councilSessionName ?? "Hội đồng khoa"} - Phòng: ${_state.repStatus!.councilRoom ?? "Chưa xếp"} - Thời gian: ${_state.repStatus!.councilTime}',
-        timeText: 'Sắp diễn ra',
-        type: 'NhacNho',
-        senderName: 'Hệ thống tự động',
-        targetAudience: 'STUDENT',
-      ));
+      autoReminders.add(
+        StudentNotification(
+          id: 'auto-council-rep',
+          title: '[Nhắc nhở] Lịch bảo vệ Hội đồng kiến tập',
+          content:
+              'Hội đồng: ${_state.repStatus!.councilSessionName ?? "Hội đồng khoa"} - Phòng: ${_state.repStatus!.councilRoom ?? "Chưa xếp"} - Thời gian: ${_state.repStatus!.councilTime}',
+          timeText: 'Sắp diễn ra',
+          type: 'NhacNho',
+          senderName: 'Hệ thống tự động',
+          targetAudience: 'STUDENT',
+        ),
+      );
     }
 
     return autoReminders;
@@ -632,16 +715,18 @@ class AppStateProviderState extends State<AppStateContainer> {
     // 1. Nhac nho cham bai
     final ungraded = _state.lecturerStudents.where((s) => !s.isGraded).toList();
     if (ungraded.isNotEmpty) {
-      autoReminders.add(LecturerNotification(
-        id: 'auto-gv-grading',
-        title: '[Nhắc nhở] Chấm bài thu hoạch sinh viên',
-        body:
-            'Thầy/Cô hiện có ${ungraded.length} bài thu hoạch của sinh viên đang chờ chấm điểm. Vui lòng vào mục "Chấm bài" để hoàn tất!',
-        time: 'Cần chấm',
-        type: 'NhacNho',
-        senderName: 'Hệ thống tự động',
-        isUnread: true,
-      ));
+      autoReminders.add(
+        LecturerNotification(
+          id: 'auto-gv-grading',
+          title: '[Nhắc nhở] Chấm bài thu hoạch sinh viên',
+          body:
+              'Thầy/Cô hiện có ${ungraded.length} bài thu hoạch của sinh viên đang chờ chấm điểm. Vui lòng vào mục "Chấm bài" để hoàn tất!',
+          time: 'Cần chấm',
+          type: 'NhacNho',
+          senderName: 'Hệ thống tự động',
+          isUnread: true,
+        ),
+      );
     }
 
     // 2. Dan doan Hom nay / Ngay mai
@@ -655,7 +740,8 @@ class AppStateProviderState extends State<AppStateContainer> {
             final parts = rawDate.split('/');
             if (parts.length == 3) {
               tourDt = DateTime.tryParse(
-                  '${parts[2]}-${parts[1].padLeft(2, '0')}-${parts[0].padLeft(2, '0')}');
+                '${parts[2]}-${parts[1].padLeft(2, '0')}-${parts[0].padLeft(2, '0')}',
+              );
             }
           }
         }
@@ -665,16 +751,18 @@ class AppStateProviderState extends State<AppStateContainer> {
           if (diffDays == 0 || diffDays == 1) {
             final whenStr = diffDays == 0 ? 'HÔM NAY' : 'NGÀY MAI';
             final timeTag = diffDays == 0 ? 'Hôm nay' : 'Ngày mai';
-            autoReminders.add(LecturerNotification(
-              id: 'auto-gv-tour-${tour.id}',
-              title: '[Nhắc nhở] Dẫn đoàn $whenStr: ${tour.name}',
-              body:
-                  'Thời gian khởi hành: ${tour.timeRange}. Sĩ số: ${tour.registeredCount}/${tour.maxCount} sinh viên. Thầy/Cô vui lòng có mặt đúng giờ để điểm danh sinh viên!',
-              time: timeTag,
-              type: 'NhacNho',
-              senderName: 'Hệ thống tự động',
-              isUnread: true,
-            ));
+            autoReminders.add(
+              LecturerNotification(
+                id: 'auto-gv-tour-${tour.id}',
+                title: '[Nhắc nhở] Dẫn đoàn $whenStr: ${tour.name}',
+                body:
+                    'Thời gian khởi hành: ${tour.timeRange}. Sĩ số: ${tour.registeredCount}/${tour.maxCount} sinh viên. Thầy/Cô vui lòng có mặt đúng giờ để điểm danh sinh viên!',
+                time: timeTag,
+                type: 'NhacNho',
+                senderName: 'Hệ thống tự động',
+                isUnread: true,
+              ),
+            );
           }
         }
       }
@@ -683,16 +771,18 @@ class AppStateProviderState extends State<AppStateContainer> {
     // 3. Hoi dong sap toi
     for (var board in _state.councilBoards) {
       if (!board.isBoardLocked && board.status != 'completed') {
-        autoReminders.add(LecturerNotification(
-          id: 'auto-gv-board-${board.sessionId}',
-          title: '[Nhắc nhở] Buổi chấm Hội đồng: ${board.sessionName}',
-          body:
-              'Phòng: ${board.room} - Thời gian: ${board.date} (${board.timeRange}). Vai trò: ${board.role}.',
-          time: 'Sắp diễn ra',
-          type: 'NhacNho',
-          senderName: 'Hệ thống tự động',
-          isUnread: true,
-        ));
+        autoReminders.add(
+          LecturerNotification(
+            id: 'auto-gv-board-${board.sessionId}',
+            title: '[Nhắc nhở] Buổi chấm Hội đồng: ${board.sessionName}',
+            body:
+                'Phòng: ${board.room} - Thời gian: ${board.date} (${board.timeRange}). Vai trò: ${board.role}.',
+            time: 'Sắp diễn ra',
+            type: 'NhacNho',
+            senderName: 'Hệ thống tự động',
+            isUnread: true,
+          ),
+        );
       }
     }
 
@@ -702,93 +792,131 @@ class AppStateProviderState extends State<AppStateContainer> {
   Future<void> fetchStudentDataFromApi(int studentId) async {
     try {
       // 1. Fetch all available trips and registered trips
-      final List<dynamic> availableTripsJson = await ApiService.getAvailableTrips(studentId);
-      final List<dynamic> regTripsJson = await ApiService.getRegisteredTrips(studentId);
-      
+      final List<dynamic> availableTripsJson =
+          await ApiService.getAvailableTrips(studentId);
+      final List<dynamic> regTripsJson = await ApiService.getRegisteredTrips(
+        studentId,
+      );
+
       // Combine available and registered to form the studentTrips list
       List<Trip> realTrips = [];
-      
+
       // Process available trips (all trips available for regular or supplementary registration)
       for (var t in availableTripsJson) {
         final trip = _mapJsonToTrip(t, isRegistered: false);
-        realTrips.add(trip.copyWith(
-          isRegistered: false,
-          daTungDangKy: t['da_tung_dang_ky'] == true,
-          trangThaiCu: t['trang_thai_cu'],
-          tripStatus: t['trang_thai'],
-        ));
+        realTrips.add(
+          trip.copyWith(
+            isRegistered: false,
+            daTungDangKy: t['da_tung_dang_ky'] == true,
+            trangThaiCu: t['trang_thai_cu'],
+            tripStatus: t['trang_thai'],
+          ),
+        );
       }
-      
+
       // Process registered trips
       List<Submission> realSubmissions = [];
       for (var reg in regTripsJson) {
         if (reg['chuyenThamQuan'] != null) {
-          final trip = _mapJsonToTrip(reg['chuyenThamQuan'], isRegistered: true);
+          final trip = _mapJsonToTrip(
+            reg['chuyenThamQuan'],
+            isRegistered: true,
+          );
           final regStatus = reg['trang_thai']?.toString();
           final tripStatus = reg['chuyenThamQuan']?['trang_thai']?.toString();
-          final isCompleted = regStatus == 'HoanThanh' || regStatus == 'DaChamDiem' || regStatus == 'DaThamGia' || trip.isCompleted;
-          
-          realTrips.add(trip.copyWith(
-            isRegistered: true,
-            isCompleted: isCompleted,
-            registrationId: reg['id'].toString(),
-            registrationStatus: regStatus,
-            tripStatus: tripStatus,
-          ));
-          
+          final isCompleted =
+              regStatus == 'HoanThanh' ||
+              regStatus == 'DaChamDiem' ||
+              regStatus == 'DaThamGia' ||
+              trip.isCompleted;
+
+          realTrips.add(
+            trip.copyWith(
+              isRegistered: true,
+              isCompleted: isCompleted,
+              registrationId: reg['id'].toString(),
+              registrationStatus: regStatus,
+              tripStatus: tripStatus,
+            ),
+          );
+
           if (isCompleted || regStatus == 'HopLe' || regStatus == 'DaThamGia') {
-             final bth = reg['baiThuHoach'] ?? reg['phieuThamQuan']?['baiThuHoach'];
-             final diemPhieu = reg['phieuThamQuan']?['diemPhieuThamQuan'];
-             final rawNgayThamQuan = reg['chuyenThamQuan']?['ngay_tham_quan'];
-             final tripDate = rawNgayThamQuan != null ? DateTime.tryParse(rawNgayThamQuan.toString()) : null;
+            final bth =
+                reg['baiThuHoach'] ?? reg['phieuThamQuan']?['baiThuHoach'];
+            final diemPhieu = reg['phieuThamQuan']?['diemPhieuThamQuan'];
+            final rawNgayThamQuan = reg['chuyenThamQuan']?['ngay_tham_quan'];
+            final tripDate = rawNgayThamQuan != null
+                ? DateTime.tryParse(rawNgayThamQuan.toString())
+                : null;
 
-             final rawScore = diemPhieu?['diem_thu_hoach'];
-             final double? reportScore = rawScore != null ? double.tryParse(rawScore.toString()) : null;
-             final String? gvhdComment = diemPhieu?['nhan_xet_gvhd']?.toString();
-             final String? gvhdName = (diemPhieu?['giangVienHD']?['ho_ten'] ?? diemPhieu?['giangVien']?['ho_ten'])?.toString();
-             final bool isScoreLocked = diemPhieu?['da_khoa_thu_hoach'] == true || diemPhieu?['da_khoa'] == true;
+            final rawScore = diemPhieu?['diem_thu_hoach'];
+            final double? reportScore = rawScore != null
+                ? double.tryParse(rawScore.toString())
+                : null;
+            final String? gvhdComment = diemPhieu?['nhan_xet_gvhd']?.toString();
+            final String? gvhdName =
+                (diemPhieu?['giangVienHD']?['ho_ten'] ??
+                        diemPhieu?['giangVien']?['ho_ten'])
+                    ?.toString();
+            final bool isScoreLocked =
+                diemPhieu?['da_khoa_thu_hoach'] == true ||
+                diemPhieu?['da_khoa'] == true;
 
-             final rawGradedAt = diemPhieu?['ngay_cham_thu_hoach'] ?? diemPhieu?['updated_at'];
-             String? gradedAtText;
-             if (rawGradedAt != null) {
-               final dt = DateTime.tryParse(rawGradedAt.toString())?.toLocal();
-               if (dt != null) {
-                 gradedAtText = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
-               }
-             }
+            final rawGradedAt =
+                diemPhieu?['ngay_cham_thu_hoach'] ?? diemPhieu?['updated_at'];
+            String? gradedAtText;
+            if (rawGradedAt != null) {
+              final dt = DateTime.tryParse(rawGradedAt.toString())?.toLocal();
+              if (dt != null) {
+                gradedAtText =
+                    '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+              }
+            }
 
-             String? deadlineText;
-             if (tripDate != null) {
-               final dline = tripDate.add(const Duration(days: 10));
-               deadlineText = '${dline.day.toString().padLeft(2, '0')}/${dline.month.toString().padLeft(2, '0')}/${dline.year}';
-             }
+            String? deadlineText;
+            if (tripDate != null) {
+              final dline = tripDate.add(const Duration(days: 10));
+              deadlineText =
+                  '${dline.day.toString().padLeft(2, '0')}/${dline.month.toString().padLeft(2, '0')}/${dline.year}';
+            }
 
-             realSubmissions.add(Submission(
-               id: reg['id'].toString(),
-               registrationId: reg['id'],
-               tripName: trip.name,
-               typeText: (trip.type == 'TuDo' || trip.type == 'Tự do')
-                   ? 'Kiến tập tự do'
-                   : (trip.type == 'Trực tuyến' || trip.type == 'TrucTuyen')
-                       ? 'Kiến tập trực tuyến'
-                       : 'Kiến tập trực tiếp',
-               dateText: trip.date,
-               tripDate: tripDate,
-               status: bth != null ? 'Đã nộp' : 'Chưa nộp',
-               fileName: bth?['file_bao_cao']?.split('/').last ?? (bth != null ? 'baocao.pdf' : null),
-               fileSize: bth != null ? 'N/A' : null,
-               submittedAt: bth?['ngay_nop'] != null ? DateTime.tryParse(bth['ngay_nop'].toString())?.toLocal().toString().substring(0,16) : null,
-               hasConfirmationFile: bth != null && bth['file_xac_nhan_tham_quan'] != null,
-               confirmationFileName: bth?['file_xac_nhan_tham_quan']?.split('/').last,
-               fileBaoCaoUrl: bth?['file_bao_cao'],
-               fileXacNhanUrl: bth?['file_xac_nhan_tham_quan'],
-               reportScore: reportScore,
-               gvhdComment: gvhdComment,
-               gvhdName: gvhdName,
-               isScoreLocked: isScoreLocked,
-               gradedAt: gradedAtText,
-               deadlineText: deadlineText,
-             ));
+            realSubmissions.add(
+              Submission(
+                id: reg['id'].toString(),
+                registrationId: reg['id'],
+                tripName: trip.name,
+                typeText: (trip.type == 'TuDo' || trip.type == 'Tự do')
+                    ? 'Kiến tập tự do'
+                    : (trip.type == 'Trực tuyến' || trip.type == 'TrucTuyen')
+                    ? 'Kiến tập trực tuyến'
+                    : 'Kiến tập trực tiếp',
+                dateText: trip.date,
+                tripDate: tripDate,
+                status: bth != null ? 'Đã nộp' : 'Chưa nộp',
+                fileName:
+                    bth?['file_bao_cao']?.split('/').last ??
+                    (bth != null ? 'baocao.pdf' : null),
+                fileSize: bth != null ? 'N/A' : null,
+                submittedAt: bth?['ngay_nop'] != null
+                    ? DateTime.tryParse(
+                        bth['ngay_nop'].toString(),
+                      )?.toLocal().toString().substring(0, 16)
+                    : null,
+                hasConfirmationFile:
+                    bth != null && bth['file_xac_nhan_tham_quan'] != null,
+                confirmationFileName: bth?['file_xac_nhan_tham_quan']
+                    ?.split('/')
+                    .last,
+                fileBaoCaoUrl: bth?['file_bao_cao'],
+                fileXacNhanUrl: bth?['file_xac_nhan_tham_quan'],
+                reportScore: reportScore,
+                gvhdComment: gvhdComment,
+                gvhdName: gvhdName,
+                isScoreLocked: isScoreLocked,
+                gradedAt: gradedAtText,
+                deadlineText: deadlineText,
+              ),
+            );
           }
         }
       }
@@ -799,20 +927,27 @@ class AppStateProviderState extends State<AppStateContainer> {
       });
 
       // 2. Fetch Invoices
-      final List<dynamic> invoicesJson = await ApiService.getInvoices(studentId);
+      final List<dynamic> invoicesJson = await ApiService.getInvoices(
+        studentId,
+      );
       setState(() {
         if (invoicesJson.isNotEmpty) {
           _state.payments = invoicesJson.map((inv) {
-            final chuyen = inv['chuyen_di'] ?? inv['phieuDangKy']?['chuyenThamQuan'] ?? {};
+            final chuyen =
+                inv['chuyen_di'] ?? inv['phieuDangKy']?['chuyenThamQuan'] ?? {};
             final nhaMay = chuyen['nhaMay'] ?? {};
-            final tenNhaMay = nhaMay['ten_nha_may'] ?? chuyen['ten_chuyen_di'] ?? 'Chuyến kiến tập';
+            final tenNhaMay =
+                nhaMay['ten_nha_may'] ??
+                chuyen['ten_chuyen_di'] ??
+                'Chuyến kiến tập';
 
             final rawHan = inv['han_dong'] ?? inv['han_thanh_toan'];
             String formattedDueDate = 'Chưa cập nhật';
             if (rawHan != null) {
               final dt = DateTime.tryParse(rawHan.toString())?.toLocal();
               if (dt != null) {
-                formattedDueDate = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+                formattedDueDate =
+                    '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
               }
             }
 
@@ -833,7 +968,8 @@ class AppStateProviderState extends State<AppStateContainer> {
             if (rawTripDate != null) {
               final dt = DateTime.tryParse(rawTripDate.toString())?.toLocal();
               if (dt != null) {
-                formattedTripDate = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+                formattedTripDate =
+                    '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
               }
             }
 
@@ -842,16 +978,18 @@ class AppStateProviderState extends State<AppStateContainer> {
             if (rawPaidDate != null) {
               final dt = DateTime.tryParse(rawPaidDate.toString())?.toLocal();
               if (dt != null) {
-                formattedPaidDate = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+                formattedPaidDate =
+                    '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
               }
             }
 
             final hinhThuc = chuyen['hinh_thuc']?.toString();
-            final tripType = (hinhThuc == 'TrucTuyen' || hinhThuc == 'Trực tuyến')
+            final tripType =
+                (hinhThuc == 'TrucTuyen' || hinhThuc == 'Trực tuyến')
                 ? 'Trực tuyến'
                 : (hinhThuc == 'TuDo' || hinhThuc == 'Tự do')
-                    ? 'Tự do'
-                    : 'Trực tiếp';
+                ? 'Tự do'
+                : 'Trực tiếp';
 
             // Transfer code: read directly from DB noi_dung_chuyen_khoan
             final rawCode = inv['noi_dung_chuyen_khoan']?.toString().trim();
@@ -864,7 +1002,9 @@ class AppStateProviderState extends State<AppStateContainer> {
               tripId: chuyen['id']?.toString() ?? '',
               name: tenNhaMay,
               code: transferContent,
-              amount: double.tryParse(inv['so_tien']?.toString() ?? '150000') ?? 150000,
+              amount:
+                  double.tryParse(inv['so_tien']?.toString() ?? '150000') ??
+                  150000,
               dueDate: formattedDueDate,
               status: displayStatus,
               rawStatus: rawStatus,
@@ -880,47 +1020,56 @@ class AppStateProviderState extends State<AppStateContainer> {
 
       // 3. Fetch Refund Requests
       try {
-        final List<dynamic> refundsJson = await ApiService.getRefundRequests(studentId);
+        final List<dynamic> refundsJson = await ApiService.getRefundRequests(
+          studentId,
+        );
         setState(() {
           if (refundsJson.isNotEmpty) {
-          _state.refunds = refundsJson.map((ref) {
-            final invoice = ref['hoaDon'] ?? {};
-            String mappedStatus = 'Chờ xử lý';
-            final rawStatus = ref['trang_thai']?.toString() ?? '';
-            if (rawStatus == 'Approved' || rawStatus == 'DaHoanTien' || rawStatus == 'DaHoanPhi') {
-              mappedStatus = 'Đã hoàn tiền';
-            } else if (rawStatus == 'Rejected' || rawStatus == 'TuChoi') {
-              mappedStatus = 'Từ chối';
-            } else {
-              mappedStatus = 'Chờ xử lý';
-            }
-            
-            final rawDate = ref['ngay_nop'] ?? ref['ngay_yeu_cau'] ?? ref['created_at'];
-            String dateText = 'N/A';
-            if (rawDate != null) {
-              final dt = DateTime.tryParse(rawDate.toString())?.toLocal();
-              if (dt != null) {
-                dateText = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+            _state.refunds = refundsJson.map((ref) {
+              final invoice = ref['hoaDon'] ?? {};
+              String mappedStatus = 'Chờ xử lý';
+              final rawStatus = ref['trang_thai']?.toString() ?? '';
+              if (rawStatus == 'Approved' ||
+                  rawStatus == 'DaHoanTien' ||
+                  rawStatus == 'DaHoanPhi') {
+                mappedStatus = 'Đã hoàn tiền';
+              } else if (rawStatus == 'Rejected' || rawStatus == 'TuChoi') {
+                mappedStatus = 'Từ chối';
+              } else {
+                mappedStatus = 'Chờ xử lý';
               }
-            }
 
-            final amountNum = double.tryParse(invoice['so_tien']?.toString() ?? '0') ?? 0;
-            final amountFormatted = amountNum > 0
-                ? amountNum.toInt().toString().replaceAllMapped(
-                    RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-                    (Match m) => '${m[1]}.',
-                  )
-                : (invoice['so_tien']?.toString() ?? '0');
-            
-            return RefundRequest(
-              id: ref['id'].toString(),
-              invoiceName: invoice['ma_hoa_don'] ?? 'Hóa đơn #${invoice['id']}',
-              dateText: dateText,
-              amountText: '$amountFormatted đ',
-              status: mappedStatus,
-              lyDoTuChoi: ref['ly_do_tu_choi'] ?? ref['ghi_chu'] ?? ref['ly_do'],
-            );
-          }).toList();
+              final rawDate =
+                  ref['ngay_nop'] ?? ref['ngay_yeu_cau'] ?? ref['created_at'];
+              String dateText = 'N/A';
+              if (rawDate != null) {
+                final dt = DateTime.tryParse(rawDate.toString())?.toLocal();
+                if (dt != null) {
+                  dateText =
+                      '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+                }
+              }
+
+              final amountNum =
+                  double.tryParse(invoice['so_tien']?.toString() ?? '0') ?? 0;
+              final amountFormatted = amountNum > 0
+                  ? amountNum.toInt().toString().replaceAllMapped(
+                      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+                      (Match m) => '${m[1]}.',
+                    )
+                  : (invoice['so_tien']?.toString() ?? '0');
+
+              return RefundRequest(
+                id: ref['id'].toString(),
+                invoiceName:
+                    invoice['ma_hoa_don'] ?? 'Hóa đơn #${invoice['id']}',
+                dateText: dateText,
+                amountText: '$amountFormatted đ',
+                status: mappedStatus,
+                lyDoTuChoi:
+                    ref['ly_do_tu_choi'] ?? ref['ghi_chu'] ?? ref['ly_do'],
+              );
+            }).toList();
           } else {
             _state.refunds = [];
           }
@@ -929,7 +1078,9 @@ class AppStateProviderState extends State<AppStateContainer> {
         print('Error fetching refund requests: $e');
       }
 
-      final List<dynamic> notifsJson = await ApiService.getStudentNotifications(studentId);
+      final List<dynamic> notifsJson = await ApiService.getStudentNotifications(
+        studentId,
+      );
       final List<StudentNotification> backendNotifs = notifsJson.isNotEmpty
           ? notifsJson.map((n) {
               final rawDate = n['ngay_gui'] ?? n['created_at'];
@@ -937,16 +1088,20 @@ class AppStateProviderState extends State<AppStateContainer> {
               if (rawDate != null) {
                 final dt = DateTime.tryParse(rawDate.toString())?.toLocal();
                 if (dt != null) {
-                  formattedTime = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+                  formattedTime =
+                      '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
                 }
               }
 
               final rawEditedDate = n['ngay_chinh_sua'];
               String? formattedEditedTime;
               if (rawEditedDate != null) {
-                final dt = DateTime.tryParse(rawEditedDate.toString())?.toLocal();
+                final dt = DateTime.tryParse(
+                  rawEditedDate.toString(),
+                )?.toLocal();
                 if (dt != null) {
-                  formattedEditedTime = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+                  formattedEditedTime =
+                      '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
                 }
               }
 
@@ -955,8 +1110,16 @@ class AppStateProviderState extends State<AppStateContainer> {
                 title: n['tieu_de'] ?? 'Thông báo',
                 content: n['noi_dung'] ?? '',
                 timeText: formattedTime,
-                attachment: n['file_dinh_kem'] ?? (n['files'] != null && (n['files'] as List).isNotEmpty ? n['files'][0]['ten_file'] : null),
-                fileUrl: n['file_url'] ?? (n['files'] != null && (n['files'] as List).isNotEmpty ? n['files'][0]['duong_dan'] : null),
+                attachment:
+                    n['file_dinh_kem'] ??
+                    (n['files'] != null && (n['files'] as List).isNotEmpty
+                        ? n['files'][0]['ten_file']
+                        : null),
+                fileUrl:
+                    n['file_url'] ??
+                    (n['files'] != null && (n['files'] as List).isNotEmpty
+                        ? n['files'][0]['duong_dan']
+                        : null),
                 type: n['loai_thong_bao'] ?? n['type'] ?? 'ThongBao',
                 senderName: n['nguoi_gui'] ?? 'Ban Chủ nhiệm Khoa',
                 targetAudience: n['doi_tuong_nhan'] ?? 'STUDENT',
@@ -973,7 +1136,8 @@ class AppStateProviderState extends State<AppStateContainer> {
       _saveStudentNotificationsCache(_state.studentNotifications);
       NotificationService.instance.notifyStudentReminders(autoReminders);
 
-      final Map<String, dynamic> statsJson = await ApiService.getStudentDashboardStats(studentId);
+      final Map<String, dynamic> statsJson =
+          await ApiService.getStudentDashboardStats(studentId);
       setState(() {
         _state.studentDashboardStats = StudentDashboardStats(
           registered: statsJson['registered'] ?? 0,
@@ -987,9 +1151,10 @@ class AppStateProviderState extends State<AppStateContainer> {
       await fetchStudentProposals(studentId);
       await fetchStudentGrades(studentId);
       await fetchRepresentativeTripsStatus();
-
     } catch (e) {
-      print('Failed to load student data from backend (Offline mode active): $e');
+      print(
+        'Failed to load student data from backend (Offline mode active): $e',
+      );
       if (_state.studentNotifications.isEmpty) {
         final cached = await _loadStudentNotificationsCache();
         if (cached.isNotEmpty) {
@@ -1011,45 +1176,69 @@ class AppStateProviderState extends State<AppStateContainer> {
 
   Trip _mapJsonToTrip(Map<String, dynamic> json, {required bool isRegistered}) {
     final nhaMay = json['nhaMay'] ?? {};
-    
+
     return Trip(
       id: json['id'].toString(),
-      name: nhaMay['ten_nha_may'] ?? json['ten_chuyen_di'] ?? 'Chuyến tham quan',
-      date: json['ngay_tham_quan'] != null ? (_safeSub(DateTime.tryParse(json['ngay_tham_quan'])?.toLocal().toString(), 10).isNotEmpty ? _safeSub(DateTime.tryParse(json['ngay_tham_quan'])?.toLocal().toString(), 10) : 'N/A') : 'N/A',
-      time: '${_safeSub(json['gio_bat_dau'], 5).isNotEmpty ? _safeSub(json['gio_bat_dau'], 5) : '08:00'} - ${_safeSub(json['gio_ket_thuc'], 5).isNotEmpty ? _safeSub(json['gio_ket_thuc'], 5) : '12:00'}',
-      type: (json['hinh_thuc'] == 'TrucTuyen' || json['hinh_thuc'] == 'Trực tuyến')
+      name:
+          nhaMay['ten_nha_may'] ?? json['ten_chuyen_di'] ?? 'Chuyến tham quan',
+      date: json['ngay_tham_quan'] != null
+          ? (_safeSub(
+                  DateTime.tryParse(
+                    json['ngay_tham_quan'],
+                  )?.toLocal().toString(),
+                  10,
+                ).isNotEmpty
+                ? _safeSub(
+                    DateTime.tryParse(
+                      json['ngay_tham_quan'],
+                    )?.toLocal().toString(),
+                    10,
+                  )
+                : 'N/A')
+          : 'N/A',
+      time:
+          '${_safeSub(json['gio_bat_dau'], 5).isNotEmpty ? _safeSub(json['gio_bat_dau'], 5) : '08:00'} - ${_safeSub(json['gio_ket_thuc'], 5).isNotEmpty ? _safeSub(json['gio_ket_thuc'], 5) : '12:00'}',
+      type:
+          (json['hinh_thuc'] == 'TrucTuyen' ||
+              json['hinh_thuc'] == 'Trực tuyến')
           ? 'Trực tuyến'
           : (json['hinh_thuc'] == 'TuDo' || json['hinh_thuc'] == 'Tự do')
-              ? 'Tự do'
-              : 'Trực tiếp',
+          ? 'Tự do'
+          : 'Trực tiếp',
       location: nhaMay['dia_chi'] ?? 'Địa chỉ chưa cập nhật',
       industry: 'Công nghệ thực phẩm',
       description: nhaMay['mo_ta'] ?? 'Chuyến tham quan thực tế doanh nghiệp',
       heroImage: '',
       isRegistered: isRegistered,
-      isCompleted: json['trang_thai'] == 'DaDienRa' || json['trang_thai'] == 'HoanThanh',
+      isCompleted:
+          json['trang_thai'] == 'DaDienRa' || json['trang_thai'] == 'HoanThanh',
     );
   }
 
-  Future<void> fetchLecturerDataFromApi(int lecturerId) => _fetchLecturerDataFromApi(lecturerId);
+  Future<void> fetchLecturerDataFromApi(int lecturerId) =>
+      _fetchLecturerDataFromApi(lecturerId);
 
   Future<void> _fetchLecturerDataFromApi(int lecturerId) async {
     try {
-      final reportsRes = await ApiService.getGuidedReports(lecturerId, limit: 100);
+      final reportsRes = await ApiService.getGuidedReports(
+        lecturerId,
+        limit: 100,
+      );
       final List<dynamic> reportsJson = reportsRes['data'] ?? [];
-      
+
       setState(() {
         _state.lecturerStudents = reportsJson.map((r) {
           final phieuTQ = r['phieuThamQuan'] ?? {};
           final phieu = phieuTQ['phieuDangKy'] ?? {};
           final sv = phieu['sinhVien'] ?? {};
           final chuyen = phieu['chuyenThamQuan'] ?? {};
-          final diem = phieuTQ['diemPhieuThamQuan'] ?? r['diemPhieuThamQuan'] ?? {};
+          final diem =
+              phieuTQ['diemPhieuThamQuan'] ?? r['diemPhieuThamQuan'] ?? {};
           final diemDanh = phieuTQ['diemDanh'] ?? r['diemDanh'] ?? {};
-          
+
           final mssv = sv['mssv'] ?? sv['id']?.toString() ?? 'SV';
           final uniqueId = r['id'] != null ? '${mssv}_${r['id']}' : mssv;
-          
+
           return LecturerStudent(
             id: uniqueId,
             phieuId: phieu['id'],
@@ -1060,20 +1249,45 @@ class AppStateProviderState extends State<AppStateContainer> {
             completedTours: '1/1',
             papersLeft: 0,
             avatar: sv['avatar'] ?? '',
-            submittedDate: r['ngay_nop'] != null ? (_safeSub(DateTime.tryParse(r['ngay_nop'].toString())?.toLocal().toString(), 10).isNotEmpty ? _safeSub(DateTime.tryParse(r['ngay_nop'].toString())?.toLocal().toString(), 10) : 'N/A') : 'N/A',
-            dotKienTapId: chuyen['lichKienTap']?['dot_kien_tap_id'] ?? chuyen['dot_kien_tap_id'] ?? chuyen['dotId'],
-            attendanceStatus: diemDanh['trang_thai'] == 'CoMat' ? 'present' : (diemDanh['trang_thai'] == 'Vang' ? 'absent' : 'none'),
+            submittedDate: r['ngay_nop'] != null
+                ? (_safeSub(
+                        DateTime.tryParse(
+                          r['ngay_nop'].toString(),
+                        )?.toLocal().toString(),
+                        10,
+                      ).isNotEmpty
+                      ? _safeSub(
+                          DateTime.tryParse(
+                            r['ngay_nop'].toString(),
+                          )?.toLocal().toString(),
+                          10,
+                        )
+                      : 'N/A')
+                : 'N/A',
+            dotKienTapId:
+                chuyen['lichKienTap']?['dot_kien_tap_id'] ??
+                chuyen['dot_kien_tap_id'] ??
+                chuyen['dotId'],
+            attendanceStatus: diemDanh['trang_thai'] == 'CoMat'
+                ? 'present'
+                : (diemDanh['trang_thai'] == 'Vang' ? 'absent' : 'none'),
             excuseReason: diemDanh['ghi_chu'] ?? diemDanh['ly_do_vang'],
-            prelimGrade: double.tryParse(diem['diem_chuan_bi']?.toString() ?? '0') ?? 0,
-            extraGrade: double.tryParse(diem['diem_cong']?.toString() ?? '0') ?? 0,
-            gvhdGrade: double.tryParse(r['diem_thu_hoach']?.toString() ?? '0') ?? 0,
-            aiSuggestedGrade: diem['diem_ai_de_xuat'] != null ? double.tryParse(diem['diem_ai_de_xuat'].toString()) : null,
+            prelimGrade:
+                double.tryParse(diem['diem_chuan_bi']?.toString() ?? '0') ?? 0,
+            extraGrade:
+                double.tryParse(diem['diem_cong']?.toString() ?? '0') ?? 0,
+            gvhdGrade:
+                double.tryParse(r['diem_thu_hoach']?.toString() ?? '0') ?? 0,
+            aiSuggestedGrade: diem['diem_ai_de_xuat'] != null
+                ? double.tryParse(diem['diem_ai_de_xuat'].toString())
+                : null,
             comment: r['nhan_xet_cua_giang_vien'],
             isGraded: r['trang_thai'] == 'DaCham',
             tourId: chuyen['id']?.toString() ?? '',
             reportFileUrl: r['file_bao_cao'],
             confirmationFileUrl: r['file_xac_nhan_tham_quan'],
-            isScoreLocked: diem['da_khoa_thu_hoach'] == true || diem['da_khoa'] == true,
+            isScoreLocked:
+                diem['da_khoa_thu_hoach'] == true || diem['da_khoa'] == true,
           );
         }).toList();
       });
@@ -1083,23 +1297,35 @@ class AppStateProviderState extends State<AppStateContainer> {
         _state.lecturerTours = tripsJson.map((t) {
           final rawDate = t['ngay_tham_quan'] ?? t['ngay_khoi_hanh'];
           final rawStart = t['gio_bat_dau'];
-          final parsedDate = rawDate != null ? DateTime.tryParse(rawDate.toString()) : null;
+          final parsedDate = rawDate != null
+              ? DateTime.tryParse(rawDate.toString())
+              : null;
           final company = t['nhaMay']?['ten_nha_may'] ?? t['ten_nha_may'];
           final tourName = company ?? t['ten_chuyen_di'] ?? 'Chuyến tham quan';
 
           String formattedDate = 'N/A';
           if (parsedDate != null) {
-            formattedDate = '${parsedDate.day.toString().padLeft(2, '0')}/${parsedDate.month.toString().padLeft(2, '0')}/${parsedDate.year}';
+            formattedDate =
+                '${parsedDate.day.toString().padLeft(2, '0')}/${parsedDate.month.toString().padLeft(2, '0')}/${parsedDate.year}';
           }
 
           return LecturerTour(
             id: t['id'].toString(),
             name: tourName,
             date: formattedDate,
-            timeRange: '${t['gio_bat_dau'] ?? '08:00'} - ${t['gio_ket_thuc'] ?? '12:00'}',
-            registeredCount: t['so_luong_dang_ky_hien_tai'] ?? t['so_luong_dang_ky'] ?? 0,
-            maxCount: t['so_luong_sinh_vien_toi_da'] ?? t['suc_chua'] ?? t['so_luong_toi_da'] ?? 0,
-            status: t['trang_thai'] == 'HoanThanh' || t['trang_thai'] == 'DaDienRa' ? 'completed' : 'upcoming',
+            timeRange:
+                '${t['gio_bat_dau'] ?? '08:00'} - ${t['gio_ket_thuc'] ?? '12:00'}',
+            registeredCount:
+                t['so_luong_dang_ky_hien_tai'] ?? t['so_luong_dang_ky'] ?? 0,
+            maxCount:
+                t['so_luong_sinh_vien_toi_da'] ??
+                t['suc_chua'] ??
+                t['so_luong_toi_da'] ??
+                0,
+            status:
+                t['trang_thai'] == 'HoanThanh' || t['trang_thai'] == 'DaDienRa'
+                ? 'completed'
+                : 'upcoming',
             rawTripDate: parsedDate,
             rawStartTime: rawStart?.toString(),
             rawStatus: t['trang_thai']?.toString(),
@@ -1108,7 +1334,8 @@ class AppStateProviderState extends State<AppStateContainer> {
         }).toList();
       });
 
-      final Map<String, dynamic> statsJson = await ApiService.getLecturerDashboardStats(lecturerId);
+      final Map<String, dynamic> statsJson =
+          await ApiService.getLecturerDashboardStats(lecturerId);
       setState(() {
         _state.lecturerDashboardStats = LecturerDashboardStats(
           doanDangDan: statsJson['doanDangDan'] ?? 0,
@@ -1119,24 +1346,31 @@ class AppStateProviderState extends State<AppStateContainer> {
       });
 
       try {
-        final notifsJson = await ApiService.getLecturerNotifications(lecturerId);
-        final List<LecturerNotification> backendLecturerNotifs = (notifsJson is List && notifsJson.isNotEmpty)
+        final notifsJson = await ApiService.getLecturerNotifications(
+          lecturerId,
+        );
+        final List<LecturerNotification> backendLecturerNotifs =
+            (notifsJson is List && notifsJson.isNotEmpty)
             ? notifsJson.map((n) {
                 final rawDate = n['ngay_gui'] ?? n['created_at'];
                 String formattedTime = 'Vừa xong';
                 if (rawDate != null) {
                   final dt = DateTime.tryParse(rawDate.toString())?.toLocal();
                   if (dt != null) {
-                    formattedTime = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+                    formattedTime =
+                        '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
                   }
                 }
 
                 final rawEditedDate = n['ngay_chinh_sua'];
                 String? formattedEditedTime;
                 if (rawEditedDate != null) {
-                  final dt = DateTime.tryParse(rawEditedDate.toString())?.toLocal();
+                  final dt = DateTime.tryParse(
+                    rawEditedDate.toString(),
+                  )?.toLocal();
                   if (dt != null) {
-                    formattedEditedTime = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+                    formattedEditedTime =
+                        '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
                   }
                 }
 
@@ -1145,8 +1379,16 @@ class AppStateProviderState extends State<AppStateContainer> {
                   title: n['tieu_de'] ?? 'Thông báo',
                   body: n['noi_dung'] ?? '',
                   time: formattedTime,
-                  attachment: n['file_dinh_kem'] ?? (n['files'] != null && (n['files'] as List).isNotEmpty ? n['files'][0]['ten_file'] : null),
-                  fileUrl: n['file_url'] ?? (n['files'] != null && (n['files'] as List).isNotEmpty ? n['files'][0]['duong_dan'] : null),
+                  attachment:
+                      n['file_dinh_kem'] ??
+                      (n['files'] != null && (n['files'] as List).isNotEmpty
+                          ? n['files'][0]['ten_file']
+                          : null),
+                  fileUrl:
+                      n['file_url'] ??
+                      (n['files'] != null && (n['files'] as List).isNotEmpty
+                          ? n['files'][0]['duong_dan']
+                          : null),
                   type: n['loai_thong_bao'] ?? n['type'] ?? 'ThongBao',
                   senderName: n['nguoi_gui'] ?? 'Ban Chủ nhiệm Khoa',
                   targetAudience: n['doi_tuong_nhan'] ?? 'LECTURER',
@@ -1158,10 +1400,15 @@ class AppStateProviderState extends State<AppStateContainer> {
 
         final autoLecturerReminders = _generateAutoRemindersForLecturer();
         setState(() {
-          _state.lecturerNotifications = [...autoLecturerReminders, ...backendLecturerNotifs];
+          _state.lecturerNotifications = [
+            ...autoLecturerReminders,
+            ...backendLecturerNotifs,
+          ];
         });
         _saveLecturerNotificationsCache(_state.lecturerNotifications);
-        NotificationService.instance.notifyLecturerReminders(autoLecturerReminders);
+        NotificationService.instance.notifyLecturerReminders(
+          autoLecturerReminders,
+        );
       } catch (e) {
         print('Error fetching notifications: $e');
       }
@@ -1171,9 +1418,10 @@ class AppStateProviderState extends State<AppStateContainer> {
       } catch (e) {
         print('Error fetching board sessions: $e');
       }
-
     } catch (e) {
-      print('Failed to load lecturer data from backend (Offline mode active): $e');
+      print(
+        'Failed to load lecturer data from backend (Offline mode active): $e',
+      );
       if (_state.lecturerNotifications.isEmpty) {
         final cached = await _loadLecturerNotificationsCache();
         if (cached.isNotEmpty) {
@@ -1186,14 +1434,20 @@ class AppStateProviderState extends State<AppStateContainer> {
   }
 
   // Auth Operations
-  Future<void> login(String username, String password, {required VoidCallback onSuccess, required Function(String) onError}) async {
+  Future<void> login(
+    String username,
+    String password, {
+    required VoidCallback onSuccess,
+    required Function(String) onError,
+  }) async {
     try {
       final res = await ApiService.login(username, password);
       final user = res['user'];
       final userRole = user?['vai_tro'];
       final details = user?['details'];
-      
-      final bool requiresPasswordChange = user?['phai_doi_mat_khau'] == 1 || user?['phai_doi_mat_khau'] == true;
+
+      final bool requiresPasswordChange =
+          user?['phai_doi_mat_khau'] == 1 || user?['phai_doi_mat_khau'] == true;
 
       if (userRole == 'SinhVien') {
         setState(() {
@@ -1210,9 +1464,11 @@ class AppStateProviderState extends State<AppStateContainer> {
             );
           }
         });
-        
+
         if (!requiresPasswordChange) {
-          final studentId = (details != null && details['id'] is int) ? details['id'] as int : ApiService.userId;
+          final studentId = (details != null && details['id'] is int)
+              ? details['id'] as int
+              : ApiService.userId;
           if (studentId != null) {
             fetchStudentDataFromApi(studentId);
           }
@@ -1232,9 +1488,11 @@ class AppStateProviderState extends State<AppStateContainer> {
             );
           }
         });
-        
+
         if (!requiresPasswordChange) {
-          final lecturerId = (details != null && details['id'] is int) ? details['id'] as int : ApiService.userId;
+          final lecturerId = (details != null && details['id'] is int)
+              ? details['id'] as int
+              : ApiService.userId;
           if (lecturerId != null) {
             _fetchLecturerDataFromApi(lecturerId);
           }
@@ -1245,9 +1503,11 @@ class AppStateProviderState extends State<AppStateContainer> {
       }
     } catch (e) {
       final msg = e.toString().replaceAll('Exception: ', '');
-      onError(msg.isNotEmpty
-          ? msg
-          : 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin tài khoản hoặc kết nối mạng.');
+      onError(
+        msg.isNotEmpty
+            ? msg
+            : 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin tài khoản hoặc kết nối mạng.',
+      );
     }
   }
 
@@ -1313,7 +1573,9 @@ class AppStateProviderState extends State<AppStateContainer> {
           ),
         );
         final codeSuffix = Random().nextInt(90000) + 10000;
-        final nameAbbr = trip.name.length > 11 ? trip.name.substring(8, 11).toUpperCase() : 'TRIP';
+        final nameAbbr = trip.name.length > 11
+            ? trip.name.substring(8, 11).toUpperCase()
+            : 'TRIP';
         final newPayment = Payment(
           id: 'pay-$tripId',
           tripId: tripId,
@@ -1363,11 +1625,18 @@ class AppStateProviderState extends State<AppStateContainer> {
   Future<void> cancelStudentProposal(int proposalId) async {
     await ApiService.cancelProposal(proposalId);
     setState(() {
-      _state.proposals = _state.proposals.where((p) => p.id != proposalId).toList();
+      _state.proposals = _state.proposals
+          .where((p) => p.id != proposalId)
+          .toList();
     });
   }
 
-  Future<String> cancelTripRegistration(String tripId, String? registrationId, {required String lyDo, String? fileMinhChung}) async {
+  Future<String> cancelTripRegistration(
+    String tripId,
+    String? registrationId, {
+    required String lyDo,
+    String? fileMinhChung,
+  }) async {
     final regId = int.tryParse(registrationId ?? '');
     if (regId == null) {
       throw Exception('Không tìm thấy mã phiếu đăng ký hợp lệ cho chuyến này.');
@@ -1376,7 +1645,11 @@ class AppStateProviderState extends State<AppStateContainer> {
     String? fileReference;
     if (fileMinhChung != null) {
       try {
-        final uploadRes = await ApiService.uploadFile('upload/attachment', fileMinhChung, 'file');
+        final uploadRes = await ApiService.uploadFile(
+          'upload/attachment',
+          fileMinhChung,
+          'file',
+        );
         fileReference = uploadRes['key'] ?? uploadRes['url'] ?? fileMinhChung;
       } catch (e) {
         print('uploadConfirmationFile file upload failed: $e');
@@ -1387,10 +1660,13 @@ class AppStateProviderState extends State<AppStateContainer> {
     final res = await ApiService.post('sinh-vien/request-cancel', {
       'registrationId': regId,
       'lyDo': lyDo,
-      if (fileReference != null && fileReference.isNotEmpty) 'fileMinhChung': fileReference,
+      if (fileReference != null && fileReference.isNotEmpty)
+        'fileMinhChung': fileReference,
     });
 
-    final message = res is Map && res['message'] != null ? res['message'].toString() : 'Đã xử lý yêu cầu hủy thành công';
+    final message = res is Map && res['message'] != null
+        ? res['message'].toString()
+        : 'Đã xử lý yêu cầu hủy thành công';
 
     if (ApiService.userId != null) {
       await fetchStudentDataFromApi(ApiService.userId!);
@@ -1415,7 +1691,13 @@ class AppStateProviderState extends State<AppStateContainer> {
     return message;
   }
 
-  Future<bool> uploadReport(String submissionId, String localPath, String fileName, String fileSize, {String? extractedText}) async {
+  Future<bool> uploadReport(
+    String submissionId,
+    String localPath,
+    String fileName,
+    String fileSize, {
+    String? extractedText,
+  }) async {
     final regId = int.tryParse(submissionId);
     if (regId == null) {
       throw Exception('Mã bài nộp không hợp lệ ($submissionId).');
@@ -1423,7 +1705,11 @@ class AppStateProviderState extends State<AppStateContainer> {
 
     String fileReference = fileName;
     try {
-      final uploadRes = await ApiService.uploadFile('upload/report', localPath, 'file');
+      final uploadRes = await ApiService.uploadFile(
+        'upload/report',
+        localPath,
+        'file',
+      );
       fileReference = uploadRes['key'] ?? uploadRes['url'] ?? fileName;
     } catch (e) {
       print('uploadReport file upload failed: $e');
@@ -1441,7 +1727,12 @@ class AppStateProviderState extends State<AppStateContainer> {
         hasConfirmationFile: false,
       ),
     );
-    await ApiService.submitReport(regId, fileReference, sub.fileXacNhanUrl, extractedText: extractedText);
+    await ApiService.submitReport(
+      regId,
+      fileReference,
+      sub.fileXacNhanUrl,
+      extractedText: extractedText,
+    );
 
     setState(() {
       _state.submissions = _state.submissions.map((s) {
@@ -1450,8 +1741,11 @@ class AppStateProviderState extends State<AppStateContainer> {
             fileName: fileName,
             fileSize: fileSize,
             fileBaoCaoUrl: fileReference,
-            status: s.hasConfirmationFile || !s.tripName.contains('tự do') ? 'Đã nộp' : 'Chưa nộp',
-            submittedAt: '${DateTime.now().hour}:${DateTime.now().minute} - ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
+            status: s.hasConfirmationFile || !s.tripName.contains('tự do')
+                ? 'Đã nộp'
+                : 'Chưa nộp',
+            submittedAt:
+                '${DateTime.now().hour}:${DateTime.now().minute} - ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
           );
         }
         return s;
@@ -1461,7 +1755,11 @@ class AppStateProviderState extends State<AppStateContainer> {
     return true;
   }
 
-  Future<bool> uploadConfirmationFile(String submissionId, String localPath, String fileName) async {
+  Future<bool> uploadConfirmationFile(
+    String submissionId,
+    String localPath,
+    String fileName,
+  ) async {
     final regId = int.tryParse(submissionId);
     if (regId == null) {
       throw Exception('Mã bài nộp không hợp lệ ($submissionId).');
@@ -1469,7 +1767,11 @@ class AppStateProviderState extends State<AppStateContainer> {
 
     String fileReference = fileName;
     try {
-      final uploadRes = await ApiService.uploadFile('upload/payment', localPath, 'file');
+      final uploadRes = await ApiService.uploadFile(
+        'upload/payment',
+        localPath,
+        'file',
+      );
       fileReference = uploadRes['key'] ?? uploadRes['url'] ?? fileName;
     } catch (e) {
       print('uploadConfirmationFile file upload failed: $e');
@@ -1523,7 +1825,17 @@ class AppStateProviderState extends State<AppStateContainer> {
     });
   }
 
-  Future<bool> addRefund(String paymentId, String invoiceName, String amountText, {String? localPath, String? fileName, String? bankName, String? accountNumber, String? accountName, String? reason}) async {
+  Future<bool> addRefund(
+    String paymentId,
+    String invoiceName,
+    String amountText, {
+    String? localPath,
+    String? fileName,
+    String? bankName,
+    String? accountNumber,
+    String? accountName,
+    String? reason,
+  }) async {
     final invoiceId = int.tryParse(paymentId);
     if (invoiceId == null) {
       throw Exception('Không tìm thấy mã hóa đơn cần hoàn phí.');
@@ -1531,17 +1843,29 @@ class AppStateProviderState extends State<AppStateContainer> {
 
     String fileReference = fileName ?? 'hoadon_daquet.pdf';
     if (localPath != null) {
-      final uploadRes = await ApiService.uploadFile('upload/attachment', localPath, 'file');
+      final uploadRes = await ApiService.uploadFile(
+        'upload/attachment',
+        localPath,
+        'file',
+      );
       fileReference = uploadRes['key'] ?? uploadRes['url'] ?? fileReference;
     }
 
-    await ApiService.requestRefund(invoiceId, fileReference, bankName: bankName, accountNumber: accountNumber, accountName: accountName, reason: reason);
+    await ApiService.requestRefund(
+      invoiceId,
+      fileReference,
+      bankName: bankName,
+      accountNumber: accountNumber,
+      accountName: accountName,
+      reason: reason,
+    );
 
     setState(() {
       final newRefund = RefundRequest(
         id: 'ref-${DateTime.now().millisecondsSinceEpoch}',
         invoiceName: invoiceName,
-        dateText: '${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
+        dateText:
+            '${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
         amountText: amountText,
         status: 'Chờ xử lý',
       );
@@ -1556,10 +1880,16 @@ class AppStateProviderState extends State<AppStateContainer> {
   }
 
   // Lecturer Operations
-  Future<void> updateAttendance(String studentId, String status, {String? reason}) async {
+  Future<void> updateAttendance(
+    String studentId,
+    String status, {
+    String? reason,
+  }) async {
     final student = _state.lecturerStudents.firstWhere(
       (s) => s.id == studentId,
-      orElse: () => throw Exception('Không tìm thấy sinh viên $studentId trong danh sách.'),
+      orElse: () => throw Exception(
+        'Không tìm thấy sinh viên $studentId trong danh sách.',
+      ),
     );
 
     final tId = int.tryParse(student.tourId);
@@ -1569,7 +1899,9 @@ class AppStateProviderState extends State<AppStateContainer> {
 
     final phieuId = student.phieuId ?? int.tryParse(studentId);
     if (phieuId == null) {
-      throw Exception('Không xác định được mã phiếu đăng ký của sinh viên $studentId.');
+      throw Exception(
+        'Không xác định được mã phiếu đăng ký của sinh viên $studentId.',
+      );
     }
 
     // Ánh xạ trạng thái điểm danh khớp đúng với DTO backend (CoMat, Vang, TuChoiThamGia)
@@ -1582,7 +1914,7 @@ class AppStateProviderState extends State<AppStateContainer> {
         'phieuId': phieuId,
         'status': backendStatus,
         if (reason != null && reason.isNotEmpty) 'note': reason,
-      }
+      },
     ]);
 
     setState(() {
@@ -1598,15 +1930,26 @@ class AppStateProviderState extends State<AppStateContainer> {
     });
   }
 
-  Future<void> updateStudentGrade(String studentId, {double? prelimGrade, double? extraGrade, double? gvhdGrade, String? comment, bool? isGraded}) async {
+  Future<void> updateStudentGrade(
+    String studentId, {
+    double? prelimGrade,
+    double? extraGrade,
+    double? gvhdGrade,
+    String? comment,
+    bool? isGraded,
+  }) async {
     final student = _state.lecturerStudents.firstWhere(
       (s) => s.id == studentId,
-      orElse: () => throw Exception('Không tìm thấy sinh viên $studentId trong danh sách.'),
+      orElse: () => throw Exception(
+        'Không tìm thấy sinh viên $studentId trong danh sách.',
+      ),
     );
 
     final phieuId = student.phieuId ?? int.tryParse(studentId);
     if ((prelimGrade != null || extraGrade != null) && phieuId == null) {
-      throw Exception('Không xác định được mã phiếu đăng ký để nhập điểm quá trình.');
+      throw Exception(
+        'Không xác định được mã phiếu đăng ký để nhập điểm quá trình.',
+      );
     }
 
     if (prelimGrade != null || extraGrade != null) {
@@ -1654,13 +1997,28 @@ class AppStateProviderState extends State<AppStateContainer> {
             final nhaMay = p['nhaMay'] ?? {};
             return TripProposal(
               id: p['id'] ?? 0,
-              tenDoanhNghiep: nhaMay['ten_nha_may'] ?? p['ten_nha_may_de_xuat'] ?? 'Doanh nghiệp đề xuất',
+              tenDoanhNghiep:
+                  nhaMay['ten_nha_may'] ??
+                  p['ten_nha_may_de_xuat'] ??
+                  'Doanh nghiệp đề xuất',
               diaChi: nhaMay['dia_chi'] ?? p['dia_chi_de_xuat'],
-              ngayThamQuan: (p['ngay_tham_quan_de_xuat'] ?? p['ngay_tham_quan']) != null
-                  ? _safeSub(DateTime.tryParse((p['ngay_tham_quan_de_xuat'] ?? p['ngay_tham_quan']).toString())?.toLocal().toString(), 10)
+              ngayThamQuan:
+                  (p['ngay_tham_quan_de_xuat'] ?? p['ngay_tham_quan']) != null
+                  ? _safeSub(
+                      DateTime.tryParse(
+                        (p['ngay_tham_quan_de_xuat'] ?? p['ngay_tham_quan'])
+                            .toString(),
+                      )?.toLocal().toString(),
+                      10,
+                    )
                   : null,
-              gioBatDau: _safeSub(p['gio_bat_dau_de_xuat'] ?? p['gio_bat_dau'], 5),
-              hinhThuc: p['hinh_thuc'] == 'TrucTuyen' ? 'Trực tuyến' : 'Trực tiếp',
+              gioBatDau: _safeSub(
+                p['gio_bat_dau_de_xuat'] ?? p['gio_bat_dau'],
+                5,
+              ),
+              hinhThuc: p['hinh_thuc'] == 'TrucTuyen'
+                  ? 'Trực tuyến'
+                  : 'Trực tiếp',
               trangThai: p['trang_thai_duyet'] ?? p['trang_thai'] ?? 'ChoDuyet',
               lyDo: p['ly_do'],
               phanHoi: p['phan_hoi'],
@@ -1680,17 +2038,29 @@ class AppStateProviderState extends State<AppStateContainer> {
       if (gradesRes is List && gradesRes.isNotEmpty) {
         final termData = gradesRes[0];
         final List<dynamic> rawTrips = termData['selectedTrips'] ?? [];
-        
+
         final tripGrades = rawTrips.map((t) {
           return TripGradeItem(
             id: t['id'] ?? 0,
             tenNhaMay: t['ten_nha_may'] ?? 'Doanh nghiệp',
-            hinhThuc: t['hinh_thuc'] == 'TrucTuyen' ? 'Trực tuyến' : 'Trực tiếp',
-            diemChuanBi: t['diem_chuan_bi'] != null ? double.tryParse(t['diem_chuan_bi'].toString()) : null,
-            diemBaiThuHoach: t['diem_bai_thu_hoach'] != null ? double.tryParse(t['diem_bai_thu_hoach'].toString()) : null,
-            diemBaoCaoTQNM: t['diem_bao_cao_tqnm'] != null ? double.tryParse(t['diem_bao_cao_tqnm'].toString()) : null,
-            diemCong: t['diem_cong'] != null ? double.tryParse(t['diem_cong'].toString()) : null,
-            diemTongChuyen: t['diem_tong_chuyen'] != null ? double.tryParse(t['diem_tong_chuyen'].toString()) : null,
+            hinhThuc: t['hinh_thuc'] == 'TrucTuyen'
+                ? 'Trực tuyến'
+                : 'Trực tiếp',
+            diemChuanBi: t['diem_chuan_bi'] != null
+                ? double.tryParse(t['diem_chuan_bi'].toString())
+                : null,
+            diemBaiThuHoach: t['diem_bai_thu_hoach'] != null
+                ? double.tryParse(t['diem_bai_thu_hoach'].toString())
+                : null,
+            diemBaoCaoTQNM: t['diem_bao_cao_tqnm'] != null
+                ? double.tryParse(t['diem_bao_cao_tqnm'].toString())
+                : null,
+            diemCong: t['diem_cong'] != null
+                ? double.tryParse(t['diem_cong'].toString())
+                : null,
+            diemTongChuyen: t['diem_tong_chuyen'] != null
+                ? double.tryParse(t['diem_tong_chuyen'].toString())
+                : null,
             ketQua: t['ket_qua'],
             daKhoaChuanBi: t['da_khoa_chuan_bi'] == true,
             daKhoaThuHoach: t['da_khoa_thu_hoach'] == true,
@@ -1699,7 +2069,9 @@ class AppStateProviderState extends State<AppStateContainer> {
           );
         }).toList();
 
-        final double? dtk = termData['diem_tong_ket'] != null ? double.tryParse(termData['diem_tong_ket'].toString()) : null;
+        final double? dtk = termData['diem_tong_ket'] != null
+            ? double.tryParse(termData['diem_tong_ket'].toString())
+            : null;
         setState(() {
           _state.termGrade = StudentTermGrade(
             diemTongKet: dtk,
@@ -1719,19 +2091,42 @@ class AppStateProviderState extends State<AppStateContainer> {
       final res = await ApiService.getRepresentativeTripsStatus();
       if (res != null) {
         final List<dynamic> regIds = res['selectedRegistrationIds'] ?? [];
-        final council = res['assignedCouncil'] ?? res['hoiDong'] ?? res['council'];
+        final council =
+            res['assignedCouncil'] ?? res['hoiDong'] ?? res['council'];
         final List<dynamic> members = council?['thanhVien'] ?? [];
-        
+
         setState(() {
           _state.repStatus = RepresentativeTripsStatus(
-            selectedRegistrationIds: regIds.map((id) => int.tryParse(id.toString()) ?? 0).where((id) => id > 0).toList(),
+            selectedRegistrationIds: regIds
+                .map((id) => int.tryParse(id.toString()) ?? 0)
+                .where((id) => id > 0)
+                .toList(),
             isLockedByKhoa: res['isLockedByKhoa'] == true,
             lockReason: res['lockReason'] as String?,
             canEdit: res['canEdit'] ?? !(res['isLockedByKhoa'] == true),
-            councilSessionName: council?['tenHoiDong'] ?? council?['ten_hoi_dong'] ?? council?['ten_buoi'],
-            councilRoom: council?['diaDiem'] ?? council?['dia_diem'] ?? council?['phong'] ?? 'Chưa xếp phòng',
-            councilTime: council?['ngayBaoCao'] ?? council?['thoi_gian'] ?? council?['ngayCham'] ?? 'Chưa có lịch',
-            councilMembers: members.map((m) => (m['hoTen'] ?? m['ho_ten'] ?? m['giangVien']?['ho_ten'])?.toString() ?? '').where((m) => m.isNotEmpty).toList(),
+            councilSessionName:
+                council?['tenHoiDong'] ??
+                council?['ten_hoi_dong'] ??
+                council?['ten_buoi'],
+            councilRoom:
+                council?['diaDiem'] ??
+                council?['dia_diem'] ??
+                council?['phong'] ??
+                'Chưa xếp phòng',
+            councilTime:
+                council?['ngayBaoCao'] ??
+                council?['thoi_gian'] ??
+                council?['ngayCham'] ??
+                'Chưa có lịch',
+            councilMembers: members
+                .map(
+                  (m) =>
+                      (m['hoTen'] ?? m['ho_ten'] ?? m['giangVien']?['ho_ten'])
+                          ?.toString() ??
+                      '',
+                )
+                .where((m) => m.isNotEmpty)
+                .toList(),
           );
         });
       }
@@ -1745,7 +2140,9 @@ class AppStateProviderState extends State<AppStateContainer> {
     await fetchRepresentativeTripsStatus();
   }
 
-  Future<List<TripRegistrationStudent>> fetchTripRegistrations(int tripId) async {
+  Future<List<TripRegistrationStudent>> fetchTripRegistrations(
+    int tripId,
+  ) async {
     try {
       final res = await ApiService.getTripRegistrations(tripId);
       if (res is List) {
@@ -1753,7 +2150,8 @@ class AppStateProviderState extends State<AppStateContainer> {
           final sv = r['sinhVien'] ?? {};
           final phieuTQ = r['phieuThamQuan'] ?? {};
           final diemDanh = r['diemDanh'] ?? phieuTQ['diemDanh'] ?? {};
-          final diem = r['diemPhieuThamQuan'] ?? phieuTQ['diemPhieuThamQuan'] ?? {};
+          final diem =
+              r['diemPhieuThamQuan'] ?? phieuTQ['diemPhieuThamQuan'] ?? {};
           final hoaDon = r['hoaDon'] ?? {};
 
           return TripRegistrationStudent(
@@ -1765,19 +2163,35 @@ class AppStateProviderState extends State<AppStateContainer> {
             soDienThoai: sv['so_dien_thoai'] ?? sv['sdt'],
             email: sv['email'],
             avatar: sv['avatar'] ?? '',
-            feeStatus: hoaDon['trang_thai'] ?? (r['trang_thai'] == 'HopLe' || r['trang_thai'] == 'DaThamGia' ? 'DaDongDungHan' : 'ChuaDong'),
+            feeStatus:
+                hoaDon['trang_thai'] ??
+                (r['trang_thai'] == 'HopLe' || r['trang_thai'] == 'DaThamGia'
+                    ? 'DaDongDungHan'
+                    : 'ChuaDong'),
             attendanceStatus: diemDanh['trang_thai'] ?? 'ChuaDiemDanh',
             excuseReason: diemDanh['ghi_chu'] ?? diemDanh['ly_do_vang'],
-            prelimGrade: double.tryParse(diem['diem_chuan_bi']?.toString() ?? '0') ?? 0.0,
-            extraGrade: double.tryParse((diem['diem_cong_final'] ?? diem['diem_cong'])?.toString() ?? '0') ?? 0.0,
-            isLockedPrep: diem['da_khoa_chuan_bi'] == true || diem['da_khoa'] == true || phieuTQ['is_locked_prep'] == true,
+            prelimGrade:
+                double.tryParse(diem['diem_chuan_bi']?.toString() ?? '0') ??
+                0.0,
+            extraGrade:
+                double.tryParse(
+                  (diem['diem_cong_final'] ?? diem['diem_cong'])?.toString() ??
+                      '0',
+                ) ??
+                0.0,
+            isLockedPrep:
+                diem['da_khoa_chuan_bi'] == true ||
+                diem['da_khoa'] == true ||
+                phieuTQ['is_locked_prep'] == true,
             fileXacNhanUrl: r['file_xac_nhan_tham_quan'],
             cachToChuc: r['cach_to_chuc'],
           );
         }).toList();
 
         setState(() {
-          final newCache = Map<int, List<TripRegistrationStudent>>.from(_state.tripStudentsCache);
+          final newCache = Map<int, List<TripRegistrationStudent>>.from(
+            _state.tripStudentsCache,
+          );
           newCache[tripId] = list;
           _state.tripStudentsCache = newCache;
         });
@@ -1796,24 +2210,38 @@ class AppStateProviderState extends State<AppStateContainer> {
         final chuyen = res['chuyenThamQuan'] ?? res;
         final List<dynamic> rawStudents = res['students'] ?? [];
         final List<dynamic> rawLecturers = res['lecturers'] ?? [];
-        
-        final students = rawStudents.map((s) => TripBusMember(
-          id: s['id'] ?? 0,
-          hoTen: s['ho_ten'] ?? s['name'] ?? '',
-          mssv: s['mssv'] ?? '',
-          isLeader: s['truong_nhom'] == true,
-        )).toList();
+
+        final students = rawStudents
+            .map(
+              (s) => TripBusMember(
+                id: s['id'] ?? 0,
+                hoTen: s['ho_ten'] ?? s['name'] ?? '',
+                mssv: s['mssv'] ?? '',
+                isLeader: s['truong_nhom'] == true,
+              ),
+            )
+            .toList();
 
         final leadGv = rawLecturers.isNotEmpty ? rawLecturers[0] : null;
-        final enterpriseContact = res['enterpriseContact'] is Map ? res['enterpriseContact'] : null;
-        final enterprisePerson = enterpriseContact?['nguoi_lien_he']?.toString();
+        final enterpriseContact = res['enterpriseContact'] is Map
+            ? res['enterpriseContact']
+            : null;
+        final enterprisePerson = enterpriseContact?['nguoi_lien_he']
+            ?.toString();
         final enterprisePhone = enterpriseContact?['sdt_lien_he']?.toString();
 
         return TripBusInfo(
           tripId: tripId,
-          tenChuyenDi: chuyen['ten_nha_may'] ?? chuyen['ten_chuyen_di'] ?? 'Chuyến tham quan',
-          gioBatDau: _safeSub(chuyen['gio_bat_dau'], 5).isNotEmpty ? _safeSub(chuyen['gio_bat_dau'], 5) : '08:00',
-          gioKetThuc: _safeSub(chuyen['gio_ket_thuc'], 5).isNotEmpty ? _safeSub(chuyen['gio_ket_thuc'], 5) : '12:00',
+          tenChuyenDi:
+              chuyen['ten_nha_may'] ??
+              chuyen['ten_chuyen_di'] ??
+              'Chuyến tham quan',
+          gioBatDau: _safeSub(chuyen['gio_bat_dau'], 5).isNotEmpty
+              ? _safeSub(chuyen['gio_bat_dau'], 5)
+              : '08:00',
+          gioKetThuc: _safeSub(chuyen['gio_ket_thuc'], 5).isNotEmpty
+              ? _safeSub(chuyen['gio_ket_thuc'], 5)
+              : '12:00',
           hinhThuc: chuyen['hinh_thuc'] ?? 'TrucTiep',
           lecturerName: leadGv?['ho_ten'],
           lecturerPhone: leadGv?['so_dien_thoai'],
@@ -1833,13 +2261,24 @@ class AppStateProviderState extends State<AppStateContainer> {
     await fetchTripRegistrations(tripId);
   }
 
-  Future<void> saveTripPrepGradesBatch(int tripId, List<Map<String, dynamic>> records) async {
+  Future<void> saveTripPrepGradesBatch(
+    int tripId,
+    List<Map<String, dynamic>> records,
+  ) async {
     await ApiService.gradePrepAndBonusBatch(tripId, records);
     await fetchTripRegistrations(tripId);
   }
 
-  Future<Map<String, dynamic>> importPrepGradesExcel(int tripId, String filePath, {bool saveImmediately = false}) async {
-    final res = await ApiService.importPrepGradesExcel(tripId, filePath, saveImmediately: saveImmediately);
+  Future<Map<String, dynamic>> importPrepGradesExcel(
+    int tripId,
+    String filePath, {
+    bool saveImmediately = false,
+  }) async {
+    final res = await ApiService.importPrepGradesExcel(
+      tripId,
+      filePath,
+      saveImmediately: saveImmediately,
+    );
     if (saveImmediately) {
       await fetchTripRegistrations(tripId);
     }
@@ -1859,21 +2298,36 @@ class AppStateProviderState extends State<AppStateContainer> {
       if (res is List) {
         final boards = res.map((b) {
           final session = b['session'] ?? {};
-          final isBoardLocked = b['isBoardLocked'] == true || session['isBoardLocked'] == true;
-          final List<dynamic> rawStudents = b['students'] ?? b['registrations'] ?? [];
+          final isBoardLocked =
+              b['isBoardLocked'] == true || session['isBoardLocked'] == true;
+          final List<dynamic> rawStudents =
+              b['students'] ?? b['registrations'] ?? [];
 
           final students = rawStudents.map((st) {
             final List<dynamic> rawTrips = st['trips'] ?? [];
-            final trips = rawTrips.map((t) => CouncilStudentTripItem(
-              phieuId: t['phieuThamQuanId'] ?? t['id'] ?? 0,
-              tenNhaMay: t['tenNhaMay'] ?? t['ten_nha_may'] ?? 'Doanh nghiệp',
-              hinhThuc: t['hinh_thuc'] ?? 'TrucTiep',
-              myScore: t['myScore'] != null ? double.tryParse(t['myScore'].toString()) : null,
-              diemTong: t['diem_bao_cao_tqnm'] != null ? double.tryParse(t['diem_bao_cao_tqnm'].toString()) : null,
-              isLocked: isBoardLocked || t['daKhoa'] == true || t['daKhoaHoiDong'] == true,
-            )).toList();
+            final trips = rawTrips
+                .map(
+                  (t) => CouncilStudentTripItem(
+                    phieuId: t['phieuThamQuanId'] ?? t['id'] ?? 0,
+                    tenNhaMay:
+                        t['tenNhaMay'] ?? t['ten_nha_may'] ?? 'Doanh nghiệp',
+                    hinhThuc: t['hinh_thuc'] ?? 'TrucTiep',
+                    myScore: t['myScore'] != null
+                        ? double.tryParse(t['myScore'].toString())
+                        : null,
+                    diemTong: t['diem_bao_cao_tqnm'] != null
+                        ? double.tryParse(t['diem_bao_cao_tqnm'].toString())
+                        : null,
+                    isLocked:
+                        isBoardLocked ||
+                        t['daKhoa'] == true ||
+                        t['daKhoaHoiDong'] == true,
+                  ),
+                )
+                .toList();
 
-            final isStudentLocked = isBoardLocked ||
+            final isStudentLocked =
+                isBoardLocked ||
                 st['daKhoaHoiDong'] == true ||
                 st['da_khoa_hoi_dong'] == true ||
                 st['isGradeLocked'] == true;
@@ -1882,12 +2336,18 @@ class AppStateProviderState extends State<AppStateContainer> {
             return CouncilStudentItem(
               studentId: sv['id'] ?? st['id'] ?? 0,
               mssv: sv['mssv'] ?? st['mssv'] ?? '',
-              hoTen: sv['ho_ten'] ?? sv['name'] ?? st['ho_ten'] ?? st['name'] ?? 'Sinh viên',
+              hoTen:
+                  sv['ho_ten'] ??
+                  sv['name'] ??
+                  st['ho_ten'] ??
+                  st['name'] ??
+                  'Sinh viên',
               className: sv['lop'] ?? st['lop'] ?? 'N/A',
               topic: st['de_tai'] ?? st['topic'],
               trips: trips,
               isGradeLocked: isStudentLocked,
-              councilNote: st['ghi_chu_hoi_dong'] ?? st['councilNote'] ?? st['ghiChu'],
+              councilNote:
+                  st['ghi_chu_hoi_dong'] ?? st['councilNote'] ?? st['ghiChu'],
               boChuyenId: st['boChuyenId'] ?? st['bo_chuyen_id'] ?? st['id'],
             );
           }).toList();
@@ -1895,12 +2355,28 @@ class AppStateProviderState extends State<AppStateContainer> {
           return CouncilBoardItem(
             sessionId: session['id'] ?? 0,
             memberId: b['memberId'] ?? 0,
-            sessionName: session['ten_buoi'] ?? session['ten_hoi_dong'] ?? 'Buổi chấm hội đồng',
+            sessionName:
+                session['ten_buoi'] ??
+                session['ten_hoi_dong'] ??
+                'Buổi chấm hội đồng',
             room: session['phong'] ?? 'Phòng bảo vệ',
-            date: session['ngay_bao_cao'] != null ? (_safeSub(session['ngay_bao_cao'], 10).isNotEmpty ? _safeSub(session['ngay_bao_cao'], 10) : 'N/A') : 'N/A',
-            timeRange: '${_safeSub(session['gio_bat_dau'], 5).isNotEmpty ? _safeSub(session['gio_bat_dau'], 5) : '08:00'} - ${_safeSub(session['gio_ket_thuc'], 5).isNotEmpty ? _safeSub(session['gio_ket_thuc'], 5) : '11:30'}',
-            role: b['role'] ?? 'Ủy viên',
-            status: session['trang_thai'] == 'HoanThanh' ? 'completed' : (session['trang_thai'] == 'DangDienRa' ? 'ongoing' : 'upcoming'),
+            date: session['ngay_bao_cao'] != null
+                ? (_safeSub(session['ngay_bao_cao'], 10).isNotEmpty
+                      ? _safeSub(session['ngay_bao_cao'], 10)
+                      : 'N/A')
+                : 'N/A',
+            timeRange:
+                '${_safeSub(session['gio_bat_dau'], 5).isNotEmpty ? _safeSub(session['gio_bat_dau'], 5) : '08:00'} - ${_safeSub(session['gio_ket_thuc'], 5).isNotEmpty ? _safeSub(session['gio_ket_thuc'], 5) : '11:30'}',
+            role: (b['vai_tro'] == 'ChuTich' || b['role'] == 'ChuTich')
+                ? 'Chủ tịch'
+                : (b['vai_tro'] == 'ThuKy' || b['role'] == 'ThuKy')
+                ? 'Thư ký'
+                : 'Ủy viên',
+            status: session['trang_thai'] == 'HoanThanh'
+                ? 'completed'
+                : (session['trang_thai'] == 'DangDienRa'
+                      ? 'ongoing'
+                      : 'upcoming'),
             isBoardLocked: isBoardLocked,
             students: students,
           );
@@ -1922,7 +2398,11 @@ class AppStateProviderState extends State<AppStateContainer> {
     }
   }
 
-  Future<void> submitBoardScoresBatch(int memberId, List<int> phieuIds, double score) async {
+  Future<void> submitBoardScoresBatch(
+    int memberId,
+    List<int> phieuIds,
+    double score,
+  ) async {
     await ApiService.submitBoardScoresBatch(memberId, phieuIds, score);
     if (ApiService.userId != null) {
       await fetchBoardSessions(ApiService.userId!);
@@ -1939,7 +2419,11 @@ class AppStateProviderState extends State<AppStateContainer> {
     }
   }
 
-  Future<void> updateCouncilStudentNote({required int boardId, required int boChuyenId, required String ghiChu}) async {
+  Future<void> updateCouncilStudentNote({
+    required int boardId,
+    required int boChuyenId,
+    required String ghiChu,
+  }) async {
     await ApiService.updateCouncilStudentNote({
       'boChuyenId': boChuyenId,
       'ghiChu': ghiChu,
