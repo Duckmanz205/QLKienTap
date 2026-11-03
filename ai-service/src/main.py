@@ -19,10 +19,19 @@ from src.schemas import (
     DanhGia_VSATTP,
     KetQua_KiemToan_Rubric
 )
+from src.model_profiles import (
+    ACTIVE_GRADING_PROFILE,
+    ACTIVE_OCR_PROFILE,
+    PROFILE_GRADING_QWEN38_MAX,
+    PROFILE_GRADING_DEEPSEEK_FLASH_1017
+)
 
 # ==========================================
 # CẤU HÌNH KHỞI TẠO & MÔI TRƯỜNG
 # ==========================================
+from pathlib import Path
+ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(dotenv_path=ENV_PATH)
 load_dotenv()
 
 QWEN_API_KEY = os.getenv("QWEN_API_KEY")
@@ -123,7 +132,7 @@ async def process_pdf_endpoint(file: UploadFile = File(...)):
 
             try:
                 response = await client.chat.completions.create(
-                    model="qwen3.8-flash",
+                    model=ACTIVE_OCR_PROFILE["model_name"],
                     messages=[
                         {
                             "role": "user",
@@ -133,12 +142,10 @@ async def process_pdf_endpoint(file: UploadFile = File(...)):
                             ]
                         }
                     ],
-                    temperature=0.01,
-                    max_tokens=2000,
-                    stream=True,
-                    extra_body={
-                        "enable_thinking": False
-                    }
+                    temperature=ACTIVE_OCR_PROFILE.get("temperature", 0.01),
+                    max_tokens=ACTIVE_OCR_PROFILE.get("max_tokens", 4000),
+                    stream=ACTIVE_OCR_PROFILE.get("stream", True),
+                    extra_body=ACTIVE_OCR_PROFILE.get("extra_body", {"enable_thinking": False})
                 )
 
                 ocr_text = ""
@@ -171,7 +178,7 @@ async def process_pdf_endpoint(file: UploadFile = File(...)):
 # ==========================================
 # MODULE 2: GRADING ENGINE (HỘI ĐỒNG CHẤM AI)
 # ==========================================
-EXPERT_MODEL = "qwen3.7-flash"  # Model flash phục vụ test nhanh & demo nội bộ
+EXPERT_MODEL = ACTIVE_GRADING_PROFILE["model_name"]  # Được cấu hình tự động qua src/model_profiles.py
 
 class GradingRequest(BaseModel):
     document_text: str
@@ -240,18 +247,21 @@ TRẢ VỀ KẾT QUẢ DƯỚI DẠNG JSON TUYỆT ĐỐI TUÂN THỦ CẤU TRÚ
 async def call_and_parse_json(system_prompt: str, document_text: str, pydantic_model):
     try:
         response = await client.chat.completions.create(
-            model=EXPERT_MODEL,
+            model=ACTIVE_GRADING_PROFILE["model_name"],
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"BÁO CÁO CỦA SINH VIÊN:\n\n{document_text}"}
             ],
-            temperature=0.1,
-            response_format={"type": "json_object"},
-            extra_body={
-                "enable_thinking": False
-            }
+            temperature=ACTIVE_GRADING_PROFILE.get("temperature", 0.05),
+            max_tokens=ACTIVE_GRADING_PROFILE.get("max_tokens", 2500),
+            response_format=ACTIVE_GRADING_PROFILE.get("response_format", {"type": "json_object"}),
+            extra_body=ACTIVE_GRADING_PROFILE.get("extra_body", {"enable_thinking": False})
         )
-        raw_content = response.choices[0].message.content
+        msg = response.choices[0].message
+        reasoning = getattr(msg, "reasoning_content", "") or ""
+        if reasoning:
+            print(f"🧠 [Thinking/Suy luận - {pydantic_model.__name__}]: Đã suy luận {len(reasoning)} ký tự.")
+        raw_content = msg.content
         return pydantic_model.model_validate_json(raw_content)
     except Exception as e:
         print(f"❌ Lỗi AI Agent chi tiết: {str(e)}")
