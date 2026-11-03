@@ -599,8 +599,20 @@ export class GiangVienService implements OnModuleInit {
         diem.phieu_tham_quan_id = ptq.id;
       }
 
-      const prepScore = Math.max(0, Math.min(10, Number(rec.diemChuanBi)));
-      const bonusScore = Math.max(0, Math.min(1.0, Number(rec.diemCong || 0)));
+      const rawPrep = Number(rec.diemChuanBi);
+      if (typeof rec.diemChuanBi !== 'number' || !Number.isFinite(rawPrep) || rawPrep < 0 || rawPrep > 10) {
+        throw new BadRequestException(
+          `Điểm chuẩn bị không hợp lệ cho phiếu đăng ký ID ${rec.phieuId} (phải là số từ 0 đến 10)`,
+        );
+      }
+      const rawBonus = Number(rec.diemCong || 0);
+      if (typeof rec.diemCong !== 'undefined' && (!Number.isFinite(rawBonus) || rawBonus < 0 || rawBonus > 1.0)) {
+        throw new BadRequestException(
+          `Điểm cộng không hợp lệ cho phiếu đăng ký ID ${rec.phieuId} (phải là số từ 0 đến 1)`,
+        );
+      }
+      const prepScore = Math.round(rawPrep * 100) / 100;
+      const bonusScore = Math.round(rawBonus * 100) / 100;
 
       diem.diem_chuan_bi = prepScore;
       diem.diem_cong_final = bonusScore;

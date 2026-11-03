@@ -99,9 +99,22 @@ export default function DiemChuanBi_DiemCong_GV() {
   };
 
   const handleScoreChange = (id, field, value) => {
+    let sanitizedValue = value;
+    if (field === 'diemChuanBi') {
+      if (value !== '' && value !== null && value !== undefined) {
+        const num = parseFloat(value);
+        if (isNaN(num)) {
+          sanitizedValue = '';
+        } else if (num < 0) {
+          sanitizedValue = '0';
+        } else if (num > 10) {
+          sanitizedValue = '10';
+        }
+      }
+    }
     setStudents(prev => prev.map(s => {
       if (s.id === id) {
-        return { ...s, [field]: value };
+        return { ...s, [field]: sanitizedValue };
       }
       return s;
     }));
@@ -150,6 +163,16 @@ export default function DiemChuanBi_DiemCong_GV() {
 
     try {
       setIsLocking(true);
+      // Validate all scores before lock
+      const invalidScoreStudent = students.find(s => {
+        const num = Number(s.diemChuanBi);
+        return isNaN(num) || num < 0 || num > 10;
+      });
+      if (invalidScoreStudent) {
+        toast.error(`Sinh viên ${invalidScoreStudent.ho_ten || invalidScoreStudent.mssv} có điểm chuẩn bị không hợp lệ (${invalidScoreStudent.diemChuanBi}). Điểm phải từ 0 đến 10.`);
+        return;
+      }
+
       // Auto save scores first using batch API
       const records = students.map(student => ({
         phieuId: student.id,
@@ -177,6 +200,17 @@ export default function DiemChuanBi_DiemCong_GV() {
   const handleSaveScores = async () => {
     if (students.length === 0 || !selectedTrip) return;
     try {
+      // Validate all entered scores are in range [0, 10]
+      for (const student of students) {
+        if (student.diemChuanBi !== '' && student.diemChuanBi !== null && student.diemChuanBi !== undefined) {
+          const num = Number(student.diemChuanBi);
+          if (isNaN(num) || num < 0 || num > 10) {
+            toast.error(`Sinh viên ${student.ho_ten || student.mssv} có điểm chuẩn bị (${student.diemChuanBi}) không hợp lệ. Điểm phải từ 0 đến 10.`);
+            return;
+          }
+        }
+      }
+
       setLoading(true);
       const records = students.map(student => ({
         phieuId: student.id,
@@ -687,6 +721,9 @@ export default function DiemChuanBi_DiemCong_GV() {
                           min="0" max="10" step="0.1"
                           disabled={isTripLocked || student.da_khoa}
                           value={student.diemChuanBi}
+                          onKeyDown={(e) => {
+                            if (['-', '+', 'e', 'E'].includes(e.key)) e.preventDefault();
+                          }}
                           onChange={(e) => handleScoreChange(student.id, 'diemChuanBi', e.target.value)}
                           placeholder="--"
                           className={`w-20 px-3 py-2 text-center rounded-lg text-sm font-bold transition-all placeholder-slate-300 ${
