@@ -569,8 +569,13 @@ TRANG 38
 
   const handleSaveGrade = async (e) => {
     e.preventDefault();
-    if (!score || score < 0 || score > 10) {
-      toast.error("Vui lòng nhập điểm hợp lệ (0-10)");
+    if (score === '' || score === null || score === undefined) {
+      toast.error("Vui lòng nhập điểm bài thu hoạch");
+      return;
+    }
+    const numScore = parseFloat(score);
+    if (isNaN(numScore) || numScore < 0 || numScore > 10) {
+      toast.error("Điểm bài thu hoạch không hợp lệ. Điểm phải nằm trong thang điểm từ 0 đến 10");
       return;
     }
     try {
@@ -1231,7 +1236,19 @@ TRANG 38
                       type="number" min="0" max="10" step="0.1"
                       disabled={selectedReport?.da_khoa || selectedReport?.da_khoa_thu_hoach}
                       value={score}
-                      onChange={(e) => setScore(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (['-', '+', 'e', 'E'].includes(e.key)) e.preventDefault();
+                      }}
+                      onChange={(e) => {
+                        let val = e.target.value;
+                        if (val !== '' && val !== null && val !== undefined) {
+                          const num = parseFloat(val);
+                          if (isNaN(num)) val = '';
+                          else if (num < 0) val = '0';
+                          else if (num > 10) val = '10';
+                        }
+                        setScore(val);
+                      }}
                       placeholder="--"
                       required
                       className={`w-full px-3 py-2 border rounded-lg text-lg font-black transition-all text-center shadow-sm ${
