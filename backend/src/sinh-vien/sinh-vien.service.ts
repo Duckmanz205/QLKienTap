@@ -2085,16 +2085,170 @@ export class SinhVienService {
     };
   }
 
+  private async buildTripGradeDetail(
+    pdk: PhieuDangKy,
+    termOutcome: 'Dat' | 'KhongDat' | 'DangThucHien',
+  ) {
+    const phieuTQ = pdk.phieuThamQuan;
+    let score = await this.diemPhieuRepo.findOne({
+      where: { phieu_tham_quan_id: phieuTQ.id },
+    });
+
+    if (!score) {
+      score = new DiemPhieuThamQuan();
+      score.phieu_tham_quan_id = phieuTQ.id;
+      score.diem_cong_final = 0;
+      score = await this.diemPhieuRepo.save(score);
+    }
+
+    // Điểm chuẩn bị và điểm cộng: Hiển thị khi Giảng viên dẫn đoàn đã chốt (da_khoa_chuan_bi) hoặc Khoa đã khóa (da_khoa)
+    const isChuanBiLocked =
+      score.da_khoa_chuan_bi === true || score.da_khoa === true;
+    // Điểm bài thu hoạch: Hiển thị khi Giảng viên hướng dẫn đã chốt (da_khoa_thu_hoach) hoặc Khoa đã khóa (da_khoa)
+    const isThuHoachLocked =
+      score.da_khoa_thu_hoach === true || score.da_khoa === true;
+    // Điểm báo cáo hội đồng: Hiển thị khi Hội đồng đã khóa (da_khoa_hoi_dong) hoặc Khoa đã khóa (da_khoa)
+    const isBaoCaoLocked =
+      score.da_khoa_hoi_dong === true || score.da_khoa === true;
+
+    const diemChuanBi = isChuanBiLocked ? (score.diem_chuan_bi ?? null) : null;
+    const diemCong = isChuanBiLocked ? (score.diem_cong_final ?? null) : null;
+    const diemThuHoach = isThuHoachLocked ? (score.diem_thu_hoach ?? null) : null;
+    const diemBaoCao = isBaoCaoLocked ? (score.diem_hoi_dong_final ?? null) : null;
+
+    let diemTongChuyen: number | null = null;
+    if (score.diem_tong_chuyen !== null && score.diem_tong_chuyen !== undefined) {
+      diemTongChuyen = Number(score.diem_tong_chuyen);
+    } else if (diemChuanBi !== null && diemThuHoach !== null && diemBaoCao !== null) {
+      const total =
+        Number(diemChuanBi) * 0.3 +
+        Number(diemThuHoach) * 0.3 +
+        Number(diemBaoCao) * 0.4 +
+        Number(diemCong || 0);
+      diemTongChuyen = Number(Math.min(10, total).toFixed(2));
+    }
+
+    let ketQua = 'ChoDiem';
+    if (termOutcome === 'Dat') {
+      ketQua = 'Dat';
+    } else if (termOutcome === 'KhongDat') {
+      ketQua = 'KhongDat';
+    } else if (diemTongChuyen !== null) {
+      ketQua = diemTongChuyen >= 5.0 ? 'Dat' : 'KhongDat';
+    }
+
+    return {
+      id: phieuTQ.id,
+      phieu_dang_ky_id: pdk.id,
+      ten_nha_may: pdk.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Chưa cập nhật',
+      hinh_thuc: pdk.chuyenThamQuan?.hinh_thuc || 'N/A',
+      diem_chuan_bi: diemChuanBi,
+      diem_bai_thu_hoach: diemThuHoach,
+      diem_bao_cao_tqnm: diemBaoCao,
+      diem_cong: diemCong,
+      diem_tong_chuyen: diemTongChuyen,
+      ket_qua: ketQua,
+      da_khoa_chuan_bi: score.da_khoa_chuan_bi ?? false,
+      da_khoa_thu_hoach: score.da_khoa_thu_hoach ?? false,
+      da_khoa_hoi_dong: score.da_khoa_hoi_dong ?? false,
+      da_khoa: score.da_khoa ?? false,
+    };
+  }
+
   // Xem diem cua sinh vien
   async getStudentGrades(studentId: number) {
     const dksvs = await this.dksvRepo.find({
       where: { sinh_vien_id: studentId },
-      relations: { dotKienTap: { hocKy: true } },
+      relations: {
+        dotKienTap: {
+          hocKy: {
+            namHoc: true,
+          },
+        },
+      },
+      order: { id: 'DESC' },
     });
 
-    const results: any[] = [];
-    for (const dksv of dksvs) {
+    // Trường hợp sinh viên chưa có bản ghi DotKienTap_SinhVien nhưng đã tích lũy chuyến ngoài đợt
+    if (dksvs.length === 0) {
+      const rawPdks = await this.phieuRepo.find({
+        where: [
+          {
+            sinh_vien_id: studentId,
+            chuyenThamQuan: {
+              lichKienTap: {
+                dot_kien_tap_id: IsNull(),
+              },
+            },
+          },
+          {
+            sinh_vien_id: studentId,
+            chuyenThamQuan: {
+              lich_kien_tap_id: IsNull(),
+            },
+          },
+        ],
+        relations: {
+          chuyenThamQuan: { nhaMay: true, lichKienTap: true },
+          phieuThamQuan: true,
+        },
+        order: { id: 'ASC' },
+      });
+
+      const seenPdkIds = new Set<number>();
+      const pdks: PhieuDangKy[] = [];
+      for (const p of rawPdks) {
+        if (!seenPdkIds.has(p.id)) {
+          seenPdkIds.add(p.id);
+          pdks.push(p);
+        }
+      }
+
       const selectedTrips: any[] = [];
+      for (const pdk of pdks) {
+        if (!pdk.phieuThamQuan || pdk.phieuThamQuan.trang_thai !== 'HopLe') {
+          continue;
+        }
+        if (pdk.trang_thai === 'BiLoai' || pdk.trang_thai === 'DaHuy') {
+          continue;
+        }
+        const tripDetail = await this.buildTripGradeDetail(pdk, 'DangThucHien');
+        selectedTrips.push(tripDetail);
+      }
+
+      if (selectedTrips.length > 0) {
+        return [
+          {
+            id: 0,
+            dot_kien_tap_id: null,
+            ten_dot: 'Chuyến tích lũy tự do',
+            ten_hoc_ky: 'Chưa vào đợt chính thức',
+            nam_hoc: '',
+            lan_dang_ky: 1,
+            is_hoc_lai: false,
+            dotKienTap: null,
+            trang_thai: 'DangThucHien',
+            diem_tong_ket: null,
+            ket_qua: 'DangThucHien',
+            selectedTrips,
+          },
+        ];
+      }
+      return [];
+    }
+
+    const results: any[] = [];
+    for (const [idx, dksv] of dksvs.entries()) {
+      const selectedTrips: any[] = [];
+
+      // 1. Tính toán lần đăng ký và học lại có fallback theo thứ tự đợt
+      const computedAttempt = dksvs.length - idx;
+      const lan_dang_ky = Math.max(dksv.lan_dang_ky || 1, computedAttempt);
+      const is_hoc_lai = lan_dang_ky > 1;
+
+      // Đợt hiện tại là đợt mới nhất (idx === 0)
+      const isCurrentCohort =
+        idx === 0 && (dksv.trang_thai === 'DangThucHien' || dksvs.length === 1);
 
       // Tính điểm tổng kết học phần từ 3 chuyến đại diện đã khóa hoặc đã có điểm
       let calculatedTermScore: number | null = null;
@@ -2153,13 +2307,26 @@ export class SinhVienService {
         termOutcome = calculatedTermScore >= 4.0 ? 'Dat' : 'KhongDat';
       }
 
-      const pdks = await this.phieuRepo.find({
-        where: [
+      // Điều kiện truy vấn các phiếu đăng ký:
+      const whereConditions: any[] = [
+        {
+          sinh_vien_id: studentId,
+          chuyenThamQuan: {
+            lichKienTap: {
+              dot_kien_tap_id: dksv.dot_kien_tap_id,
+            },
+          },
+        },
+      ];
+
+      // Nếu là đợt mới nhất: Lấy thêm các chuyến ngoài đợt (để hiển thị chuyến tích lũy tự do)
+      if (isCurrentCohort) {
+        whereConditions.push(
           {
             sinh_vien_id: studentId,
             chuyenThamQuan: {
               lichKienTap: {
-                dot_kien_tap_id: dksv.dot_kien_tap_id,
+                dot_kien_tap_id: IsNull(),
               },
             },
           },
@@ -2169,12 +2336,37 @@ export class SinhVienService {
               lich_kien_tap_id: IsNull(),
             },
           },
-        ],
+        );
+      }
+
+      // Nếu đợt này đã có bộ chuyến báo cáo (bo), chắc chắn lấy các chuyến trong bộ đó
+      if (bo) {
+        whereConditions.push({
+          sinh_vien_id: studentId,
+          phieuThamQuan: {
+            bo_chuyen_bao_cao_id: bo.id,
+          },
+        });
+      }
+
+      const rawPdks = await this.phieuRepo.find({
+        where: whereConditions,
         relations: {
           chuyenThamQuan: { nhaMay: true, lichKienTap: true },
           phieuThamQuan: true,
         },
+        order: { id: 'ASC' },
       });
+
+      // 1. Khử trùng lặp theo pdk.id
+      const seenPdkIds = new Set<number>();
+      const pdks: PhieuDangKy[] = [];
+      for (const p of rawPdks) {
+        if (!seenPdkIds.has(p.id)) {
+          seenPdkIds.add(p.id);
+          pdks.push(p);
+        }
+      }
 
       for (const pdk of pdks) {
         if (!pdk.phieuThamQuan || pdk.phieuThamQuan.trang_thai !== 'HopLe') {
@@ -2183,80 +2375,41 @@ export class SinhVienService {
         if (pdk.trang_thai === 'BiLoai' || pdk.trang_thai === 'DaHuy') {
           continue;
         }
-        const phieuTQ = pdk.phieuThamQuan;
-        let score = await this.diemPhieuRepo.findOne({
-          where: { phieu_tham_quan_id: phieuTQ.id },
-        });
 
-        if (!score) {
-          score = new DiemPhieuThamQuan();
-          score.phieu_tham_quan_id = phieuTQ.id;
-          score.diem_cong_final = 0;
-          score = await this.diemPhieuRepo.save(score);
+        // 2. Cách ly chuyến ngoài đợt (dot_kien_tap_id == null hoặc lich_kien_tap_id == null):
+        const isOutsideDot =
+          !pdk.chuyenThamQuan?.lich_kien_tap_id ||
+          pdk.chuyenThamQuan?.lichKienTap?.dot_kien_tap_id == null;
+
+        if (isOutsideDot) {
+          const tripBoId = pdk.phieuThamQuan?.bo_chuyen_bao_cao_id;
+          if (!isCurrentCohort) {
+            // Đợt cũ: CHỈ lấy nếu chuyến ngoài đợt đã được gắn vào chính bo.id của đợt cũ này
+            if (!bo || tripBoId !== bo.id) {
+              continue;
+            }
+          } else {
+            // Đợt mới nhất: Lấy chuyến thuộc bo.id của đợt này HOẶC chuyến tự do chưa gắn bộ (tripBoId == null)
+            // Loại bỏ chuyến ngoài đợt đã thuộc bộ báo cáo của đợt học khác trong quá khứ
+            if (tripBoId && (!bo || tripBoId !== bo.id)) {
+              continue;
+            }
+          }
         }
 
-        // Điểm chuẩn bị và điểm cộng: Hiển thị khi Giảng viên dẫn đoàn đã chốt (da_khoa_chuan_bi) hoặc Khoa đã khóa (da_khoa)
-        const isChuanBiLocked =
-          score.da_khoa_chuan_bi === true || score.da_khoa === true;
-        // Điểm bài thu hoạch: Hiển thị khi Giảng viên hướng dẫn đã chốt (da_khoa_thu_hoach) hoặc Khoa đã khóa (da_khoa)
-        const isThuHoachLocked =
-          score.da_khoa_thu_hoach === true || score.da_khoa === true;
-        // Điểm báo cáo hội đồng: Hiển thị khi Hội đồng đã khóa (da_khoa_hoi_dong) hoặc Khoa đã khóa (da_khoa)
-        const isBaoCaoLocked =
-          score.da_khoa_hoi_dong === true || score.da_khoa === true;
-
-        const diemChuanBi = isChuanBiLocked ? (score.diem_chuan_bi ?? null) : null;
-        const diemCong = isChuanBiLocked ? (score.diem_cong_final ?? null) : null;
-        const diemThuHoach = isThuHoachLocked ? (score.diem_thu_hoach ?? null) : null;
-        const diemBaoCao = isBaoCaoLocked ? (score.diem_hoi_dong_final ?? null) : null;
-
-        let diemTongChuyen: number | null = null;
-        if (score.diem_tong_chuyen !== null && score.diem_tong_chuyen !== undefined) {
-          diemTongChuyen = Number(score.diem_tong_chuyen);
-        } else if (diemChuanBi !== null && diemThuHoach !== null && diemBaoCao !== null) {
-          const total =
-            Number(diemChuanBi) * 0.3 +
-            Number(diemThuHoach) * 0.3 +
-            Number(diemBaoCao) * 0.4 +
-            Number(diemCong || 0);
-          diemTongChuyen = Number(Math.min(10, total).toFixed(2));
-        }
-
-        // Nếu sinh viên được đánh Đạt -> tất cả các chuyến đều Đạt
-        // Nếu sinh viên bị đánh Không đạt -> tất cả các chuyến đều Không đạt
-        // Nếu đang thực hiện -> tính theo điểm chuyến (nếu đủ điểm) hoặc Chờ chốt điểm
-        let ketQua = 'ChoDiem';
-        if (termOutcome === 'Dat') {
-          ketQua = 'Dat';
-        } else if (termOutcome === 'KhongDat') {
-          ketQua = 'KhongDat';
-        } else if (diemTongChuyen !== null) {
-          ketQua = diemTongChuyen >= 5.0 ? 'Dat' : 'KhongDat';
-        }
-
-        selectedTrips.push({
-          id: phieuTQ.id,
-          phieu_dang_ky_id: pdk.id,
-          ten_nha_may: pdk.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Chưa cập nhật',
-          hinh_thuc: pdk.chuyenThamQuan?.hinh_thuc || 'N/A',
-          diem_chuan_bi: diemChuanBi,
-          diem_bai_thu_hoach: diemThuHoach,
-          diem_bao_cao_tqnm: diemBaoCao,
-          diem_cong: diemCong,
-          diem_tong_chuyen: diemTongChuyen,
-          ket_qua: ketQua,
-          da_khoa_chuan_bi: score.da_khoa_chuan_bi ?? false,
-          da_khoa_thu_hoach: score.da_khoa_thu_hoach ?? false,
-          da_khoa_hoi_dong: score.da_khoa_hoi_dong ?? false,
-          da_khoa: score.da_khoa ?? false,
-        });
+        const tripDetail = await this.buildTripGradeDetail(pdk, termOutcome);
+        selectedTrips.push(tripDetail);
       }
 
       results.push({
         id: dksv.id,
         dot_kien_tap_id: dksv.dot_kien_tap_id,
+        ten_dot: dksv.dotKienTap?.ten_dot || 'Đợt kiến tập',
+        ten_hoc_ky: dksv.dotKienTap?.hocKy?.ten_hoc_ky || '',
+        nam_hoc: dksv.dotKienTap?.hocKy?.namHoc?.ten_nam_hoc || '',
+        lan_dang_ky,
+        is_hoc_lai,
         dotKienTap: dksv.dotKienTap,
-        lan_dang_ky: dksv.lan_dang_ky,
         trang_thai: termOutcome === 'DangThucHien' ? dksv.trang_thai : termOutcome,
         diem_tong_ket: calculatedTermScore,
         ket_qua: termOutcome === 'DangThucHien' ? dksv.trang_thai : termOutcome,
@@ -2531,17 +2684,52 @@ export class SinhVienService {
     };
   }
 
-  private async runBackgroundExtraction(validBaoCaoRef: string) {
+  public async runBackgroundExtraction(validBaoCaoRef: string): Promise<boolean> {
     try {
-      console.log(`[Background AI OCR] Đang tiến hành trích xuất ngầm cho: ${validBaoCaoRef}`);
+      console.log(`[Background AI OCR] Đang kiểm tra trích xuất ngầm cho: ${validBaoCaoRef}`);
 
-      const keyRegex = /^\/api\/upload\/file\/reports\/(.+)$/;
-      const match = validBaoCaoRef.match(keyRegex);
-      if (!match) return;
+      let r2Key = validBaoCaoRef.trim();
+      if (r2Key.includes('?')) {
+        r2Key = r2Key.split('?')[0];
+      }
+      if (r2Key.includes('://')) {
+        try {
+          const parsed = new URL(r2Key);
+          r2Key = parsed.pathname;
+        } catch {
+          // ignore
+        }
+      }
+      r2Key = r2Key.replace(/^\/+/, '');
+      if (r2Key.startsWith('api/upload/file/')) {
+        r2Key = r2Key.replace(/^api\/upload\/file\//, '');
+      }
 
-      const r2Key = match[1];
+      if (!r2Key.toLowerCase().endsWith('.pdf')) {
+        console.log(`[Background AI OCR] File không phải PDF, bỏ qua: ${r2Key}`);
+        return false;
+      }
 
-      // 1. Download file
+      const txtKey = r2Key.replace(/\.\w+$/, '.txt');
+
+      // 0. Kiểm tra nếu file .txt đã tồn tại trên R2 thì bỏ qua
+      if (this.r2Storage.isReady()) {
+        try {
+          const existing = await this.r2Storage.getFileStream(
+            this.r2Storage.BUCKET_REPORTS,
+            txtKey,
+          );
+          if (existing && existing.contentLength && existing.contentLength > 10) {
+            console.log(`[Background AI OCR] File TXT đã tồn tại trên R2 (${txtKey}), không cần chạy lại.`);
+            return true;
+          }
+        } catch {
+          // File .txt chưa có -> tiếp tục trích xuất
+        }
+      }
+
+      // 1. Download file PDF từ R2
+      console.log(`[Background AI OCR] Đang tải PDF từ R2 để gửi sang AI Service: ${r2Key}`);
       const signedUrl = await this.r2Storage.getSignedUrl(
         this.r2Storage.BUCKET_REPORTS,
         r2Key,
@@ -2550,45 +2738,51 @@ export class SinhVienService {
 
       const fileRes = await fetch(signedUrl);
       if (!fileRes.ok) {
-        console.error(`[Background AI OCR] Không thể tải file từ R2: ${fileRes.status}`);
-        return;
+        console.error(`[Background AI OCR] Không thể tải file từ R2: HTTP ${fileRes.status}`);
+        return false;
       }
 
       const pdfBuffer = await fileRes.arrayBuffer();
       const fileName = r2Key.split('/').pop() || 'report.pdf';
 
-      // 2. Gọi Python OCR
+      // 2. Gửi sang Python OCR Microservice (timeout 180s)
       const formData = new FormData();
       const fileBlob = new Blob([pdfBuffer], { type: 'application/pdf' });
       formData.append('file', fileBlob, fileName);
 
+      console.log(`[Background AI OCR] Đang gửi PDF (${pdfBuffer.byteLength} bytes) sang AI Service...`);
       const aiResponse = await fetch('http://127.0.0.1:8000/process-pdf', {
         method: 'POST',
         body: formData,
+        signal: AbortSignal.timeout(180000),
       });
 
       if (aiResponse.ok) {
-        const aiData = await aiResponse.json();
-        if (aiData.extracted_text) {
-          const extractedText = aiData.extracted_text.trim();
-          console.log(`[Background AI OCR] Trích xuất thành công: ${r2Key}`);
+        const aiData: any = await aiResponse.json();
+        const extractedText = (aiData?.extracted_text || '').trim();
+        const txtContent = extractedText || 'Không thể trích xuất văn bản từ file này.';
+        const txtBuffer = Buffer.from('\uFEFF' + txtContent, 'utf-8');
 
-          // 3. Upload file txt lên R2
-          const txtKey = r2Key.replace(/\.\w+$/, '.txt');
-          const txtBuffer = Buffer.from('\uFEFF' + extractedText, 'utf-8');
+        console.log(`[Background AI OCR] Trích xuất thành công (${txtContent.length} ký tự). Đang đẩy lên R2...`);
 
-          await this.r2Storage.uploadFile(
-            this.r2Storage.BUCKET_REPORTS,
-            txtKey,
-            txtBuffer,
-            'text/plain; charset=utf-8',
-          );
-        }
+        // 3. Upload file txt lên R2
+        await this.r2Storage.uploadFile(
+          this.r2Storage.BUCKET_REPORTS,
+          txtKey,
+          txtBuffer,
+          'text/plain; charset=utf-8',
+        );
+
+        console.log(`[Background AI OCR] Đã tải lên file TXT thành công lên R2: ${txtKey}`);
+        return true;
       } else {
-        console.error('[Background AI OCR] Lỗi OCR service:', await aiResponse.text());
+        const errText = await aiResponse.text();
+        console.error(`[Background AI OCR] Lỗi từ AI Service (HTTP ${aiResponse.status}):`, errText);
+        return false;
       }
-    } catch (err) {
-      console.error('[Background AI OCR] Lỗi quá trình trích xuất ngầm:', err);
+    } catch (err: any) {
+      console.error('[Background AI OCR] Lỗi quá trình trích xuất ngầm:', err?.message || err);
+      return false;
     }
   }
 }
