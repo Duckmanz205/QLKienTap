@@ -7500,6 +7500,8 @@ export class KhoaService implements OnModuleInit {
           .leftJoinAndSelect('chuyen.nhaMay', 'nhaMay')
           .leftJoinAndSelect('chuyen.lichKienTap', 'lich')
           .leftJoinAndSelect('phieu.phieuThamQuan', 'ptq')
+          .leftJoinAndSelect('ptq.boChuyenBaoCao', 'bo')
+          .leftJoinAndSelect('bo.dotKienTapSinhVien', 'dksvBo')
           .leftJoinAndSelect('ptq.diemPhieuThamQuan', 'diem')
           .where('phieu.sinh_vien_id IN (:...chunk)', { chunk })
           .andWhere('phieu.trang_thai IN (:...statuses)', {
@@ -7507,7 +7509,10 @@ export class KhoaService implements OnModuleInit {
           });
 
         if (targetDotId) {
-          qbPhieus.andWhere('lich.dot_kien_tap_id = :dotId', { dotId: targetDotId });
+          qbPhieus.andWhere(
+            '(lich.dot_kien_tap_id = :dotId OR dksvBo.dot_kien_tap_id = :dotId OR ((lich.dot_kien_tap_id IS NULL OR chuyen.lich_kien_tap_id IS NULL) AND (ptq.bo_chuyen_bao_cao_id IS NULL OR dksvBo.dot_kien_tap_id = :dotId)))',
+            { dotId: targetDotId },
+          );
         }
 
         const chunkPhieus = await qbPhieus
@@ -7529,9 +7534,20 @@ export class KhoaService implements OnModuleInit {
             }
           : null;
 
-        const studentTrips = phieus.filter(
-          (p) => p.sinh_vien_id === e.sinh_vien_id,
-        );
+        const studentTrips = phieus.filter((p) => {
+          if (p.sinh_vien_id !== e.sinh_vien_id) return false;
+          const isOutside =
+            !p.chuyenThamQuan?.lich_kien_tap_id ||
+            p.chuyenThamQuan?.lichKienTap?.dot_kien_tap_id == null;
+          if (isOutside && targetDotId) {
+            const tripBoDotId =
+              p.phieuThamQuan?.boChuyenBaoCao?.dotKienTapSinhVien?.dot_kien_tap_id;
+            if (p.phieuThamQuan?.bo_chuyen_bao_cao_id && tripBoDotId !== targetDotId) {
+              return false;
+            }
+          }
+          return true;
+        });
 
         // Thống kê số lượng nhà máy theo quy chế HUIT
         const distinctFactoryIds = new Set(
