@@ -123,9 +123,20 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
   };
 
   const handleTripScoreChange = (tripId, value) => {
+    let sanitizedVal = value;
+    if (value !== '' && value !== null && value !== undefined) {
+      const num = parseFloat(value);
+      if (isNaN(num)) {
+        sanitizedVal = '';
+      } else if (num < 0) {
+        sanitizedVal = '0';
+      } else if (num > 10) {
+        sanitizedVal = '10';
+      }
+    }
     setTripScores(prev => ({
       ...prev,
-      [tripId]: value
+      [tripId]: sanitizedVal
     }));
   };
 
@@ -1167,6 +1178,9 @@ export default function HoiDongChamBaoCao_DSBuoi_GV() {
                                     value={currentScore}
                                     disabled={isTripLocked}
                                     readOnly={isTripLocked}
+                                    onKeyDown={(e) => {
+                                      if (['-', '+', 'e', 'E'].includes(e.key)) e.preventDefault();
+                                    }}
                                     onChange={(e) => handleTripScoreChange(tripId, e.target.value)}
                                     className={`w-full pl-3 pr-9 py-2 font-mono font-bold text-base text-center rounded-xl focus:outline-none transition-all ${
                                       isTripLocked

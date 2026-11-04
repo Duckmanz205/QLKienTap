@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { 
-  ChevronDown, Check, ChevronRight, Paperclip, 
+import {
+  ChevronDown, Check, ChevronRight, Paperclip,
   CheckCircle2, XCircle, Filter, Download, X,
   MapPin, Calendar, Clock, Search, Eye, ArrowUp, ArrowDown, ArrowUpDown,
   User, Building2, FileText, AlertCircle, Laptop, Banknote, Info,
@@ -14,7 +14,7 @@ import SearchableDropdown from '../../components/SearchableDropdown';
 export default function RegistrationManagement_Khoa() {
   const [masterTab, setMasterTab] = useState('trips'); // 'trips' | 'huy'
   const [selectedTripForReg, setSelectedTripForReg] = useState(null);
-  
+
   const [trips, setTrips] = useState([]);
   const [loadingTrips, setLoadingTrips] = useState(false);
 
@@ -26,7 +26,7 @@ export default function RegistrationManagement_Khoa() {
   const [globalCancelRequests, setGlobalCancelRequests] = useState([]);
   const [finalizedStudents, setFinalizedStudents] = useState([]);
   const [loadingRegs, setLoadingRegs] = useState(false);
-  
+
   // Search & Filter for Master Tab 1 (trips)
   const [searchNhaMay, setSearchNhaMay] = useState('');
   const [filterDot, setFilterDot] = useState('ALL');
@@ -169,10 +169,10 @@ export default function RegistrationManagement_Khoa() {
       }));
 
       setRegistrations(enrichedData);
-      
+
       const acceptedSet = new Set(accepted.map(r => r.sinhVien?.id || r.sinh_vien_id));
       const rejectedSet = new Set(rejected.map(r => r.sinhVien?.id || r.sinh_vien_id));
-      
+
       setSelectedStudentIds(acceptedSet);
       setRejectedStudentIds(rejectedSet);
     } catch (err) {
@@ -203,7 +203,7 @@ export default function RegistrationManagement_Khoa() {
       showPopup('Chuyến đi đã diễn ra hoặc đã bị hủy, không thể chốt lại danh sách', 'error');
       return;
     }
-    
+
     const maxCapacity = selectedTripForReg?.suc_chua || 0;
     if (maxCapacity > 0 && selectedStudentIds.size > maxCapacity) {
       showPopup(
@@ -216,8 +216,8 @@ export default function RegistrationManagement_Khoa() {
     showConfirm("Chốt danh sách", `Bạn có chắc chắn muốn chốt danh sách với ${selectedStudentIds.size} sinh viên được chọn? Những sinh viên không được chọn sẽ bị loại.`, async () => {
       try {
         const acceptedStudentIds = Array.from(selectedStudentIds).filter(Boolean);
-        await khoaApi.confirmAssignStudents({ 
-          tripId: selectedTripForReg.id, 
+        await khoaApi.confirmAssignStudents({
+          tripId: selectedTripForReg.id,
           acceptedStudentIds,
         });
         showPopup('Chốt danh sách thành công', 'success');
@@ -297,7 +297,7 @@ export default function RegistrationManagement_Khoa() {
 
   // Status mapping
   const getStatusBadge = (statusStr) => {
-    switch(statusStr) {
+    switch (statusStr) {
       case 'Chờ duyệt': return <span className="bg-[#DBD468] text-slate-800 text-xs px-2.5 py-1 rounded-full font-bold shadow-sm inline-flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-slate-800 animate-pulse"></span>Chờ duyệt</span>;
       case 'Hợp lệ': return <span className="bg-[#407F3E] text-white text-xs px-2.5 py-1 rounded-full font-bold shadow-sm inline-flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" />Hợp lệ</span>;
       case 'Đã tham gia':
@@ -436,22 +436,20 @@ export default function RegistrationManagement_Khoa() {
         </div>
 
         <div className="flex items-center gap-6 border-b border-[#E7E0C4] mb-6 overflow-x-auto whitespace-nowrap">
-          <button 
+          <button
             onClick={() => setMasterTab('trips')}
-            className={`pb-3 text-sm font-bold transition-all relative cursor-pointer ${
-              masterTab === 'trips' ? 'text-[#89B449]' : 'text-slate-500 hover:text-slate-700'
-            }`}
+            className={`pb-3 text-sm font-bold transition-all relative cursor-pointer ${masterTab === 'trips' ? 'text-[#89B449]' : 'text-slate-500 hover:text-slate-700'
+              }`}
           >
             Danh sách đăng ký chuyến tham quan
             {masterTab === 'trips' && (
               <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[#89B449] rounded-t-full"></div>
             )}
           </button>
-          <button 
+          <button
             onClick={() => setMasterTab('huy')}
-            className={`pb-3 text-sm font-bold transition-all relative flex items-center gap-2 cursor-pointer ${
-              masterTab === 'huy' ? 'text-[#89B449]' : 'text-slate-500 hover:text-slate-700'
-            }`}
+            className={`pb-3 text-sm font-bold transition-all relative flex items-center gap-2 cursor-pointer ${masterTab === 'huy' ? 'text-[#89B449]' : 'text-slate-500 hover:text-slate-700'
+              }`}
           >
             Duyệt tổng minh chứng hủy
             <span className="bg-[#DBD468] text-slate-800 text-[10px] px-1.5 py-0.5 rounded-full font-bold shadow-sm">
@@ -470,9 +468,9 @@ export default function RegistrationManagement_Khoa() {
               <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
                 <div className="relative flex-1 sm:w-64 min-w-[220px]">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input 
-                    type="text" 
-                    placeholder="Tìm kiếm nhà máy..." 
+                  <input
+                    type="text"
+                    placeholder="Tìm kiếm nhà máy..."
                     value={searchNhaMay}
                     onChange={(e) => {
                       setSearchNhaMay(e.target.value);
@@ -539,15 +537,15 @@ export default function RegistrationManagement_Khoa() {
                         const used = trip.dang_ky_count || 0;
                         const max = trip.suc_chua || 0;
                         const percent = max > 0 ? (used / max) * 100 : 0;
-                        
+
                         return (
-                          <tr 
-                            key={trip.id} 
-                            onClick={() => { 
-                              setSelectedTripForReg(trip); 
+                          <tr
+                            key={trip.id}
+                            onClick={() => {
+                              setSelectedTripForReg(trip);
                               const defaultTab = ['DaChotDanhSach', 'DaDienRa'].includes(trip.trang_thai) ? 'dachot' : 'danhsach';
-                              setActiveTab(defaultTab); 
-                            }} 
+                              setActiveTab(defaultTab);
+                            }}
                             className="hover:bg-slate-50 transition-colors cursor-pointer group"
                           >
                             <td className="p-4 pl-6">
@@ -567,8 +565,8 @@ export default function RegistrationManagement_Khoa() {
                                   <span>{max}</span>
                                 </div>
                                 <div className="w-20 h-1.5 bg-slate-100 rounded-full overflow-hidden mx-auto">
-                                  <div 
-                                    className={`h-full rounded-full transition-all ${percent >= 100 ? 'bg-[#E68A8C]' : 'bg-[#89B449]'}`} 
+                                  <div
+                                    className={`h-full rounded-full transition-all ${percent >= 100 ? 'bg-[#E68A8C]' : 'bg-[#89B449]'}`}
                                     style={{ width: `${percent}%` }}
                                   ></div>
                                 </div>
@@ -581,12 +579,12 @@ export default function RegistrationManagement_Khoa() {
                               {trip.trang_thai === 'DaHuy' && <span className="bg-[#E68A8C] text-white text-[11px] px-3 py-1.5 rounded-full font-bold shadow-sm border border-[#E68A8C]/20 whitespace-nowrap">Đã hủy</span>}
                             </td>
                             <td className="p-4 text-right pr-6">
-                              <button 
-                                onClick={(e) => { 
-                                  e.stopPropagation(); 
-                                  setSelectedTripForReg(trip); 
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedTripForReg(trip);
                                   const defaultTab = ['DaChotDanhSach', 'DaDienRa'].includes(trip.trang_thai) ? 'dachot' : 'danhsach';
-                                  setActiveTab(defaultTab); 
+                                  setActiveTab(defaultTab);
                                 }}
                                 className="px-3 py-1.5 bg-slate-100 text-slate-600 group-hover:bg-[#407F3E] group-hover:text-white rounded-lg text-xs font-bold transition-all shadow-sm inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
                               >
@@ -672,9 +670,9 @@ export default function RegistrationManagement_Khoa() {
             <div className="flex flex-wrap items-center gap-3">
               <div className="relative flex-1 sm:w-72 min-w-[240px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input 
-                  type="text" 
-                  placeholder="Tìm kiếm MSSV, họ tên, chuyến đi..." 
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm MSSV, họ tên, chuyến đi..."
                   value={searchHuy}
                   onChange={(e) => {
                     setSearchHuy(e.target.value);
@@ -725,14 +723,14 @@ export default function RegistrationManagement_Khoa() {
                           <td className="p-4 font-medium text-slate-500">{new Date(r.yeuCauHuy?.ngay_yeu_cau).toLocaleDateString('vi-VN')}</td>
                           <td className="p-4 text-right pr-6">
                             <div className="flex items-center justify-end gap-2">
-                              <button 
+                              <button
                                 onClick={() => handleApproveCancel(r.yeuCauHuy?.id, true)}
                                 className="px-3 py-1.5 bg-[#89B449] hover:bg-[#89B449]/90 text-white rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center gap-1 cursor-pointer"
                               >
                                 <CheckCircle2 className="w-4 h-4" />
                                 Duyệt
                               </button>
-                              <button 
+                              <button
                                 onClick={() => handleApproveCancel(r.yeuCauHuy?.id, false)}
                                 className="px-3 py-1.5 border border-[#E68A8C] text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
                               >
@@ -813,12 +811,12 @@ export default function RegistrationManagement_Khoa() {
       {/* ================= DETAIL VIEW POPUP (MODAL) ================= */}
       {selectedTripForReg && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div 
+          <div
             className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200"
             onClick={(e) => { e.stopPropagation(); setSelectedTripForReg(null); }}
           ></div>
 
-          <div 
+          <div
             className="bg-[#f8f9fa] w-full max-w-6xl rounded-2xl shadow-xl relative z-10 animate-in zoom-in-95 duration-200 flex flex-col overflow-hidden max-h-[90vh]"
             onClick={(e) => e.stopPropagation()}
           >
@@ -828,17 +826,17 @@ export default function RegistrationManagement_Khoa() {
                 <MapPin className="w-6 h-6 text-[#89B449]" />
                 Quản lý đăng ký: {selectedTripForReg.nhaMay?.ten_nha_may || 'Đang cập nhật'}
               </h2>
-              <button 
+              <button
                 onClick={() => setSelectedTripForReg(null)}
                 className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
               >
                 <X className="w-6 h-6" />
               </button>
             </div>
-            
+
             {/* Scrollable Body */}
             <div className="overflow-y-auto p-6 space-y-6 flex-1">
-              
+
               {/* Info Body */}
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -885,10 +883,10 @@ export default function RegistrationManagement_Khoa() {
                     <div>
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Trạng thái</label>
                       <p className="text-sm font-medium text-slate-700 mt-0.5">
-                        {selectedTripForReg.trang_thai === 'MoDangKy' ? 'Mở đăng ký' : 
-                          selectedTripForReg.trang_thai === 'DaChotDanhSach' ? 'Đã chốt danh sách' : 
-                          selectedTripForReg.trang_thai === 'DaDienRa' ? 'Đã diễn ra' : 
-                          selectedTripForReg.trang_thai === 'DaHuy' ? 'Đã huỷ' : 'Nháp'}
+                        {selectedTripForReg.trang_thai === 'MoDangKy' ? 'Mở đăng ký' :
+                          selectedTripForReg.trang_thai === 'DaChotDanhSach' ? 'Đã chốt danh sách' :
+                            selectedTripForReg.trang_thai === 'DaDienRa' ? 'Đã diễn ra' :
+                              selectedTripForReg.trang_thai === 'DaHuy' ? 'Đã huỷ' : 'Nháp'}
                       </p>
                     </div>
                   </div>
@@ -897,22 +895,20 @@ export default function RegistrationManagement_Khoa() {
 
               {/* Tabs */}
               <div className="flex items-center gap-6 border-b border-slate-200 overflow-x-auto whitespace-nowrap">
-                <button 
+                <button
                   onClick={() => setActiveTab('danhsach')}
-                  className={`pb-3 text-sm font-bold transition-all relative cursor-pointer ${
-                    activeTab === 'danhsach' ? 'text-[#89B449]' : 'text-slate-500 hover:text-slate-700'
-                  }`}
+                  className={`pb-3 text-sm font-bold transition-all relative cursor-pointer ${activeTab === 'danhsach' ? 'text-[#89B449]' : 'text-slate-500 hover:text-slate-700'
+                    }`}
                 >
                   Danh sách đăng ký
                   {activeTab === 'danhsach' && (
                     <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[#89B449] rounded-t-full"></div>
                   )}
                 </button>
-                <button 
+                <button
                   onClick={() => setActiveTab('chot')}
-                  className={`pb-3 text-sm font-bold transition-all relative cursor-pointer ${
-                    activeTab === 'chot' ? 'text-[#89B449]' : 'text-slate-500 hover:text-slate-700'
-                  }`}
+                  className={`pb-3 text-sm font-bold transition-all relative cursor-pointer ${activeTab === 'chot' ? 'text-[#89B449]' : 'text-slate-500 hover:text-slate-700'
+                    }`}
                 >
                   Lọc & chốt danh sách
                   {activeTab === 'chot' && (
@@ -920,11 +916,10 @@ export default function RegistrationManagement_Khoa() {
                   )}
                 </button>
                 {['DaChotDanhSach', 'DaDienRa'].includes(selectedTripForReg.trang_thai) && (
-                  <button 
+                  <button
                     onClick={() => setActiveTab('dachot')}
-                    className={`pb-3 text-sm font-bold transition-all relative cursor-pointer ${
-                      activeTab === 'dachot' ? 'text-[#89B449]' : 'text-slate-500 hover:text-slate-700'
-                    }`}
+                    className={`pb-3 text-sm font-bold transition-all relative cursor-pointer ${activeTab === 'dachot' ? 'text-[#89B449]' : 'text-slate-500 hover:text-slate-700'
+                      }`}
                   >
                     Danh sách sinh viên đã chốt
                     {activeTab === 'dachot' && (
@@ -940,9 +935,9 @@ export default function RegistrationManagement_Khoa() {
                   <div className="flex flex-wrap items-center gap-3 flex-1">
                     <div className="relative flex-1 sm:w-64 min-w-[200px]">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <input 
-                        type="text" 
-                        placeholder="Tìm kiếm MSSV, họ tên..." 
+                      <input
+                        type="text"
+                        placeholder="Tìm kiếm MSSV, họ tên..."
                         value={searchRegStudent}
                         onChange={(e) => {
                           setSearchRegStudent(e.target.value);
@@ -991,8 +986,8 @@ export default function RegistrationManagement_Khoa() {
                           <tr><td colSpan="5" className="text-center py-8 text-slate-500 font-medium">Không tìm thấy đăng ký nào phù hợp.</td></tr>
                         ) : (
                           paginatedRegs.map(r => (
-                            <tr 
-                              key={r.id} 
+                            <tr
+                              key={r.id}
                               onClick={() => setViewingDetail(r)}
                               className="hover:bg-slate-50 transition-colors cursor-pointer group"
                             >
@@ -1018,7 +1013,7 @@ export default function RegistrationManagement_Khoa() {
                   <div className="p-4 border-t border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
                       <span>Hiển thị</span>
-                      <SearchableDropdown 
+                      <SearchableDropdown
                         options={[
                           { value: 15, label: '15' },
                           { value: 30, label: '30' },
@@ -1087,13 +1082,12 @@ export default function RegistrationManagement_Khoa() {
                       <span className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg text-xs font-bold border border-slate-200">
                         Tổng: {registrations.length} đăng ký
                       </span>
-                      <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-colors ${
-                        selectedTripForReg?.suc_chua && selectedStudentIds.size > selectedTripForReg.suc_chua
+                      <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-colors ${selectedTripForReg?.suc_chua && selectedStudentIds.size > selectedTripForReg.suc_chua
                           ? 'bg-red-100 text-red-700 border-red-300 font-extrabold animate-pulse'
                           : selectedStudentIds.size === selectedTripForReg?.suc_chua
                             ? 'bg-[#407F3E]/10 text-[#407F3E] border-[#407F3E]/20'
                             : 'bg-amber-50 text-amber-700 border-amber-200'
-                      }`}>
+                        }`}>
                         Hợp lệ: {selectedStudentIds.size} / {selectedTripForReg?.suc_chua || 0} SV (Sức chứa)
                       </span>
                       <span className="px-2.5 py-1 bg-[#E68A8C]/15 text-[#E68A8C] rounded-lg text-xs font-bold border border-[#E68A8C]/30">
@@ -1108,7 +1102,7 @@ export default function RegistrationManagement_Khoa() {
                           Chuyến đã diễn ra (Đã khóa danh sách)
                         </span>
                       ) : (
-                        <button 
+                        <button
                           onClick={handleConfirmAssignStudents}
                           className="px-5 py-2 bg-[#407F3E] hover:bg-[#407F3E]/90 text-white rounded-xl text-sm font-bold transition-colors shadow-sm flex items-center gap-2 cursor-pointer"
                         >
@@ -1133,9 +1127,9 @@ export default function RegistrationManagement_Khoa() {
                     {/* Search Input */}
                     <div className="relative flex-1 sm:w-72 min-w-[220px]">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <input 
-                        type="text" 
-                        placeholder="Tìm kiếm MSSV, họ tên, lớp..." 
+                      <input
+                        type="text"
+                        placeholder="Tìm kiếm MSSV, họ tên, lớp..."
                         value={searchChot}
                         onChange={(e) => {
                           setSearchChot(e.target.value);
@@ -1144,7 +1138,7 @@ export default function RegistrationManagement_Khoa() {
                         className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#407F3E] focus:border-[#407F3E] transition-shadow"
                       />
                       {searchChot && (
-                        <button 
+                        <button
                           onClick={() => { setSearchChot(''); setCurrentPageChot(1); }}
                           className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 rounded-full cursor-pointer"
                           title="Xóa tìm kiếm"
@@ -1158,32 +1152,29 @@ export default function RegistrationManagement_Khoa() {
                     <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl">
                       <button
                         onClick={() => { setFilterChotStatus('ALL'); setCurrentPageChot(1); }}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                          filterChotStatus === 'ALL'
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${filterChotStatus === 'ALL'
                             ? 'bg-white text-slate-800 shadow-sm'
                             : 'text-slate-600 hover:text-slate-900'
-                        }`}
+                          }`}
                       >
                         Tất cả ({registrations.length})
                       </button>
                       <button
                         onClick={() => { setFilterChotStatus('ACCEPTED'); setCurrentPageChot(1); }}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                          filterChotStatus === 'ACCEPTED'
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${filterChotStatus === 'ACCEPTED'
                             ? 'bg-white text-[#407F3E] shadow-sm'
                             : 'text-slate-600 hover:text-[#407F3E]'
-                        }`}
+                          }`}
                       >
                         <CheckCircle2 className="w-3.5 h-3.5 text-[#407F3E]" />
                         Hợp lệ dự kiến ({selectedStudentIds.size})
                       </button>
                       <button
                         onClick={() => { setFilterChotStatus('REJECTED'); setCurrentPageChot(1); }}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                          filterChotStatus === 'REJECTED'
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${filterChotStatus === 'REJECTED'
                             ? 'bg-white text-[#E68A8C] shadow-sm'
                             : 'text-slate-600 hover:text-[#E68A8C]'
-                        }`}
+                          }`}
                       >
                         <XCircle className="w-3.5 h-3.5 text-[#E68A8C]" />
                         Bị loại dự kiến ({rejectedStudentIds.size})
@@ -1203,7 +1194,7 @@ export default function RegistrationManagement_Khoa() {
                             <th className="py-3 px-3 whitespace-nowrap">Lớp</th>
                             <th className="py-3 px-3 text-center whitespace-nowrap">Trạng thái hiện tại</th>
                             <th className="py-3 px-3 whitespace-nowrap">Kết quả lọc dự kiến</th>
-                            <th 
+                            <th
                               onClick={toggleSortChotTime}
                               className="py-3 px-3 text-center cursor-pointer select-none group hover:bg-slate-100 transition-colors whitespace-nowrap"
                               title={`Nhấp để sắp xếp theo thời điểm đăng ký (${sortChotTime === 'ASC' ? 'Đang: Sớm nhất trước - Nhấp để đảo chiều' : 'Đang: Mới nhất trước - Nhấp để đảo chiều'})`}
@@ -1231,8 +1222,8 @@ export default function RegistrationManagement_Khoa() {
                               const isAccepted = selectedStudentIds.has(studentId);
 
                               return (
-                                <tr 
-                                  key={r.id} 
+                                <tr
+                                  key={r.id}
                                   onClick={() => setViewingDetail(r)}
                                   className="hover:bg-slate-50/70 transition-colors cursor-pointer group"
                                 >
@@ -1275,7 +1266,7 @@ export default function RegistrationManagement_Khoa() {
                                   <td className="py-3 pr-6 pl-3 text-right" onClick={(e) => e.stopPropagation()}>
                                     {selectedTripForReg?.trang_thai !== 'DaDienRa' && (
                                       isAccepted ? (
-                                        <button 
+                                        <button
                                           onClick={(e) => { e.stopPropagation(); moveStudent(studentId, false); }}
                                           className="px-3 py-1.5 bg-[#E68A8C]/10 text-[#E68A8C] hover:bg-[#E68A8C]/20 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1 ml-auto cursor-pointer"
                                           title="Chuyển sang danh sách bị loại"
@@ -1283,7 +1274,7 @@ export default function RegistrationManagement_Khoa() {
                                           Loại <ArrowDown className="w-3.5 h-3.5" />
                                         </button>
                                       ) : (
-                                        <button 
+                                        <button
                                           onClick={(e) => { e.stopPropagation(); moveStudent(studentId, true); }}
                                           className="px-3 py-1.5 bg-[#407F3E]/10 text-[#407F3E] hover:bg-[#407F3E]/20 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1 ml-auto cursor-pointer"
                                           title="Chuyển vào danh sách hợp lệ"
@@ -1305,7 +1296,7 @@ export default function RegistrationManagement_Khoa() {
                     <div className="p-4 border-t border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
                       <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
                         <span>Hiển thị</span>
-                        <SearchableDropdown 
+                        <SearchableDropdown
                           options={[
                             { value: 15, label: '15' },
                             { value: 30, label: '30' },
@@ -1384,9 +1375,9 @@ export default function RegistrationManagement_Khoa() {
 
                     <div className="relative w-full sm:w-64 min-w-[200px]">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <input 
-                        type="text" 
-                        placeholder="Tìm MSSV, tên, lớp..." 
+                      <input
+                        type="text"
+                        placeholder="Tìm MSSV, tên, lớp..."
                         value={searchFinalizedStudent}
                         onChange={(e) => {
                           setSearchFinalizedStudent(e.target.value);
@@ -1506,12 +1497,12 @@ export default function RegistrationManagement_Khoa() {
 
             return (
               <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-                <div 
+                <div
                   className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200"
                   onClick={(e) => { e.stopPropagation(); setViewingDetail(null); }}
                 ></div>
-                
-                <div 
+
+                <div
                   className="bg-white w-full max-w-3xl rounded-2xl shadow-2xl relative z-10 animate-in zoom-in-95 duration-200 flex flex-col max-h-[88vh] overflow-hidden border border-slate-200"
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -1537,12 +1528,12 @@ export default function RegistrationManagement_Khoa() {
                         </p>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center gap-3">
                       <div>
                         {getStatusBadge(displayStatus)}
                       </div>
-                      <button 
+                      <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); setViewingDetail(null); }}
                         className="p-1.5 text-slate-400 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg transition-colors cursor-pointer"
@@ -1552,7 +1543,7 @@ export default function RegistrationManagement_Khoa() {
                       </button>
                     </div>
                   </div>
-                  
+
                   {/* Body */}
                   <div className="p-6 space-y-4 overflow-y-auto bg-slate-50/50 flex-1">
                     {/* Alert Box nếu bị loại */}
@@ -1599,13 +1590,13 @@ export default function RegistrationManagement_Khoa() {
                         <User className="w-4 h-4 text-[#407F3E]" />
                         <span>Thông tin sinh viên</span>
                       </div>
-                      
+
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                         <div className="bg-slate-50/70 p-2.5 rounded-lg border border-slate-100">
                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Họ và tên</span>
                           <span className="text-sm font-bold text-slate-800 block mt-0.5 truncate">{student.ho_ten || '--'}</span>
                         </div>
-                        
+
                         <div className="bg-slate-50/70 p-2.5 rounded-lg border border-slate-100">
                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Mã số sinh viên (MSSV)</span>
                           <span className="text-sm font-mono font-bold text-[#407F3E] block mt-0.5">{student.mssv || '--'}</span>
@@ -1674,7 +1665,7 @@ export default function RegistrationManagement_Khoa() {
                         <div className="bg-slate-50/70 p-2.5 rounded-lg border border-slate-100 sm:col-span-2">
                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Địa điểm tập trung / Tham quan</span>
                           <p className="text-xs font-medium text-slate-700 mt-1 leading-relaxed">
-                            {trip.hinh_thuc === 'TrucTuyen' 
+                            {trip.hinh_thuc === 'TrucTuyen'
                               ? 'Tham quan trực tuyến qua hệ thống hội thảo số của nhà trường/doanh nghiệp'
                               : (trip.dia_diem_tap_trung || trip.nhaMay?.dia_chi || 'Theo thông báo của ban tổ chức')}
                           </p>
@@ -1682,10 +1673,10 @@ export default function RegistrationManagement_Khoa() {
                       </div>
                     </div>
                   </div>
-                  
+
                   {/* Footer */}
                   <div className="px-6 py-3.5 border-t border-slate-200 bg-slate-50/70 flex items-center justify-end rounded-b-2xl shrink-0">
-                    <button 
+                    <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); setViewingDetail(null); }}
                       className="px-6 py-2 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl text-sm font-bold transition-all shadow-sm hover:shadow-md cursor-pointer"
@@ -1703,11 +1694,10 @@ export default function RegistrationManagement_Khoa() {
       {/* Toast Popup */}
       {popup.show && createPortal(
         <div className="fixed top-6 right-6 z-[9999] animate-in slide-in-from-right-8 fade-in duration-300">
-          <div className={`flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-xl border text-sm font-semibold text-white ${
-            popup.type === 'success' 
-              ? 'bg-[#407F3E] border-[#407F3E] shadow-[#407F3E]/20' 
+          <div className={`flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-xl border text-sm font-semibold text-white ${popup.type === 'success'
+              ? 'bg-[#407F3E] border-[#407F3E] shadow-[#407F3E]/20'
               : 'bg-red-600 border-red-600 shadow-red-600/20'
-          }`}>
+            }`}>
             <span className="p-1 bg-white/20 rounded-full flex items-center justify-center shrink-0">
               {popup.type === 'success' ? <CheckCircle2 className="w-4 h-4 text-white" /> : <XCircle className="w-4 h-4 text-white" />}
             </span>
@@ -1727,13 +1717,13 @@ export default function RegistrationManagement_Khoa() {
               <p className="text-slate-600 text-sm">{confirmDialog.message}</p>
             </div>
             <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
-              <button 
+              <button
                 onClick={closeConfirm}
                 className="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded-xl text-sm font-bold transition-colors cursor-pointer"
               >
                 Hủy
               </button>
-              <button 
+              <button
                 onClick={() => {
                   confirmDialog.onConfirm();
                   closeConfirm();

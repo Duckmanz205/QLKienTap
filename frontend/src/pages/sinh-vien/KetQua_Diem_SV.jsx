@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  GraduationCap, BookOpen, AlertCircle, CheckCircle2, XCircle, Clock
+  GraduationCap, BookOpen, AlertCircle, CheckCircle2, XCircle, Clock, RotateCcw, Calendar, History
 } from 'lucide-react';
 import { sinhVienApi } from '../../services/api';
 
 export default function KetQua_Diem_SV() {
   const [student, setStudent] = useState(null);
-  const [termGrade, setTermGrade] = useState(null);
-  const [grades, setGrades] = useState([]);
+  const [cohorts, setCohorts] = useState([]);
+  const [selectedCohortIndex, setSelectedCohortIndex] = useState(0);
 
   useEffect(() => {
     const userJson = localStorage.getItem('user');
@@ -24,14 +24,16 @@ export default function KetQua_Diem_SV() {
     try {
       const res = await sinhVienApi.getGrades(svId);
       if (res.data && res.data.length > 0) {
-        setTermGrade(res.data[0]);
-        const trips = res.data[0].selectedTrips || [];
-        setGrades(trips);
+        setCohorts(res.data);
+        setSelectedCohortIndex(0); // Luôn mặc định hiển thị đợt học mới nhất
       }
     } catch (err) {
       console.error(err);
     }
   };
+
+  const termGrade = cohorts[selectedCohortIndex] || null;
+  const grades = termGrade?.selectedTrips || [];
 
   const calculateTripScore = (trip) => {
     if (!trip) return '-';
@@ -112,12 +114,64 @@ export default function KetQua_Diem_SV() {
   return (
     <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-6 animate-in fade-in duration-300">
       
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-800">Kết quả & điểm</h1>
+      {/* Header and Cohort Switcher */}
+      <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">Kết quả & điểm</h1>
+          <p className="text-sm text-slate-500 mt-1">
+            Theo dõi tiến độ chấm điểm và kết quả tổng kết học phần kiến tập
+          </p>
+        </div>
+
+        {/* Multi-cohort Tabs / Attempt Switcher */}
+        {cohorts.length > 1 && (
+          <div className="flex items-center gap-2 bg-white p-1.5 rounded-xl border border-[#E7E0C4] shadow-sm flex-wrap">
+            <span className="text-xs font-bold text-slate-500 px-2 flex items-center gap-1.5">
+              <History className="w-3.5 h-3.5 text-[#407F3E]" />
+              Lần học:
+            </span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {cohorts.map((c, idx) => {
+                const isActive = idx === selectedCohortIndex;
+                const isPassed = c.trang_thai === 'Dat' || c.ket_qua === 'Dat';
+                const isFailed = c.trang_thai === 'KhongDat' || c.ket_qua === 'KhongDat';
+                const label = c.is_hoc_lai ? `Học lại (Lần ${c.lan_dang_ky})` : 'Lần 1';
+
+                return (
+                  <button
+                    key={c.id || idx}
+                    onClick={() => setSelectedCohortIndex(idx)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      isActive
+                        ? 'bg-[#407F3E] text-white shadow-sm'
+                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    }`}
+                  >
+                    {c.is_hoc_lai ? (
+                      <RotateCcw className={`w-3 h-3 ${isActive ? 'text-white' : 'text-amber-600'}`} />
+                    ) : (
+                      <Calendar className="w-3 h-3" />
+                    )}
+                    <span>{label}</span>
+                    {idx === 0 && (
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
+                        isActive ? 'bg-white/20 text-white' : 'bg-[#407F3E]/10 text-[#407F3E]'
+                      }`}>
+                        Mới nhất
+                      </span>
+                    )}
+                    {isPassed && <CheckCircle2 className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-[#89B449]'}`} />}
+                    {isFailed && <XCircle className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-rose-500'}`} />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Top Summary Card */}
-      <div className="bg-[#407F3E] rounded-2xl p-8 lg:p-10 shadow-lg relative overflow-hidden mb-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="bg-[#407F3E] rounded-2xl p-8 lg:p-10 shadow-lg relative overflow-hidden mb-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
         
         {/* Decorative Background Icon */}
         <div className="absolute right-0 bottom-0 opacity-10 transform translate-x-4 translate-y-8 pointer-events-none">
@@ -125,8 +179,25 @@ export default function KetQua_Diem_SV() {
         </div>
 
         <div className="relative z-10 flex-1">
-          <p className="text-white/80 text-sm font-bold uppercase tracking-widest mb-2 flex items-center gap-2">
-            <BookOpen className="w-5 h-5" />
+          {/* Metadata badges of the cohort */}
+          <div className="flex items-center gap-2 mb-3 flex-wrap">
+            <span className="text-white text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 bg-white/20 backdrop-blur-sm px-2.5 py-1 rounded-md shadow-sm">
+              <BookOpen className="w-3.5 h-3.5" />
+              {termGrade?.ten_dot || 'Đợt kiến tập'}
+            </span>
+            {termGrade?.ten_hoc_ky && (
+              <span className="text-white/90 text-xs font-medium bg-white/10 px-2.5 py-1 rounded-md">
+                {termGrade.ten_hoc_ky} {termGrade.nam_hoc ? `(${termGrade.nam_hoc})` : ''}
+              </span>
+            )}
+            <span className={`text-xs font-bold px-2.5 py-1 rounded-md shadow-sm ${
+              termGrade?.is_hoc_lai ? 'bg-amber-300 text-slate-900' : 'bg-white/20 text-white'
+            }`}>
+              {termGrade?.is_hoc_lai ? `Học lại (Lần ${termGrade.lan_dang_ky})` : 'Lần học 1'}
+            </span>
+          </div>
+
+          <p className="text-white/80 text-xs font-bold uppercase tracking-widest mb-1">
             Điểm tổng kết học phần
           </p>
           
@@ -172,10 +243,34 @@ export default function KetQua_Diem_SV() {
         )}
       </div>
 
+      {/* Alert banner when viewing past cohort */}
+      {selectedCohortIndex > 0 && (
+        <div className="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200/80 flex items-center justify-between gap-4 text-amber-900 text-sm animate-in fade-in shadow-sm">
+          <div className="flex items-center gap-2.5">
+            <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+            <div>
+              <span>Bạn đang xem lại lịch sử bảng điểm của <strong>{termGrade?.ten_dot || `Lần ${termGrade?.lan_dang_ky || 1}`}</strong>.</span>
+              <p className="text-xs text-amber-700 mt-0.5">Kết quả này thuộc đợt học trước và không ảnh hưởng đến tiến độ của đợt học lại hiện tại.</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setSelectedCohortIndex(0)}
+            className="shrink-0 px-3 py-1.5 rounded-lg bg-[#407F3E] text-white text-xs font-bold hover:bg-[#346632] transition-colors shadow-sm"
+          >
+            Về đợt hiện tại
+          </button>
+        </div>
+      )}
+
       {/* Detailed Grades Table */}
       <div className="bg-white rounded-2xl shadow-sm border border-[#E7E0C4] overflow-hidden">
-        <div className="p-6 border-b border-[#E7E0C4] bg-white">
+        <div className="p-6 border-b border-[#E7E0C4] bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <h2 className="text-lg font-bold text-slate-800">Chi tiết điểm theo từng chuyến</h2>
+          {termGrade?.ten_dot && (
+            <span className="text-xs text-slate-500 font-medium">
+              Thuộc {termGrade.ten_dot} ({termGrade.is_hoc_lai ? `Học lại lần ${termGrade.lan_dang_ky}` : 'Lần 1'})
+            </span>
+          )}
         </div>
         
         <div className="overflow-x-auto">
@@ -268,7 +363,7 @@ export default function KetQua_Diem_SV() {
         {grades.length === 0 && (
           <div className="p-10 text-center flex flex-col items-center justify-center bg-slate-50">
             <BookOpen className="w-12 h-12 text-slate-300 mb-3" />
-            <p className="text-slate-500 font-bold">Chưa có dữ liệu điểm.</p>
+            <p className="text-slate-500 font-bold">Chưa có dữ liệu chuyến đi cho đợt này.</p>
             <p className="text-xs text-slate-400 mt-1">Vui lòng hoàn thành nộp bài báo cáo để giảng viên chấm điểm.</p>
           </div>
         )}

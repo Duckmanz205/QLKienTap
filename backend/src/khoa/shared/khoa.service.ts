@@ -1514,6 +1514,31 @@ export class KhoaService implements OnModuleInit {
         );
       }
 
+      // Kiểm tra tất cả chuyến tham quan đưa vào lịch phải có giảng viên dẫn đoàn
+      if (
+        chuyen_tham_quan_ids &&
+        Array.isArray(chuyen_tham_quan_ids) &&
+        chuyen_tham_quan_ids.length > 0
+      ) {
+        const assignments = await manager.find(PhanCongGiangVienDanDoan, {
+          where: { chuyen_tham_quan_id: In(chuyen_tham_quan_ids) },
+        });
+        const assignedTripIdSet = new Set(assignments.map((a) => a.chuyen_tham_quan_id));
+        const unassignedTripIds = chuyen_tham_quan_ids.filter((id) => !assignedTripIdSet.has(id));
+        if (unassignedTripIds.length > 0) {
+          const unassignedTrips = await manager.find(ChuyenThamQuan, {
+            where: { id: In(unassignedTripIds) },
+            relations: { nhaMay: true },
+          });
+          const tripNames = unassignedTrips
+            .map((t) => `ID ${t.id} (${t.nhaMay?.ten_nha_may || 'Nhà máy'})`)
+            .join(', ');
+          throw new BadRequestException(
+            `Không thể thêm chuyến tham quan chưa có giảng viên dẫn đoàn vào lịch kiến tập: ${tripNames}. Vui lòng phân công giảng viên dẫn đoàn trước.`,
+          );
+        }
+      }
+
       // Kiểm tra thời gian đăng ký phải kết thúc TRƯỚC ngày tổ chức của tất cả các chuyến tham quan trong lịch
       if (
         chuyen_tham_quan_ids &&
@@ -1642,6 +1667,26 @@ export class KhoaService implements OnModuleInit {
             this.validateRegistrationTimeWithTrips(effectiveTgDen, trips);
           }
 
+          if (targetTripIds.length > 0) {
+            const assignments = await manager.find(PhanCongGiangVienDanDoan, {
+              where: { chuyen_tham_quan_id: In(targetTripIds) },
+            });
+            const assignedTripIdSet = new Set(assignments.map((a) => a.chuyen_tham_quan_id));
+            const unassignedTripIds = targetTripIds.filter((tid) => !assignedTripIdSet.has(tid));
+            if (unassignedTripIds.length > 0) {
+              const unassignedTrips = await manager.find(ChuyenThamQuan, {
+                where: { id: In(unassignedTripIds) },
+                relations: { nhaMay: true },
+              });
+              const tripNames = unassignedTrips
+                .map((t) => `ID ${t.id} (${t.nhaMay?.ten_nha_may || 'Nhà máy'})`)
+                .join(', ');
+              throw new BadRequestException(
+                `Không thể lưu lịch kiến tập vì có chuyến tham quan chưa có giảng viên dẫn đoàn: ${tripNames}. Vui lòng phân công giảng viên dẫn đoàn trước.`,
+              );
+            }
+          }
+
           if (lichData.tg_mo_dang_ky_tu) {
             const tuDate = new Date(lichData.tg_mo_dang_ky_tu);
             if (typeof lichData.tg_mo_dang_ky_tu === 'string' && !lichData.tg_mo_dang_ky_tu.includes('T')) {
@@ -1709,6 +1754,31 @@ export class KhoaService implements OnModuleInit {
         'Chỉ có thể gửi duyệt các lịch ở trạng thái Nháp',
       );
     }
+    const tripsInSchedule = await this.chuyenRepo.find({
+      where: { lich_kien_tap_id: id },
+      relations: { nhaMay: true },
+    });
+    if (tripsInSchedule.length === 0) {
+      throw new BadRequestException(
+        'Lịch kiến tập phải có ít nhất một chuyến tham quan trước khi gửi duyệt',
+      );
+    }
+
+    const scheduleTripIds = tripsInSchedule.map((t) => t.id);
+    const tripAssignments = await this.danDoanRepo.find({
+      where: { chuyen_tham_quan_id: In(scheduleTripIds) },
+    });
+    const assignedIds = new Set(tripAssignments.map((a) => a.chuyen_tham_quan_id));
+    const missingLeaderTrips = tripsInSchedule.filter((t) => !assignedIds.has(t.id));
+    if (missingLeaderTrips.length > 0) {
+      const names = missingLeaderTrips
+        .map((t) => `ID ${t.id} (${t.nhaMay?.ten_nha_may || 'Nhà máy'})`)
+        .join(', ');
+      throw new BadRequestException(
+        `Không thể gửi duyệt vì các chuyến tham quan sau chưa có giảng viên dẫn đoàn: ${names}. Vui lòng phân công giảng viên trước.`,
+      );
+    }
+
     lich.trang_thai = 'ChoDuyet';
     await this.lichRepo.save(lich);
 
@@ -1764,6 +1834,28 @@ export class KhoaService implements OnModuleInit {
           );
         }
       }
+    }
+
+    const tripsInSchedule = await this.chuyenRepo.find({
+      where: { lich_kien_tap_id: id },
+      relations: { nhaMay: true },
+    });
+    if (tripsInSchedule.length === 0) {
+      throw new BadRequestException('Lịch kiến tập không có chuyến tham quan nào.');
+    }
+    const scheduleTripIds = tripsInSchedule.map((t) => t.id);
+    const tripAssignments = await this.danDoanRepo.find({
+      where: { chuyen_tham_quan_id: In(scheduleTripIds) },
+    });
+    const assignedIds = new Set(tripAssignments.map((a) => a.chuyen_tham_quan_id));
+    const missingLeaderTrips = tripsInSchedule.filter((t) => !assignedIds.has(t.id));
+    if (missingLeaderTrips.length > 0) {
+      const names = missingLeaderTrips
+        .map((t) => `ID ${t.id} (${t.nhaMay?.ten_nha_may || 'Nhà máy'})`)
+        .join(', ');
+      throw new BadRequestException(
+        `Không thể phê duyệt vì các chuyến tham quan sau chưa có giảng viên dẫn đoàn: ${names}.`,
+      );
     }
 
     lich.trang_thai = 'DaDuyet';
@@ -4536,7 +4628,10 @@ export class KhoaService implements OnModuleInit {
     lecturerId: number,
     laTruongDoan: boolean,
   ) {
-    const trip = await this.chuyenRepo.findOne({ where: { id: tripId } });
+    const trip = await this.chuyenRepo.findOne({
+      where: { id: tripId },
+      relations: { lichKienTap: true },
+    });
     if (!trip) throw new NotFoundException('Không tìm thấy chuyến tham quan');
 
     if (trip.trang_thai === 'DaDienRa' || trip.trang_thai === 'DaHuy') {
@@ -4575,13 +4670,33 @@ export class KhoaService implements OnModuleInit {
   }
 
   async unassignTourLeader(tripId: number, lecturerId: number) {
-    const trip = await this.chuyenRepo.findOne({ where: { id: tripId } });
+    const trip = await this.chuyenRepo.findOne({
+      where: { id: tripId },
+      relations: { lichKienTap: true },
+    });
     if (!trip) throw new NotFoundException('Không tìm thấy chuyến tham quan');
 
     if (trip.trang_thai === 'DaDienRa' || trip.trang_thai === 'DaHuy') {
       throw new BadRequestException(
         'Không thể gỡ phân công giảng viên dẫn đoàn sau khi chuyến tham quan đã diễn ra hoặc bị hủy',
       );
+    }
+
+    if (trip.lich_kien_tap_id) {
+      const scheduleName = trip.lichKienTap?.ten_lich
+        ? `"${trip.lichKienTap.ten_lich}"`
+        : 'hiện tại';
+      const scheduleStatus = trip.lichKienTap?.trang_thai;
+
+      if (scheduleStatus === 'Nhap') {
+        throw new BadRequestException(
+          `Chuyến tham quan đang thuộc lịch kiến tập ${scheduleName} (trạng thái Nháp). Không thể gỡ phân công giảng viên dẫn đoàn. Vui lòng vào Lịch kiến tập để gỡ chuyến tham quan ra khỏi lịch trước, hoặc phân công giảng viên khác thay thế.`,
+        );
+      } else {
+        throw new BadRequestException(
+          `Chuyến tham quan đang thuộc lịch kiến tập ${scheduleName} đã được gửi duyệt hoặc đang triển khai. Không thể gỡ bỏ giảng viên dẫn đoàn (chỉ được phép phân công giảng viên khác thay thế).`,
+        );
+      }
     }
 
     const exist = await this.danDoanRepo.findOne({
@@ -7500,6 +7615,8 @@ export class KhoaService implements OnModuleInit {
           .leftJoinAndSelect('chuyen.nhaMay', 'nhaMay')
           .leftJoinAndSelect('chuyen.lichKienTap', 'lich')
           .leftJoinAndSelect('phieu.phieuThamQuan', 'ptq')
+          .leftJoinAndSelect('ptq.boChuyenBaoCao', 'bo')
+          .leftJoinAndSelect('bo.dotKienTapSinhVien', 'dksvBo')
           .leftJoinAndSelect('ptq.diemPhieuThamQuan', 'diem')
           .where('phieu.sinh_vien_id IN (:...chunk)', { chunk })
           .andWhere('phieu.trang_thai IN (:...statuses)', {
@@ -7507,7 +7624,10 @@ export class KhoaService implements OnModuleInit {
           });
 
         if (targetDotId) {
-          qbPhieus.andWhere('lich.dot_kien_tap_id = :dotId', { dotId: targetDotId });
+          qbPhieus.andWhere(
+            '(lich.dot_kien_tap_id = :dotId OR dksvBo.dot_kien_tap_id = :dotId OR ((lich.dot_kien_tap_id IS NULL OR chuyen.lich_kien_tap_id IS NULL) AND (ptq.bo_chuyen_bao_cao_id IS NULL OR dksvBo.dot_kien_tap_id = :dotId)))',
+            { dotId: targetDotId },
+          );
         }
 
         const chunkPhieus = await qbPhieus
@@ -7529,9 +7649,20 @@ export class KhoaService implements OnModuleInit {
             }
           : null;
 
-        const studentTrips = phieus.filter(
-          (p) => p.sinh_vien_id === e.sinh_vien_id,
-        );
+        const studentTrips = phieus.filter((p) => {
+          if (p.sinh_vien_id !== e.sinh_vien_id) return false;
+          const isOutside =
+            !p.chuyenThamQuan?.lich_kien_tap_id ||
+            p.chuyenThamQuan?.lichKienTap?.dot_kien_tap_id == null;
+          if (isOutside && targetDotId) {
+            const tripBoDotId =
+              p.phieuThamQuan?.boChuyenBaoCao?.dotKienTapSinhVien?.dot_kien_tap_id;
+            if (p.phieuThamQuan?.bo_chuyen_bao_cao_id && tripBoDotId !== targetDotId) {
+              return false;
+            }
+          }
+          return true;
+        });
 
         // Thống kê số lượng nhà máy theo quy chế HUIT
         const distinctFactoryIds = new Set(

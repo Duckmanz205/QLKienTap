@@ -144,16 +144,39 @@ export default function ChamHoiDong_GV() {
   };
 
   const handleScoreChange = (phieuId, value) => {
-    setScores(prev => ({ ...prev, [phieuId]: value }));
+    let sanitizedVal = value;
+    if (value !== '' && value !== null && value !== undefined) {
+      const num = parseFloat(value);
+      if (isNaN(num)) {
+        sanitizedVal = '';
+      } else if (num < 0) {
+        sanitizedVal = '0';
+      } else if (num > 10) {
+        sanitizedVal = '10';
+      }
+    }
+    setScores(prev => ({ ...prev, [phieuId]: sanitizedVal }));
   };
 
   const handleSaveAndNext = async () => {
     try {
+      // Validate all scores before submitting
+      for (const rep of studentReports) {
+        const score = scores[rep.id];
+        if (score !== '' && score !== null && score !== undefined) {
+          const num = parseFloat(score);
+          if (isNaN(num) || num < 0 || num > 10) {
+            toast.error(`Điểm cho chuyến "${rep.factoryName || 'chuyến đi'}" không hợp lệ (${score}). Điểm phải từ 0 đến 10.`);
+            return;
+          }
+        }
+      }
+
       setSaving(true);
       // Submit scores
       for (const rep of studentReports) {
         const score = scores[rep.id];
-        if (score !== '' && score !== null) {
+        if (score !== '' && score !== null && score !== undefined) {
           await giangVienApi.submitBoardScore({
             memberId: rep.memberId,
             phieuId: rep.id,
@@ -382,6 +405,9 @@ export default function ChamHoiDong_GV() {
                       <input 
                         type="number" min="0" max="10" step="0.1" 
                         value={scores[rep.id] || ''}
+                        onKeyDown={(e) => {
+                          if (['-', '+', 'e', 'E'].includes(e.key)) e.preventDefault();
+                        }}
                         onChange={(e) => handleScoreChange(rep.id, e.target.value)}
                         placeholder="--"
                         className="w-full pl-6 pr-12 py-4 bg-white border border-[#E7E0C4] rounded-xl text-2xl focus:outline-none focus:border-[#407F3E] focus:ring-2 focus:ring-[#407F3E]/20 font-black text-[#407F3E] transition-all text-center shadow-inner"

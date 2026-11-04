@@ -269,7 +269,7 @@ export class UploadController {
     try {
       let extractedText = '';
       if (originalName.toLowerCase().endsWith('.pdf')) {
-        console.log('Background: Sending PDF to AI Service for extraction...', originalName);
+        console.log(`[Upload Background AI] Đang gửi PDF sang AI Service: ${originalName} (Key R2: ${keyTxt})`);
         const fileBuffer = require('fs').readFileSync(pdfPath);
         const blob = new Blob([fileBuffer]);
         const formData = new FormData();
@@ -278,14 +278,15 @@ export class UploadController {
         const response = await fetch('http://127.0.0.1:8000/process-pdf', {
           method: 'POST',
           body: formData,
+          signal: AbortSignal.timeout(180000),
         });
 
         if (response.ok) {
-          const data = await response.json();
-          extractedText = data.extracted_text?.trim() || '';
-          console.log('Background: AI Extraction completed for', originalName);
+          const data: any = await response.json();
+          extractedText = (data?.extracted_text || '').trim();
+          console.log(`[Upload Background AI] Trích xuất thành công (${extractedText.length} ký tự) cho: ${originalName}`);
         } else {
-          console.error('Background: AI Service extraction failed with status:', response.status);
+          console.error(`[Upload Background AI] AI Service trả mã lỗi ${response.status}:`, await response.text());
         }
       }
 
@@ -299,13 +300,14 @@ export class UploadController {
           txtBuffer,
           'text/plain; charset=utf-8',
         );
-        console.log('Background: TXT file uploaded to R2 for', originalName);
+        console.log(`[Upload Background AI] Đã lưu file TXT lên Cloudflare R2: ${keyTxt}`);
       } else {
         const txtPath = pdfPath.replace(/\.\w+$/, '.txt');
         require('fs').writeFileSync(txtPath, txtBuffer);
+        console.log(`[Upload Background AI] Đã lưu file TXT local: ${txtPath}`);
       }
-    } catch (err) {
-      console.error('Background: PDF extraction via AI Service error:', err);
+    } catch (err: any) {
+      console.error(`[Upload Background AI] Lỗi trong quá trình trích xuất ngầm cho ${originalName}:`, err?.message || err);
     } finally {
       try {
         if (require('fs').existsSync(pdfPath)) {

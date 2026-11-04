@@ -156,12 +156,19 @@ export default function LeaderAssignment_Khoa() {
   };
 
   const handleUnassign = (trip, lecturerId, lecturerName) => {
-    if (isTripLocked(trip) && userRole !== 'QuanLyCLB') {
-      showConfirm(
-        "⚠️ Cảnh báo nghiêm ngặt",
-        `Lịch kiến tập này đã được duyệt. Việc gỡ Giảng viên dẫn đoàn lúc này có thể gây thiếu sót nhân sự. Bạn có chắc chắn muốn gỡ phân công giảng viên ${lecturerName}?`,
-        () => executeUnassign(trip.id, lecturerId)
-      );
+    const schedule = trip.lichKienTap;
+    if (schedule) {
+      if (schedule.trang_thai === 'Nhap') {
+        showPopup(
+          `Chuyến tham quan đang thuộc lịch kiến tập "${schedule.ten_lich}" (trạng thái Nháp). Không thể gỡ phân công giảng viên dẫn đoàn. Vui lòng vào Lịch kiến tập để gỡ chuyến tham quan ra khỏi lịch trước, hoặc chọn giảng viên khác để phân công thay thế.`,
+          'error'
+        );
+      } else {
+        showPopup(
+          `Không thể gỡ phân công giảng viên vì chuyến tham quan đang thuộc lịch kiến tập "${schedule.ten_lich}" (${schedule.trang_thai === 'ChoDuyet' ? 'Đang chờ duyệt' : 'Đã duyệt/triển khai'}). Vui lòng chọn phân công giảng viên khác thay thế nếu cần đổi người.`,
+          'error'
+        );
+      }
       return;
     }
 
@@ -174,8 +181,8 @@ export default function LeaderAssignment_Khoa() {
 
   const executeUnassign = async (tripId, lecturerId) => {
     try {
-      await khoaApi.unassignGvdd(tripId, lecturerId);
-      showPopup('Đã gỡ phân công thành công', 'success');
+      const res = await khoaApi.unassignGvdd(tripId, lecturerId);
+      showPopup(res.data?.message || 'Đã gỡ phân công thành công', 'success');
       fetchTrips();
     } catch (err) {
       console.error(err);
@@ -503,16 +510,33 @@ export default function LeaderAssignment_Khoa() {
                               >
                                 <Edit3 className="w-4 h-4" />
                               </button>
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleUnassign(t, gvdd[0].giang_vien_id, gvdd[0].giangVien?.ho_ten);
-                                }}
-                                className="w-8 h-8 rounded-full flex items-center justify-center bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-colors shadow-sm cursor-pointer"
-                                title="Gỡ phân công"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
+                              {t.lichKienTap ? (
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleUnassign(t, gvdd[0].giang_vien_id, gvdd[0].giangVien?.ho_ten);
+                                  }}
+                                  className="w-8 h-8 rounded-full flex items-center justify-center bg-slate-100 text-slate-400 hover:bg-slate-200 transition-colors shadow-sm cursor-not-allowed"
+                                  title={
+                                    t.lichKienTap.trang_thai === 'Nhap'
+                                      ? `Chuyến thuộc lịch kiến tập "${t.lichKienTap.ten_lich}" (Nháp). Không thể gỡ bỏ GV, vui lòng phân công thay thế hoặc gỡ chuyến khỏi lịch.`
+                                      : `Chuyến thuộc lịch kiến tập "${t.lichKienTap.ten_lich}" (${t.lichKienTap.trang_thai === 'ChoDuyet' ? 'Chờ duyệt' : 'Đã duyệt/triển khai'}). Không thể gỡ bỏ GV, chỉ có thể phân công thay thế.`
+                                  }
+                                >
+                                  <Trash2 className="w-4 h-4 text-slate-400" />
+                                </button>
+                              ) : (
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleUnassign(t, gvdd[0].giang_vien_id, gvdd[0].giangVien?.ho_ten);
+                                  }}
+                                  className="w-8 h-8 rounded-full flex items-center justify-center bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-colors shadow-sm cursor-pointer"
+                                  title="Gỡ phân công"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
                             </>
                           )}
                         </div>

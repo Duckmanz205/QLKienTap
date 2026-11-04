@@ -13,18 +13,60 @@ from PIL import Image
 import fitz  # PyMuPDF
 from dotenv import load_dotenv
 
-from src.schemas import (
-    DanhGia_HinhThuc_TongQuan,
-    DanhGia_QuyTrinh,
-    DanhGia_VSATTP,
-    KetQua_KiemToan_Rubric
-)
-from src.model_profiles import (
-    ACTIVE_GRADING_PROFILE,
-    ACTIVE_OCR_PROFILE,
-    PROFILE_GRADING_QWEN38_MAX,
-    PROFILE_GRADING_DEEPSEEK_FLASH_1017
-)
+try:
+    from src.schemas import (
+        DanhGia_HinhThuc_TongQuan,
+        DanhGia_QuyTrinh,
+        DanhGia_VSATTP,
+        KetQua_KiemToan_Rubric
+    )
+except ImportError:
+    from schemas import (
+        DanhGia_HinhThuc_TongQuan,
+        DanhGia_QuyTrinh,
+        DanhGia_VSATTP,
+        KetQua_KiemToan_Rubric
+    )
+try:
+    from src.model_profiles import (
+        ACTIVE_GRADING_PROFILE,
+        ACTIVE_OCR_PROFILE,
+        PROFILE_GRADING_QWEN38_MAX,
+        PROFILE_GRADING_DEEPSEEK_FLASH_1017
+    )
+except ImportError:
+    try:
+        from model_profiles import (
+            ACTIVE_GRADING_PROFILE,
+            ACTIVE_OCR_PROFILE,
+            PROFILE_GRADING_QWEN38_MAX,
+            PROFILE_GRADING_DEEPSEEK_FLASH_1017
+        )
+    except ImportError:
+        # Fallback an toàn mặc định nếu chưa kéo file model_profiles.py
+        PROFILE_GRADING_QWEN38_MAX = {
+            "model_name": "qwen3.8-max-0902",
+            "temperature": 0.05,
+            "max_tokens": 4000,
+            "response_format": {"type": "json_object"},
+            "extra_body": {"enable_thinking": True}
+        }
+        PROFILE_GRADING_DEEPSEEK_FLASH_1017 = {
+            "model_name": "deepseek-v4.1-flash-1017",
+            "temperature": 0.05,
+            "max_tokens": 2500,
+            "response_format": {"type": "json_object"},
+            "extra_body": {"enable_thinking": False}
+        }
+        PROFILE_OCR_DEEPSEEK_FLASH = {
+            "model_name": "deepseek-v4.1-flash",
+            "temperature": 0.01,
+            "max_tokens": 4000,
+            "stream": True,
+            "extra_body": {"enable_thinking": False}
+        }
+        ACTIVE_GRADING_PROFILE = PROFILE_GRADING_DEEPSEEK_FLASH_1017
+        ACTIVE_OCR_PROFILE = PROFILE_OCR_DEEPSEEK_FLASH
 
 # ==========================================
 # CẤU HÌNH KHỞI TẠO & MÔI TRƯỜNG
