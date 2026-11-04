@@ -191,7 +191,7 @@ class _KetQuaDiemSVScreenState extends State<KetQuaDiemSVScreen> {
                 ),
               ),
             ] else ...[
-              ...termGrade.tripGrades.map((tg) => _buildTripGradeCard(tg)),
+              ...termGrade.tripGrades.map((tg) => _buildTripGradeCard(tg, termGrade)),
             ],
             const SizedBox(height: 16),
           ],
@@ -310,9 +310,90 @@ class _KetQuaDiemSVScreenState extends State<KetQuaDiemSVScreen> {
     );
   }
 
-  Widget _buildTripGradeCard(TripGradeItem trip) {
+  Widget _buildTripGradeCard(TripGradeItem trip, StudentTermGrade? termGrade) {
     final finalScore = trip.calculateCalculatedScore();
     final hasScore = finalScore != null;
+
+    final isScoreLocked = termGrade?.isScoreLocked == true || termGrade?.diemTongKet != null;
+    final isPassed = termGrade?.isPassed ?? false;
+    final isOverallPassed = termGrade?.trangThai == 'Dat' || (isScoreLocked && isPassed);
+    final isOverallFailed = termGrade?.trangThai == 'KhongDat' || (isScoreLocked && !isPassed);
+
+    String tripResult;
+    if (isOverallPassed) {
+      tripResult = 'Dat';
+    } else if (isOverallFailed) {
+      tripResult = 'KhongDat';
+    } else if (trip.ketQua == 'Dat' || trip.ketQua == 'KhongDat') {
+      tripResult = trip.ketQua!;
+    } else if (hasScore) {
+      tripResult = finalScore >= 5.0 ? 'Dat' : 'KhongDat';
+    } else {
+      tripResult = 'ChoDiem';
+    }
+
+    Widget resultBadge;
+    if (tripResult == 'Dat') {
+      resultBadge = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: AppColors.secondary.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.secondary.withValues(alpha: 0.3)),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.check_circle_outline, size: 12, color: AppColors.secondary),
+            SizedBox(width: 4),
+            Text(
+              'Đạt',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: AppColors.secondary,
+              ),
+            ),
+          ],
+        ),
+      );
+    } else if (tripResult == 'KhongDat') {
+      resultBadge = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: AppColors.danger.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.cancel_outlined, size: 12, color: AppColors.danger),
+            SizedBox(width: 4),
+            Text(
+              'Không đạt',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: AppColors.danger,
+              ),
+            ),
+          ],
+        ),
+      );
+    } else {
+      resultBadge = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: AppColors.warning.withValues(alpha: 0.2),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Text(
+          'Đang chấm',
+          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.darkSlate),
+        ),
+      );
+    }
 
     return Card(
       margin: const EdgeInsets.only(bottom: 14),
@@ -357,32 +438,14 @@ class _KetQuaDiemSVScreenState extends State<KetQuaDiemSVScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    if (hasScore)
+                    if (hasScore) ...[
                       Text(
                         finalScore.toStringAsFixed(1),
                         style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.primary),
-                      )
-                    else
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.warning.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Text(
-                          'Đang chấm',
-                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.darkSlate),
-                        ),
                       ),
-                    if (hasScore)
-                      Text(
-                        finalScore >= 5.0 ? 'Đạt' : 'Chưa đạt',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: finalScore >= 5.0 ? AppColors.secondary : AppColors.danger,
-                        ),
-                      ),
+                      const SizedBox(height: 2),
+                    ],
+                    resultBadge,
                   ],
                 ),
               ],
@@ -396,21 +459,21 @@ class _KetQuaDiemSVScreenState extends State<KetQuaDiemSVScreen> {
                   child: _buildScoreColumn(
                     'Chuẩn bị (30%)',
                     trip.diemChuanBi,
-                    pendingText: (!trip.daKhoaChuanBi && !trip.daKhoa) ? 'Chờ chốt' : null,
+                    pendingText: (!trip.daKhoaChuanBi && !trip.daKhoa && !isScoreLocked) ? 'Chờ chốt' : null,
                   ),
                 ),
                 Expanded(
                   child: _buildScoreColumn(
                     'Báo cáo (30%)',
                     trip.diemBaiThuHoach,
-                    pendingText: (!trip.daKhoaThuHoach && !trip.daKhoa) ? 'Chờ chốt' : null,
+                    pendingText: (!trip.daKhoaThuHoach && !trip.daKhoa && !isScoreLocked) ? 'Chờ chốt' : null,
                   ),
                 ),
                 Expanded(
                   child: _buildScoreColumn(
                     'Hội đồng (40%)',
                     trip.diemBaoCaoTQNM,
-                    pendingText: (!trip.daKhoaHoiDong && !trip.daKhoa) ? 'Chờ chốt' : null,
+                    pendingText: (!trip.daKhoaHoiDong && !trip.daKhoa && !isScoreLocked) ? 'Chờ chốt' : null,
                   ),
                 ),
                 Expanded(

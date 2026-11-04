@@ -252,7 +252,7 @@ class AppState {
 
     // 1. Nhac nho Bai thu hoach can cham
     final ungradedStudents = lecturerStudents
-        .where((s) => !s.isGraded)
+        .where((s) => !s.isGraded && !s.isScoreLocked)
         .toList();
     if (ungradedStudents.isNotEmpty) {
       reminders.add(
@@ -723,7 +723,9 @@ class AppStateProviderState extends State<AppStateContainer> {
     final today = DateTime(now.year, now.month, now.day);
 
     // 1. Nhac nho cham bai
-    final ungraded = _state.lecturerStudents.where((s) => !s.isGraded).toList();
+    final ungraded = _state.lecturerStudents
+        .where((s) => !s.isGraded && !s.isScoreLocked)
+        .toList();
     if (ungraded.isNotEmpty) {
       autoReminders.add(
         LecturerNotification(
@@ -1249,6 +1251,28 @@ class AppStateProviderState extends State<AppStateContainer> {
           final mssv = sv['mssv'] ?? sv['id']?.toString() ?? 'SV';
           final uniqueId = r['id'] != null ? '${mssv}_${r['id']}' : mssv;
 
+          final dotKienTap = chuyen['lichKienTap']?['dotKienTap'] ??
+              chuyen['dotKienTap'] ??
+              {};
+          final dotId = chuyen['lichKienTap']?['dot_kien_tap_id'] ??
+              dotKienTap['id'] ??
+              chuyen['dot_kien_tap_id'] ??
+              chuyen['dotId'];
+          final termName = dotKienTap['ten_dot'] ??
+              (dotId == 1 ? 'Đợt 1' : (dotId == 7 ? 'Đợt 2' : (dotId != null ? 'Đợt $dotId' : 'N/A')));
+
+          final hasGrade = r['diem_thu_hoach'] != null ||
+              diem['diem_thu_hoach'] != null ||
+              r['trang_thai'] == 'DaCham';
+          final isScoreLocked = diem['da_khoa_thu_hoach'] == true ||
+              diem['da_khoa'] == true ||
+              r['da_khoa'] == true ||
+              r['da_khoa_thu_hoach'] == true ||
+              dotKienTap['trang_thai'] == 'DaKhoa' ||
+              dotKienTap['trang_thai'] == 'DaKetThuc';
+          final isGraded = hasGrade || isScoreLocked;
+          final papersLeft = isGraded ? 0 : 1;
+
           return LecturerStudent(
             id: uniqueId,
             phieuId: phieu['id'],
@@ -1257,7 +1281,7 @@ class AppStateProviderState extends State<AppStateContainer> {
             className: sv['lop'] ?? 'N/A',
             company: chuyen['nhaMay']?['ten_nha_may'] ?? 'Doanh nghiệp',
             completedTours: '1/1',
-            papersLeft: 0,
+            papersLeft: papersLeft,
             avatar: sv['avatar'] ?? '',
             submittedDate: r['ngay_nop'] != null
                 ? (_safeSub(
@@ -1274,10 +1298,8 @@ class AppStateProviderState extends State<AppStateContainer> {
                         )
                       : 'N/A')
                 : 'N/A',
-            dotKienTapId:
-                chuyen['lichKienTap']?['dot_kien_tap_id'] ??
-                chuyen['dot_kien_tap_id'] ??
-                chuyen['dotId'],
+            dotKienTapId: dotId,
+            termName: termName,
             attendanceStatus: diemDanh['trang_thai'] == 'CoMat'
                 ? 'present'
                 : (diemDanh['trang_thai'] == 'Vang' ? 'absent' : 'none'),
@@ -1292,12 +1314,11 @@ class AppStateProviderState extends State<AppStateContainer> {
                 ? double.tryParse(diem['diem_ai_de_xuat'].toString())
                 : null,
             comment: r['nhan_xet_cua_giang_vien'],
-            isGraded: r['trang_thai'] == 'DaCham',
+            isGraded: isGraded,
             tourId: chuyen['id']?.toString() ?? '',
             reportFileUrl: r['file_bao_cao'],
             confirmationFileUrl: r['file_xac_nhan_tham_quan'],
-            isScoreLocked:
-                diem['da_khoa_thu_hoach'] == true || diem['da_khoa'] == true,
+            isScoreLocked: isScoreLocked,
           );
         }).toList();
       });
@@ -1988,12 +2009,14 @@ class AppStateProviderState extends State<AppStateContainer> {
     setState(() {
       _state.lecturerStudents = _state.lecturerStudents.map((s) {
         if (s.id == studentId) {
+          final newIsGraded = isGraded ?? (gvhdGrade != null ? true : s.isGraded);
           return s.copyWith(
             prelimGrade: prelimGrade ?? s.prelimGrade,
             extraGrade: extraGrade ?? s.extraGrade,
             gvhdGrade: gvhdGrade ?? s.gvhdGrade,
             comment: comment ?? s.comment,
-            isGraded: isGraded ?? s.isGraded,
+            isGraded: newIsGraded,
+            papersLeft: newIsGraded ? 0 : 1,
           );
         }
         return s;
