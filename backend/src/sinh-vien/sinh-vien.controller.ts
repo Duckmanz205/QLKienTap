@@ -31,6 +31,18 @@ import {
 export class SinhVienController {
   constructor(private readonly svService: SinhVienService) { }
 
+  /**
+   * Helper: Lấy profileId từ JWT payload (tiết kiệm 1 query DB trên mỗi request),
+   * fallback gọi getStudentByAccountId nếu token cũ chưa có profileId.
+   */
+  private async resolveStudentId(user: JwtPayloadUser): Promise<number> {
+    if (user.profileId) {
+      return user.profileId;
+    }
+    const student = await this.svService.getStudentByAccountId(user.sub);
+    return student.id;
+  }
+
   @Get('profile')
   async getMyProfile(@CurrentUser() user: JwtPayloadUser) {
     return this.svService.getStudentByAccountId(user.sub);
@@ -57,14 +69,14 @@ export class SinhVienController {
 
   @Get('available-trips')
   async getMyAvailableTrips(@CurrentUser() user: JwtPayloadUser) {
-    const student = await this.svService.getStudentByAccountId(user.sub);
-    return this.svService.getAvailableTrips(student.id);
+    const studentId = await this.resolveStudentId(user);
+    return this.svService.getAvailableTrips(studentId);
   }
 
   @Get('available-trips/:studentId')
   async getAvailableTrips(@CurrentUser() user: JwtPayloadUser) {
-    const student = await this.svService.getStudentByAccountId(user.sub);
-    return this.svService.getAvailableTrips(student.id);
+    const studentId = await this.resolveStudentId(user);
+    return this.svService.getAvailableTrips(studentId);
   }
 
   @Get('payment-config')
@@ -74,14 +86,14 @@ export class SinhVienController {
 
   @Get('registered-trips')
   async getMyRegisteredTrips(@CurrentUser() user: JwtPayloadUser) {
-    const student = await this.svService.getStudentByAccountId(user.sub);
-    return this.svService.getStudentRegisteredTrips(student.id);
+    const studentId = await this.resolveStudentId(user);
+    return this.svService.getStudentRegisteredTrips(studentId);
   }
 
   @Get('registered-trips/:studentId')
   async getRegisteredTrips(@CurrentUser() user: JwtPayloadUser) {
-    const student = await this.svService.getStudentByAccountId(user.sub);
-    return this.svService.getStudentRegisteredTrips(student.id);
+    const studentId = await this.resolveStudentId(user);
+    return this.svService.getStudentRegisteredTrips(studentId);
   }
 
   @Get('trip-info/:tripId')
@@ -89,20 +101,20 @@ export class SinhVienController {
     @CurrentUser() user: JwtPayloadUser,
     @Param('tripId', ParseIntPipe) tripId: number,
   ) {
-    const student = await this.svService.getStudentByAccountId(user.sub);
-    return this.svService.getTripInfo(student.id, tripId);
+    const studentId = await this.resolveStudentId(user);
+    return this.svService.getTripInfo(studentId, tripId);
   }
 
   @Get('proposal-portal-status')
   async getProposalPortalStatus(@CurrentUser() user: JwtPayloadUser) {
-    const student = await this.svService.getStudentByAccountId(user.sub);
-    return this.svService.getProposalPortalStatus(student?.id);
+    const studentId = await this.resolveStudentId(user);
+    return this.svService.getProposalPortalStatus(studentId);
   }
 
   @Get('proposals')
   async getMyProposals(@CurrentUser() user: JwtPayloadUser) {
-    const student = await this.svService.getStudentByAccountId(user.sub);
-    return this.svService.getStudentProposals(student.id);
+    const studentId = await this.resolveStudentId(user);
+    return this.svService.getStudentProposals(studentId);
   }
 
   @Delete('proposals/:id')
@@ -110,8 +122,8 @@ export class SinhVienController {
     @CurrentUser() user: JwtPayloadUser,
     @Param('id', ParseIntPipe) proposalId: number,
   ) {
-    const student = await this.svService.getStudentByAccountId(user.sub);
-    return this.svService.cancelProposal(student.id, proposalId);
+    const studentId = await this.resolveStudentId(user);
+    return this.svService.cancelProposal(studentId, proposalId);
   }
 
   @Post('register')
@@ -119,8 +131,8 @@ export class SinhVienController {
     @CurrentUser() user: JwtPayloadUser,
     @Body() body: RegisterTripDto,
   ) {
-    const student = await this.svService.getStudentByAccountId(user.sub);
-    return this.svService.registerTrip(student.id, body.tripId);
+    const studentId = await this.resolveStudentId(user);
+    return this.svService.registerTrip(studentId, body.tripId);
   }
 
   @Post('propose-trip')
@@ -128,9 +140,9 @@ export class SinhVienController {
     @CurrentUser() user: JwtPayloadUser,
     @Body() body: ProposeTripDto,
   ) {
-    const student = await this.svService.getStudentByAccountId(user.sub);
+    const studentId = await this.resolveStudentId(user);
     return this.svService.proposeTrip(
-      student.id,
+      studentId,
       body.ngayThamQuan,
       body.gioBatDau,
       body.hinhThuc,
@@ -147,13 +159,13 @@ export class SinhVienController {
     @CurrentUser() user: JwtPayloadUser,
     @Body() body: RequestCancelDto,
   ) {
-    const student = await this.svService.getStudentByAccountId(user.sub);
+    const studentId = await this.resolveStudentId(user);
     const regId = body.registrationId || body.dangKyId;
     if (!regId) {
       throw new BadRequestException('Mã phiếu đăng ký không hợp lệ');
     }
     return this.svService.requestCancel(
-      student.id,
+      studentId,
       regId,
       body.lyDo,
       body.fileMinhChung || '',
@@ -162,14 +174,14 @@ export class SinhVienController {
 
   @Get('invoices')
   async getMyInvoices(@CurrentUser() user: JwtPayloadUser) {
-    const student = await this.svService.getStudentByAccountId(user.sub);
-    return this.svService.getInvoices(student.id);
+    const studentId = await this.resolveStudentId(user);
+    return this.svService.getInvoices(studentId);
   }
 
   @Get('invoices/:studentId')
   async getInvoices(@CurrentUser() user: JwtPayloadUser) {
-    const student = await this.svService.getStudentByAccountId(user.sub);
-    return this.svService.getInvoices(student.id);
+    const studentId = await this.resolveStudentId(user);
+    return this.svService.getInvoices(studentId);
   }
 
   @Post('pay-invoice/:invoiceId')
@@ -177,8 +189,8 @@ export class SinhVienController {
     @CurrentUser() user: JwtPayloadUser,
     @Param('invoiceId', ParseIntPipe) invoiceId: number,
   ) {
-    const student = await this.svService.getStudentByAccountId(user.sub);
-    return this.svService.payInvoiceForStudent(student.id, invoiceId);
+    const studentId = await this.resolveStudentId(user);
+    return this.svService.payInvoiceForStudent(studentId, invoiceId);
   }
 
   @Post('request-refund')
@@ -186,9 +198,9 @@ export class SinhVienController {
     @CurrentUser() user: JwtPayloadUser,
     @Body() body: RequestRefundDto,
   ) {
-    const student = await this.svService.getStudentByAccountId(user.sub);
+    const studentId = await this.resolveStudentId(user);
     return this.svService.requestRefundForStudent(
-      student.id,
+      studentId,
       body.invoiceId,
       body.fileScanUrl,
       body.nganHangNhan,
@@ -199,26 +211,26 @@ export class SinhVienController {
 
   @Get('refund-requests')
   async getMyRefundRequests(@CurrentUser() user: JwtPayloadUser) {
-    const student = await this.svService.getStudentByAccountId(user.sub);
-    return this.svService.getRefundRequests(student.id);
+    const studentId = await this.resolveStudentId(user);
+    return this.svService.getRefundRequests(studentId);
   }
 
   @Get('refund-requests/:studentId')
   async getRefundRequests(@CurrentUser() user: JwtPayloadUser) {
-    const student = await this.svService.getStudentByAccountId(user.sub);
-    return this.svService.getRefundRequests(student.id);
+    const studentId = await this.resolveStudentId(user);
+    return this.svService.getRefundRequests(studentId);
   }
 
   @Get('notifications')
   async getMyNotifications(@CurrentUser() user: JwtPayloadUser) {
-    const student = await this.svService.getStudentByAccountId(user.sub);
-    return this.svService.getNotifications(student.id);
+    const studentId = await this.resolveStudentId(user);
+    return this.svService.getNotifications(studentId);
   }
 
   @Get('notifications/:studentId')
   async getNotifications(@CurrentUser() user: JwtPayloadUser) {
-    const student = await this.svService.getStudentByAccountId(user.sub);
-    return this.svService.getNotifications(student.id);
+    const studentId = await this.resolveStudentId(user);
+    return this.svService.getNotifications(studentId);
   }
 
   @Post('submit-report')
@@ -226,9 +238,9 @@ export class SinhVienController {
     @CurrentUser() user: JwtPayloadUser,
     @Body() body: SubmitReportDto,
   ) {
-    const student = await this.svService.getStudentByAccountId(user.sub);
+    const studentId = await this.resolveStudentId(user);
     return this.svService.submitReport(
-      student.id,
+      studentId,
       body.registrationId,
       body.fileBaoCaoUrl,
       body.fileXacNhanUrl,
@@ -241,9 +253,9 @@ export class SinhVienController {
     @CurrentUser() user: JwtPayloadUser,
     @Body() body: SubmitConfirmationPaperDto,
   ) {
-    const student = await this.svService.getStudentByAccountId(user.sub);
+    const studentId = await this.resolveStudentId(user);
     return this.svService.submitConfirmationPaper(
-      student.id,
+      studentId,
       body.registrationId,
       body.fileXacNhanUrl,
     );
@@ -254,14 +266,14 @@ export class SinhVienController {
     @CurrentUser() user: JwtPayloadUser,
     @Param('registrationId', ParseIntPipe) registrationId: number,
   ) {
-    const student = await this.svService.getStudentByAccountId(user.sub);
-    return this.svService.deleteReport(student.id, registrationId);
+    const studentId = await this.resolveStudentId(user);
+    return this.svService.deleteReport(studentId, registrationId);
   }
 
   @Get('representative-trips-status')
   async getRepresentativeTripsStatus(@CurrentUser() user: JwtPayloadUser) {
-    const student = await this.svService.getStudentByAccountId(user.sub);
-    return this.svService.getRepresentativeTripsStatus(student.id);
+    const studentId = await this.resolveStudentId(user);
+    return this.svService.getRepresentativeTripsStatus(studentId);
   }
 
   @Post('select-representative-trips')
@@ -269,9 +281,9 @@ export class SinhVienController {
     @CurrentUser() user: JwtPayloadUser,
     @Body() body: SelectRepresentativeTripsDto,
   ) {
-    const student = await this.svService.getStudentByAccountId(user.sub);
+    const studentId = await this.resolveStudentId(user);
     return this.svService.selectRepresentativeTrips(
-      student.id,
+      studentId,
       body.termStudentId,
       body.registrationIds,
     );
@@ -279,27 +291,36 @@ export class SinhVienController {
 
   @Get('grades')
   async getMyGrades(@CurrentUser() user: JwtPayloadUser) {
-    const student = await this.svService.getStudentByAccountId(user.sub);
-    try { return await this.svService.getStudentGrades(student.id); } catch (e) { console.error('API ERROR:', e); throw e; }
+    const studentId = await this.resolveStudentId(user);
+    try {
+      return await this.svService.getStudentGrades(studentId);
+    } catch (e) {
+      console.error('API ERROR:', e);
+      throw e;
+    }
   }
 
   @Get('grades/:studentId')
   async getGrades(@CurrentUser() user: JwtPayloadUser) {
-    const student = await this.svService.getStudentByAccountId(user.sub);
-    try { return await this.svService.getStudentGrades(student.id); } catch (e) { console.error('API FATAL ERROR:', e); throw e; }
+    const studentId = await this.resolveStudentId(user);
+    try {
+      return await this.svService.getStudentGrades(studentId);
+    } catch (e) {
+      console.error('API FATAL ERROR:', e);
+      throw e;
+    }
   }
 
   @Get('dashboard-stats')
   async getMyDashboardStats(@CurrentUser() user: JwtPayloadUser) {
-    const student = await this.svService.getStudentByAccountId(user.sub);
-    return this.svService.getDashboardStats(student.id);
+    const studentId = await this.resolveStudentId(user);
+    return this.svService.getDashboardStats(studentId);
   }
 
   @Get('dashboard-stats/:studentId')
   async getDashboardStats(@CurrentUser() user: JwtPayloadUser) {
     // Luon lay stats cua sinh vien dang dang nhap de chong IDOR
-    const student = await this.svService.getStudentByAccountId(user.sub);
-    return this.svService.getDashboardStats(student.id);
+    const studentId = await this.resolveStudentId(user);
+    return this.svService.getDashboardStats(studentId);
   }
-
 }

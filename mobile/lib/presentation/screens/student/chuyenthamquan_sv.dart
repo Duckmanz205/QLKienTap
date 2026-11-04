@@ -432,8 +432,9 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
 
     return RefreshIndicator(
       onRefresh: () async {
-        if (ApiService.userId != null) {
-          await appStateProvider.fetchStudentDataFromApi(ApiService.userId!);
+        final activeId = ApiService.profileId ?? ApiService.userId;
+        if (activeId != null) {
+          await appStateProvider.fetchStudentDataFromApi(activeId);
           await _loadFactories();
         }
       },
@@ -1598,7 +1599,7 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
   }
 }
 
-class ChuyenThamQuanDetailSVScreen extends StatelessWidget {
+class ChuyenThamQuanDetailSVScreen extends StatefulWidget {
   final Trip trip;
   final VoidCallback onBack;
 
@@ -1609,7 +1610,18 @@ class ChuyenThamQuanDetailSVScreen extends StatelessWidget {
   });
 
   @override
+  State<ChuyenThamQuanDetailSVScreen> createState() =>
+      _ChuyenThamQuanDetailSVScreenState();
+}
+
+class _ChuyenThamQuanDetailSVScreenState
+    extends State<ChuyenThamQuanDetailSVScreen> {
+  bool _isRegistering = false;
+
+  @override
   Widget build(BuildContext context) {
+    final trip = widget.trip;
+    final onBack = widget.onBack;
     final appStateProvider = AppStateProvider.of(context);
 
     final hasValidHeroImage = trip.heroImage.trim().isNotEmpty &&
@@ -1677,30 +1689,43 @@ class ChuyenThamQuanDetailSVScreen extends StatelessWidget {
                 const SizedBox(height: 32),
                 if (!trip.isRegistered)
                   ElevatedButton(
-                    onPressed: () async {
-                      try {
-                        await appStateProvider.registerTrip(trip.id);
-                        if (context.mounted) {
-                          onBack();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Đăng ký thành công chuyến ${trip.name}')),
-                          );
-                        }
-                      } catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Đăng ký thất bại: $e')),
-                          );
-                        }
-                      }
-                    },
+                    onPressed: _isRegistering
+                        ? null
+                        : () async {
+                            setState(() => _isRegistering = true);
+                            try {
+                              await appStateProvider.registerTrip(trip.id);
+                              if (context.mounted) {
+                                onBack();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Đăng ký thành công chuyến ${trip.name}')),
+                                );
+                              }
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Đăng ký thất bại: $e')),
+                                );
+                              }
+                            } finally {
+                              if (mounted) {
+                                setState(() => _isRegistering = false);
+                              }
+                            }
+                          },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text('ĐĂNG KÝ THAM GIA CHUYẾN ĐI', style: TextStyle(fontWeight: FontWeight.bold)),
+                    child: _isRegistering
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          )
+                        : const Text('ĐĂNG KÝ THAM GIA CHUYẾN ĐI', style: TextStyle(fontWeight: FontWeight.bold)),
                   )
                 else
                   ElevatedButton(

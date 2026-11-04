@@ -4,6 +4,7 @@ export class JwtPayloadUser {
   sub: number;
   username: string;
   role: string;
+  profileId?: number;
   phai_doi_mat_khau?: boolean;
 }
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import {
   Plus, ChevronDown, Check, X, Calendar, Clock, MapPin,
@@ -12,6 +13,7 @@ import { getValidSession } from '../../utils/auth';
 import SearchableDropdown from '../../components/SearchableDropdown';
 
 export default function ChuyenThamQuan_DSLoc() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('khoa'); // 'khoa' | 'tudo'
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [emailSubject, setEmailSubject] = useState('');
@@ -1020,6 +1022,9 @@ export default function ChuyenThamQuan_DSLoc() {
 
                                         {t.trang_thai === 'DaChotDanhSach' && (
                                           <>
+                                            <button onClick={(e) => { e.stopPropagation(); navigate('/clb/registrations'); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#407F3E] hover:bg-green-50 flex items-center gap-2 transition-colors border-b border-slate-100">
+                                              <Users className="w-4 h-4 text-[#407F3E]" /> Quản lý duyệt / Chốt SV
+                                            </button>
                                             {t.trang_thai_sua_doi !== 'ChoDuyet' && (
                                               <button onClick={(e) => { e.stopPropagation(); handleEditClick(t); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors border-b border-slate-100">
                                                 <Edit className="w-4 h-4 text-orange-500" /> Sửa đổi khẩn cấp

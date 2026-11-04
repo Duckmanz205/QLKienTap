@@ -226,8 +226,9 @@ class _ThongBaoSVScreenState extends State<ThongBaoSVScreen> {
 
     return RefreshIndicator(
       onRefresh: () async {
-        if (ApiService.userId != null) {
-          await AppStateProvider.of(context).fetchStudentDataFromApi(ApiService.userId!);
+        final activeId = ApiService.profileId ?? ApiService.userId;
+        if (activeId != null) {
+          await AppStateProvider.of(context).fetchStudentDataFromApi(activeId);
         }
       },
       child: Column(

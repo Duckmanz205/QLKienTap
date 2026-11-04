@@ -824,7 +824,7 @@ export default function PlanManagement_Khoa() {
               {!isEditMode && (
                 <div>
                   <label className="flex items-center justify-between text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
-                    <span>Danh sách sinh viên ưu tiên (Excel)</span>
+                    <span>Danh sách sinh viên đăng ký học phần (Excel)</span>
                     <a href="/Mau_DanhSachSinhVien.xlsx" download className="text-[#407F3E] hover:underline normal-case font-medium flex items-center gap-1">
                       <Download className="w-3 h-3" /> Tải file mẫu
                     </a>

@@ -83,7 +83,7 @@ class _HoiDongChamBaoCaoDSBuoiGVScreenState extends State<HoiDongChamBaoCaoDSBuo
   }
 
   Future<void> _loadSessions() async {
-    final lecturerId = ApiService.userId;
+    final lecturerId = ApiService.profileId ?? ApiService.userId;
     if (lecturerId == null) return;
     setState(() => _isLoading = true);
     try {
