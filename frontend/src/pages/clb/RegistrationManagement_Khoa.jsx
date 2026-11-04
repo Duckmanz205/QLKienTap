@@ -121,7 +121,7 @@ export default function RegistrationManagement_Khoa() {
       // Fetch all cancel requests
       const res = await khoaApi.getRegistrations({ hasCancelRequest: true, limit: 1000 });
       const data = res.data?.data || res.data?.items || (Array.isArray(res.data) ? res.data : []);
-      const filtered = data.filter(r => r.yeuCauHuy && r.yeuCauHuy.trang_thai === 'ChoDuyet');
+      const filtered = data.filter(r => r.yeuCauHuy && (r.yeuCauHuy.trang_thai_duyet === 'ChoDuyet' || r.yeuCauHuy.trang_thai === 'ChoDuyet'));
       setGlobalCancelRequests(filtered);
     } catch (err) {
       console.error(err);
