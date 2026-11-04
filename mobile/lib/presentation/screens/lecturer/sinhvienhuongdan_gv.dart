@@ -20,6 +20,7 @@ class SinhVienHuongDanGVScreen extends StatefulWidget {
 class _SinhVienHuongDanGVScreenState extends State<SinhVienHuongDanGVScreen> {
   String _filter = 'all'; // 'all', 'graded', 'ungraded'
   String _filterCompany = 'Tất cả';
+  String _filterTerm = 'Tất cả đợt';
   bool _isLocking = false;
 
   @override
@@ -93,6 +94,9 @@ class _SinhVienHuongDanGVScreenState extends State<SinhVienHuongDanGVScreen> {
     final appState = appStateProvider.state;
 
     final allStudents = appState.lecturerStudents;
+    final gradedCount = allStudents.where((s) => s.papersLeft == 0).length;
+    final ungradedCount = allStudents.where((s) => s.papersLeft > 0).length;
+
     final uniqueClasses = allStudents
         .map((s) => s.className.trim())
         .where((c) => c.isNotEmpty && c != '--')
@@ -108,7 +112,21 @@ class _SinhVienHuongDanGVScreenState extends State<SinhVienHuongDanGVScreen> {
         .toList()
       ..sort();
 
+    final uniqueTerms = allStudents
+        .map((s) => s.termName?.trim() ?? '')
+        .where((t) => t.isNotEmpty && t != 'N/A')
+        .toSet()
+        .toList()
+      ..sort();
+    final termOptions = ['Tất cả đợt', ...uniqueTerms];
+
     final filtered = allStudents.where((s) {
+      if (_filterTerm != 'Tất cả đợt' && (s.termName ?? '') != _filterTerm) {
+        return false;
+      }
+      if (_filterCompany != 'Tất cả' && s.company != _filterCompany) {
+        return false;
+      }
       if (_filter == 'graded') return s.papersLeft == 0;
       if (_filter == 'ungraded') return s.papersLeft > 0;
       return true;
@@ -133,9 +151,9 @@ class _SinhVienHuongDanGVScreenState extends State<SinhVienHuongDanGVScreen> {
                 children: [
                   _buildFilterTab('all', 'Tất cả (${allStudents.length})'),
                   const SizedBox(width: 8),
-                  _buildFilterTab('graded', 'Đã chấm đủ'),
+                  _buildFilterTab('graded', 'Đã chấm đủ ($gradedCount)'),
                   const SizedBox(width: 8),
-                  _buildFilterTab('ungraded', 'Chưa xong'),
+                  _buildFilterTab('ungraded', 'Chưa xong ($ungradedCount)'),
                 ],
               ),
               const SizedBox(height: 10),
@@ -144,7 +162,11 @@ class _SinhVienHuongDanGVScreenState extends State<SinhVienHuongDanGVScreen> {
                 child: OutlinedButton.icon(
                   onPressed: _isLocking ? null : () {
                     final students = AppStateProvider.of(context).state.lecturerStudents;
-                    final dotId = students.map((s) => s.dotKienTapId).firstWhere((id) => id != null && id > 0, orElse: () => 2) ?? 2;
+                    final activeStudent = students.firstWhere(
+                      (s) => !s.isScoreLocked && s.dotKienTapId != null && s.dotKienTapId! > 0,
+                      orElse: () => students.firstWhere((s) => s.dotKienTapId != null && s.dotKienTapId! > 0, orElse: () => students.first),
+                    );
+                    final dotId = activeStudent.dotKienTapId ?? 7;
                     _lockAllGuidedReports(dotId);
                   },
                   icon: _isLocking
@@ -171,41 +193,83 @@ class _SinhVienHuongDanGVScreenState extends State<SinhVienHuongDanGVScreen> {
             itemName: 'sinh viên',
             verticalFilters: false,
             headerWidgetBuilder: (items) {
-              if (uniqueCompanies.isEmpty) return const SizedBox.shrink();
-              final companyList = ['Tất cả', ...uniqueCompanies];
-              return Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                child: SizedBox(
-                  height: 34,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: companyList.length,
-                    separatorBuilder: (context, index) => const SizedBox(width: 8),
-                    itemBuilder: (context, idx) {
-                      final comp = companyList[idx];
-                      final isSelected = _filterCompany == comp;
-                      return ChoiceChip(
-                        label: Text(
-                          comp,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                            color: isSelected ? Colors.white : AppColors.darkSlate,
-                          ),
+              final companyList = uniqueCompanies.isNotEmpty ? ['Tất cả', ...uniqueCompanies] : <String>[];
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (uniqueTerms.length > 1) ...[
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 6, 16, 2),
+                      child: SizedBox(
+                        height: 32,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: termOptions.length,
+                          separatorBuilder: (context, index) => const SizedBox(width: 8),
+                          itemBuilder: (context, idx) {
+                            final term = termOptions[idx];
+                            final isSelected = _filterTerm == term;
+                            return ChoiceChip(
+                              label: Text(
+                                term,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                  color: isSelected ? Colors.white : AppColors.darkSlate,
+                                ),
+                              ),
+                              selected: isSelected,
+                              selectedColor: Colors.blue.shade700,
+                              backgroundColor: Colors.white,
+                              side: BorderSide(
+                                color: isSelected ? Colors.blue.shade700 : AppColors.beigeBorder,
+                              ),
+                              onSelected: (val) {
+                                if (val) setState(() => _filterTerm = term);
+                              },
+                            );
+                          },
                         ),
-                        selected: isSelected,
-                        selectedColor: AppColors.primary,
-                        backgroundColor: Colors.white,
-                        side: BorderSide(
-                          color: isSelected ? AppColors.primary : AppColors.beigeBorder,
+                      ),
+                    ),
+                  ],
+                  if (companyList.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+                      child: SizedBox(
+                        height: 32,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: companyList.length,
+                          separatorBuilder: (context, index) => const SizedBox(width: 8),
+                          itemBuilder: (context, idx) {
+                            final comp = companyList[idx];
+                            final isSelected = _filterCompany == comp;
+                            return ChoiceChip(
+                              label: Text(
+                                comp,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                  color: isSelected ? Colors.white : AppColors.darkSlate,
+                                ),
+                              ),
+                              selected: isSelected,
+                              selectedColor: AppColors.primary,
+                              backgroundColor: Colors.white,
+                              side: BorderSide(
+                                color: isSelected ? AppColors.primary : AppColors.beigeBorder,
+                              ),
+                              onSelected: (val) {
+                                if (val) setState(() => _filterCompany = comp);
+                              },
+                            );
+                          },
                         ),
-                        onSelected: (val) {
-                          if (val) setState(() => _filterCompany = comp);
-                        },
-                      );
-                    },
-                  ),
-                ),
+                      ),
+                    ),
+                  ],
+                ],
               );
             },
             filter: (student, query, selectedClass) {
@@ -265,6 +329,28 @@ class _SinhVienHuongDanGVScreenState extends State<SinhVienHuongDanGVScreen> {
 
                       Row(
                         children: [
+                          if (student.termName != null && student.termName!.isNotEmpty) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: (student.dotKienTapId == 7 || student.termName == 'Đợt 2')
+                                    ? Colors.blue.withValues(alpha: 0.15)
+                                    : Colors.purple.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                student.termName!,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: (student.dotKienTapId == 7 || student.termName == 'Đợt 2')
+                                      ? Colors.blue.shade700
+                                      : Colors.purple.shade700,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(

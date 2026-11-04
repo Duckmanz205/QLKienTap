@@ -491,6 +491,8 @@ class StudentTermGrade {
   });
 
   bool get isPassed {
+    if (trangThai == 'Dat') return true;
+    if (trangThai == 'KhongDat') return false;
     if (diemTongKet != null) {
       return diemTongKet! >= 5.0;
     }
@@ -754,6 +756,7 @@ class LecturerStudent {
   final bool isGraded;
   final String tourId;
   final int? dotKienTapId;
+  final String? termName;
   final String? reportFileUrl;
   final String? confirmationFileUrl;
   final bool isScoreLocked;
@@ -779,6 +782,7 @@ class LecturerStudent {
     required this.isGraded,
     required this.tourId,
     this.dotKienTapId,
+    this.termName,
     this.reportFileUrl,
     this.confirmationFileUrl,
     this.isScoreLocked = false,
@@ -794,6 +798,9 @@ class LecturerStudent {
     double? gvhdGrade,
     String? comment,
     bool? isGraded,
+    int? papersLeft,
+    int? dotKienTapId,
+    String? termName,
     String? reportFileUrl,
     String? confirmationFileUrl,
     bool? isScoreLocked,
@@ -806,7 +813,7 @@ class LecturerStudent {
       className: className,
       company: company,
       completedTours: completedTours,
-      papersLeft: papersLeft,
+      papersLeft: papersLeft ?? this.papersLeft,
       avatar: avatar,
       submittedDate: submittedDate,
       attendanceStatus: attendanceStatus ?? this.attendanceStatus,
@@ -818,6 +825,8 @@ class LecturerStudent {
       comment: comment ?? this.comment,
       isGraded: isGraded ?? this.isGraded,
       tourId: tourId,
+      dotKienTapId: dotKienTapId ?? this.dotKienTapId,
+      termName: termName ?? this.termName,
       reportFileUrl: reportFileUrl ?? this.reportFileUrl,
       confirmationFileUrl: confirmationFileUrl ?? this.confirmationFileUrl,
       isScoreLocked: isScoreLocked ?? this.isScoreLocked,
