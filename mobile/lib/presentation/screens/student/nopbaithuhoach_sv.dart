@@ -7,6 +7,7 @@ import '../../../data/models/app_models.dart';
 import '../../../data/state/app_state.dart';
 import '../../widgets/paginated_list.dart';
 import 'kiemtra_baocao_sv.dart';
+import '../shared/pdf_viewer_screen.dart';
 
 class NopBaiThuHoachSVScreen extends StatefulWidget {
   const NopBaiThuHoachSVScreen({super.key});
@@ -811,6 +812,16 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
                       );
                       return;
                     }
+                    if (sub.isTuDo && !isConfirmUploaded && (sub.fileXacNhanUrl == null || sub.fileXacNhanUrl!.isEmpty)) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Text('Chuyến tự do bắt buộc phải nộp Giấy xác nhận tham quan doanh nghiệp trước khi nộp bài thu hoạch.'),
+                          backgroundColor: Colors.orange.shade800,
+                        ),
+                      );
+                      return;
+                    }
+
                     try {
                       final pickerResult = await FilePicker.pickFiles(
                         type: FileType.custom,
@@ -900,7 +911,7 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
                   ],
                 ),
 
-                if (sub.tripName.contains('Cát Lái') || sub.typeText.contains('tự do')) ...[
+                if (sub.isTuDo || sub.tripName.contains('Cát Lái') || sub.typeText.contains('tự do')) ...[
                   const SizedBox(height: 12),
                   _buildUploadDropzone(
                     title: 'Giấy xác nhận tham quan (bắt buộc)',
@@ -909,11 +920,16 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
                     fileName: _uploadedConfirms[sub.id] ?? sub.confirmationFileName,
                     fileSize: isConfirmUploaded ? 'Đã đính kèm' : null,
                     onViewTap: sub.fileXacNhanUrl != null
-                        ? () async {
-                            final uri = Uri.parse(sub.fileXacNhanUrl!);
-                            if (await canLaunchUrl(uri)) {
-                              await launchUrl(uri, mode: LaunchMode.externalApplication);
-                            }
+                        ? () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => PdfViewerScreen(
+                                  title: 'Giấy xác nhận - ${sub.tripName}',
+                                  pdfUrl: sub.fileXacNhanUrl!,
+                                ),
+                              ),
+                            );
                           }
                         : null,
                     onTap: () async {

@@ -328,9 +328,10 @@ export class CreateTripDto {
 }
 
 export class CancelTripDto {
-  @IsInt()
-  @Min(1)
-  tripId: number;
+  @IsOptional()
+  @IsInt({ message: 'Mã chuyến tham quan (tripId) phải là số nguyên' })
+  @Min(1, { message: 'Mã chuyến tham quan (tripId) phải lớn hơn hoặc bằng 1' })
+  tripId?: number;
 
   @IsString({ message: 'Lý do hủy không được để trống' })
   @MinLength(5, { message: 'Lý do hủy phải có ít nhất 5 ký tự' })

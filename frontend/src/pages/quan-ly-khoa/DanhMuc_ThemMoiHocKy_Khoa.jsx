@@ -1,14 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { Edit2, Plus, Calendar, Trash2, X, ChevronDown, Check, Search } from 'lucide-react';
+import { Edit2, Plus, Calendar, Trash2, X, ChevronDown, Check, Search, Lock } from 'lucide-react';
 import { khoaApi } from '../../services/api';
 import Toast from '../../components/Toast';
 import SearchableDropdown from '../../components/SearchableDropdown';
+import ConfirmModal from '../../components/ConfirmModal';
 
 export default function DanhMucNen_ThemMoiHocKy_Khoa() {
   const [activeTab, setActiveTab] = useState('nam-hoc');
   const [years, setYears] = useState([]);
   const [terms, setTerms] = useState([]);
   const [courses, setCourses] = useState([]);
+
+  // Confirmation modal state
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    actionType: 'delete',
+    onConfirm: null,
+  });
 
   // Toast state
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
@@ -76,9 +86,9 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
     try {
       if (activeTab === 'nam-hoc') {
         if (!tenNamHoc) { setToast({ show: true, message: 'Vui lòng nhập tên năm học', type: 'error' }); return; }
-        const yearMatch = tenNamHoc.trim().match(/^(\d{4})-(\d{4})$/);
+        const yearMatch = tenNamHoc.trim().match(/^(\d{4})\s*[-–—]\s*(\d{4})$/);
         if (!yearMatch) {
-          setToast({ show: true, message: 'Tên năm học phải có định dạng YYYY-YYYY (Ví dụ: 2024-2025)', type: 'error' });
+          setToast({ show: true, message: 'Tên năm học phải có định dạng YYYY-YYYY (Ví dụ: 2026-2027)', type: 'error' });
           return;
         }
         const y1 = parseInt(yearMatch[1], 10);
@@ -98,6 +108,19 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
         setToast({ show: true, message: 'Thêm mới năm học thành công!', type: 'success' });
       } else if (activeTab === 'hoc-ky') {
         if (!tenHocKy || !selectedNamHoc) { setToast({ show: true, message: 'Vui lòng nhập tên học kỳ và chọn năm học', type: 'error' }); return; }
+        const cleanTenHocKy = tenHocKy.trim().replace(/\s+/g, ' ');
+        if (cleanTenHocKy.length > 20) {
+          setToast({ show: true, message: 'Tên học kỳ không được vượt quá 20 ký tự (chuẩn CSDL NVARCHAR(20))', type: 'error' });
+          return;
+        }
+        const isDup = terms.some(
+          t => Number(t.nam_hoc_id) === Number(selectedNamHoc) &&
+               t.ten_hoc_ky.trim().replace(/\s+/g, ' ').toLowerCase() === cleanTenHocKy.toLowerCase()
+        );
+        if (isDup) {
+          setToast({ show: true, message: `Học kỳ "${cleanTenHocKy}" đã tồn tại trong năm học này. Vui lòng chọn tên khác!`, type: 'error' });
+          return;
+        }
         if (!ngayBatDau || !ngayKetThuc) { setToast({ show: true, message: 'Vui lòng chọn ngày bắt đầu và kết thúc', type: 'error' }); return; }
         if (new Date(ngayKetThuc) <= new Date(ngayBatDau)) { setToast({ show: true, message: 'Ngày kết thúc phải lớn hơn ngày bắt đầu', type: 'error' }); return; }
 
@@ -119,7 +142,7 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
         }
 
         await khoaApi.createTerm({
-          ten_hoc_ky: tenHocKy,
+          ten_hoc_ky: cleanTenHocKy,
           nam_hoc_id: selectedNamHoc,
           ngay_bat_dau: ngayBatDau,
           ngay_ket_thuc: ngayKetThuc
@@ -165,9 +188,9 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
     try {
       if (editingItem.type === 'nam-hoc') {
         if (!editFormData.ten_nam_hoc) { setToast({ show: true, message: 'Vui lòng nhập tên năm học', type: 'error' }); return; }
-        const yearMatch = editFormData.ten_nam_hoc.trim().match(/^(\d{4})-(\d{4})$/);
+        const yearMatch = editFormData.ten_nam_hoc.trim().match(/^(\d{4})\s*[-–—]\s*(\d{4})$/);
         if (!yearMatch) {
-          setToast({ show: true, message: 'Tên năm học phải có định dạng YYYY-YYYY (Ví dụ: 2024-2025)', type: 'error' });
+          setToast({ show: true, message: 'Tên năm học phải có định dạng YYYY-YYYY (Ví dụ: 2026-2027)', type: 'error' });
           return;
         }
         const y1 = parseInt(yearMatch[1], 10);
@@ -180,11 +203,27 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
         if (new Date(editFormData.ngay_ket_thuc) <= new Date(editFormData.ngay_bat_dau)) { setToast({ show: true, message: 'Ngày kết thúc phải lớn hơn ngày bắt đầu', type: 'error' }); return; }
         await khoaApi.updateYear(editingItem.id, { ...editFormData, ten_nam_hoc: `${y1}-${y2}` });
       } else if (editingItem.type === 'hoc-ky') {
+        if (!editFormData.ten_hoc_ky) { setToast({ show: true, message: 'Vui lòng nhập tên học kỳ', type: 'error' }); return; }
+        const cleanTenHocKy = editFormData.ten_hoc_ky.trim().replace(/\s+/g, ' ');
+        if (cleanTenHocKy.length > 20) {
+          setToast({ show: true, message: 'Tên học kỳ không được vượt quá 20 ký tự (chuẩn CSDL NVARCHAR(20))', type: 'error' });
+          return;
+        }
+        const targetYearId = editFormData.nam_hoc_id;
+        const isDup = terms.some(
+          t => t.id !== editingItem.id &&
+               Number(t.nam_hoc_id) === Number(targetYearId) &&
+               t.ten_hoc_ky.trim().replace(/\s+/g, ' ').toLowerCase() === cleanTenHocKy.toLowerCase()
+        );
+        if (isDup) {
+          setToast({ show: true, message: `Học kỳ "${cleanTenHocKy}" đã tồn tại trong năm học này. Vui lòng chọn tên khác!`, type: 'error' });
+          return;
+        }
         if (!editFormData.ngay_bat_dau || !editFormData.ngay_ket_thuc) { setToast({ show: true, message: 'Vui lòng chọn ngày bắt đầu và kết thúc', type: 'error' }); return; }
         if (new Date(editFormData.ngay_ket_thuc) <= new Date(editFormData.ngay_bat_dau)) { setToast({ show: true, message: 'Ngày kết thúc phải lớn hơn ngày bắt đầu', type: 'error' }); return; }
 
         // Kiểm tra thời gian học kỳ phải nằm trong năm học đã chọn
-        const targetYearId = editFormData.nam_hoc_id;
+        
         const selectedYearObj = years.find(y => y.id === Number(targetYearId));
         if (selectedYearObj && selectedYearObj.ngay_bat_dau && selectedYearObj.ngay_ket_thuc) {
           const yStart = selectedYearObj.ngay_bat_dau.substring(0, 10);
@@ -203,7 +242,7 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
           }
         }
 
-        await khoaApi.updateTerm(editingItem.id, editFormData);
+        await khoaApi.updateTerm(editingItem.id, { ...editFormData, ten_hoc_ky: cleanTenHocKy });
       } else if (editingItem.type === 'khoa') {
         await khoaApi.updateCourse(editingItem.id, editFormData);
       }
@@ -218,10 +257,31 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
     }
   };
 
-  const handleDelete = async (id, type) => {
-    const confirmMsg = 'Bạn có chắc chắn muốn xóa mục này?';
-    if (!window.confirm(confirmMsg)) return;
+  const promptDelete = (id, type, name) => {
+    let title = 'Xác nhận xóa';
+    let message = 'Bạn có chắc chắn muốn xóa mục này? Hành động này không thể hoàn tác.';
+    if (type === 'nam-hoc') {
+      title = 'Xác nhận xóa Năm học';
+      message = `Bạn có chắc chắn muốn xóa năm học "${name}" không? Toàn bộ học kỳ trực thuộc có thể bị ảnh hưởng.`;
+    } else if (type === 'hoc-ky') {
+      title = 'Xác nhận xóa Học kỳ';
+      message = `Bạn có chắc chắn muốn xóa học kỳ "${name}" không?`;
+    } else if (type === 'khoa') {
+      title = 'Xác nhận xóa Khóa học';
+      message = `Bạn có chắc chắn muốn xóa khóa học "${name}" không?`;
+    }
 
+    setConfirmModal({
+      isOpen: true,
+      title,
+      message,
+      actionType: 'delete',
+      onConfirm: () => executeDelete(id, type),
+    });
+  };
+
+  const executeDelete = async (id, type) => {
+    setConfirmModal(prev => ({ ...prev, isOpen: false }));
     try {
       if (type === 'nam-hoc') {
         await khoaApi.deleteYear(id);
@@ -256,6 +316,16 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
   return (
     <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-2">
       <Toast show={toast.show} message={toast.message} type={toast.type} onClose={() => setToast({ show: false, message: '', type: 'success' })} />
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        actionType={confirmModal.actionType}
+        confirmText="Xóa"
+        cancelText="Hủy"
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-800">Quản lý danh mục</h1>
         <p className="text-sm text-slate-500 mt-1">Quản lý các danh mục cơ sở của hệ thống</p>
@@ -339,7 +409,16 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
           <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
             {activeTab === 'nam-hoc' && paginatedYears.map(y => (
               <tr key={y.id} onClick={() => handleOpenView(y, 'nam-hoc')} className="hover:bg-slate-50 transition-colors cursor-pointer group">
-                <td className="p-4 font-semibold text-[#407F3E] group-hover:underline">{y.ten_nam_hoc}</td>
+                <td className="p-4 font-semibold text-[#407F3E] group-hover:underline">
+                  <div className="flex items-center gap-2">
+                    <span>{y.ten_nam_hoc}</span>
+                    {y.dot_kien_tap_count > 0 && (
+                      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-normal">
+                        <Lock className="w-3 h-3 text-emerald-600" /> {y.dot_kien_tap_count} đợt
+                      </span>
+                    )}
+                  </div>
+                </td>
                 <td className="p-4 text-slate-600">{y.ngay_bat_dau ? new Date(y.ngay_bat_dau).toLocaleDateString('vi-VN') : '-'}</td>
                 <td className="p-4 text-slate-600">{y.ngay_ket_thuc ? new Date(y.ngay_ket_thuc).toLocaleDateString('vi-VN') : '-'}</td>
                 <td className="p-4 text-right" onClick={(e) => e.stopPropagation()}>
@@ -347,7 +426,16 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
                     <button onClick={(e) => { e.stopPropagation(); handleOpenEdit(y, 'nam-hoc'); }} className="p-1.5 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded transition-colors cursor-pointer" title="Sửa">
                       <Edit2 className="w-4 h-4" />
                     </button>
-                    <button onClick={(e) => { e.stopPropagation(); handleDelete(y.id, 'nam-hoc'); }} className="p-1.5 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded transition-colors cursor-pointer" title="Xóa">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); promptDelete(y.id, 'nam-hoc', y.ten_nam_hoc); }}
+                      disabled={y.has_dots}
+                      className={`p-1.5 rounded transition-colors ${
+                        y.has_dots
+                          ? 'text-slate-300 cursor-not-allowed'
+                          : 'hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 text-slate-400 cursor-pointer'
+                      }`}
+                      title={y.has_dots ? `Không thể xóa vì năm học có ${y.dot_kien_tap_count} đợt kiến tập` : 'Xóa'}
+                    >
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -360,7 +448,16 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
 
             {activeTab === 'hoc-ky' && paginatedTerms.map(t => (
               <tr key={t.id} onClick={() => handleOpenView(t, 'hoc-ky')} className="hover:bg-slate-50 transition-colors cursor-pointer group">
-                <td className="p-4 font-semibold text-[#407F3E] group-hover:underline">{t.ten_hoc_ky}</td>
+                <td className="p-4 font-semibold text-[#407F3E] group-hover:underline">
+                  <div className="flex items-center gap-2">
+                    <span>{t.ten_hoc_ky}</span>
+                    {t.dot_kien_tap_count > 0 && (
+                      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-normal">
+                        <Lock className="w-3 h-3 text-emerald-600" /> {t.dot_kien_tap_count} đợt
+                      </span>
+                    )}
+                  </div>
+                </td>
                 <td className="p-4 text-slate-600">{t.namHoc?.ten_nam_hoc}</td>
                 <td className="p-4 text-slate-600">{t.ngay_bat_dau ? new Date(t.ngay_bat_dau).toLocaleDateString('vi-VN') : '-'}</td>
                 <td className="p-4 text-slate-600">{t.ngay_ket_thuc ? new Date(t.ngay_ket_thuc).toLocaleDateString('vi-VN') : '-'}</td>
@@ -369,7 +466,16 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
                     <button onClick={(e) => { e.stopPropagation(); handleOpenEdit(t, 'hoc-ky'); }} className="p-1.5 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded transition-colors cursor-pointer" title="Sửa">
                       <Edit2 className="w-4 h-4" />
                     </button>
-                    <button onClick={(e) => { e.stopPropagation(); handleDelete(t.id, 'hoc-ky'); }} className="p-1.5 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded transition-colors cursor-pointer" title="Xóa">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); promptDelete(t.id, 'hoc-ky', t.ten_hoc_ky); }}
+                      disabled={t.has_dots}
+                      className={`p-1.5 rounded transition-colors ${
+                        t.has_dots
+                          ? 'text-slate-300 cursor-not-allowed'
+                          : 'hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 text-slate-400 cursor-pointer'
+                      }`}
+                      title={t.has_dots ? `Không thể xóa vì học kỳ có ${t.dot_kien_tap_count} đợt kiến tập` : 'Xóa'}
+                    >
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -390,7 +496,7 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
                     <button onClick={(e) => { e.stopPropagation(); handleOpenEdit(c, 'khoa'); }} className="p-1.5 hover:text-[#407F3E] hover:bg-[#407F3E]/10 rounded transition-colors cursor-pointer" title="Sửa">
                       <Edit2 className="w-4 h-4" />
                     </button>
-                    <button onClick={(e) => { e.stopPropagation(); handleDelete(c.id, 'khoa'); }} className="p-1.5 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded transition-colors cursor-pointer" title="Xóa">
+                    <button onClick={(e) => { e.stopPropagation(); promptDelete(c.id, 'khoa', c.ten_khoa_hoc); }} className="p-1.5 hover:text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded transition-colors cursor-pointer" title="Xóa">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -525,20 +631,6 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
                 <>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                      Tên học kỳ <span className="text-[#E68A8C]">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={tenHocKy}
-                      onChange={(e) => setTenHocKy(e.target.value)}
-                      placeholder="Học kỳ 1"
-                      required
-                      className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">
                       Năm học <span className="text-[#E68A8C]">*</span>
                     </label>
                     <SearchableDropdown
@@ -551,12 +643,49 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
                     />
                     {(() => {
                       const selYear = years.find(y => y.id === Number(selectedNamHoc));
-                      if (selYear && selYear.ngay_bat_dau && selYear.ngay_ket_thuc) {
-                        const sVN = new Date(selYear.ngay_bat_dau).toLocaleDateString('vi-VN');
-                        const eVN = new Date(selYear.ngay_ket_thuc).toLocaleDateString('vi-VN');
-                        return (
-                          <p className="text-xs text-[#407F3E] font-medium mt-1.5 flex items-center gap-1 bg-[#407F3E]/10 px-3 py-1.5 rounded-lg border border-[#407F3E]/20">
+                      if (!selYear) return null;
+                      const sVN = selYear.ngay_bat_dau ? new Date(selYear.ngay_bat_dau).toLocaleDateString('vi-VN') : '';
+                      const eVN = selYear.ngay_ket_thuc ? new Date(selYear.ngay_ket_thuc).toLocaleDateString('vi-VN') : '';
+                      if (!sVN || !eVN) return null;
+                      return (
+                        <div className="mt-2">
+                          <p className="text-xs text-[#407F3E] font-medium flex items-center gap-1 bg-[#407F3E]/10 px-3 py-1.5 rounded-lg border border-[#407F3E]/20">
                             <span>ℹ️ Năm học diễn ra từ <strong>{sVN}</strong> đến <strong>{eVN}</strong></span>
+                          </p>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between items-center mb-1.5">
+                      <label className="block text-sm font-semibold text-slate-700">
+                        Tên học kỳ <span className="text-[#E68A8C]">*</span>
+                      </label>
+                      <span className="text-xs text-slate-400">{tenHocKy.length}/20</span>
+                    </div>
+                    <input
+                      type="text"
+                      value={tenHocKy}
+                      onChange={(e) => setTenHocKy(e.target.value)}
+                      maxLength={20}
+                      placeholder="VD: Học kỳ 2"
+                      required
+                      className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#407F3E] focus:ring-1 focus:ring-[#407F3E] transition-all"
+                    />
+
+                    {/* Realtime duplicate warning */}
+                    {(() => {
+                      if (!selectedNamHoc || !tenHocKy.trim()) return null;
+                      const clean = tenHocKy.trim().replace(/\s+/g, ' ').toLowerCase();
+                      const matched = terms.find(
+                        t => Number(t.nam_hoc_id) === Number(selectedNamHoc) &&
+                             t.ten_hoc_ky.trim().replace(/\s+/g, ' ').toLowerCase() === clean
+                      );
+                      if (matched) {
+                        return (
+                          <p className="text-xs text-rose-600 font-semibold mt-2 p-2 bg-rose-50 border border-rose-200 rounded-lg flex items-center gap-1.5">
+                            <span>⚠️ Học kỳ "{tenHocKy.trim()}" đã tồn tại trong năm học này. Vui lòng chọn tên khác!</span>
                           </p>
                         );
                       }
@@ -671,11 +800,18 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">Tên năm học <span className="text-[#E68A8C]">*</span></label>
                     <input
                       type="text"
+                      disabled={editingItem.has_active_dots}
                       value={editFormData.ten_nam_hoc}
                       onChange={(e) => setEditFormData({ ...editFormData, ten_nam_hoc: e.target.value })}
                       required
-                      className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:border-[#407F3E]"
+                      className={`w-full px-4 py-2.5 border rounded-lg text-sm ${editingItem.has_active_dots ? 'bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed' : 'border-[#E7E0C4] focus:border-[#407F3E]'}`}
                     />
+                    {editingItem.has_active_dots && (
+                      <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 mt-1.5 flex items-center gap-1.5">
+                        <Lock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                        <span>Năm học đang có đợt kiến tập ({editingItem.active_dot_names?.join(', ')}) nên bị khóa đổi tên.</span>
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">Ngày bắt đầu</label>
@@ -701,25 +837,51 @@ export default function DanhMucNen_ThemMoiHocKy_Khoa() {
               {editingItem.type === 'hoc-ky' && (
                 <>
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Tên học kỳ <span className="text-[#E68A8C]">*</span></label>
+                    <div className="flex justify-between items-center mb-1.5">
+                      <label className="block text-sm font-semibold text-slate-700">Tên học kỳ <span className="text-[#E68A8C]">*</span></label>
+                      <span className="text-xs text-slate-400">{(editFormData.ten_hoc_ky || '').length}/20</span>
+                    </div>
                     <input
                       type="text"
+                      disabled={editingItem.has_active_dots}
+                      maxLength={20}
                       value={editFormData.ten_hoc_ky}
                       onChange={(e) => setEditFormData({ ...editFormData, ten_hoc_ky: e.target.value })}
                       required
-                      className="w-full px-4 py-2.5 border border-[#E7E0C4] rounded-lg text-sm focus:border-[#407F3E]"
+                      className={`w-full px-4 py-2.5 border rounded-lg text-sm ${editingItem.has_active_dots ? 'bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed' : 'border-[#E7E0C4] focus:border-[#407F3E]'}`}
                     />
+                    {editingItem.has_active_dots && (
+                      <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 mt-1.5 flex items-center gap-1.5">
+                        <Lock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                        <span>Học kỳ đang có đợt kiến tập ({editingItem.active_dot_names?.join(', ')}) nên bị khóa đổi tên.</span>
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">Năm học <span className="text-[#E68A8C]">*</span></label>
-                    <SearchableDropdown
-                      options={years.map(y => ({ value: y.id, label: y.ten_nam_hoc }))}
-                      value={editFormData.nam_hoc_id}
-                      onChange={(val) => setEditFormData({ ...editFormData, nam_hoc_id: val })}
-                      placeholder="Chọn năm học"
-                      searchPlaceholder="Tìm năm học..."
-                      className="w-full"
-                    />
+                    {editingItem.has_dots ? (
+                      <div>
+                        <input
+                          type="text"
+                          disabled
+                          value={years.find(y => y.id === Number(editFormData.nam_hoc_id))?.ten_nam_hoc || ''}
+                          className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-sm text-slate-500 cursor-not-allowed font-medium"
+                        />
+                        <p className="text-xs text-amber-700 mt-1 flex items-center gap-1">
+                          <Lock className="w-3.5 h-3.5 text-amber-600" />
+                          <span>Không thể đổi năm học vì học kỳ đã được gắn vào {editingItem.dot_kien_tap_count} đợt kiến tập.</span>
+                        </p>
+                      </div>
+                    ) : (
+                      <SearchableDropdown
+                        options={years.map(y => ({ value: y.id, label: y.ten_nam_hoc }))}
+                        value={editFormData.nam_hoc_id}
+                        onChange={(val) => setEditFormData({ ...editFormData, nam_hoc_id: val })}
+                        placeholder="Chọn năm học"
+                        searchPlaceholder="Tìm năm học..."
+                        className="w-full"
+                      />
+                    )}
                     {(() => {
                       const selYear = years.find(y => y.id === Number(editFormData.nam_hoc_id));
                       if (selYear && selYear.ngay_bat_dau && selYear.ngay_ket_thuc) {

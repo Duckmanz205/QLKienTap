@@ -165,8 +165,11 @@ export class ClbController {
   async cancelTrip(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: CancelTripDto,
+    @CurrentUser() user: JwtPayloadUser,
   ) {
-    return this.khoaService.cancelTrip(id, body.lyDoHuy);
+    const tripId = id || body.tripId!;
+    const userAccountId = user?.sub || (user as any)?.id || (user as any)?.userId;
+    return this.khoaService.cancelTrip(tripId, body.lyDoHuy, userAccountId);
   }
   @Patch('trips/:id/reopen')
   async reopenTripRegistration(@Param('id', ParseIntPipe) id: number) {
@@ -204,8 +207,10 @@ export class ClbController {
   }
 
   @Get('lecturers-with-workload')
-  async getLecturersWithWorkload() {
-    return this.khoaService.getLecturersWithWorkload();
+  async getLecturersWithWorkload(@Query('dotKienTapId') dotKienTapId?: string) {
+    return this.khoaService.getLecturersWithWorkload(
+      dotKienTapId ? parseInt(dotKienTapId) : undefined,
+    );
   }
 
   @Post('assign-gvdd')

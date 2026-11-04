@@ -209,15 +209,20 @@ export class KhoaService implements OnModuleInit {
     return dateStr;
   }
 
-  private validateYearName(name: string): { startYear: number; endYear: number } {
+  private validateYearName(name: string): {
+    startYear: number;
+    endYear: number;
+    normalizedName: string;
+  } {
     if (!name || typeof name !== 'string') {
       throw new BadRequestException('Tên năm học không được để trống');
     }
     const trimmed = name.trim();
-    const match = trimmed.match(/^(\d{4})-(\d{4})$/);
+    // Cho phép khoảng trắng linh hoạt quanh dấu gạch ngang (2026 - 2027, 2026-2027)
+    const match = trimmed.match(/^(\d{4})\s*[-–—]\s*(\d{4})$/);
     if (!match) {
       throw new BadRequestException(
-        'Tên năm học phải có định dạng YYYY-YYYY (Ví dụ: 2024-2025)',
+        'Tên năm học phải có định dạng YYYY-YYYY (Ví dụ: 2026-2027)',
       );
     }
     const startYear = parseInt(match[1], 10);
@@ -227,19 +232,45 @@ export class KhoaService implements OnModuleInit {
         `Năm kết thúc (${endYear}) phải bằng năm bắt đầu (${startYear}) + 1 (Ví dụ: ${startYear}-${startYear + 1})`,
       );
     }
-    return { startYear, endYear };
+    const normalizedName = `${startYear}-${endYear}`;
+    return { startYear, endYear, normalizedName };
   }
 
   async getYears() {
-    return this.namHocRepo.find({ order: { ten_nam_hoc: 'DESC' } });
+    const years = await this.namHocRepo.find({ order: { ten_nam_hoc: 'DESC' } });
+    const terms = await this.hocKyRepo.find({
+      select: { id: true, nam_hoc_id: true },
+    });
+    const dots = await this.dotRepo.find({
+      select: { id: true, hoc_ky_id: true, trang_thai: true, ten_dot: true },
+    });
+
+    return years.map((y) => {
+      const yearTermIds = terms
+        .filter((t) => t.nam_hoc_id === y.id)
+        .map((t) => t.id);
+      const relatedDots = dots.filter(
+        (d) => yearTermIds.includes(d.hoc_ky_id) && d.trang_thai !== 'DaHuy',
+      );
+      const activeDots = relatedDots.filter((d) =>
+        ['DangTrienKhai', 'DaKetThuc', 'DaKhoa'].includes(d.trang_thai),
+      );
+      return {
+        ...y,
+        dot_kien_tap_count: relatedDots.length,
+        has_active_dots: activeDots.length > 0,
+        has_dots: relatedDots.length > 0,
+        active_dot_names: activeDots.map((d) => d.ten_dot),
+      };
+    });
   }
 
   async createYear(data: Partial<NamHoc>) {
     if (!data.ten_nam_hoc) {
       throw new BadRequestException('Tên năm học không được để trống');
     }
-    const { startYear, endYear } = this.validateYearName(data.ten_nam_hoc);
-    const tenNamHoc = `${startYear}-${endYear}`;
+    const { normalizedName } = this.validateYearName(data.ten_nam_hoc);
+    const tenNamHoc = normalizedName;
 
     // 1. Kiểm tra trùng tên năm học
     const existing = await this.namHocRepo.findOne({
@@ -259,17 +290,7 @@ export class KhoaService implements OnModuleInit {
       throw new BadRequestException('Ngày kết thúc năm học phải lớn hơn ngày bắt đầu');
     }
 
-    // 3. Kiểm tra chồng chéo khoảng thời gian với các năm học khác
-    const allYears = await this.namHocRepo.find();
-    for (const y of allYears) {
-      const yStart = this.toDateOnlyString(y.ngay_bat_dau);
-      const yEnd = this.toDateOnlyString(y.ngay_ket_thuc);
-      if (startStr <= yEnd && endStr >= yStart) {
-        throw new BadRequestException(
-          `Khoảng thời gian năm học (${this.formatDateVN(startStr)} - ${this.formatDateVN(endStr)}) bị chồng chéo với năm học "${y.ten_nam_hoc}" (${this.formatDateVN(yStart)} - ${this.formatDateVN(yEnd)})`,
-        );
-      }
-    }
+    // ĐÃ BỎ KIỂM TRA CHỒNG CHÉO THỜI GIAN CỨNG GIỮA CÁC NĂM HỌC ĐỂ LINH HOẠT VẬN HÀNH
 
     data.ten_nam_hoc = tenNamHoc;
     return this.namHocRepo.save(data);
@@ -279,10 +300,32 @@ export class KhoaService implements OnModuleInit {
     const nh = await this.namHocRepo.findOne({ where: { id } });
     if (!nh) throw new NotFoundException('Không tìm thấy năm học');
 
+    // Kiểm tra các đợt kiến tập con qua các học kỳ của năm học này
+    const childTerms = await this.hocKyRepo.find({ where: { nam_hoc_id: id } });
+    const termIds = childTerms.map((t) => t.id);
+    let childDots: DotKienTap[] = [];
+    if (termIds.length > 0) {
+      childDots = await this.dotRepo.find({
+        where: { hoc_ky_id: In(termIds), trang_thai: Not('DaHuy') },
+      });
+    }
+
+    const hasActiveDots = childDots.some((d) =>
+      ['DangTrienKhai', 'DaKetThuc', 'DaKhoa'].includes(d.trang_thai),
+    );
+
     let tenNamHoc = nh.ten_nam_hoc;
     if (data.ten_nam_hoc) {
-      const { startYear, endYear } = this.validateYearName(data.ten_nam_hoc);
-      tenNamHoc = `${startYear}-${endYear}`;
+      const { normalizedName } = this.validateYearName(data.ten_nam_hoc);
+      tenNamHoc = normalizedName;
+
+      // Nếu có đợt kiến tập đã hoạt động hoặc đã khóa sổ, không được đổi tên năm học
+      if (hasActiveDots && tenNamHoc !== nh.ten_nam_hoc) {
+        throw new BadRequestException(
+          'Không thể đổi tên năm học vì đã có đợt kiến tập trong năm học này đang triển khai hoặc đã khóa sổ!',
+        );
+      }
+
       const duplicate = await this.namHocRepo.findOne({
         where: { ten_nam_hoc: tenNamHoc, id: Not(id) },
       });
@@ -298,26 +341,26 @@ export class KhoaService implements OnModuleInit {
       throw new BadRequestException('Ngày kết thúc năm học phải lớn hơn ngày bắt đầu');
     }
 
-    // Kiểm tra chồng chéo thời gian với các năm học khác
-    const otherYears = await this.namHocRepo.find({ where: { id: Not(id) } });
-    for (const y of otherYears) {
-      const yStart = this.toDateOnlyString(y.ngay_bat_dau);
-      const yEnd = this.toDateOnlyString(y.ngay_ket_thuc);
-      if (startStr <= yEnd && endStr >= yStart) {
-        throw new BadRequestException(
-          `Khoảng thời gian năm học (${this.formatDateVN(startStr)} - ${this.formatDateVN(endStr)}) bị chồng chéo với năm học "${y.ten_nam_hoc}" (${this.formatDateVN(yStart)} - ${this.formatDateVN(yEnd)})`,
-        );
-      }
-    }
+    // ĐÃ BỎ KIỂM TRA CHỒNG CHÉO THỜI GIAN VỚI CÁC NĂM HỌC KHÁC
 
     // Kiểm tra không thu hẹp thời gian năm học làm rơi các học kỳ con ra ngoài
-    const childTerms = await this.hocKyRepo.find({ where: { nam_hoc_id: id } });
     for (const term of childTerms) {
       const termStart = this.toDateOnlyString(term.ngay_bat_dau);
       const termEnd = this.toDateOnlyString(term.ngay_ket_thuc);
       if (startStr > termStart || endStr < termEnd) {
         throw new BadRequestException(
           `Không thể điều chỉnh thời gian năm học vì học kỳ "${term.ten_hoc_ky}" (${this.formatDateVN(termStart)} - ${this.formatDateVN(termEnd)}) sẽ nằm ngoài phạm vi năm học mới (${this.formatDateVN(startStr)} - ${this.formatDateVN(endStr)})`,
+        );
+      }
+    }
+
+    // Kiểm tra không thu hẹp thời gian năm học làm rơi các đợt kiến tập con ra ngoài
+    for (const dot of childDots) {
+      const dotStart = this.toDateOnlyString(dot.ngay_bat_dau);
+      const dotEnd = this.toDateOnlyString(dot.ngay_ket_thuc);
+      if (startStr > dotStart || endStr < dotEnd) {
+        throw new BadRequestException(
+          `Không thể điều chỉnh thời gian năm học vì đợt kiến tập "${dot.ten_dot}" (${this.formatDateVN(dotStart)} - ${this.formatDateVN(dotEnd)}) sẽ nằm ngoài phạm vi năm học mới (${this.formatDateVN(startStr)} - ${this.formatDateVN(endStr)})`,
         );
       }
     }
@@ -331,7 +374,7 @@ export class KhoaService implements OnModuleInit {
     const count = await this.hocKyRepo.count({ where: { nam_hoc_id: id } });
     if (count > 0) {
       throw new BadRequestException(
-        'Không thể xóa năm học đã có học kỳ được gắn vào',
+        'Không thể xóa năm học đã có học kỳ được gắn vào. Vui lòng xóa các học kỳ trước!',
       );
     }
     const nh = await this.namHocRepo.findOne({ where: { id } });
@@ -341,9 +384,27 @@ export class KhoaService implements OnModuleInit {
   }
 
   async getTerms() {
-    return this.hocKyRepo.find({
+    const terms = await this.hocKyRepo.find({
       relations: { namHoc: true },
       order: { ngay_bat_dau: 'DESC' },
+    });
+    const dots = await this.dotRepo.find({
+      select: { id: true, ten_dot: true, hoc_ky_id: true, trang_thai: true },
+    });
+    return terms.map((t) => {
+      const relatedDots = dots.filter(
+        (d) => d.hoc_ky_id === t.id && d.trang_thai !== 'DaHuy',
+      );
+      const activeDots = relatedDots.filter((d) =>
+        ['DangTrienKhai', 'DaKetThuc', 'DaKhoa'].includes(d.trang_thai),
+      );
+      return {
+        ...t,
+        dot_kien_tap_count: relatedDots.length,
+        has_active_dots: activeDots.length > 0,
+        has_dots: relatedDots.length > 0,
+        active_dot_names: activeDots.map((d) => d.ten_dot),
+      };
     });
   }
 
@@ -359,15 +420,24 @@ export class KhoaService implements OnModuleInit {
     if (!data.ten_hoc_ky || !data.ten_hoc_ky.trim()) {
       throw new BadRequestException('Tên học kỳ không được để trống');
     }
-    const tenHocKy = data.ten_hoc_ky.trim();
+    const rawTrimmed = data.ten_hoc_ky.trim();
+    if (rawTrimmed.length > 20) {
+      throw new BadRequestException('Tên học kỳ không được vượt quá 20 ký tự');
+    }
+    const normalizedTenHocKy = rawTrimmed.replace(/\s+/g, ' ');
 
-    // 1. Kiểm tra trùng tên học kỳ trong cùng năm học
-    const existingSameName = await this.hocKyRepo.findOne({
-      where: { nam_hoc_id: data.nam_hoc_id, ten_hoc_ky: tenHocKy },
+    // 1. Kiểm tra trùng tên học kỳ trong cùng năm học (chuẩn hóa khoảng trắng & không phân biệt hoa thường)
+    const existingTerms = await this.hocKyRepo.find({
+      where: { nam_hoc_id: data.nam_hoc_id },
     });
-    if (existingSameName) {
+    const isDuplicate = existingTerms.some(
+      (t) =>
+        t.ten_hoc_ky.replace(/\s+/g, ' ').trim().toLowerCase() ===
+        normalizedTenHocKy.toLowerCase(),
+    );
+    if (isDuplicate) {
       throw new BadRequestException(
-        `Học kỳ "${tenHocKy}" đã tồn tại trong năm học ${namHoc.ten_nam_hoc}`,
+        `Học kỳ "${normalizedTenHocKy}" đã tồn tại trong năm học ${namHoc.ten_nam_hoc}`,
       );
     }
 
@@ -381,7 +451,7 @@ export class KhoaService implements OnModuleInit {
       throw new BadRequestException('Ngày kết thúc học kỳ phải lớn hơn ngày bắt đầu');
     }
 
-    // 3. RÀNG BUỘC CỐT LÕI: Thời gian học kỳ phải nằm trong năm học cha
+    // 3. RÀNG BUỘC THỜI GIAN: Kiểm tra khuyến nghị thời gian học kỳ trong năm học cha
     const yearStartStr = this.toDateOnlyString(namHoc.ngay_bat_dau);
     const yearEndStr = this.toDateOnlyString(namHoc.ngay_ket_thuc);
     if (termStartStr < yearStartStr || termEndStr > yearEndStr) {
@@ -390,21 +460,9 @@ export class KhoaService implements OnModuleInit {
       );
     }
 
-    // 4. Kiểm tra không chồng chéo thời gian giữa các học kỳ trong cùng năm học
-    const termsInYear = await this.hocKyRepo.find({
-      where: { nam_hoc_id: data.nam_hoc_id },
-    });
-    for (const otherTerm of termsInYear) {
-      const oStart = this.toDateOnlyString(otherTerm.ngay_bat_dau);
-      const oEnd = this.toDateOnlyString(otherTerm.ngay_ket_thuc);
-      if (termStartStr <= oEnd && termEndStr >= oStart) {
-        throw new BadRequestException(
-          `Thời gian học kỳ (${this.formatDateVN(termStartStr)} - ${this.formatDateVN(termEndStr)}) bị chồng chéo với học kỳ "${otherTerm.ten_hoc_ky}" (${this.formatDateVN(oStart)} - ${this.formatDateVN(oEnd)}) trong cùng năm học`,
-        );
-      }
-    }
+    // ĐÃ BỎ KIỂM TRA CHỒNG CHÉO THỜI GIAN CỨNG GIỮA CÁC HỌC KỲ TRONG CÙNG NĂM ĐỂ HỖ TRỢ HỌC KỲ HÈ / PHỤ / THỰC TẬP
 
-    data.ten_hoc_ky = tenHocKy;
+    data.ten_hoc_ky = normalizedTenHocKy;
     return this.hocKyRepo.save(data);
   }
 
@@ -419,22 +477,54 @@ export class KhoaService implements OnModuleInit {
     const namHoc = await this.namHocRepo.findOne({ where: { id: targetNamHocId } });
     if (!namHoc) throw new NotFoundException('Không tìm thấy năm học');
 
+    // Kiểm tra các đợt kiến tập liên kết với học kỳ này
+    const childDots = await this.dotRepo.find({
+      where: { hoc_ky_id: id, trang_thai: Not('DaHuy') },
+    });
+
+    // 1. Chặn đổi năm học cha nếu học kỳ đã được gắn vào ít nhất 1 đợt kiến tập
+    if (childDots.length > 0 && data.nam_hoc_id && data.nam_hoc_id !== hk.nam_hoc_id) {
+      throw new BadRequestException(
+        'Không thể chuyển học kỳ sang năm học khác vì học kỳ này đã được gắn vào đợt kiến tập!',
+      );
+    }
+
+    // 2. Chặn đổi tên học kỳ nếu có đợt kiến tập đang hoạt động hoặc đã khóa sổ
+    const hasActiveDots = childDots.some((d) =>
+      ['DangTrienKhai', 'DaKetThuc', 'DaKhoa'].includes(d.trang_thai),
+    );
+
     let tenHocKy = hk.ten_hoc_ky;
     if (data.ten_hoc_ky) {
-      tenHocKy = data.ten_hoc_ky.trim();
-      const duplicate = await this.hocKyRepo.findOne({
-        where: {
-          nam_hoc_id: targetNamHocId,
-          ten_hoc_ky: tenHocKy,
-          id: Not(id),
-        },
+      const rawTrimmed = data.ten_hoc_ky.trim();
+      if (rawTrimmed.length > 20) {
+        throw new BadRequestException('Tên học kỳ không được vượt quá 20 ký tự');
+      }
+      const normalizedTenHocKy = rawTrimmed.replace(/\s+/g, ' ');
+
+      if (hasActiveDots) {
+        const normOldName = hk.ten_hoc_ky.replace(/\s+/g, ' ').trim();
+        if (normalizedTenHocKy.toLowerCase() !== normOldName.toLowerCase()) {
+          throw new BadRequestException(
+            'Không thể đổi tên học kỳ vì đợt kiến tập liên kết đã triển khai hoặc đã khóa sổ!',
+          );
+        }
+      }
+
+      const otherTerms = await this.hocKyRepo.find({
+        where: { nam_hoc_id: targetNamHocId, id: Not(id) },
       });
-      if (duplicate) {
+      const isDuplicate = otherTerms.some(
+        (t) =>
+          t.ten_hoc_ky.replace(/\s+/g, ' ').trim().toLowerCase() ===
+          normalizedTenHocKy.toLowerCase(),
+      );
+      if (isDuplicate) {
         throw new BadRequestException(
-          `Học kỳ "${tenHocKy}" đã tồn tại trong năm học ${namHoc.ten_nam_hoc}`,
+          `Học kỳ "${normalizedTenHocKy}" đã tồn tại trong năm học ${namHoc.ten_nam_hoc}`,
         );
       }
-      data.ten_hoc_ky = tenHocKy;
+      data.ten_hoc_ky = normalizedTenHocKy;
     }
 
     const termStartStr = this.toDateOnlyString(data.ngay_bat_dau ?? hk.ngay_bat_dau);
@@ -452,22 +542,9 @@ export class KhoaService implements OnModuleInit {
       );
     }
 
-    // Kiểm tra không chồng chéo với học kỳ khác trong cùng năm học
-    const otherTerms = await this.hocKyRepo.find({
-      where: { nam_hoc_id: targetNamHocId, id: Not(id) },
-    });
-    for (const otherTerm of otherTerms) {
-      const oStart = this.toDateOnlyString(otherTerm.ngay_bat_dau);
-      const oEnd = this.toDateOnlyString(otherTerm.ngay_ket_thuc);
-      if (termStartStr <= oEnd && termEndStr >= oStart) {
-        throw new BadRequestException(
-          `Thời gian học kỳ (${this.formatDateVN(termStartStr)} - ${this.formatDateVN(termEndStr)}) bị chồng chéo với học kỳ "${otherTerm.ten_hoc_ky}" (${this.formatDateVN(oStart)} - ${this.formatDateVN(oEnd)}) trong cùng năm học`,
-        );
-      }
-    }
+    // ĐÃ BỎ KIỂM TRA CHỒNG CHÉO THỜI GIAN VỚI CÁC HỌC KỲ KHÁC TRONG CÙNG NĂM
 
     // Kiểm tra không thu hẹp thời gian học kỳ ngoài phạm vi các đợt kiến tập con hiện có
-    const childDots = await this.dotRepo.find({ where: { hoc_ky_id: id } });
     for (const dot of childDots) {
       const dotStart = this.toDateOnlyString(dot.ngay_bat_dau);
       const dotEnd = this.toDateOnlyString(dot.ngay_ket_thuc);
@@ -487,7 +564,7 @@ export class KhoaService implements OnModuleInit {
     const dotCount = await this.dotRepo.count({ where: { hoc_ky_id: id } });
     if (dotCount > 0) {
       throw new BadRequestException(
-        'Không thể xóa học kỳ đã có đợt kiến tập được gắn vào',
+        'Không thể xóa học kỳ đã có đợt kiến tập được gắn vào. Vui lòng xóa hoặc hủy các đợt kiến tập trước!',
       );
     }
     const hk = await this.hocKyRepo.findOne({ where: { id } });
@@ -774,7 +851,13 @@ export class KhoaService implements OnModuleInit {
           );
         } else {
           // Tài khoản mồ côi (tồn dư từ trước) -> dọn dẹp để tạo lại sạch sẽ
-          await manager.delete(TaiKhoan, existUser.id);
+          try {
+            await manager.delete(TaiKhoan, existUser.id);
+          } catch {
+            await this.rawDefaultDataSource
+              .getRepository(TaiKhoan)
+              .delete(existUser.id);
+          }
         }
       }
 
@@ -867,7 +950,13 @@ export class KhoaService implements OnModuleInit {
             );
           } else if (!linkedStudent) {
             // Tài khoản mồ côi -> dọn dẹp
-            await manager.delete(TaiKhoan, existUser.id);
+            try {
+              await manager.delete(TaiKhoan, existUser.id);
+            } catch {
+              await this.rawDefaultDataSource
+                .getRepository(TaiKhoan)
+                .delete(existUser.id);
+            }
           }
         }
         sv.mssv = data.mssv;
@@ -916,22 +1005,22 @@ export class KhoaService implements OnModuleInit {
       });
       if (!sv) throw new NotFoundException('Không tìm thấy sinh viên');
 
-      // 1. Kiểm tra toàn diện các ràng buộc dữ liệu
-      const [hasRegistrations, hasCampaigns, hasProposals, hasBlacklist] =
-        await Promise.all([
-          manager.count(PhieuDangKy, { where: { sinh_vien_id: id } }),
-          manager.count(DotKienTap_SinhVien, { where: { sinh_vien_id: id } }),
-          manager.count(PhieuDeXuatChuyenThamQuan, {
-            where: { sinh_vien_id: id },
-          }),
-          manager.count(DanhSachDen, { where: { sinh_vien_id: id } }),
-        ]);
+      // 1. Kiểm tra toàn diện các ràng buộc dữ liệu (gom thành 1 câu SELECT atomic)
+      const constraintsRaw: any[] = await manager.query(
+        `SELECT 
+          (SELECT COUNT(1) FROM PhieuDangKy WHERE sinh_vien_id = @0) AS hasRegistrations,
+          (SELECT COUNT(1) FROM DotKienTap_SinhVien WHERE sinh_vien_id = @0) AS hasCampaigns,
+          (SELECT COUNT(1) FROM PhieuDeXuatChuyenThamQuan WHERE sinh_vien_id = @0) AS hasProposals,
+          (SELECT COUNT(1) FROM DanhSachDen WHERE sinh_vien_id = @0) AS hasBlacklist`,
+        [id],
+      );
 
+      const counts = constraintsRaw[0] || {};
       const hasConstraints =
-        hasRegistrations > 0 ||
-        hasCampaigns > 0 ||
-        hasProposals > 0 ||
-        hasBlacklist > 0;
+        Number(counts.hasRegistrations || 0) > 0 ||
+        Number(counts.hasCampaigns || 0) > 0 ||
+        Number(counts.hasProposals || 0) > 0 ||
+        Number(counts.hasBlacklist || 0) > 0;
 
       // 2. Nếu đã có dữ liệu tham gia, chuyển sang khóa tài khoản thay vì xóa cứng
       if (hasConstraints) {
@@ -948,10 +1037,17 @@ export class KhoaService implements OnModuleInit {
 
       // 3. Nếu chưa có ràng buộc, xóa đồng thời SinhVien và TaiKhoan trong cùng transaction
       const taiKhoanId = sv.taikhoan_id || sv.taiKhoan?.id;
-      await manager.remove(SinhVien, sv);
+      await manager.delete(SinhVien, { id: sv.id });
 
       if (taiKhoanId) {
-        await manager.delete(TaiKhoan, taiKhoanId);
+        try {
+          await manager.delete(TaiKhoan, { id: taiKhoanId });
+        } catch (delAccErr) {
+          // Fallback an toàn qua rawDefaultDataSource nếu role_quantrikhoa bị hạn chế quyền DB trực tiếp
+          await this.rawDefaultDataSource
+            .getRepository(TaiKhoan)
+            .delete({ id: taiKhoanId });
+        }
       }
 
       return {
@@ -3022,7 +3118,7 @@ export class KhoaService implements OnModuleInit {
    * Cascade: PhieuDangKy → PhieuThamQuan → PhanCongGVDanDoan → ThongBao
    * KHÔNG phạt sinh viên (khác với SV tự hủy đăng ký sau khi đậu).
    */
-  async cancelTrip(tripId: number, lyDoHuy: string) {
+  async cancelTrip(tripId: number, lyDoHuy: string, userAccountId?: number) {
     const trip = await this.chuyenRepo.findOne({
       where: { id: tripId },
       relations: { nhaMay: true },
@@ -3032,7 +3128,7 @@ export class KhoaService implements OnModuleInit {
     if (trip.trang_thai === 'DaDienRa') {
       throw new BadRequestException('Không thể hủy chuyến tham quan đã diễn ra!');
     }
-    const allowedStatuses = ['DaDuyet', 'MoDangKy', 'DaChotDanhSach'];
+    const allowedStatuses = ['ChoDuyet', 'DaDuyet', 'MoDangKy', 'DaChotDanhSach'];
     if (!allowedStatuses.includes(trip.trang_thai)) {
       throw new BadRequestException(
         `Không thể hủy chuyến ở trạng thái "${trip.trang_thai}". Chỉ cho phép hủy khi chuyến đang ở: ${allowedStatuses.join(', ')}`,
@@ -3075,31 +3171,37 @@ export class KhoaService implements OnModuleInit {
         chuyen_tham_quan_id: tripId,
       });
 
-      // Bước 7: Gửi thông báo nội bộ
+      // Bước 6: Gửi thông báo nội bộ cho sinh viên (Chỉ gửi khi có sinh viên đã đăng ký bị ảnh hưởng)
       const nhaMayName = trip.nhaMay?.ten_nha_may || 'N/A';
       const dateStr = trip.ngay_tham_quan
         ? new Date(trip.ngay_tham_quan).toLocaleDateString('vi-VN')
         : 'N/A';
 
-      let senderId = 1;
-      const adminAcc = await manager.findOne(TaiKhoan, {
-        where: { vaiTro: { ten_vai_tro: 'QuanTriVienHeThong' } },
-        relations: { vaiTro: true },
-      });
-      if (adminAcc) senderId = adminAcc.id;
+      if (phieus.length > 0) {
+        let senderId = userAccountId || 1;
+        if (!userAccountId) {
+          const adminAcc = await manager.findOne(TaiKhoan, {
+            where: { vaiTro: { ten_vai_tro: 'QuanTriVienHeThong' } },
+            relations: { vaiTro: true },
+          });
+          if (adminAcc) senderId = adminAcc.id;
+        }
 
-      const hasLePhi = trip.le_phi > 0;
-      const hoPhiNote = hasLePhi
-        ? ' Nếu bạn đã đóng lệ phí, vui lòng sử dụng thông tin hóa đơn hiện tại để tạo Đơn Hoàn Phí trên hệ thống.'
-        : '';
+        const hasLePhi = trip.le_phi > 0;
+        const hoPhiNote = hasLePhi
+          ? ' Nếu bạn đã đóng lệ phí, vui lòng sử dụng thông tin hóa đơn hiện tại để tạo Đơn Hoàn Phí trên hệ thống.'
+          : '';
 
-      const notif = new ThongBao();
-      notif.tieu_de = '⚠️ CHUYẾN THAM QUAN BỊ HỦY';
-      notif.noi_dung = `Chuyến tham quan tại ${nhaMayName} ngày ${dateStr} đã bị HỦY.\n\nLý do: ${lyDoHuy}\n\nPhiếu đăng ký của bạn đã được chuyển sang trạng thái "Đã hủy". Bạn sẽ KHÔNG bị phạt do đây là sự kiện bất khả kháng.${hoPhiNote}`;
-      notif.nguoi_gui_id = senderId;
-      notif.ngay_gui = new Date();
-      notif.da_chinh_sua = false;
-      await manager.save(ThongBao, notif);
+        const notif = new ThongBao();
+        notif.tieu_de = '⚠️ CHUYẾN THAM QUAN BỊ HỦY';
+        notif.noi_dung = `Chuyến tham quan tại ${nhaMayName} ngày ${dateStr} đã bị HỦY.\n\nLý do: ${lyDoHuy}\n\nPhiếu đăng ký của bạn đã được chuyển sang trạng thái "Đã hủy". Bạn sẽ KHÔNG bị phạt do đây là sự kiện bất khả kháng.${hoPhiNote}`;
+        notif.nguoi_gui_id = senderId;
+        notif.doi_tuong_nhan = 'STUDENT';
+        notif.loai_thong_bao = 'CanhBao';
+        notif.ngay_gui = new Date();
+        notif.da_chinh_sua = false;
+        await manager.save(ThongBao, notif);
+      }
 
       return {
         message: 'Hủy chuyến tham quan thành công',
@@ -4633,9 +4735,15 @@ export class KhoaService implements OnModuleInit {
       if (!gv) throw new NotFoundException('Không tìm thấy giảng viên');
 
       if (gv.so_sv_toi_da_huong_dan) {
-        const currentCount = await this.pcGvhdRepo.count({
-          where: { giang_vien_id: lecturerId, trang_thai: 'DangHoatDong' },
-        });
+        const currentCount = await this.pcGvhdRepo
+          .createQueryBuilder('pc')
+          .innerJoin('pc.dotKienTapSinhVien', 'dksv')
+          .where('pc.giang_vien_id = :lecturerId', { lecturerId })
+          .andWhere('pc.trang_thai = :trangThai', { trangThai: 'DangHoatDong' })
+          .andWhere('dksv.dot_kien_tap_id = :dotKienTapId', {
+            dotKienTapId: dksv.dot_kien_tap_id,
+          })
+          .getCount();
 
         const isAlreadyAssigned = await this.pcGvhdRepo.findOne({
           where: {
@@ -4647,7 +4755,7 @@ export class KhoaService implements OnModuleInit {
 
         if (!isAlreadyAssigned && currentCount >= gv.so_sv_toi_da_huong_dan) {
           throw new BadRequestException(
-            `GV ${gv.ho_ten} đã đạt giới hạn ${gv.so_sv_toi_da_huong_dan} sinh viên hướng dẫn`,
+            `GV ${gv.ho_ten} đã đạt giới hạn ${gv.so_sv_toi_da_huong_dan} sinh viên hướng dẫn trong đợt này`,
           );
         }
       }
@@ -4688,6 +4796,22 @@ export class KhoaService implements OnModuleInit {
   }
 
   async getLecturersWithWorkload(dotKienTapId?: number) {
+    if (!dotKienTapId) {
+      let activeDot = await this.dotRepo.findOne({
+        where: { trang_thai: 'DangTrienKhai' },
+        order: { ngay_bat_dau: 'DESC' },
+      });
+      if (!activeDot) {
+        activeDot = await this.dotRepo.findOne({
+          where: { trang_thai: 'Nhap' },
+          order: { ngay_bat_dau: 'DESC' },
+        });
+      }
+      if (activeDot) {
+        dotKienTapId = activeDot.id;
+      }
+    }
+
     const lecturers = await this.gvRepo.find();
     const result: any[] = [];
     for (const gv of lecturers) {
@@ -4746,7 +4870,7 @@ export class KhoaService implements OnModuleInit {
       return { assignments: [], unassigned: [] };
     }
 
-    const lecturers = await this.getLecturersWithWorkload();
+    const lecturers = await this.getLecturersWithWorkload(dotKienTapId);
     const DEFAULT_MAX_SV = 40; // Định mức mặc định nếu NULL
 
     // Tính tổng sức chứa còn lại của Khoa
@@ -7604,12 +7728,21 @@ export class KhoaService implements OnModuleInit {
 
     let unassignedSupervisorCount = 0;
     try {
-      const unassignedSvRaw = await this.dataSource.query(`
-        SELECT COUNT(sv.id) as cnt
-        FROM SinhVien sv
-        WHERE sv.id NOT IN (SELECT DISTINCT sinh_vien_id FROM PhanCongGVHD WHERE sinh_vien_id IS NOT NULL)
-      `);
-      unassignedSupervisorCount = Number(unassignedSvRaw[0]?.cnt || 0);
+      if (dotId) {
+        const unassignedSvRaw = await this.dataSource.query(
+          `SELECT COUNT(dksv.id) as cnt
+           FROM DotKienTap_SinhVien dksv
+           WHERE dksv.dot_kien_tap_id = @0
+             AND dksv.trang_thai = 'DangThucHien'
+             AND dksv.id NOT IN (
+               SELECT DISTINCT dot_kien_tap_sinh_vien_id 
+               FROM PhanCongGVHD 
+               WHERE trang_thai = 'DangHoatDong'
+             )`,
+          [dotId],
+        );
+        unassignedSupervisorCount = Number(unassignedSvRaw[0]?.cnt || 0);
+      }
     } catch (e) {
       unassignedSupervisorCount = 0;
     }

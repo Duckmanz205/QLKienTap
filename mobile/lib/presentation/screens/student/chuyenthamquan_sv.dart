@@ -6,6 +6,7 @@ import '../../../data/state/app_state.dart';
 import '../../../core/network/api_service.dart';
 import '../../../core/utils/company_matcher.dart';
 import '../../widgets/paginated_list.dart';
+import '../shared/pdf_viewer_screen.dart';
 
 Future<void> _showCancelDialog(
   BuildContext context,
@@ -358,6 +359,60 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
           );
         }
       }
+    }
+  }
+
+  Future<void> _uploadConfirmationForTrip(
+    Trip trip,
+    AppStateProviderState appStateProvider,
+  ) async {
+    final regIdStr = trip.registrationId;
+    if (regIdStr == null || regIdStr.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Không tìm thấy mã đăng ký chuyến đi.'),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final pickerResult = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'docx', 'doc', 'jpg', 'jpeg', 'png'],
+      );
+      if (pickerResult != null && pickerResult.files.single.path != null) {
+        final file = pickerResult.files.single;
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đang tải lên Giấy xác nhận tham quan...')),
+        );
+
+        final success = await appStateProvider.uploadConfirmationFile(
+          regIdStr,
+          file.path!,
+          file.name,
+        );
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              success
+                  ? 'Nộp Giấy xác nhận thành công! Vui lòng chờ Giảng viên duyệt điểm danh.'
+                  : 'Nộp Giấy xác nhận thất bại.',
+            ),
+            backgroundColor: success ? AppColors.secondary : AppColors.danger,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lỗi tải tệp lên: $e'), backgroundColor: AppColors.danger),
+      );
     }
   }
 
@@ -751,31 +806,44 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
                 Row(
                   children: [
                     Builder(builder: (context) {
+                      final isTuDo = trip.isTuDo;
                       final isOnline = trip.type == 'Trực tuyến' || trip.type == 'TrucTuyen';
+                      final typeBgColor = isTuDo
+                          ? Colors.purple.shade50
+                          : (isOnline ? const Color(0xFFEFF6FF) : AppColors.primary.withValues(alpha: 0.1));
+                      final typeBorderColor = isTuDo
+                          ? Colors.purple.shade200
+                          : (isOnline ? const Color(0xFFBFDBFE) : AppColors.primary.withValues(alpha: 0.2));
+                      final typeTextColor = isTuDo
+                          ? Colors.purple.shade800
+                          : (isOnline ? const Color(0xFF1D4ED8) : AppColors.primary);
+                      final typeIcon = isTuDo
+                          ? Icons.explore_outlined
+                          : (isOnline ? Icons.laptop_mac : Icons.location_on);
+                      final typeLabel = isTuDo ? 'Kiến tập tự do' : trip.type;
+
                       return Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: isOnline ? const Color(0xFFEFF6FF) : AppColors.primary.withValues(alpha: 0.1),
+                          color: typeBgColor,
                           borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: isOnline ? const Color(0xFFBFDBFE) : AppColors.primary.withValues(alpha: 0.2),
-                          ),
+                          border: Border.all(color: typeBorderColor),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              isOnline ? Icons.laptop_mac : Icons.location_on,
+                              typeIcon,
                               size: 11,
-                              color: isOnline ? const Color(0xFF1D4ED8) : AppColors.primary,
+                              color: typeTextColor,
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              trip.type,
+                              typeLabel,
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
-                                color: isOnline ? const Color(0xFF1D4ED8) : AppColors.primary,
+                                color: typeTextColor,
                               ),
                             ),
                           ],
@@ -801,6 +869,108 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
                     ),
                   ],
                 ),
+                if (trip.isTuDo && regStatus != 'DaHuy' && regStatus != 'BiLoai') ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: trip.fileXacNhanUrl != null ? const Color(0xFFF0FDF4) : const Color(0xFFFFFBEB),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: trip.fileXacNhanUrl != null ? const Color(0xFFBBF7D0) : const Color(0xFFFDE68A),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  trip.fileXacNhanUrl != null ? Icons.verified : Icons.warning_amber_rounded,
+                                  size: 16,
+                                  color: trip.fileXacNhanUrl != null ? const Color(0xFF16A34A) : const Color(0xFFD97706),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  trip.fileXacNhanUrl != null ? 'Đã nộp giấy xác nhận' : 'Chưa nộp giấy xác nhận',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: trip.fileXacNhanUrl != null ? const Color(0xFF166534) : const Color(0xFF92400E),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (trip.fileXacNhanUrl != null)
+                              InkWell(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => PdfViewerScreen(
+                                        title: 'Giấy xác nhận - ${trip.name}',
+                                        pdfUrl: trip.fileXacNhanUrl!,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.visibility_outlined, size: 14, color: AppColors.primary),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'Xem lại',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: AppColors.primary,
+                                        fontWeight: FontWeight.bold,
+                                        decoration: TextDecoration.underline,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          trip.fileXacNhanUrl != null
+                              ? 'Tệp đã được lưu trên hệ thống. Giảng viên sẽ căn cứ vào giấy này để duyệt điểm danh Có mặt.'
+                              : 'Chuyến tự do bắt buộc nộp Giấy xác nhận tham quan doanh nghiệp (có mộc đỏ) để Giảng viên duyệt điểm danh Có mặt.',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: trip.fileXacNhanUrl != null ? const Color(0xFF15803D) : const Color(0xFFB45309),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: ElevatedButton.icon(
+                            onPressed: () => _uploadConfirmationForTrip(trip, appStateProvider),
+                            icon: Icon(trip.fileXacNhanUrl != null ? Icons.file_upload_outlined : Icons.upload_file, size: 14),
+                            label: Text(
+                              trip.fileXacNhanUrl != null ? 'Tải tệp khác' : 'Nộp giấy xác nhận',
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: trip.fileXacNhanUrl != null ? Colors.white : const Color(0xFFD97706),
+                              foregroundColor: trip.fileXacNhanUrl != null ? AppColors.primary : Colors.white,
+                              side: trip.fileXacNhanUrl != null ? const BorderSide(color: AppColors.primary) : null,
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 if (canCancel) ...[
                   const SizedBox(height: 12),
                   Row(
