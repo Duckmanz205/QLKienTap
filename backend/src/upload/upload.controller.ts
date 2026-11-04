@@ -187,7 +187,7 @@ export class UploadController {
       new ParseFilePipe({
         validators: [
           new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }),
-          new CustomFileTypeValidator({ fileType: /(pdf|docx|doc)$/i }),
+          new CustomFileTypeValidator({ fileType: /(pdf)$/i }),
         ],
       }),
     )
@@ -275,7 +275,8 @@ export class UploadController {
         const formData = new FormData();
         formData.append('file', blob, originalName);
 
-        const response = await fetch('http://127.0.0.1:8000/process-pdf', {
+        const aiBaseUrl = (process.env.AI_SERVICE_URL || 'http://127.0.0.1:8000').replace(/\/+$/, '');
+        const response = await fetch(`${aiBaseUrl}/process-pdf`, {
           method: 'POST',
           body: formData,
           signal: AbortSignal.timeout(180000),

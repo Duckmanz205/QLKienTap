@@ -468,12 +468,22 @@ class TripGradeItem {
 }
 
 class StudentTermGrade {
+  final int? dotKienTapId;
+  final String? tenDot;
+  final String? namHoc;
+  final String? hocKy;
+  final int? lanDangKy;
   final double? diemTongKet;
   final String? trangThai; // 'Dat', 'KhongDat', 'ChoDiem'
   final bool isScoreLocked;
   final List<TripGradeItem> tripGrades;
 
   StudentTermGrade({
+    this.dotKienTapId,
+    this.tenDot,
+    this.namHoc,
+    this.hocKy,
+    this.lanDangKy,
     this.diemTongKet,
     this.trangThai,
     required this.isScoreLocked,

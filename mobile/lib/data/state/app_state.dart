@@ -20,6 +20,8 @@ class AppState {
   List<RefundRequest> refunds;
   List<TripProposal> proposals;
   StudentTermGrade? termGrade;
+  List<StudentTermGrade> termGrades;
+  int selectedTermIndex;
   RepresentativeTripsStatus? repStatus;
 
   // Lecturer state
@@ -44,6 +46,8 @@ class AppState {
     required this.refunds,
     this.proposals = const [],
     this.termGrade,
+    this.termGrades = const [],
+    this.selectedTermIndex = 0,
     this.repStatus,
     required this.lecturerProfile,
     this.lecturerDashboardStats,
@@ -67,6 +71,8 @@ class AppState {
     List<RefundRequest>? refunds,
     List<TripProposal>? proposals,
     StudentTermGrade? termGrade,
+    List<StudentTermGrade>? termGrades,
+    int? selectedTermIndex,
     RepresentativeTripsStatus? repStatus,
     LecturerProfile? lecturerProfile,
     LecturerDashboardStats? lecturerDashboardStats,
@@ -90,6 +96,8 @@ class AppState {
       refunds: refunds ?? this.refunds,
       proposals: proposals ?? this.proposals,
       termGrade: termGrade ?? this.termGrade,
+      termGrades: termGrades ?? this.termGrades,
+      selectedTermIndex: selectedTermIndex ?? this.selectedTermIndex,
       repStatus: repStatus ?? this.repStatus,
       lecturerProfile: lecturerProfile ?? this.lecturerProfile,
       lecturerDashboardStats:
@@ -447,6 +455,8 @@ class AppStateProviderState extends State<AppStateContainer> {
       refunds: [],
       proposals: [],
       termGrade: null,
+      termGrades: [],
+      selectedTermIndex: 0,
       repStatus: null,
       lecturerProfile: LecturerProfile(
         name: '',
@@ -1619,7 +1629,7 @@ class AppStateProviderState extends State<AppStateContainer> {
       hinhThuc: tType,
     );
 
-    await fetchStudentProposals(ApiService.userId!);
+    await fetchStudentProposals(ApiService.profileId ?? ApiService.userId!);
   }
 
   Future<void> cancelStudentProposal(int proposalId) async {
@@ -1668,8 +1678,9 @@ class AppStateProviderState extends State<AppStateContainer> {
         ? res['message'].toString()
         : 'Đã xử lý yêu cầu hủy thành công';
 
-    if (ApiService.userId != null) {
-      await fetchStudentDataFromApi(ApiService.userId!);
+    final activeId = ApiService.profileId ?? ApiService.userId;
+    if (activeId != null) {
+      await fetchStudentDataFromApi(activeId);
     } else {
       setState(() {
         _state.studentTrips = _state.studentTrips.map((t) {
@@ -1801,8 +1812,9 @@ class AppStateProviderState extends State<AppStateContainer> {
     final regId = int.tryParse(submissionId);
     if (regId != null) {
       await ApiService.deleteReport(regId);
-      if (ApiService.userId != null) {
-        await fetchStudentDataFromApi(ApiService.userId!);
+      final activeId = ApiService.profileId ?? ApiService.userId;
+      if (activeId != null) {
+        await fetchStudentDataFromApi(activeId);
       }
     }
   }
@@ -1872,8 +1884,9 @@ class AppStateProviderState extends State<AppStateContainer> {
       _state.refunds = [newRefund, ..._state.refunds];
     });
 
-    if (ApiService.userId != null) {
-      fetchStudentDataFromApi(ApiService.userId!);
+    final activeId = ApiService.profileId ?? ApiService.userId;
+    if (activeId != null) {
+      fetchStudentDataFromApi(activeId);
     }
 
     return true;
@@ -2032,53 +2045,78 @@ class AppStateProviderState extends State<AppStateContainer> {
     }
   }
 
+  void setSelectedTermIndex(int index) {
+    if (index >= 0 && index < _state.termGrades.length) {
+      setState(() {
+        _state.selectedTermIndex = index;
+        _state.termGrade = _state.termGrades[index];
+      });
+    }
+  }
+
   Future<void> fetchStudentGrades(int studentId) async {
     try {
       final gradesRes = await ApiService.getStudentGrades(studentId);
       if (gradesRes is List && gradesRes.isNotEmpty) {
-        final termData = gradesRes[0];
-        final List<dynamic> rawTrips = termData['selectedTrips'] ?? [];
+        final List<StudentTermGrade> terms = [];
+        for (var termData in gradesRes) {
+          final List<dynamic> rawTrips = termData['selectedTrips'] ?? [];
 
-        final tripGrades = rawTrips.map((t) {
-          return TripGradeItem(
-            id: t['id'] ?? 0,
-            tenNhaMay: t['ten_nha_may'] ?? 'Doanh nghiệp',
-            hinhThuc: t['hinh_thuc'] == 'TrucTuyen'
-                ? 'Trực tuyến'
-                : 'Trực tiếp',
-            diemChuanBi: t['diem_chuan_bi'] != null
-                ? double.tryParse(t['diem_chuan_bi'].toString())
-                : null,
-            diemBaiThuHoach: t['diem_bai_thu_hoach'] != null
-                ? double.tryParse(t['diem_bai_thu_hoach'].toString())
-                : null,
-            diemBaoCaoTQNM: t['diem_bao_cao_tqnm'] != null
-                ? double.tryParse(t['diem_bao_cao_tqnm'].toString())
-                : null,
-            diemCong: t['diem_cong'] != null
-                ? double.tryParse(t['diem_cong'].toString())
-                : null,
-            diemTongChuyen: t['diem_tong_chuyen'] != null
-                ? double.tryParse(t['diem_tong_chuyen'].toString())
-                : null,
-            ketQua: t['ket_qua'],
-            daKhoaChuanBi: t['da_khoa_chuan_bi'] == true,
-            daKhoaThuHoach: t['da_khoa_thu_hoach'] == true,
-            daKhoaHoiDong: t['da_khoa_hoi_dong'] == true,
-            daKhoa: t['da_khoa'] == true,
+          final tripGrades = rawTrips.map((t) {
+            return TripGradeItem(
+              id: t['id'] ?? 0,
+              tenNhaMay: t['ten_nha_may'] ?? 'Doanh nghiệp',
+              hinhThuc: t['hinh_thuc'] == 'TrucTuyen'
+                  ? 'Trực tuyến'
+                  : 'Trực tiếp',
+              diemChuanBi: t['diem_chuan_bi'] != null
+                  ? double.tryParse(t['diem_chuan_bi'].toString())
+                  : null,
+              diemBaiThuHoach: t['diem_bai_thu_hoach'] != null
+                  ? double.tryParse(t['diem_bai_thu_hoach'].toString())
+                  : null,
+              diemBaoCaoTQNM: t['diem_bao_cao_tqnm'] != null
+                  ? double.tryParse(t['diem_bao_cao_tqnm'].toString())
+                  : null,
+              diemCong: t['diem_cong'] != null
+                  ? double.tryParse(t['diem_cong'].toString())
+                  : null,
+              diemTongChuyen: t['diem_tong_chuyen'] != null
+                  ? double.tryParse(t['diem_tong_chuyen'].toString())
+                  : null,
+              ketQua: t['ket_qua'],
+              daKhoaChuanBi: t['da_khoa_chuan_bi'] == true,
+              daKhoaThuHoach: t['da_khoa_thu_hoach'] == true,
+              daKhoaHoiDong: t['da_khoa_hoi_dong'] == true,
+              daKhoa: t['da_khoa'] == true,
+            );
+          }).toList();
+
+          final double? dtk = termData['diem_tong_ket'] != null
+              ? double.tryParse(termData['diem_tong_ket'].toString())
+              : null;
+
+          terms.add(
+            StudentTermGrade(
+              dotKienTapId: termData['dot_kien_tap_id'],
+              tenDot: termData['ten_dot']?.toString(),
+              namHoc: termData['nam_hoc']?.toString(),
+              hocKy: termData['hoc_ky']?.toString(),
+              lanDangKy: termData['lan_dang_ky'] != null
+                  ? int.tryParse(termData['lan_dang_ky'].toString())
+                  : null,
+              diemTongKet: dtk,
+              trangThai: termData['trang_thai'] ?? termData['ket_qua'],
+              isScoreLocked: dtk != null,
+              tripGrades: tripGrades,
+            ),
           );
-        }).toList();
+        }
 
-        final double? dtk = termData['diem_tong_ket'] != null
-            ? double.tryParse(termData['diem_tong_ket'].toString())
-            : null;
         setState(() {
-          _state.termGrade = StudentTermGrade(
-            diemTongKet: dtk,
-            trangThai: termData['trang_thai'] ?? termData['ket_qua'],
-            isScoreLocked: dtk != null,
-            tripGrades: tripGrades,
-          );
+          _state.termGrades = terms;
+          _state.selectedTermIndex = 0;
+          _state.termGrade = terms.isNotEmpty ? terms[0] : null;
         });
       }
     } catch (e) {
@@ -2287,8 +2325,9 @@ class AppStateProviderState extends State<AppStateContainer> {
 
   Future<void> lockGuidedReportsGrades(int dotKienTapId) async {
     await ApiService.lockGuidedReportsGrades(dotKienTapId);
-    if (ApiService.userId != null) {
-      await _fetchLecturerDataFromApi(ApiService.userId!);
+    final activeId = ApiService.profileId ?? ApiService.userId;
+    if (activeId != null) {
+      await _fetchLecturerDataFromApi(activeId);
     }
   }
 
@@ -2393,8 +2432,9 @@ class AppStateProviderState extends State<AppStateContainer> {
 
   Future<void> submitBoardScore(int memberId, int phieuId, double score) async {
     await ApiService.submitBoardScore(memberId, phieuId, score);
-    if (ApiService.userId != null) {
-      await fetchBoardSessions(ApiService.userId!);
+    final activeId = ApiService.profileId ?? ApiService.userId;
+    if (activeId != null) {
+      await fetchBoardSessions(activeId);
     }
   }
 

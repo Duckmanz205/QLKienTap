@@ -40,6 +40,18 @@ import {
 export class GiangVienController {
   constructor(private readonly gvService: GiangVienService) {}
 
+  /**
+   * Helper: Lấy profileId từ JWT payload (tiết kiệm 1 query DB trên mỗi request),
+   * fallback gọi getLecturerByAccountId nếu token cũ chưa có profileId.
+   */
+  private async resolveLecturerId(user: JwtPayloadUser): Promise<number> {
+    if (user.profileId) {
+      return user.profileId;
+    }
+    const gv = await this.gvService.getLecturerByAccountId(user.sub);
+    return gv.id;
+  }
+
   @Get('profile')
   async getMyProfile(@CurrentUser() user: JwtPayloadUser) {
     return this.gvService.getLecturerByAccountId(user.sub);
@@ -52,26 +64,26 @@ export class GiangVienController {
 
   @Get('guided-students')
   async getMyGuidedStudents(@CurrentUser() user: JwtPayloadUser) {
-    const gv = await this.gvService.getLecturerByAccountId(user.sub);
-    return this.gvService.getGuidedStudents(gv.id);
+    const lecturerId = await this.resolveLecturerId(user);
+    return this.gvService.getGuidedStudents(lecturerId);
   }
 
   @Get('guided-students/:lecturerId')
   async getGuidedStudents(@CurrentUser() user: JwtPayloadUser) {
-    const gv = await this.gvService.getLecturerByAccountId(user.sub);
-    return this.gvService.getGuidedStudents(gv.id);
+    const lecturerId = await this.resolveLecturerId(user);
+    return this.gvService.getGuidedStudents(lecturerId);
   }
 
   @Get('led-trips')
   async getMyLedTrips(@CurrentUser() user: JwtPayloadUser) {
-    const gv = await this.gvService.getLecturerByAccountId(user.sub);
-    return this.gvService.getLedTrips(gv.id);
+    const lecturerId = await this.resolveLecturerId(user);
+    return this.gvService.getLedTrips(lecturerId);
   }
 
   @Get('led-trips/:lecturerId')
   async getLedTrips(@CurrentUser() user: JwtPayloadUser) {
-    const gv = await this.gvService.getLecturerByAccountId(user.sub);
-    return this.gvService.getLedTrips(gv.id);
+    const lecturerId = await this.resolveLecturerId(user);
+    return this.gvService.getLedTrips(lecturerId);
   }
 
   @Get('trip-registrations/:tripId')
@@ -79,8 +91,8 @@ export class GiangVienController {
     @CurrentUser() user: JwtPayloadUser,
     @Param('tripId', ParseIntPipe) tripId: number,
   ) {
-    const gv = await this.gvService.getLecturerByAccountId(user.sub);
-    return this.gvService.getTripRegistrations(gv.id, tripId);
+    const lecturerId = await this.resolveLecturerId(user);
+    return this.gvService.getTripRegistrations(lecturerId, tripId);
   }
 
   @Post('take-attendance')
@@ -88,8 +100,8 @@ export class GiangVienController {
     @CurrentUser() user: JwtPayloadUser,
     @Body() body: TakeAttendanceDto,
   ) {
-    const gv = await this.gvService.getLecturerByAccountId(user.sub);
-    return this.gvService.takeAttendance(gv.id, body.tripId, body.records);
+    const lecturerId = await this.resolveLecturerId(user);
+    return this.gvService.takeAttendance(lecturerId, body.tripId, body.records);
   }
 
   @Post('grade-prep-bonus')
@@ -97,9 +109,9 @@ export class GiangVienController {
     @CurrentUser() user: JwtPayloadUser,
     @Body() body: GradePrepBonusDto,
   ) {
-    const gv = await this.gvService.getLecturerByAccountId(user.sub);
+    const lecturerId = await this.resolveLecturerId(user);
     return this.gvService.gradePrepAndBonus(
-      gv.id,
+      lecturerId,
       body.phieuId,
       body.diemChuanBi,
       body.diemCong,
@@ -111,9 +123,9 @@ export class GiangVienController {
     @CurrentUser() user: JwtPayloadUser,
     @Body() body: GradePrepBonusBatchDto,
   ) {
-    const gv = await this.gvService.getLecturerByAccountId(user.sub);
+    const lecturerId = await this.resolveLecturerId(user);
     return this.gvService.gradePrepAndBonusBatch(
-      gv.id,
+      lecturerId,
       body.tripId,
       body.records,
     );
@@ -125,9 +137,9 @@ export class GiangVienController {
     @Param('tripId', ParseIntPipe) tripId: number,
     @Res() res: Response,
   ) {
-    const gv = await this.gvService.getLecturerByAccountId(user.sub);
+    const lecturerId = await this.resolveLecturerId(user);
     const { buffer, fileName } = await this.gvService.getPrepGradesTemplate(
-      gv.id,
+      lecturerId,
       tripId,
     );
     res.setHeader(
@@ -158,9 +170,9 @@ export class GiangVienController {
     }
     const saveImmediately =
       rawSaveImmediately === true || rawSaveImmediately === 'true';
-    const gv = await this.gvService.getLecturerByAccountId(user.sub);
+    const lecturerId = await this.resolveLecturerId(user);
     return this.gvService.importPrepGradesExcel(
-      gv.id,
+      lecturerId,
       tripId,
       file.buffer,
       saveImmediately,
@@ -172,8 +184,8 @@ export class GiangVienController {
     @CurrentUser() user: JwtPayloadUser,
     @Body() body: LockTripPrepGradesDto,
   ) {
-    const gv = await this.gvService.getLecturerByAccountId(user.sub);
-    return this.gvService.lockTripPrepGrades(gv.id, body.tripId);
+    const lecturerId = await this.resolveLecturerId(user);
+    return this.gvService.lockTripPrepGrades(lecturerId, body.tripId);
   }
 
   @Post('lock-guided-reports-grades')
@@ -181,8 +193,8 @@ export class GiangVienController {
     @CurrentUser() user: JwtPayloadUser,
     @Body() body: LockGuidedReportsGradesDto,
   ) {
-    const gv = await this.gvService.getLecturerByAccountId(user.sub);
-    return this.gvService.lockGuidedReportsGrades(gv.id, body.dotKienTapId);
+    const lecturerId = await this.resolveLecturerId(user);
+    return this.gvService.lockGuidedReportsGrades(lecturerId, body.dotKienTapId);
   }
 
   @Get('guided-reports')
@@ -190,9 +202,9 @@ export class GiangVienController {
     @CurrentUser() user: JwtPayloadUser,
     @Query() query: GuidedReportsQueryDto,
   ) {
-    const gv = await this.gvService.getLecturerByAccountId(user.sub);
+    const lecturerId = await this.resolveLecturerId(user);
     return this.gvService.getGuidedStudentReports(
-      gv.id,
+      lecturerId,
       query.page || 1,
       query.limit || 10,
       query.search,
@@ -205,9 +217,9 @@ export class GiangVienController {
     @CurrentUser() user: JwtPayloadUser,
     @Query() query: GuidedReportsQueryDto,
   ) {
-    const gv = await this.gvService.getLecturerByAccountId(user.sub);
+    const lecturerId = await this.resolveLecturerId(user);
     return this.gvService.getGuidedStudentReports(
-      gv.id,
+      lecturerId,
       query.page || 1,
       query.limit || 10,
       query.search,
@@ -220,9 +232,9 @@ export class GiangVienController {
     @CurrentUser() user: JwtPayloadUser,
     @Body() body: GradeReportDto,
   ) {
-    const gv = await this.gvService.getLecturerByAccountId(user.sub);
+    const lecturerId = await this.resolveLecturerId(user);
     return this.gvService.gradeReport(
-      gv.id,
+      lecturerId,
       body.reportId,
       body.score,
       body.comment || '',
@@ -234,9 +246,9 @@ export class GiangVienController {
     @CurrentUser() user: JwtPayloadUser,
     @Body() body: GradeReportDto,
   ) {
-    const gv = await this.gvService.getLecturerByAccountId(user.sub);
+    const lecturerId = await this.resolveLecturerId(user);
     return this.gvService.saveAIGrade(
-      gv.id,
+      lecturerId,
       body.reportId,
       body.score,
       body.comment || '',
@@ -251,24 +263,38 @@ export class GiangVienController {
     if (!reportIds || !reportIds.length) {
       throw new BadRequestException('Danh sách bài thu hoạch không được trống');
     }
-    const gv = await this.gvService.getLecturerByAccountId(user.sub);
+    const lecturerId = await this.resolveLecturerId(user);
     // Gọi hàm chạy ngầm (Fire-and-forget), không dùng await để tránh block frontend
-    this.gvService.processBulkAiGradingInBackground(gv.id, reportIds).catch(err => {
+    this.gvService.processBulkAiGradingInBackground(lecturerId, reportIds).catch(err => {
       console.error('Lỗi khi chạy background chấm AI:', err);
     });
     return { message: 'Đã đưa danh sách bài vào hàng đợi chấm AI dưới nền' };
   }
 
+  @Post('evaluate-ai')
+  async evaluateAi(
+    @CurrentUser() user: JwtPayloadUser,
+    @Body('document_text') documentText: string,
+  ) {
+    if (!documentText || documentText.trim().length < 50) {
+      throw new BadRequestException(
+        'Văn bản bài thu hoạch quá ngắn hoặc không hợp lệ để chấm AI (tối thiểu 50 ký tự).',
+      );
+    }
+    await this.resolveLecturerId(user);
+    return this.gvService.evaluateTextWithAi(documentText);
+  }
+
   @Get('board-sessions')
   async getMyBoardSessions(@CurrentUser() user: JwtPayloadUser) {
-    const gv = await this.gvService.getLecturerByAccountId(user.sub);
-    return this.gvService.getBoardSessions(gv.id);
+    const lecturerId = await this.resolveLecturerId(user);
+    return this.gvService.getBoardSessions(lecturerId);
   }
 
   @Get('board-sessions/:lecturerId')
   async getBoardSessions(@CurrentUser() user: JwtPayloadUser) {
-    const gv = await this.gvService.getLecturerByAccountId(user.sub);
-    return this.gvService.getBoardSessions(gv.id);
+    const lecturerId = await this.resolveLecturerId(user);
+    return this.gvService.getBoardSessions(lecturerId);
   }
 
   @Post('submit-board-score')
@@ -276,9 +302,9 @@ export class GiangVienController {
     @CurrentUser() user: JwtPayloadUser,
     @Body() body: SubmitBoardScoreDto,
   ) {
-    const gv = await this.gvService.getLecturerByAccountId(user.sub);
+    const lecturerId = await this.resolveLecturerId(user);
     return this.gvService.submitBoardScore(
-      gv.id,
+      lecturerId,
       body.memberId,
       body.phieuId,
       body.score,
@@ -290,9 +316,9 @@ export class GiangVienController {
     @CurrentUser() user: JwtPayloadUser,
     @Body() body: SubmitBoardScoresBatchDto,
   ) {
-    const gv = await this.gvService.getLecturerByAccountId(user.sub);
+    const lecturerId = await this.resolveLecturerId(user);
     return this.gvService.submitBoardScoresBatch(
-      gv.id,
+      lecturerId,
       body.memberId,
       body.phieuIds,
       body.score,
@@ -304,8 +330,8 @@ export class GiangVienController {
     @CurrentUser() user: JwtPayloadUser,
     @Body() body: LockCouncilGradeDto,
   ) {
-    const gv = await this.gvService.getLecturerByAccountId(user.sub);
-    return this.gvService.lockCouncilGrade(gv.id, body);
+    const lecturerId = await this.resolveLecturerId(user);
+    return this.gvService.lockCouncilGrade(lecturerId, body);
   }
 
   @Put('council-student-note')
@@ -313,17 +339,25 @@ export class GiangVienController {
     @CurrentUser() user: JwtPayloadUser,
     @Body() body: UpdateCouncilStudentNoteDto,
   ) {
-    const gv = await this.gvService.getLecturerByAccountId(user.sub);
-    return this.gvService.updateCouncilStudentNote(gv.id, body);
+    const lecturerId = await this.resolveLecturerId(user);
+    return this.gvService.updateCouncilStudentNote(lecturerId, body);
   }
 
   @Get('notifications/:lecturerId')
-  async getNotifications(@Param('lecturerId') lecturerId: number) {
-    return this.gvService.getNotifications(+lecturerId);
+  async getNotifications(
+    @CurrentUser() user: JwtPayloadUser,
+    @Param('lecturerId') lecturerId: number,
+  ) {
+    const resolvedId = await this.resolveLecturerId(user);
+    return this.gvService.getNotifications(resolvedId);
   }
 
   @Get('dashboard-stats/:lecturerId')
-  async getDashboardStats(@Param('lecturerId') lecturerId: number) {
-    return this.gvService.getDashboardStats(+lecturerId);
+  async getDashboardStats(
+    @CurrentUser() user: JwtPayloadUser,
+    @Param('lecturerId') lecturerId: number,
+  ) {
+    const resolvedId = await this.resolveLecturerId(user);
+    return this.gvService.getDashboardStats(resolvedId);
   }
 }

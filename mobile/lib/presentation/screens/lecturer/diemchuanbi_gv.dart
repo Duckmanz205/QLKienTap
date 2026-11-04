@@ -82,6 +82,21 @@ class _DiemChuanBiGVScreenState extends State<DiemChuanBiGVScreen> {
         final prepText = _prepControllers[s.phieuId]?.text.trim() ?? '0';
         final prepScore = double.tryParse(prepText) ?? 0.0;
         final extraScore = _extraGrades[s.phieuId] ?? 0.0;
+
+        // BC14 & User instruction 3: Validate 0 <= prepScore <= 10 and 0 <= extraScore <= 1.0
+        if (prepScore < 0 || prepScore > 10 || extraScore < 0 || extraScore > 1.0) {
+          setState(() => _isSaving = false);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Điểm SV ${s.mssv} không hợp lệ (Điểm chuẩn bị: 0..10, Điểm cộng: 0..1.0).'),
+                backgroundColor: AppColors.danger,
+              ),
+            );
+          }
+          return;
+        }
+
         records.add({
           'phieuId': s.phieuId,
           'diemChuanBi': prepScore,

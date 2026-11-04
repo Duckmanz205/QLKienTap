@@ -132,6 +132,7 @@ class ApiService {
     // Invalid session data -> clear session
     token = null;
     userId = null;
+    profileId = null;
     role = null;
     await SecureStorage.clearAll();
     return false;
@@ -744,25 +745,17 @@ class ApiService {
 
   static Future<Map<String, dynamic>> gradeWithAI(String documentText) async {
     try {
-      String aiBase = 'http://10.0.2.2:8000';
-      try {
-        final uri = Uri.parse(baseUrl);
-        aiBase = '${uri.scheme}://${uri.host}:8000';
-      } catch (e) {
-        // Fallback
-      }
-
-      final uri = Uri.parse('$aiBase/grade');
+      final uri = Uri.parse('$baseUrl/giang-vien/evaluate-ai');
       final response = await http.post(
         uri,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer satori_2026_secure_key'
+          'Authorization': 'Bearer $token',
         },
         body: jsonEncode({'document_text': documentText}),
       ).timeout(const Duration(seconds: 120));
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
         return jsonDecode(utf8.decode(response.bodyBytes));
       } else {
         throw Exception('Lỗi AI: ${response.statusCode} - ${response.body}');

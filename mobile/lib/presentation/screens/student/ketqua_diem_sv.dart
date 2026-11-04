@@ -25,7 +25,7 @@ class _KetQuaDiemSVScreenState extends State<KetQuaDiemSVScreen> {
   }
 
   Future<void> _loadGrades() async {
-    final studentId = ApiService.userId;
+    final studentId = ApiService.profileId ?? ApiService.userId;
     if (studentId == null) return;
 
     setState(() => _isLoading = true);
@@ -53,6 +53,67 @@ class _KetQuaDiemSVScreenState extends State<KetQuaDiemSVScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Thanh chọn Đợt kiến tập (Cohort Selector) khi sinh viên học lại / có nhiều đợt
+            if (appState.termGrades.length > 1) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.beigeBorder),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.school_outlined, size: 20, color: AppColors.primary),
+                    const SizedBox(width: 10),
+                    const Text(
+                      'Đợt học:',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black87),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<int>(
+                          value: appState.selectedTermIndex < appState.termGrades.length
+                              ? appState.selectedTermIndex
+                              : 0,
+                          isExpanded: true,
+                          icon: const Icon(Icons.arrow_drop_down, color: AppColors.primary),
+                          items: List.generate(appState.termGrades.length, (idx) {
+                            final tg = appState.termGrades[idx];
+                            final title = tg.tenDot ?? 'Đợt kiến tập #${idx + 1}';
+                            final extra = tg.lanDangKy != null && tg.lanDangKy! > 1
+                                ? ' (Lần ${tg.lanDangKy})'
+                                : '';
+                            return DropdownMenuItem<int>(
+                              value: idx,
+                              child: Text(
+                                '$title$extra',
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            );
+                          }),
+                          onChanged: (newIdx) {
+                            if (newIdx != null) {
+                              appStateProvider.setSelectedTermIndex(newIdx);
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             // Overall Grade Card
             _buildOverallGradeCard(termGrade),
             const SizedBox(height: 16),

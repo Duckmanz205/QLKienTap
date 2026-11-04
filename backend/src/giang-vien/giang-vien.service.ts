@@ -519,6 +519,27 @@ export class GiangVienService implements OnModuleInit {
       diem.phieu_tham_quan_id = phieuTQ.id;
     }
 
+    if (
+      typeof diemChuanBi !== 'number' ||
+      !Number.isFinite(diemChuanBi) ||
+      diemChuanBi < 0 ||
+      diemChuanBi > 10
+    ) {
+      throw new BadRequestException(
+        'Điểm chuẩn bị không hợp lệ (phải từ 0 đến 10)',
+      );
+    }
+    if (
+      typeof diemCong !== 'number' ||
+      !Number.isFinite(diemCong) ||
+      diemCong < 0 ||
+      diemCong > 1.0
+    ) {
+      throw new BadRequestException(
+        'Điểm cộng không hợp lệ (phải từ 0 đến 1)',
+      );
+    }
+
     diem.diem_chuan_bi = diemChuanBi;
     diem.diem_cong_final = Math.min(1.0, Math.max(0.0, diemCong));
     diem.giang_vien_dan_doan_id = lecturerId;
@@ -1120,6 +1141,17 @@ export class GiangVienService implements OnModuleInit {
           'Điểm bài thu hoạch này đã được nộp/khóa lên Khoa, không thể chỉnh sửa',
         );
       }
+      if (
+        typeof score !== 'number' ||
+        !Number.isFinite(score) ||
+        score < 0 ||
+        score > 10
+      ) {
+        throw new BadRequestException(
+          'Điểm bài thu hoạch không hợp lệ (phải từ 0 đến 10)!',
+        );
+      }
+
       if (!diem) {
         diem = new DiemPhieuThamQuan();
         diem.phieu_tham_quan_id = phieuTQ.id;
@@ -1236,11 +1268,13 @@ export class GiangVienService implements OnModuleInit {
         if (!textToAnalyze || textToAnalyze.length < 50) continue;
 
         // Gọi AI Service
-        const aiRes = await fetch('http://127.0.0.1:8000/grade', {
+        const aiBaseUrl = (process.env.AI_SERVICE_URL || 'http://127.0.0.1:8000').replace(/\/+$/, '');
+        const aiSecretKey = process.env.AI_SECRET_KEY || 'satori_2026_secure_key';
+        const aiRes = await fetch(`${aiBaseUrl}/grade`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': 'Bearer satori_2026_secure_key' // Giả sử key bảo mật nội bộ
+            'Authorization': `Bearer ${aiSecretKey}`
           },
           body: JSON.stringify({ document_text: textToAnalyze })
         });
@@ -1261,6 +1295,31 @@ export class GiangVienService implements OnModuleInit {
         console.error(`Lỗi quá trình chấm AI ngầm cho report ${reportId}:`, err);
       }
     }
+  }
+
+  // Đánh giá văn bản bài thu hoạch trực tiếp qua AI Microservice (Proxy bảo mật)
+  async evaluateTextWithAi(documentText: string) {
+    const aiBaseUrl = (process.env.AI_SERVICE_URL || 'http://127.0.0.1:8000').replace(/\/+$/, '');
+    const aiSecretKey = process.env.AI_SECRET_KEY || 'satori_2026_secure_key';
+
+    const aiRes = await fetch(`${aiBaseUrl}/grade`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${aiSecretKey}`,
+      },
+      body: JSON.stringify({ document_text: documentText }),
+      signal: AbortSignal.timeout(120000),
+    });
+
+    if (!aiRes.ok) {
+      const errText = await aiRes.text();
+      throw new BadRequestException(
+        `AI Microservice trả về lỗi (${aiRes.status}): ${errText}`,
+      );
+    }
+
+    return await aiRes.json();
   }
 
   // Lay danh sach buoi bao cao hoi dong của giang vien
@@ -1568,10 +1627,18 @@ export class GiangVienService implements OnModuleInit {
       item.ngay_cham = new Date();
       await diemHoiDongRepo.save(item);
 
-      // Tính điểm trung bình của tất cả thành viên trong hội đồng cho riêng chuyến tham quan này
-      const allScores = await diemHoiDongRepo.find({
-        where: { phieu_tham_quan_id: phieuTQ.id },
-      });
+      // BC12: Chỉ tính điểm trung bình của các thành viên thuộc chính Hội đồng hiện tại quản lý bộ chuyến
+      const currentBoardId = phieuTQ.boChuyenBaoCao?.hoi_dong_id;
+      const allScores = currentBoardId
+        ? await diemHoiDongRepo
+            .createQueryBuilder('d')
+            .innerJoin('d.hoiDongThanhVien', 'tv')
+            .where('d.phieu_tham_quan_id = :phieuId', { phieuId: phieuTQ.id })
+            .andWhere('tv.hoi_dong_id = :boardId', { boardId: currentBoardId })
+            .getMany()
+        : await diemHoiDongRepo.find({
+            where: { phieu_tham_quan_id: phieuTQ.id },
+          });
 
       if (allScores.length > 0) {
         const sum = allScores.reduce((acc, curr) => acc + Number(curr.diem), 0);

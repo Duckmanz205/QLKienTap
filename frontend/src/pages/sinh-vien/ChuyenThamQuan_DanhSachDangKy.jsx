@@ -61,6 +61,7 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
     reason: ''
   });
   const [viewingTrip, setViewingTrip] = useState(null);
+  const [isActionSubmitting, setIsActionSubmitting] = useState(false);
 
   const showPopup = (message, type = 'success') => {
     setPopup({ show: true, message, type });
@@ -200,6 +201,8 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
   };
 
   const handleConfirmAction = async () => {
+    if (isActionSubmitting) return;
+    setIsActionSubmitting(true);
     if (confirmModal.type === 'register') {
       try {
         await sinhVienApi.registerTrip(confirmModal.targetId);
@@ -212,6 +215,7 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
     } else if (confirmModal.type === 'cancel') {
       if (!confirmModal.reason.trim()) {
         showPopup('Vui lòng nhập lý do hủy', 'error');
+        setIsActionSubmitting(false);
         return;
       }
       try {
@@ -231,6 +235,7 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
       }
     }
     setConfirmModal({ ...confirmModal, isOpen: false });
+    setIsActionSubmitting(false);
   };
 
   const handleProposalSubmit = async (e) => {
@@ -378,16 +383,18 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
             </div>
             <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
               <button
+                disabled={isActionSubmitting}
                 onClick={() => setConfirmModal({ ...confirmModal, isOpen: false })}
-                className="px-5 py-2.5 border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-bold transition-colors cursor-pointer"
+                className="px-5 py-2.5 border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-bold transition-colors cursor-pointer disabled:opacity-50"
               >
                 Hủy bỏ
               </button>
               <button
+                disabled={isActionSubmitting}
                 onClick={handleConfirmAction}
-                className={`px-6 py-2.5 text-white rounded-xl text-sm font-bold transition-colors shadow-sm cursor-pointer ${confirmModal.type === 'cancel' || confirmModal.type === 'cancel_proposal' ? 'bg-[#E68A8C] hover:bg-[#E68A8C]/90' : 'bg-[#407F3E] hover:bg-[#407F3E]/90'}`}
+                className={`px-6 py-2.5 text-white rounded-xl text-sm font-bold transition-colors shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${confirmModal.type === 'cancel' || confirmModal.type === 'cancel_proposal' ? 'bg-[#E68A8C] hover:bg-[#E68A8C]/90' : 'bg-[#407F3E] hover:bg-[#407F3E]/90'}`}
               >
-                Xác nhận
+                {isActionSubmitting ? 'Đang xử lý...' : 'Xác nhận'}
               </button>
             </div>
           </div>

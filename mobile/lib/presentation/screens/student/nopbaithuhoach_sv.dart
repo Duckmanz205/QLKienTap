@@ -821,6 +821,18 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
                         final sizeInMb = file.size / (1024 * 1024);
                         final fileSizeStr = '${sizeInMb.toStringAsFixed(1)} MB';
 
+                        // ML5: Chặn tệp vượt quá 5MB
+                        if (file.size > 5 * 1024 * 1024) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Dung lượng tệp ($fileSizeStr) vượt quá giới hạn 5MB. Vui lòng nén file PDF trước khi nộp.'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                          return;
+                        }
+
                         if (!context.mounted) return;
                         final success = await Navigator.push(
                           context,

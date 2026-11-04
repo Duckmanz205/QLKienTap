@@ -29,8 +29,9 @@ class _TaiChinhSVScreenState extends State<TaiChinhSVScreen> {
     super.initState();
     _loadPaymentConfig();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && ApiService.userId != null) {
-        AppStateProvider.of(context).fetchStudentDataFromApi(ApiService.userId!);
+      final activeId = ApiService.profileId ?? ApiService.userId;
+      if (mounted && activeId != null) {
+        AppStateProvider.of(context).fetchStudentDataFromApi(activeId);
       }
     });
   }
@@ -112,8 +113,9 @@ class _TaiChinhSVScreenState extends State<TaiChinhSVScreen> {
   Widget _buildPaymentsTab(AppState appState, AppStateProviderState appStateProvider) {
     return RefreshIndicator(
       onRefresh: () async {
-        if (ApiService.userId != null) {
-          await appStateProvider.fetchStudentDataFromApi(ApiService.userId!);
+        final activeId = ApiService.profileId ?? ApiService.userId;
+        if (activeId != null) {
+          await appStateProvider.fetchStudentDataFromApi(activeId);
           await _loadPaymentConfig();
         }
       },
@@ -836,8 +838,9 @@ class _TaiChinhSVScreenState extends State<TaiChinhSVScreen> {
 
     return RefreshIndicator(
       onRefresh: () async {
-        if (ApiService.userId != null) {
-          await appStateProvider.fetchStudentDataFromApi(ApiService.userId!);
+        final activeId = ApiService.profileId ?? ApiService.userId;
+        if (activeId != null) {
+          await appStateProvider.fetchStudentDataFromApi(activeId);
         }
       },
       child: SingleChildScrollView(

@@ -51,7 +51,10 @@ export class AuthService {
       );
     }
 
-    const user = await this.taiKhoanRepo.findOne({ where: { ten_dang_nhap } });
+    const user = await this.taiKhoanRepo.findOne({
+      where: { ten_dang_nhap },
+      relations: { vaiTro: true },
+    });
 
     const recordFailedAttempt = () => {
       const current = this.failedAttempts.get(ten_dang_nhap) || {
@@ -96,11 +99,14 @@ export class AuthService {
 
     this.failedAttempts.delete(ten_dang_nhap);
 
-    user.lan_dang_nhap_cuoi = new Date();
-    await this.taiKhoanRepo.save(user);
+    // Non-blocking fire-and-forget: cập nhật thời gian đăng nhập mà không làm chậm phản hồi login
+    this.taiKhoanRepo
+      .update(user.id, { lan_dang_nhap_cuoi: new Date() })
+      .catch((err) => console.error('Failed to update lan_dang_nhap_cuoi:', err));
 
-    // (v8) Resolve ma_vai_tro từ VaiTro table
-    const maVaiTro = await this.resolveMaVaiTro(user.vai_tro_id);
+    // (v8) Resolve ma_vai_tro từ quan hệ vaiTro hoặc fallback VaiTro table
+    const maVaiTro =
+      user.vaiTro?.ma_vai_tro || (await this.resolveMaVaiTro(user.vai_tro_id));
 
     let details: any = null;
     if (maVaiTro === 'SinhVien') {
@@ -118,6 +124,7 @@ export class AuthService {
       sub: user.id,
       username: user.ten_dang_nhap,
       role: maVaiTro,
+      profileId: details?.id,
     };
     const token = this.jwtService.sign(payload);
 
