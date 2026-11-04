@@ -76,7 +76,8 @@ export default function ChuyenThamQuan_DSLoc() {
   // Toast Popup State
   const [popup, setPopup] = useState({ show: false, message: '', type: 'success' });
   const showPopup = (message, type = 'success') => {
-    setPopup({ show: true, message, type });
+    const formattedMsg = Array.isArray(message) ? message.join(', ') : message;
+    setPopup({ show: true, message: formattedMsg, type });
     setTimeout(() => setPopup(prev => ({ ...prev, show: false })), 3000);
   };
 

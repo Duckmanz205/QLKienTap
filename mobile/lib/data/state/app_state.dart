@@ -840,6 +840,11 @@ class AppStateProviderState extends State<AppStateContainer> {
               regStatus == 'DaThamGia' ||
               trip.isCompleted;
 
+          final bth =
+              reg['baiThuHoach'] ?? reg['phieuThamQuan']?['baiThuHoach'];
+          final fileXacNhan = bth?['file_xac_nhan_tham_quan'];
+          final cachToChuc = reg['chuyenThamQuan']?['cach_to_chuc'] ?? trip.cachToChuc;
+
           realTrips.add(
             trip.copyWith(
               isRegistered: true,
@@ -847,12 +852,12 @@ class AppStateProviderState extends State<AppStateContainer> {
               registrationId: reg['id'].toString(),
               registrationStatus: regStatus,
               tripStatus: tripStatus,
+              cachToChuc: cachToChuc,
+              fileXacNhanUrl: fileXacNhan,
             ),
           );
 
           if (isCompleted || regStatus == 'HopLe' || regStatus == 'DaThamGia') {
-            final bth =
-                reg['baiThuHoach'] ?? reg['phieuThamQuan']?['baiThuHoach'];
             final diemPhieu = reg['phieuThamQuan']?['diemPhieuThamQuan'];
             final rawNgayThamQuan = reg['chuyenThamQuan']?['ngay_tham_quan'];
             final tripDate = rawNgayThamQuan != null
@@ -890,34 +895,38 @@ class AppStateProviderState extends State<AppStateContainer> {
                   '${dline.day.toString().padLeft(2, '0')}/${dline.month.toString().padLeft(2, '0')}/${dline.year}';
             }
 
+            final hasBaoCao = bth != null &&
+                bth['file_bao_cao'] != null &&
+                bth['file_bao_cao'].toString().isNotEmpty;
+
             realSubmissions.add(
               Submission(
                 id: reg['id'].toString(),
                 registrationId: reg['id'],
                 tripName: trip.name,
-                typeText: (trip.type == 'TuDo' || trip.type == 'Tự do')
+                typeText: (trip.isTuDo || trip.cachToChuc == 'TuDo' || trip.type == 'TuDo' || trip.type == 'Tự do')
                     ? 'Kiến tập tự do'
                     : (trip.type == 'Trực tuyến' || trip.type == 'TrucTuyen')
                     ? 'Kiến tập trực tuyến'
                     : 'Kiến tập trực tiếp',
                 dateText: trip.date,
                 tripDate: tripDate,
-                status: bth != null ? 'Đã nộp' : 'Chưa nộp',
-                fileName:
-                    bth?['file_bao_cao']?.split('/').last ??
-                    (bth != null ? 'baocao.pdf' : null),
-                fileSize: bth != null ? 'N/A' : null,
+                status: hasBaoCao ? 'Đã nộp' : 'Chưa nộp',
+                fileName: hasBaoCao
+                    ? bth['file_bao_cao']?.toString().split('/').last
+                    : null,
+                fileSize: hasBaoCao ? 'N/A' : null,
                 submittedAt: bth?['ngay_nop'] != null
                     ? DateTime.tryParse(
                         bth['ngay_nop'].toString(),
                       )?.toLocal().toString().substring(0, 16)
                     : null,
                 hasConfirmationFile:
-                    bth != null && bth['file_xac_nhan_tham_quan'] != null,
+                    bth != null && bth['file_xac_nhan_tham_quan'] != null && bth['file_xac_nhan_tham_quan'].toString().isNotEmpty,
                 confirmationFileName: bth?['file_xac_nhan_tham_quan']
                     ?.split('/')
                     .last,
-                fileBaoCaoUrl: bth?['file_bao_cao'],
+                fileBaoCaoUrl: hasBaoCao ? bth['file_bao_cao'] : null,
                 fileXacNhanUrl: bth?['file_xac_nhan_tham_quan'],
                 reportScore: reportScore,
                 gvhdComment: gvhdComment,
@@ -1208,12 +1217,14 @@ class AppStateProviderState extends State<AppStateContainer> {
           : 'N/A',
       time:
           '${_safeSub(json['gio_bat_dau'], 5).isNotEmpty ? _safeSub(json['gio_bat_dau'], 5) : '08:00'} - ${_safeSub(json['gio_ket_thuc'], 5).isNotEmpty ? _safeSub(json['gio_ket_thuc'], 5) : '12:00'}',
-      type:
-          (json['hinh_thuc'] == 'TrucTuyen' ||
-              json['hinh_thuc'] == 'Trực tuyến')
-          ? 'Trực tuyến'
-          : (json['hinh_thuc'] == 'TuDo' || json['hinh_thuc'] == 'Tự do')
+      type: (json['cach_to_chuc'] == 'TuDo' ||
+              json['cach_to_chuc'] == 'Tự do' ||
+              json['hinh_thuc'] == 'TuDo' ||
+              json['hinh_thuc'] == 'Tự do')
           ? 'Tự do'
+          : (json['hinh_thuc'] == 'TrucTuyen' ||
+                  json['hinh_thuc'] == 'Trực tuyến')
+          ? 'Trực tuyến'
           : 'Trực tiếp',
       location: nhaMay['dia_chi'] ?? 'Địa chỉ chưa cập nhật',
       industry: 'Công nghệ thực phẩm',
@@ -1222,6 +1233,7 @@ class AppStateProviderState extends State<AppStateContainer> {
       isRegistered: isRegistered,
       isCompleted:
           json['trang_thai'] == 'DaDienRa' || json['trang_thai'] == 'HoanThanh',
+      cachToChuc: json['cach_to_chuc']?.toString(),
     );
   }
 
@@ -1778,11 +1790,20 @@ class AppStateProviderState extends State<AppStateContainer> {
 
     String fileReference = fileName;
     try {
-      final uploadRes = await ApiService.uploadFile(
-        'upload/payment',
-        localPath,
-        'file',
-      );
+      Map<String, dynamic> uploadRes;
+      try {
+        uploadRes = await ApiService.uploadFile(
+          'upload/attachment',
+          localPath,
+          'file',
+        );
+      } catch (_) {
+        uploadRes = await ApiService.uploadFile(
+          'upload/payment',
+          localPath,
+          'file',
+        );
+      }
       fileReference = uploadRes['key'] ?? uploadRes['url'] ?? fileName;
     } catch (e) {
       print('uploadConfirmationFile file upload failed: $e');
@@ -1793,17 +1814,31 @@ class AppStateProviderState extends State<AppStateContainer> {
 
     setState(() {
       _state.submissions = _state.submissions.map((s) {
-        if (s.id == submissionId) {
+        if (s.id == submissionId || s.registrationId == regId) {
           return s.copyWith(
             hasConfirmationFile: true,
             confirmationFileName: fileName,
             fileXacNhanUrl: fileReference,
-            status: s.fileBaoCaoUrl != null ? 'Đã nộp' : 'Chưa nộp',
+            status: (s.fileBaoCaoUrl != null && s.fileBaoCaoUrl!.isNotEmpty)
+                ? 'Đã nộp'
+                : 'Chưa nộp',
           );
         }
         return s;
       }).toList();
+
+      _state.studentTrips = _state.studentTrips.map((t) {
+        if (t.registrationId == submissionId || t.registrationId == regId.toString()) {
+          return t.copyWith(fileXacNhanUrl: fileReference);
+        }
+        return t;
+      }).toList();
     });
+
+    final activeId = ApiService.profileId ?? ApiService.userId;
+    if (activeId != null) {
+      await fetchStudentDataFromApi(activeId);
+    }
 
     return true;
   }

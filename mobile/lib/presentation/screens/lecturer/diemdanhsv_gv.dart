@@ -122,7 +122,7 @@ class _DiemDanhSVGVScreenState extends State<DiemDanhSVGVScreen> {
     }
   }
 
-  void _markAllPresent() {
+  Future<void> _markAllPresent() async {
     if (_selectedTour != null && !_selectedTour!.isStarted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -135,6 +135,32 @@ class _DiemDanhSVGVScreenState extends State<DiemDanhSVGVScreen> {
       return;
     }
 
+    final missingProofCount = _students.where((s) => s.cachToChuc == 'TuDo' && (s.fileXacNhanUrl == null || s.fileXacNhanUrl!.isEmpty)).length;
+    if (missingProofCount > 0) {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Cảnh báo giấy xác nhận', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          content: Text(
+            'Có $missingProofCount sinh viên chuyến tự do chưa nộp Giấy xác nhận tham quan doanh nghiệp.\n\nBạn có chắc chắn muốn đánh dấu Có mặt cho tất cả không?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('HỦY', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+              child: const Text('XÁC NHẬN TẤT CẢ'),
+            ),
+          ],
+        ),
+      );
+      if (confirm != true) return;
+    }
+
+    if (!mounted) return;
     setState(() {
       _students = _students.map((s) => s.copyWith(attendanceStatus: 'CoMat', excuseReason: null)).toList();
     });
@@ -143,7 +169,7 @@ class _DiemDanhSVGVScreenState extends State<DiemDanhSVGVScreen> {
     );
   }
 
-  void _updateStudentAttendance(int phieuId, String newStatus, {String? reason}) {
+  Future<void> _updateStudentAttendance(int phieuId, String newStatus, {String? reason}) async {
     if (_selectedTour != null && !_selectedTour!.isStarted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -156,6 +182,34 @@ class _DiemDanhSVGVScreenState extends State<DiemDanhSVGVScreen> {
       return;
     }
 
+    final targetStudent = _students.firstWhere((s) => s.phieuId == phieuId, orElse: () => _students.first);
+    if (newStatus == 'CoMat' &&
+        targetStudent.cachToChuc == 'TuDo' &&
+        (targetStudent.fileXacNhanUrl == null || targetStudent.fileXacNhanUrl!.isEmpty)) {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Cảnh báo chưa nộp giấy xác nhận', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          content: Text(
+            'Sinh viên "${targetStudent.hoTen}" (${targetStudent.mssv}) chưa nộp Giấy xác nhận tham quan doanh nghiệp lên hệ thống.\n\nBạn có chắc chắn muốn điểm danh Có mặt cho sinh viên này?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('HỦY', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+              child: const Text('XÁC NHẬN CÓ MẶT'),
+            ),
+          ],
+        ),
+      );
+      if (confirm != true) return;
+    }
+
+    if (!mounted) return;
     setState(() {
       _students = _students.map((s) {
         if (s.phieuId == phieuId) {

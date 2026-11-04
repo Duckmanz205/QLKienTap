@@ -31,10 +31,22 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     _fetchPdf();
   }
 
+  bool get _isImage {
+    final lower = widget.pdfUrl.toLowerCase();
+    return lower.endsWith('.png') ||
+        lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.webp') ||
+        lower.endsWith('.gif');
+  }
+
   String _getFixedUrl(String url) {
     String finalUrl = url;
     
-    if (finalUrl.startsWith('reports/')) {
+    if (finalUrl.startsWith('reports/') ||
+        finalUrl.startsWith('attachments/') ||
+        finalUrl.startsWith('payments/') ||
+        finalUrl.startsWith('templates/')) {
       finalUrl = '${ApiService.baseUrl}/upload/file/$finalUrl';
     } else if (finalUrl.startsWith('/api/')) {
       finalUrl = ApiService.baseUrl.replaceAll('/api', '') + finalUrl;
@@ -90,9 +102,13 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isImageDoc = _isImage;
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.title.isEmpty ? 'Tài liệu PDF' : widget.title, style: const TextStyle(fontSize: 14)),
+        title: Text(
+          widget.title.isEmpty ? (isImageDoc ? 'Tài liệu ảnh' : 'Tài liệu PDF') : widget.title,
+          style: const TextStyle(fontSize: 14),
+        ),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
       ),
@@ -103,19 +119,37 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                   padding: const EdgeInsets.all(16),
                   child: Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
                 )
-              : SfPdfViewer.memory(
-                  _pdfBytes!,
-                  canShowScrollHead: false,
-                  canShowScrollStatus: false,
-                  onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Lỗi định dạng PDF: ${details.description}'),
-                        backgroundColor: Colors.red,
+              : isImageDoc
+                  ? InteractiveViewer(
+                      panEnabled: true,
+                      minScale: 0.5,
+                      maxScale: 4.0,
+                      child: Center(
+                        child: Image.memory(
+                          _pdfBytes!,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, error, stackTrace) => Center(
+                            child: Text(
+                              'Không thể hiển thị ảnh: $error',
+                              style: const TextStyle(color: Colors.red),
+                            ),
+                          ),
+                        ),
                       ),
-                    );
-                  },
-                ),
+                    )
+                  : SfPdfViewer.memory(
+                      _pdfBytes!,
+                      canShowScrollHead: false,
+                      canShowScrollStatus: false,
+                      onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Lỗi định dạng PDF: ${details.description}'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      },
+                    ),
     );
   }
 }

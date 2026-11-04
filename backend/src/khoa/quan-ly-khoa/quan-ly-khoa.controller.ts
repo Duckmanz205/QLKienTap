@@ -413,8 +413,11 @@ export class KhoaController {
   async cancelTrip(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: CancelTripDto,
+    @CurrentUser() user: JwtPayloadUser,
   ) {
-    return this.khoaService.cancelTrip(id, body.lyDoHuy);
+    const tripId = id || body.tripId!;
+    const userAccountId = user?.sub || (user as any)?.id || (user as any)?.userId;
+    return this.khoaService.cancelTrip(tripId, body.lyDoHuy, userAccountId);
   }
 
   @Patch('trips/:id/reopen')

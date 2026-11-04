@@ -124,6 +124,8 @@ class Trip {
   final String? trangThaiCu;
   final String? registrationStatus;
   final String? tripStatus;
+  final String? cachToChuc;
+  final String? fileXacNhanUrl;
 
   Trip({
     required this.id,
@@ -143,7 +145,11 @@ class Trip {
     this.trangThaiCu,
     this.registrationStatus,
     this.tripStatus,
+    this.cachToChuc,
+    this.fileXacNhanUrl,
   });
+
+  bool get isTuDo => cachToChuc == 'TuDo' || type == 'Tự do' || type.toLowerCase().contains('tự do');
 
   Trip copyWith({
     bool? isRegistered,
@@ -154,6 +160,8 @@ class Trip {
     String? trangThaiCu,
     String? registrationStatus,
     String? tripStatus,
+    String? cachToChuc,
+    String? fileXacNhanUrl,
   }) {
     return Trip(
       id: id,
@@ -173,6 +181,8 @@ class Trip {
       trangThaiCu: trangThaiCu ?? this.trangThaiCu,
       registrationStatus: registrationStatus ?? this.registrationStatus,
       tripStatus: tripStatus ?? this.tripStatus,
+      cachToChuc: cachToChuc ?? this.cachToChuc,
+      fileXacNhanUrl: fileXacNhanUrl ?? this.fileXacNhanUrl,
     );
   }
 }
@@ -278,6 +288,7 @@ class Submission {
   });
 
   bool get isGraded => reportScore != null;
+  bool get isTuDo => typeText.toLowerCase().contains('tự do') || typeText.toLowerCase().contains('tudo');
 
   Submission copyWith({
     int? registrationId,
