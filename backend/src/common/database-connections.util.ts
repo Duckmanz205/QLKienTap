@@ -37,6 +37,11 @@ export function createRoleTypeOrmOptions(
     (val) => typeof val === 'function',
   );
 
+  const defaultPoolMax = Number(configService.get('DB_POOL_MAX_DEFAULT', 50));
+  const svPoolMax = Number(configService.get('DB_POOL_MAX_SV', 80));
+  const poolMin = Number(configService.get('DB_POOL_MIN', 5));
+  const maxPool = role === 'SV' ? svPoolMax : defaultPoolMax;
+
   const opts: TypeOrmModuleOptions = {
     type: 'mssql',
     host,
@@ -49,18 +54,20 @@ export function createRoleTypeOrmOptions(
     synchronize: false,
     dropSchema: false,
     pool: {
-      max: role === 'SV' ? 20 : 10,
-      min: 2,
+      max: maxPool,
+      min: poolMin,
       idleTimeoutMillis: 30000,
-      acquireTimeoutMillis: 30000,
+      acquireTimeoutMillis: 15000,
     },
     extra: {
       validateConnection: false,
+      requestTimeout: 30000,
     },
     options: {
       encrypt: false,
       trustServerCertificate: true,
-      connectTimeout: 30000,
+      connectTimeout: 15000,
+      useUTC: false,
     },
   };
 

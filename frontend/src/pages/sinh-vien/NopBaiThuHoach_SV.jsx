@@ -163,6 +163,18 @@ export default function NopBaiThuHoach_SV() {
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      showPopup('Hệ thống chỉ chấp nhận tệp báo cáo định dạng .pdf', 'error');
+      if (e.target) e.target.value = '';
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      showPopup(`Dung lượng tệp (${(file.size / (1024 * 1024)).toFixed(1)} MB) vượt quá giới hạn 5MB. Vui lòng nén file PDF trước khi tải lên.`, 'error');
+      if (e.target) e.target.value = '';
+      return;
+    }
     
     setUploading(true);
     try {
@@ -1173,7 +1185,7 @@ export default function NopBaiThuHoach_SV() {
           type="file" 
           ref={fileInputRef} 
           className="hidden" 
-          accept=".pdf,.doc,.docx"
+          accept=".pdf"
           onChange={handleFileChange} 
         />
         <input 

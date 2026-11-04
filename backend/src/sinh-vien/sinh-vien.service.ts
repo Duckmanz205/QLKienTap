@@ -196,10 +196,7 @@ export class SinhVienService {
       return [];
     }
 
-    // 2. Kiem tra danh sach den: khong chan tren UI, xep vao Uu tien 6 khi chot danh sach
-    await this.checkAndUpdatePenalties(studentId);
-
-    // 3. Lấy danh sách TẤT CẢ chuyến đi của các lịch đang mở đăng ký
+    // 2. Lấy danh sách TẤT CẢ chuyến đi của các lịch đang mở đăng ký
     const trips = await this.chuyenRepo.find({
       where: {
         trang_thai: 'MoDangKy',
@@ -207,6 +204,10 @@ export class SinhVienService {
       },
       relations: { nhaMay: true, lichKienTap: true },
     });
+
+    if (!trips.length) {
+      return [];
+    }
 
     // Lay danh sach cac chuyen SV da dang ky de loai bo khoi ket qua
     const studentPhieus = await this.phieuRepo.find({
@@ -247,6 +248,25 @@ export class SinhVienService {
         }
       });
 
+    // Lấy trước số lượng đăng ký cho toàn bộ chuyến bằng 1 query GROUP BY duy nhất (Triệt tiêu N+1 Query)
+    const tripIds = trips.map((t) => t.id);
+    const countMap = new Map<number, number>();
+
+    if (tripIds.length > 0) {
+      const counts = await this.phieuRepo
+        .createQueryBuilder('p')
+        .select('p.chuyen_tham_quan_id', 'tripId')
+        .addSelect('COUNT(*)', 'cnt')
+        .where('p.chuyen_tham_quan_id IN (:...tripIds)', { tripIds })
+        .andWhere('p.trang_thai IN (:...statuses)', {
+          statuses: ['HopLe', 'ChoDuyet'],
+        })
+        .groupBy('p.chuyen_tham_quan_id')
+        .getRawMany();
+
+      counts.forEach((c) => countMap.set(Number(c.tripId), Number(c.cnt)));
+    }
+
     // Dem so SV da dang ky tung chuyen va chi hien thi cac chuyen hop le
     const results: any[] = [];
     for (const trip of trips) {
@@ -258,12 +278,7 @@ export class SinhVienService {
       const tripDateStr = toDateOnlyString(trip.ngay_tham_quan);
       const dateConflict = tripDateStr ? activeDateMap.get(tripDateStr) : null;
 
-      const count = await this.phieuRepo.count({
-        where: {
-          chuyen_tham_quan_id: trip.id,
-          trang_thai: In(['HopLe', 'ChoDuyet']),
-        },
-      });
+      const count = countMap.get(trip.id) || 0;
       const oldPhieu = phieuMap.get(trip.id);
       results.push({
         ...trip,
@@ -366,11 +381,75 @@ export class SinhVienService {
       }
     }
 
+    for (const phieu of phieus) {
+      if (phieu.yeuCauHuy && phieu.yeuCauHuy.trang_thai_duyet === 'ChoDuyet') {
+        (phieu as any).trang_thai = 'ChoHuy';
+      }
+    }
+
     return phieus;
   }
 
   // Dang ky chuyen tham quan (Mo hinh Đang ky theo Khung gio & Xet duyet hang loat)
   async registerTrip(studentId: number, tripId: number) {
+    const maxRetries = 2;
+    let attempt = 0;
+
+    while (true) {
+      try {
+        return await this.executeRegisterTripTransaction(studentId, tripId);
+      } catch (error: any) {
+        const errNum =
+          error?.number ??
+          error?.driverError?.number ??
+          error?.originalError?.info?.number;
+
+        // Xử lý Deadlock SQL Server (Mã lỗi 1205): Thử lại tối đa 2 lần với jitter ngẫu nhiên
+        if (errNum === 1205 && attempt < maxRetries) {
+          attempt++;
+          const delay = Math.floor(Math.random() * 100) + 50; // 50 - 150ms
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          continue;
+        }
+
+        // Bắt lỗi vi phạm ràng buộc UNIQUE (Sinh viên bấm đúp hoặc submit đồng thời trùng chuyến)
+        if (
+          errNum === 2627 ||
+          errNum === 2601 ||
+          error?.message?.includes('UQ_PhieuDangKy')
+        ) {
+          throw new BadRequestException(
+            'Bạn đã nộp đơn đăng ký chuyến tham quan này rồi.',
+          );
+        }
+
+        // Bắt lỗi trigger kiểm tra trùng ngày tham quan
+        if (
+          error?.message?.includes('trùng ngày tham quan') ||
+          error?.driverError?.message?.includes('trùng ngày tham quan')
+        ) {
+          throw new BadRequestException(
+            'Sinh viên đã có phiếu đăng ký khác còn hiệu lực trùng ngày tham quan.',
+          );
+        }
+
+        // Bắt các BadRequestException / NotFoundException đã ném từ trước
+        if (
+          error instanceof BadRequestException ||
+          error instanceof NotFoundException
+        ) {
+          throw error;
+        }
+
+        throw error;
+      }
+    }
+  }
+
+  private async executeRegisterTripTransaction(
+    studentId: number,
+    tripId: number,
+  ) {
     return this.dataSource.transaction(async (manager: EntityManager) => {
       // 1. Kiem tra danh sach den: khong chan dang ky de sinh vien tra an o Uu tien 6
       await this.checkAndUpdatePenalties(studentId);
@@ -1271,6 +1350,25 @@ export class SinhVienService {
         }
       }
 
+      // BC9: Chặn nộp đè bài thu hoạch đã chấm điểm hoặc đã khóa điểm
+      const diemPhieu = await manager.findOne(DiemPhieuThamQuan, {
+        where: { phieu_tham_quan_id: phieuTQ.id },
+      });
+      if (diemPhieu) {
+        if (diemPhieu.da_khoa_thu_hoach || diemPhieu.da_khoa) {
+          throw new BadRequestException('Bài thu hoạch này đã được khóa điểm, không thể tải lên tệp mới!');
+        }
+        if (
+          diemPhieu.diem_thu_hoach !== null &&
+          diemPhieu.diem_thu_hoach !== undefined &&
+          existingReport?.trang_thai !== 'ChoBoSung'
+        ) {
+          throw new BadRequestException(
+            'Bài thu hoạch đã được Giảng viên chấm điểm chính thức. Bạn không thể nộp đè trừ khi có yêu cầu bổ sung!',
+          );
+        }
+      }
+
       let report = existingReport;
       if (!report) {
         report = new BaiThuHoach();
@@ -1400,7 +1498,7 @@ export class SinhVienService {
   async deleteReport(studentId: number, registrationId: number) {
     const phieuTQ = await this.phieuTQRepo.findOne({
       where: { phieu_dang_ky_id: registrationId },
-      relations: { baiThuHoach: true },
+      relations: { baiThuHoach: true, phieuDangKy: true },
     });
 
     if (!phieuTQ || !phieuTQ.baiThuHoach) {
@@ -1409,13 +1507,20 @@ export class SinhVienService {
 
     const report = phieuTQ.baiThuHoach;
 
+    // Chặn IDOR: Kiểm tra bài thu hoạch phải thuộc về chính sinh viên đang đăng nhập
+    if (!phieuTQ.phieuDangKy || phieuTQ.phieuDangKy.sinh_vien_id !== studentId) {
+      throw new ForbiddenException(
+        'Bạn không có quyền xóa bài thu hoạch của sinh viên khác.',
+      );
+    }
+
     if (phieuTQ.han_nop_bao_cao && new Date() > phieuTQ.han_nop_bao_cao) {
       throw new BadRequestException(
         'Đã hết hạn 10 ngày để chỉnh sửa. Bài nộp đã được gửi cho giảng viên và không thể thu hồi.',
       );
     }
 
-    // Kiểm tra xem đã có điểm chưa
+    // Kiểm tra xem đã có điểm chưa hoặc đã khóa điểm bài thu hoạch chưa
     const diem = await this.diemPhieuRepo.findOne({
       where: { phieu_tham_quan_id: phieuTQ.id },
     });
@@ -1704,21 +1809,21 @@ export class SinhVienService {
       const phieuTQRepo = manager.getRepository(PhieuThamQuan);
 
       const dksv = await dksvRepo.findOne({
-        where: { id: resolvedTermStudentId },
+        where: { id: resolvedTermStudentId, sinh_vien_id: studentId },
         lock: { mode: 'pessimistic_write' },
         relations: { dotKienTap: true },
       });
       if (!dksv) {
-        throw new BadRequestException('Thông tin đợt kiến tập không hợp lệ.');
+        throw new ForbiddenException(
+          'Không tìm thấy thông tin đăng ký đợt kiến tập hoặc bạn không có quyền thao tác trên đợt này.',
+        );
       }
 
     // 1. Kiem tra xem Khoa co dang Khoa cong hoac da qua han ket thuc dot khong
-    const dotCheck = await this.dataSource.manager
-      .getRepository(DotKienTap)
-      .findOne({
-        where: { id: dksv.dot_kien_tap_id },
-        select: { id: true, is_bo_chuyen_locked: true, ngay_ket_thuc: true },
-      });
+    const dotCheck = await dotRepo.findOne({
+      where: { id: dksv.dot_kien_tap_id },
+      select: { id: true, is_bo_chuyen_locked: true, ngay_ket_thuc: true },
+    });
 
     const deadline = dotCheck?.ngay_ket_thuc
       ? this.getEndOfDayVietnam(dotCheck.ngay_ket_thuc)
@@ -2090,15 +2195,24 @@ export class SinhVienService {
     termOutcome: 'Dat' | 'KhongDat' | 'DangThucHien',
   ) {
     const phieuTQ = pdk.phieuThamQuan;
-    let score = await this.diemPhieuRepo.findOne({
-      where: { phieu_tham_quan_id: phieuTQ.id },
-    });
+    let score = phieuTQ?.diemPhieuThamQuan;
+    if (!score && phieuTQ?.id) {
+      score = await this.diemPhieuRepo.findOne({
+        where: { phieu_tham_quan_id: phieuTQ.id },
+      });
+    }
 
     if (!score) {
       score = new DiemPhieuThamQuan();
-      score.phieu_tham_quan_id = phieuTQ.id;
+      score.phieu_tham_quan_id = phieuTQ?.id;
+      score.diem_chuan_bi = null as any;
+      score.diem_thu_hoach = null as any;
+      score.diem_hoi_dong_final = null as any;
       score.diem_cong_final = 0;
-      score = await this.diemPhieuRepo.save(score);
+      score.da_khoa_chuan_bi = false;
+      score.da_khoa_thu_hoach = false;
+      score.da_khoa_hoi_dong = false;
+      score.da_khoa = false;
     }
 
     // Điểm chuẩn bị và điểm cộng: Hiển thị khi Giảng viên dẫn đoàn đã chốt (da_khoa_chuan_bi) hoặc Khoa đã khóa (da_khoa)
@@ -2190,7 +2304,7 @@ export class SinhVienService {
         ],
         relations: {
           chuyenThamQuan: { nhaMay: true, lichKienTap: true },
-          phieuThamQuan: true,
+          phieuThamQuan: { diemPhieuThamQuan: true },
         },
         order: { id: 'ASC' },
       });
@@ -2353,7 +2467,7 @@ export class SinhVienService {
         where: whereConditions,
         relations: {
           chuyenThamQuan: { nhaMay: true, lichKienTap: true },
-          phieuThamQuan: true,
+          phieuThamQuan: { diemPhieuThamQuan: true },
         },
         order: { id: 'ASC' },
       });
@@ -2751,7 +2865,8 @@ export class SinhVienService {
       formData.append('file', fileBlob, fileName);
 
       console.log(`[Background AI OCR] Đang gửi PDF (${pdfBuffer.byteLength} bytes) sang AI Service...`);
-      const aiResponse = await fetch('http://127.0.0.1:8000/process-pdf', {
+      const aiBaseUrl = (process.env.AI_SERVICE_URL || 'http://127.0.0.1:8000').replace(/\/+$/, '');
+      const aiResponse = await fetch(`${aiBaseUrl}/process-pdf`, {
         method: 'POST',
         body: formData,
         signal: AbortSignal.timeout(180000),

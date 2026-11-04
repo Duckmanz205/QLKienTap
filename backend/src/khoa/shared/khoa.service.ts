@@ -63,6 +63,7 @@ import { RoleDataSourceService } from '../../common/role-datasource.service';
 @Injectable()
 export class KhoaService implements OnModuleInit {
   private readonly logger = new Logger(KhoaService.name);
+  private readonly rawDefaultDataSource: DataSource;
 
   constructor(
     private dataSource: DataSource,
@@ -115,7 +116,9 @@ export class KhoaService implements OnModuleInit {
 
     private readonly taskQueueService: TaskQueueService,
     private readonly roleDataSourceService: RoleDataSourceService,
-  ) { }
+  ) {
+    this.rawDefaultDataSource = dataSource;
+  }
 
   private initRoleProxies() {
     this.dataSource = this.roleDataSourceService.createDataSourceProxy(this.dataSource);
@@ -1145,15 +1148,38 @@ export class KhoaService implements OnModuleInit {
 
         // Tất cả hợp lệ, tiến hành thêm vào đợt
         for (const sv of existingStudents) {
+          // BC2: Chặn thêm sinh viên nếu đang tham gia một đợt khác có trạng thái DangThucHien
+          const ongoingEnrollment = await manager
+            .createQueryBuilder(DotKienTap_SinhVien, 'dksv')
+            .innerJoin('dksv.dotKienTap', 'dot')
+            .where('dksv.sinh_vien_id = :svId', { svId: sv.id })
+            .andWhere('dksv.dot_kien_tap_id != :dotId', { dotId: savedDot.id })
+            .andWhere('dksv.trang_thai = :status', { status: 'DangThucHien' })
+            .andWhere('dot.trang_thai NOT IN (:...closedStatuses)', {
+              closedStatuses: ['DaKetThuc', 'DaKhoa', 'DaHuy'],
+            })
+            .getOne();
+
+          if (ongoingEnrollment) {
+            throw new BadRequestException(
+              `Sinh viên ${sv.ho_ten} (${sv.mssv}) đang tham gia một đợt kiến tập khác đang diễn ra. Không thể thêm vào đợt mới!`,
+            );
+          }
+
           const dksvExist = await manager.findOne(DotKienTap_SinhVien, {
             where: { dot_kien_tap_id: savedDot.id, sinh_vien_id: sv.id },
           });
 
           if (!dksvExist) {
+            // BC1: Tự động đếm số đợt trước đó của sinh viên để gán lan_dang_ky
+            const previousCount = await manager.count(DotKienTap_SinhVien, {
+              where: { sinh_vien_id: sv.id },
+            });
+
             const dksv = new DotKienTap_SinhVien();
             dksv.dot_kien_tap_id = savedDot.id;
             dksv.sinh_vien_id = sv.id;
-            dksv.lan_dang_ky = 1;
+            dksv.lan_dang_ky = previousCount + 1;
             dksv.trang_thai = 'DangThucHien';
             await manager.save(DotKienTap_SinhVien, dksv);
           }
@@ -1199,10 +1225,33 @@ export class KhoaService implements OnModuleInit {
 
         // Insert new ones
         for (const sv of existingStudents) {
+          // BC2: Chặn thêm sinh viên nếu đang tham gia một đợt khác có trạng thái DangThucHien
+          const ongoingEnrollment = await manager
+            .createQueryBuilder(DotKienTap_SinhVien, 'dksv')
+            .innerJoin('dksv.dotKienTap', 'dot')
+            .where('dksv.sinh_vien_id = :svId', { svId: sv.id })
+            .andWhere('dksv.dot_kien_tap_id != :dotId', { dotId: id })
+            .andWhere('dksv.trang_thai = :status', { status: 'DangThucHien' })
+            .andWhere('dot.trang_thai NOT IN (:...closedStatuses)', {
+              closedStatuses: ['DaKetThuc', 'DaKhoa', 'DaHuy'],
+            })
+            .getOne();
+
+          if (ongoingEnrollment) {
+            throw new BadRequestException(
+              `Sinh viên ${sv.ho_ten} (${sv.mssv}) đang tham gia một đợt kiến tập khác đang diễn ra. Không thể thêm vào đợt này!`,
+            );
+          }
+
+          // BC1: Tự động đếm số đợt trước đó của sinh viên để gán lan_dang_ky
+          const previousCount = await manager.count(DotKienTap_SinhVien, {
+            where: { sinh_vien_id: sv.id },
+          });
+
           const dksv = new DotKienTap_SinhVien();
           dksv.dot_kien_tap_id = id;
           dksv.sinh_vien_id = sv.id;
-          dksv.lan_dang_ky = 1;
+          dksv.lan_dang_ky = previousCount + 1;
           dksv.trang_thai = 'DangThucHien';
           await manager.save(DotKienTap_SinhVien, dksv);
         }
@@ -1319,10 +1368,33 @@ export class KhoaService implements OnModuleInit {
         'Sinh viên này đã có trong danh sách của đợt.',
       );
 
+    // BC2: Chặn thêm sinh viên nếu đang tham gia một đợt khác có trạng thái DangThucHien
+    const ongoingEnrollment = await this.dksvRepo
+      .createQueryBuilder('dksv')
+      .innerJoin('dksv.dotKienTap', 'dot')
+      .where('dksv.sinh_vien_id = :svId', { svId: sv.id })
+      .andWhere('dksv.dot_kien_tap_id != :dotId', { dotId: id })
+      .andWhere('dksv.trang_thai = :status', { status: 'DangThucHien' })
+      .andWhere('dot.trang_thai NOT IN (:...closedStatuses)', {
+        closedStatuses: ['DaKetThuc', 'DaKhoa', 'DaHuy'],
+      })
+      .getOne();
+
+    if (ongoingEnrollment) {
+      throw new BadRequestException(
+        `Sinh viên ${sv.ho_ten} (${sv.mssv}) đang tham gia một đợt kiến tập khác đang diễn ra. Không thể thêm vào đợt này!`,
+      );
+    }
+
+    // BC1: Tự động đếm số đợt trước đó của sinh viên để gán lan_dang_ky
+    const previousCount = await this.dksvRepo.count({
+      where: { sinh_vien_id: sv.id },
+    });
+
     const dksv = new DotKienTap_SinhVien();
     dksv.dot_kien_tap_id = id;
     dksv.sinh_vien_id = sv.id;
-    dksv.lan_dang_ky = 1;
+    dksv.lan_dang_ky = previousCount + 1;
     dksv.trang_thai = 'DangThucHien';
     await this.dksvRepo.save(dksv);
 
@@ -1334,14 +1406,55 @@ export class KhoaService implements OnModuleInit {
   }
 
   async removeStudentFromCampaign(id: number, studentId: number) {
-    const existing = await this.dksvRepo.findOne({
-      where: { dot_kien_tap_id: id, sinh_vien_id: studentId },
-    });
-    if (!existing)
-      throw new NotFoundException('Sinh viên không nằm trong đợt này.');
+    return this.dataSource.transaction(async (manager: EntityManager) => {
+      const existing = await manager.findOne(DotKienTap_SinhVien, {
+        where: { dot_kien_tap_id: id, sinh_vien_id: studentId },
+      });
+      if (!existing)
+        throw new NotFoundException('Sinh viên không nằm trong đợt này.');
 
-    await this.dksvRepo.remove(existing);
-    return { message: 'Xóa sinh viên khỏi đợt thành công' };
+      // 1. Kiểm tra xem sinh viên đã phát sinh điểm trong đợt này hay chưa
+      const phieuTQs = await manager.createQueryBuilder(PhieuThamQuan, 'ptq')
+        .innerJoin('ptq.phieuDangKy', 'pdk')
+        .innerJoin('pdk.chuyenThamQuan', 'ctq')
+        .innerJoin('ctq.lichKienTap', 'lkt')
+        .where('pdk.sinh_vien_id = :svId', { svId: studentId })
+        .andWhere('lkt.dot_kien_tap_id = :dotId', { dotId: id })
+        .getMany();
+
+      if (phieuTQs.length > 0) {
+        const ptqIds = phieuTQs.map(p => p.id);
+        const gradedCount = await manager.createQueryBuilder(DiemPhieuThamQuan, 'd')
+          .where('d.phieu_tham_quan_id IN (:...ptqIds)', { ptqIds })
+          .andWhere('(d.diem_chuan_bi IS NOT NULL OR d.diem_thu_hoach IS NOT NULL OR d.diem_hoi_dong_final IS NOT NULL OR d.diem_tong_chuyen IS NOT NULL)')
+          .getCount();
+
+        if (gradedCount > 0) {
+          throw new BadRequestException('Không thể xóa sinh viên khỏi đợt vì đã phát sinh dữ liệu điểm đánh giá!');
+        }
+      }
+
+      // 2. Dọn dẹp phân công GVHD
+      await manager.delete(PhanCongGVHD, {
+        dot_kien_tap_id: id,
+        sinh_vien_id: studentId,
+      });
+
+      // 3. Dọn dẹp Bộ chuyến báo cáo
+      const boChuyen = await manager.findOne(BoChuyenBaoCao, {
+        where: { dot_kien_tap_sinh_vien_id: existing.id },
+      });
+      if (boChuyen) {
+        // Gỡ bo_chuyen_bao_cao_id trên PhieuThamQuan
+        await manager.update(PhieuThamQuan, { bo_chuyen_bao_cao_id: boChuyen.id }, { bo_chuyen_bao_cao_id: null as any });
+        // Xóa BoChuyenBaoCao
+        await manager.delete(BoChuyenBaoCao, { id: boChuyen.id });
+      }
+
+      // 4. Xóa DotKienTap_SinhVien an toàn
+      await manager.remove(DotKienTap_SinhVien, existing);
+      return { message: 'Xóa sinh viên khỏi đợt thành công' };
+    });
   }
 
   // [ĐÃ XÓA] publishCampaign(): Trạng thái đợt kiến tập giờ được tự động
@@ -1706,18 +1819,54 @@ export class KhoaService implements OnModuleInit {
           const savedLich = await manager.save(LichKienTap, lich);
 
           if (chuyen_tham_quan_ids !== undefined) {
-            await manager.update(
-              ChuyenThamQuan,
-              { lich_kien_tap_id: id },
-              { lich_kien_tap_id: null as any },
+            const newTripIds = Array.isArray(chuyen_tham_quan_ids)
+              ? chuyen_tham_quan_ids.map(Number)
+              : [];
+
+            // Tìm các chuyến hiện tại đang thuộc lịch
+            const currentTrips = await manager.find(ChuyenThamQuan, {
+              where: { lich_kien_tap_id: id },
+              relations: { nhaMay: true },
+            });
+
+            // BC5: Các chuyến bị gỡ khỏi lịch là các chuyến có trong currentTrips nhưng KHÔNG có trong newTripIds
+            const tripsToRemove = currentTrips.filter(
+              (t) => !newTripIds.includes(t.id),
             );
-            if (
-              Array.isArray(chuyen_tham_quan_ids) &&
-              chuyen_tham_quan_ids.length > 0
-            ) {
+
+            for (const trip of tripsToRemove) {
+              const activeRegCount = await manager.count(PhieuDangKy, {
+                where: {
+                  chuyen_tham_quan_id: trip.id,
+                  trang_thai: Not(In(['DaHuy', 'BiLoai'])),
+                },
+              });
+
+              if (
+                activeRegCount > 0 ||
+                ['MoDangKy', 'DaChotDanhSach', 'DaDienRa'].includes(trip.trang_thai)
+              ) {
+                const tripName = trip.nhaMay?.ten_nha_may || `#${trip.id}`;
+                throw new BadRequestException(
+                  `Không thể gỡ chuyến "${tripName}" khỏi lịch vì chuyến đã có ${activeRegCount} sinh viên đăng ký hoặc đang trong tiến trình tổ chức (${trip.trang_thai})!`,
+                );
+              }
+            }
+
+            // Gỡ các chuyến hợp lệ
+            if (tripsToRemove.length > 0) {
               await manager.update(
                 ChuyenThamQuan,
-                { id: In(chuyen_tham_quan_ids) },
+                { id: In(tripsToRemove.map((t) => t.id)) },
+                { lich_kien_tap_id: null as any },
+              );
+            }
+
+            // Gán các chuyến mới vào lịch
+            if (newTripIds.length > 0) {
+              await manager.update(
+                ChuyenThamQuan,
+                { id: In(newTripIds) },
                 { lich_kien_tap_id: id },
               );
             }
@@ -2334,8 +2483,19 @@ export class KhoaService implements OnModuleInit {
     }
   }
 
-  async assignGvhdToTuDoTrips(sinhVienId: number, giangVienId: number) {
-    const phieus = await this.phieuRepo.find({
+  async assignGvhdToTuDoTrips(
+    sinhVienId: number,
+    giangVienId: number,
+    manager?: EntityManager,
+  ) {
+    const phieuRepo = manager
+      ? manager.getRepository(PhieuDangKy)
+      : this.phieuRepo;
+    const danDoanRepo = manager
+      ? manager.getRepository(PhanCongGiangVienDanDoan)
+      : this.danDoanRepo;
+
+    const phieus = await phieuRepo.find({
       where: { sinh_vien_id: sinhVienId, trang_thai: 'HopLe' },
       relations: { chuyenThamQuan: true },
     });
@@ -2345,7 +2505,7 @@ export class KhoaService implements OnModuleInit {
       .filter((t) => t && t.cach_to_chuc === 'TuDo');
 
     for (const trip of trips) {
-      const exists = await this.danDoanRepo.findOne({
+      const exists = await danDoanRepo.findOne({
         where: { chuyen_tham_quan_id: trip.id },
       });
       if (!exists) {
@@ -2353,7 +2513,7 @@ export class KhoaService implements OnModuleInit {
         dd.chuyen_tham_quan_id = trip.id;
         dd.giang_vien_id = giangVienId;
         dd.la_truong_doan = true;
-        await this.danDoanRepo.save(dd);
+        await danDoanRepo.save(dd);
       }
     }
   }
@@ -2869,6 +3029,9 @@ export class KhoaService implements OnModuleInit {
     });
     if (!trip) throw new NotFoundException('Không tìm thấy chuyến tham quan');
 
+    if (trip.trang_thai === 'DaDienRa') {
+      throw new BadRequestException('Không thể hủy chuyến tham quan đã diễn ra!');
+    }
     const allowedStatuses = ['DaDuyet', 'MoDangKy', 'DaChotDanhSach'];
     if (!allowedStatuses.includes(trip.trang_thai)) {
       throw new BadRequestException(
@@ -2983,324 +3146,347 @@ export class KhoaService implements OnModuleInit {
     gopVaoChuyenId?: number,
     gopCacPhieuDeXuatIds?: number[],
   ) {
+    if (!deXuatId) {
+      throw new BadRequestException('Mã đề xuất chuyến đi không hợp lệ');
+    }
+
     try {
-      if (!deXuatId) {
-        throw new BadRequestException('Mã đề xuất chuyến đi không hợp lệ');
-      }
+      return await this.dataSource.transaction(
+        async (manager: EntityManager) => {
+          const deXuatRepo = manager.getRepository(PhieuDeXuatChuyenThamQuan);
+          const chuyenRepo = manager.getRepository(ChuyenThamQuan);
+          const dksvRepo = manager.getRepository(DotKienTap_SinhVien);
+          const dotRepo = manager.getRepository(DotKienTap);
+          const lichRepo = manager.getRepository(LichKienTap);
+          const nhaMayRepo = manager.getRepository(NhaMay);
+          const danDoanRepo = manager.getRepository(PhanCongGiangVienDanDoan);
 
-      const dexuat = await this.deXuatRepo.findOne({
-        where: { id: deXuatId },
-        relations: { nhaMay: true, sinhVien: true },
-      });
-      if (!dexuat) {
-        throw new NotFoundException('Không tìm thấy đề xuất chuyến đi tự do');
-      }
-
-      if (dexuat.trang_thai_duyet !== 'ChoDuyet') {
-        throw new BadRequestException(
-          'Đề xuất này đã được xử lý trước đó, không thể thao tác lại',
-        );
-      }
-
-      if (!isApproved) {
-        dexuat.ngay_duyet = new Date();
-        dexuat.trang_thai_duyet = 'TuChoi';
-        await this.deXuatRepo.save(dexuat);
-
-        return {
-          message: 'Từ chối chuyến đi tự do thành công.',
-        };
-      }
-
-      // TRƯỜNG HỢP A: Gộp vào chuyến tự do đã có sẵn
-      if (gopVaoChuyenId) {
-        const existingTrip = await this.chuyenRepo.findOne({
-          where: { id: gopVaoChuyenId },
-          relations: { nhaMay: true },
-        });
-        if (!existingTrip) {
-          throw new NotFoundException(
-            'Không tìm thấy chuyến tham quan được chỉ định để gộp vào',
-          );
-        }
-        if (existingTrip.cach_to_chuc !== 'TuDo') {
-          throw new BadRequestException(
-            'Chỉ có thể gộp đề xuất tự do vào chuyến tham quan tự do',
-          );
-        }
-
-        const additionalIds = (gopCacPhieuDeXuatIds || []).filter(
-          (id) => id && id !== deXuatId,
-        );
-        const allIdsToMerge = [deXuatId, ...additionalIds];
-
-        const targetProposals = await this.deXuatRepo.find({
-          where: { id: In(allIdsToMerge), trang_thai_duyet: 'ChoDuyet' },
-        });
-
-        const isTripAlreadyApproved = existingTrip.trang_thai !== 'ChoDuyet';
-
-        // Nếu chuyến chưa được Khoa duyệt (trang_thai === 'ChoDuyet'), tăng sức chứa cho chuyến
-        if (!isTripAlreadyApproved) {
-          existingTrip.suc_chua =
-            (existingTrip.suc_chua || 0) + targetProposals.length;
-          await this.chuyenRepo.save(existingTrip);
-        }
-
-        // Cập nhật tất cả các phiếu đề xuất được gộp
-        for (const p of targetProposals) {
-          p.chuyen_tham_quan_id = existingTrip.id;
-          p.nha_may_id = existingTrip.nha_may_id;
-          p.trang_thai_duyet = 'DaDuyet';
-          p.ngay_duyet = new Date();
-          await this.deXuatRepo.save(p);
-        }
-
-        return {
-          message: isTripAlreadyApproved
-            ? (targetProposals.length > 1
-                ? `CLB đã đề cử gộp ${targetProposals.length} đề xuất vào chuyến tham quan tự do đã có. Đang chờ Quản lý Khoa phê duyệt gộp chính thức.`
-                : 'CLB đã đề cử gộp đề xuất vào chuyến tham quan tự do đã có. Đang chờ Quản lý Khoa phê duyệt gộp chính thức.')
-            : (targetProposals.length > 1
-                ? `Đã gộp thành công ${targetProposals.length} đề xuất tự do vào chuyến tham quan chờ Khoa duyệt.`
-                : 'Đã gộp thành công đề xuất tự do vào chuyến tham quan chờ Khoa duyệt.'),
-        };
-      }
-
-      // TRƯỜNG HỢP B: Tạo chuyến mới (có thể gom nhiều đề xuất tự do cùng lúc)
-      // Lưu ý: Chuyến tham quan tự do không bắt buộc phân công GVDĐ (sinh viên tự túc)
-
-      // 1. Xác định Đợt Kiến Tập của sinh viên hoặc đợt đang mở của hệ thống
-      let studentDotId: number | null = null;
-      const targetStudentId = dexuat.sinh_vien_id;
-      if (targetStudentId) {
-        const studentEnrollment = await this.dksvRepo.findOne({
-          where: { sinh_vien_id: targetStudentId },
-          relations: { dotKienTap: true },
-          order: { id: 'DESC' },
-        });
-        if (
-          studentEnrollment?.dotKienTap &&
-          ['DangTrienKhai', 'DangDienRa', 'Nhap'].includes(
-            studentEnrollment.dotKienTap.trang_thai,
-          ) &&
-          !studentEnrollment.dotKienTap.is_bo_chuyen_locked
-        ) {
-          studentDotId = studentEnrollment.dotKienTap.id;
-        }
-      }
-
-      if (!studentDotId) {
-        const activeDot = await this.dotRepo.findOne({
-          where: { trang_thai: In(['DangTrienKhai', 'DangDienRa', 'Nhap']) },
-          order: { ngay_bat_dau: 'DESC' },
-        });
-        if (activeDot && !activeDot.is_bo_chuyen_locked) {
-          studentDotId = activeDot.id;
-        }
-      }
-
-      let lichId: number | null = null;
-      let isFallbackToOutside = false;
-
-      // Bước 2: Nếu có Đợt kiến tập đang mở, kiểm tra Lịch tiếp nhận của Đợt
-      if (studentDotId) {
-        const dotLich = await this.lichRepo.findOne({
-          where: {
-            dot_kien_tap_id: studentDotId,
-            ten_lich: 'Lịch tiếp nhận đề xuất tự do',
-          },
-        });
-
-        if (!dotLich) {
-          // Chưa có lịch tiếp nhận của đợt -> Tạo mới với trạng thái MoDangKy
-          const newLich = new LichKienTap();
-          newLich.dot_kien_tap_id = studentDotId;
-          newLich.ten_lich = 'Lịch tiếp nhận đề xuất tự do';
-          newLich.so_luong_du_kien = 9999;
-          newLich.tg_mo_dang_ky_tu = new Date();
-          const endDate = new Date();
-          endDate.setMonth(endDate.getMonth() + 3);
-          newLich.tg_mo_dang_ky_den = endDate;
-          newLich.trang_thai = 'MoDangKy';
-          const savedLich = await this.lichRepo.save(newLich);
-          lichId = savedLich.id;
-        } else if (
-          dotLich.trang_thai === 'DaKhoa' ||
-          dotLich.trang_thai === 'DaKetThuc'
-        ) {
-          // Lịch của Đợt đã bị khóa hoặc kết thúc -> Tự động Fallback sang Lịch Ngoài Đợt
-          // BẢO TOÀN TRẠNG THÁI: Tuyệt đối không thay đổi trạng thái DaKhoa của Đợt!
-          isFallbackToOutside = true;
-        } else {
-          // Lịch của Đợt vẫn đang mở -> Dùng lịch này, giữ nguyên trạng thái
-          lichId = dotLich.id;
-        }
-      } else {
-        // Không có Đợt nào đang mở -> Điều hướng sang Lịch Ngoài Đợt
-        isFallbackToOutside = true;
-      }
-
-      // Bước 3: Fallback sang Lịch tiếp nhận đề xuất tự do (Ngoài đợt)
-      if (isFallbackToOutside || !lichId) {
-        let outsideLich = await this.lichRepo.findOne({
-          where: {
-            dot_kien_tap_id: IsNull(),
-            ten_lich: 'Lịch tiếp nhận đề xuất tự do (Ngoài đợt)',
-          },
-        });
-
-        if (!outsideLich) {
-          outsideLich = new LichKienTap();
-          outsideLich.dot_kien_tap_id = null;
-          outsideLich.ten_lich = 'Lịch tiếp nhận đề xuất tự do (Ngoài đợt)';
-          outsideLich.so_luong_du_kien = 9999;
-          outsideLich.tg_mo_dang_ky_tu = new Date();
-          const farEndDate = new Date();
-          farEndDate.setFullYear(farEndDate.getFullYear() + 2);
-          outsideLich.tg_mo_dang_ky_den = farEndDate;
-          outsideLich.trang_thai = 'MoDangKy';
-          outsideLich = await this.lichRepo.save(outsideLich);
-        }
-
-        lichId = outsideLich.id;
-      }
-
-      // 2. Xử lý Nhà Máy
-      let finalNhaMayId = nhaMayIdGop || dexuat.nha_may_id;
-      if (!finalNhaMayId && dexuat.ten_nha_may_de_xuat) {
-        const existingNhaMay = await this.nhaMayRepo
-          .createQueryBuilder('nm')
-          .where(
-            'nm.ten_nha_may COLLATE SQL_Latin1_General_CP1_CI_AI = :ten COLLATE SQL_Latin1_General_CP1_CI_AI',
-            { ten: dexuat.ten_nha_may_de_xuat.trim() },
-          )
-          .andWhere(
-            'nm.dia_chi COLLATE SQL_Latin1_General_CP1_CI_AI = :dc COLLATE SQL_Latin1_General_CP1_CI_AI',
-            { dc: (dexuat.dia_chi_de_xuat || '').trim() },
-          )
-          .getOne();
-
-        if (existingNhaMay) {
-          finalNhaMayId = existingNhaMay.id;
-        } else {
-          const activeFactories = await this.nhaMayRepo.find({
-            where: { trang_thai: 'HoatDong' },
+          const dexuat = await deXuatRepo.findOne({
+            where: { id: deXuatId },
+            relations: { nhaMay: true, sinhVien: true },
           });
-          const matchResult = CompanyMatcher.findBestMatch(
-            dexuat.ten_nha_may_de_xuat,
-            dexuat.dia_chi_de_xuat || '',
-            activeFactories,
-          );
-
-          if (matchResult.bestMatch && matchResult.score >= 75) {
-            finalNhaMayId = matchResult.bestMatch.id;
-          } else {
-            const newNhaMay = new NhaMay();
-            newNhaMay.ten_nha_may = CompanyMatcher.toTitleCase(
-              dexuat.ten_nha_may_de_xuat,
-            );
-            newNhaMay.dia_chi = dexuat.dia_chi_de_xuat || '';
-            newNhaMay.nguoi_lien_he = dexuat.nguoi_lien_he_de_xuat || '';
-            newNhaMay.sdt_lien_he = dexuat.sdt_lien_he_de_xuat || '';
-            newNhaMay.ho_tro_truc_tiep = dexuat.hinh_thuc === 'TrucTiep';
-            newNhaMay.ho_tro_truc_tuyen = dexuat.hinh_thuc === 'TrucTuyen';
-            newNhaMay.trang_thai = 'HoatDong';
-            const savedNhaMay = await this.nhaMayRepo.save(newNhaMay);
-            finalNhaMayId = savedNhaMay.id;
+          if (!dexuat) {
+            throw new NotFoundException('Không tìm thấy đề xuất chuyến đi tự do');
           }
-        }
-      }
 
-      if (!finalNhaMayId) {
-        throw new BadRequestException(
-          'Không xác định được nhà máy cho chuyến đi đề xuất',
-        );
-      }
+          if (dexuat.trang_thai_duyet !== 'ChoDuyet') {
+            throw new BadRequestException(
+              'Đề xuất này đã được xử lý trước đó, không thể thao tác lại',
+            );
+          }
 
-      // 3. Gom danh sách đề xuất cần tạo chung chuyến
-      const additionalIds = (gopCacPhieuDeXuatIds || []).filter(
-        (id) => id && id !== deXuatId,
-      );
-      const allIds = [deXuatId, ...additionalIds];
-      const targetProposals = await this.deXuatRepo.find({
-        where: { id: In(allIds), trang_thai_duyet: 'ChoDuyet' },
-      });
+          if (!isApproved) {
+            dexuat.ngay_duyet = new Date();
+            dexuat.trang_thai_duyet = 'TuChoi';
+            await deXuatRepo.save(dexuat);
 
-      const totalStudents =
-        targetProposals.length > 0 ? targetProposals.length : 1;
+            return {
+              message: 'Từ chối chuyến đi tự do thành công.',
+            };
+          }
 
-      // 3.5. Kiểm tra trùng lịch giảng viên dẫn đoàn trong cùng ngày
-      if (giangVienId && dexuat.ngay_tham_quan_de_xuat) {
-        const targetDate = new Date(dexuat.ngay_tham_quan_de_xuat).toDateString();
-        const sameDayAssignments = await this.danDoanRepo.find({
-          where: { giang_vien_id: giangVienId },
-          relations: { chuyenThamQuan: true },
-        });
-        const isConflict = sameDayAssignments.some(
-          (a) =>
-            a.chuyenThamQuan &&
-            a.chuyenThamQuan.trang_thai !== 'DaHuy' &&
-            a.chuyenThamQuan.ngay_tham_quan &&
-            new Date(a.chuyenThamQuan.ngay_tham_quan).toDateString() === targetDate,
-        );
-        if (isConflict) {
-          throw new BadRequestException(
-            'Giảng viên đã được phân công dẫn đoàn cho một chuyến tham quan khác trong cùng ngày',
+          // TRƯỜNG HỢP A: Gộp vào chuyến tự do đã có sẵn
+          if (gopVaoChuyenId) {
+            const existingTrip = await chuyenRepo.findOne({
+              where: { id: gopVaoChuyenId },
+              relations: { nhaMay: true },
+            });
+            if (!existingTrip) {
+              throw new NotFoundException(
+                'Không tìm thấy chuyến tham quan được chỉ định để gộp vào',
+              );
+            }
+            if (existingTrip.cach_to_chuc !== 'TuDo') {
+              throw new BadRequestException(
+                'Chỉ có thể gộp đề xuất tự do vào chuyến tham quan tự do',
+              );
+            }
+
+            const additionalIds = (gopCacPhieuDeXuatIds || []).filter(
+              (id) => id && id !== deXuatId,
+            );
+            const allIdsToMerge = [deXuatId, ...additionalIds];
+
+            const targetProposals = await deXuatRepo.find({
+              where: { id: In(allIdsToMerge), trang_thai_duyet: 'ChoDuyet' },
+            });
+
+            const isTripAlreadyApproved = existingTrip.trang_thai !== 'ChoDuyet';
+
+            // Nếu chuyến chưa được Khoa duyệt (trang_thai === 'ChoDuyet'), tăng sức chứa cho chuyến
+            if (!isTripAlreadyApproved) {
+              existingTrip.suc_chua =
+                (existingTrip.suc_chua || 0) + targetProposals.length;
+              await chuyenRepo.save(existingTrip);
+            }
+
+            // Cập nhật tất cả các phiếu đề xuất được gộp
+            for (const p of targetProposals) {
+              p.chuyen_tham_quan_id = existingTrip.id;
+              p.nha_may_id = existingTrip.nha_may_id;
+              p.trang_thai_duyet = 'DaDuyet';
+              p.ngay_duyet = new Date();
+              await deXuatRepo.save(p);
+            }
+
+            return {
+              message: isTripAlreadyApproved
+                ? (targetProposals.length > 1
+                    ? `CLB đã đề cử gộp ${targetProposals.length} đề xuất vào chuyến tham quan tự do đã có. Đang chờ Quản lý Khoa phê duyệt gộp chính thức.`
+                    : 'CLB đã đề cử gộp đề xuất vào chuyến tham quan tự do đã có. Đang chờ Quản lý Khoa phê duyệt gộp chính thức.')
+                : (targetProposals.length > 1
+                    ? `Đã gộp thành công ${targetProposals.length} đề xuất tự do vào chuyến tham quan chờ Khoa duyệt.`
+                    : 'Đã gộp thành công đề xuất tự do vào chuyến tham quan chờ Khoa duyệt.'),
+            };
+          }
+
+          // TRƯỜNG HỢP B: Tạo chuyến mới (có thể gom nhiều đề xuất tự do cùng lúc)
+          // Lưu ý: Chuyến tham quan tự do không bắt buộc phân công GVDĐ (sinh viên tự túc)
+
+          // 1. Xác định Đợt Kiến Tập của sinh viên hoặc đợt đang mở của hệ thống
+          let studentDotId: number | null = null;
+          const targetStudentId = dexuat.sinh_vien_id;
+          if (targetStudentId) {
+            const studentEnrollment = await dksvRepo.findOne({
+              where: { sinh_vien_id: targetStudentId },
+              relations: { dotKienTap: true },
+              order: { id: 'DESC' },
+            });
+            if (
+              studentEnrollment?.dotKienTap &&
+              ['DangTrienKhai', 'DangDienRa', 'Nhap'].includes(
+                studentEnrollment.dotKienTap.trang_thai,
+              ) &&
+              !studentEnrollment.dotKienTap.is_bo_chuyen_locked
+            ) {
+              studentDotId = studentEnrollment.dotKienTap.id;
+            }
+          }
+
+          if (!studentDotId) {
+            const activeDot = await dotRepo.findOne({
+              where: { trang_thai: In(['DangTrienKhai', 'DangDienRa', 'Nhap']) },
+              order: { ngay_bat_dau: 'DESC' },
+            });
+            if (activeDot && !activeDot.is_bo_chuyen_locked) {
+              studentDotId = activeDot.id;
+            }
+          }
+
+          let lichId: number | null = null;
+          let isFallbackToOutside = false;
+
+          // Bước 2: Nếu có Đợt kiến tập đang mở, kiểm tra Lịch tiếp nhận của Đợt
+          if (studentDotId) {
+            const dotLich = await lichRepo.findOne({
+              where: {
+                dot_kien_tap_id: studentDotId,
+                ten_lich: 'Lịch tiếp nhận đề xuất tự do',
+              },
+            });
+
+            if (!dotLich) {
+              // Chưa có lịch tiếp nhận của đợt -> Tạo mới với trạng thái MoDangKy
+              const newLich = new LichKienTap();
+              newLich.dot_kien_tap_id = studentDotId;
+              newLich.ten_lich = 'Lịch tiếp nhận đề xuất tự do';
+              newLich.so_luong_du_kien = 9999;
+              newLich.tg_mo_dang_ky_tu = new Date();
+              const endDate = new Date();
+              endDate.setMonth(endDate.getMonth() + 3);
+              newLich.tg_mo_dang_ky_den = endDate;
+              newLich.trang_thai = 'MoDangKy';
+              const savedLich = await lichRepo.save(newLich);
+              lichId = savedLich.id;
+            } else if (
+              dotLich.trang_thai === 'DaKhoa' ||
+              dotLich.trang_thai === 'DaKetThuc'
+            ) {
+              // Lịch của Đợt đã bị khóa hoặc kết thúc -> Tự động Fallback sang Lịch Ngoài Đợt
+              // BẢO TOÀN TRẠNG THÁI: Tuyệt đối không thay đổi trạng thái DaKhoa của Đợt!
+              isFallbackToOutside = true;
+            } else {
+              // Lịch của Đợt vẫn đang mở -> Dùng lịch này, giữ nguyên trạng thái
+              lichId = dotLich.id;
+            }
+          } else {
+            // Không có Đợt nào đang mở -> Điều hướng sang Lịch Ngoài Đợt
+            isFallbackToOutside = true;
+          }
+
+          // Bước 3: Fallback sang Lịch tiếp nhận đề xuất tự do (Ngoài đợt)
+          if (isFallbackToOutside || !lichId) {
+            let outsideLich = await lichRepo.findOne({
+              where: {
+                dot_kien_tap_id: IsNull(),
+                ten_lich: 'Lịch tiếp nhận đề xuất tự do (Ngoài đợt)',
+              },
+            });
+
+            if (!outsideLich) {
+              outsideLich = new LichKienTap();
+              outsideLich.dot_kien_tap_id = null;
+              outsideLich.ten_lich = 'Lịch tiếp nhận đề xuất tự do (Ngoài đợt)';
+              outsideLich.so_luong_du_kien = 9999;
+              outsideLich.tg_mo_dang_ky_tu = new Date();
+              const farEndDate = new Date();
+              farEndDate.setFullYear(farEndDate.getFullYear() + 2);
+              outsideLich.tg_mo_dang_ky_den = farEndDate;
+              outsideLich.trang_thai = 'MoDangKy';
+              outsideLich = await lichRepo.save(outsideLich);
+            }
+
+            lichId = outsideLich.id;
+          }
+
+          // 2. Xử lý Nhà Máy
+          let finalNhaMayId = nhaMayIdGop || dexuat.nha_may_id;
+          if (!finalNhaMayId && dexuat.ten_nha_may_de_xuat) {
+            const existingNhaMay = await nhaMayRepo
+              .createQueryBuilder('nm')
+              .where(
+                'nm.ten_nha_may COLLATE SQL_Latin1_General_CP1_CI_AI = :ten COLLATE SQL_Latin1_General_CP1_CI_AI',
+                { ten: dexuat.ten_nha_may_de_xuat.trim() },
+              )
+              .andWhere(
+                'nm.dia_chi COLLATE SQL_Latin1_General_CP1_CI_AI = :dc COLLATE SQL_Latin1_General_CP1_CI_AI',
+                { dc: (dexuat.dia_chi_de_xuat || '').trim() },
+              )
+              .getOne();
+
+            if (existingNhaMay) {
+              finalNhaMayId = existingNhaMay.id;
+            } else {
+              const activeFactories = await nhaMayRepo.find({
+                where: { trang_thai: 'HoatDong' },
+              });
+              const matchResult = CompanyMatcher.findBestMatch(
+                dexuat.ten_nha_may_de_xuat,
+                dexuat.dia_chi_de_xuat || '',
+                activeFactories,
+              );
+
+              if (matchResult.bestMatch && matchResult.score >= 75) {
+                finalNhaMayId = matchResult.bestMatch.id;
+              } else {
+                const newNhaMay = new NhaMay();
+                newNhaMay.ten_nha_may = CompanyMatcher.toTitleCase(
+                  dexuat.ten_nha_may_de_xuat,
+                );
+                newNhaMay.dia_chi = dexuat.dia_chi_de_xuat || '';
+                newNhaMay.nguoi_lien_he = dexuat.nguoi_lien_he_de_xuat || '';
+                newNhaMay.sdt_lien_he = dexuat.sdt_lien_he_de_xuat || '';
+                newNhaMay.ho_tro_truc_tiep = dexuat.hinh_thuc === 'TrucTiep';
+                newNhaMay.ho_tro_truc_tuyen = dexuat.hinh_thuc === 'TrucTuyen';
+                newNhaMay.trang_thai = 'HoatDong';
+                const savedNhaMay = await nhaMayRepo.save(newNhaMay);
+                finalNhaMayId = savedNhaMay.id;
+              }
+            }
+          }
+
+          if (!finalNhaMayId) {
+            throw new BadRequestException(
+              'Không xác định được nhà máy cho chuyến đi đề xuất',
+            );
+          }
+
+          // 3. Gom danh sách đề xuất cần tạo chung chuyến
+          const additionalIds = (gopCacPhieuDeXuatIds || []).filter(
+            (id) => id && id !== deXuatId,
           );
-        }
-      }
+          const allIds = [deXuatId, ...additionalIds];
+          const targetProposals = await deXuatRepo.find({
+            where: { id: In(allIds), trang_thai_duyet: 'ChoDuyet' },
+          });
 
-      // 4. Tạo Chuyến Tham Quan (Trạng thái: ChoDuyet)
-      const trip = new ChuyenThamQuan();
-      trip.nha_may_id = finalNhaMayId;
-      trip.lich_kien_tap_id = lichId;
-      trip.ngay_tham_quan = dexuat.ngay_tham_quan_de_xuat;
-      trip.gio_bat_dau = dexuat.gio_bat_dau_de_xuat;
-      trip.hinh_thuc = dexuat.hinh_thuc;
-      trip.cach_to_chuc = 'TuDo';
-      trip.suc_chua = totalStudents;
-      trip.trang_thai = 'ChoDuyet';
-      trip.le_phi = 0;
-      const savedTrip = await this.chuyenRepo.save(trip);
+          const totalStudents =
+            targetProposals.length > 0 ? targetProposals.length : 1;
 
-      // 5. Gán Giảng Viên do CLB đề xuất vào bảng PhanCongGiangVienDanDoan (nếu có chọn)
-      if (giangVienId) {
-        const dd = new PhanCongGiangVienDanDoan();
-        dd.chuyen_tham_quan_id = savedTrip.id;
-        dd.giang_vien_id = giangVienId;
-        dd.la_truong_doan = true;
-        await this.danDoanRepo.save(dd);
-      }
+          // 3.5. Kiểm tra trùng lịch giảng viên dẫn đoàn trong cùng ngày
+          if (giangVienId && dexuat.ngay_tham_quan_de_xuat) {
+            const targetDate = new Date(dexuat.ngay_tham_quan_de_xuat).toDateString();
+            const sameDayAssignments = await danDoanRepo.find({
+              where: { giang_vien_id: giangVienId },
+              relations: { chuyenThamQuan: true },
+            });
+            const isConflict = sameDayAssignments.some(
+              (a) =>
+                a.chuyenThamQuan &&
+                a.chuyenThamQuan.trang_thai !== 'DaHuy' &&
+                a.chuyenThamQuan.ngay_tham_quan &&
+                new Date(a.chuyenThamQuan.ngay_tham_quan).toDateString() === targetDate,
+            );
+            if (isConflict) {
+              throw new BadRequestException(
+                'Giảng viên đã được phân công dẫn đoàn cho một chuyến tham quan khác trong cùng ngày',
+              );
+            }
+          }
 
-      // 6. Cập nhật các Phiếu Đề Xuất
-      for (const p of targetProposals) {
-        p.chuyen_tham_quan_id = savedTrip.id;
-        p.nha_may_id = finalNhaMayId;
-        p.trang_thai_duyet = 'DaDuyet';
-        p.ngay_duyet = new Date();
-        await this.deXuatRepo.save(p);
-      }
+          // 4. Tạo Chuyến Tham Quan (Trạng thái: ChoDuyet)
+          const trip = new ChuyenThamQuan();
+          trip.nha_may_id = finalNhaMayId;
+          trip.lich_kien_tap_id = lichId;
+          trip.ngay_tham_quan = dexuat.ngay_tham_quan_de_xuat;
+          trip.gio_bat_dau = dexuat.gio_bat_dau_de_xuat;
+          trip.hinh_thuc = dexuat.hinh_thuc;
+          trip.cach_to_chuc = 'TuDo';
+          trip.suc_chua = totalStudents;
+          trip.trang_thai = 'ChoDuyet';
+          trip.le_phi = 0;
+          const savedTrip = await chuyenRepo.save(trip);
 
-      let approvalMsg =
-        targetProposals.length > 1
-          ? `CLB đã duyệt gom ${targetProposals.length} đề xuất vào chuyến mới và chuyển đến Quản lý Khoa phê duyệt.`
-          : 'CLB đã duyệt sơ bộ đề xuất và chuyển đến Quản lý Khoa phê duyệt.';
-      if (isFallbackToOutside) {
-        approvalMsg +=
-          ' (Lịch đợt kiến tập đã khóa, chuyến đã được tự động điều hướng sang Lịch tiếp nhận tự do tích lũy ngoài đợt).';
-      }
+          // 5. Gán Giảng Viên do CLB đề xuất vào bảng PhanCongGiangVienDanDoan (nếu có chọn)
+          if (giangVienId) {
+            const dd = new PhanCongGiangVienDanDoan();
+            dd.chuyen_tham_quan_id = savedTrip.id;
+            dd.giang_vien_id = giangVienId;
+            dd.la_truong_doan = true;
+            await danDoanRepo.save(dd);
+          }
 
-      return {
-        message: approvalMsg,
-      };
-    } catch (error) {
+          // 6. Cập nhật các Phiếu Đề Xuất
+          for (const p of targetProposals) {
+            p.chuyen_tham_quan_id = savedTrip.id;
+            p.nha_may_id = finalNhaMayId;
+            p.trang_thai_duyet = 'DaDuyet';
+            p.ngay_duyet = new Date();
+            await deXuatRepo.save(p);
+          }
+
+          let approvalMsg =
+            targetProposals.length > 1
+              ? `CLB đã duyệt gom ${targetProposals.length} đề xuất vào chuyến mới và chuyển đến Quản lý Khoa phê duyệt.`
+              : 'CLB đã duyệt sơ bộ đề xuất và chuyển đến Quản lý Khoa phê duyệt.';
+          if (isFallbackToOutside) {
+            approvalMsg +=
+              ' (Lịch đợt kiến tập đã khóa, chuyến đã được tự động điều hướng sang Lịch tiếp nhận tự do tích lũy ngoài đợt).';
+          }
+
+          return {
+            message: approvalMsg,
+          };
+        },
+      );
+    } catch (error: any) {
       console.error('Lỗi khi CLB duyệt chuyến đi:', error);
       if (
         error instanceof NotFoundException ||
         error instanceof BadRequestException
       ) {
         throw error;
+      }
+      const errMsg = error?.message || '';
+      const errNumber = error?.number || error?.driverError?.number;
+      if (
+        errNumber === 50000 ||
+        errMsg.includes('trg_GVDanDoan_ChanTrungNgay') ||
+        errMsg.includes('Giảng viên đã được phân công dẫn đoàn cho một chuyến khác trong cùng ngày')
+      ) {
+        throw new BadRequestException(
+          'Giảng viên đã được phân công dẫn đoàn cho một chuyến tham quan khác trong cùng ngày',
+        );
       }
       throw new BadRequestException(
         'Không thể phê duyệt chuyến tham quan do lỗi xử lý dữ liệu hệ thống. Vui lòng thử lại.',
@@ -3940,6 +4126,18 @@ export class KhoaService implements OnModuleInit {
           phieu_dang_ky_id: req.phieu_dang_ky_id,
           trang_thai: In(['ChuaDong', 'ViPham']),
         });
+      } else {
+        // BC8: Khi từ chối duyệt hủy, khôi phục/xác nhận trạng thái HopLe
+        req.phieuDangKy.trang_thai = 'HopLe';
+        await manager.save(PhieuDangKy, req.phieuDangKy);
+
+        const ptq = await manager.findOne(PhieuThamQuan, {
+          where: { phieu_dang_ky_id: req.phieu_dang_ky_id },
+        });
+        if (ptq && ptq.trang_thai !== 'HopLe') {
+          ptq.trang_thai = 'HopLe';
+          await manager.save(PhieuThamQuan, ptq);
+        }
       }
 
       return { message: 'Xử lý yêu cầu hủy thành công' };
@@ -3955,6 +4153,10 @@ export class KhoaService implements OnModuleInit {
       relations: { lichKienTap: { dotKienTap: { hocKy: { namHoc: true } } } },
     });
     if (!trip) throw new NotFoundException('Không tìm thấy chuyến đi');
+
+    if (['DaDienRa', 'DaHuy'].includes(trip.trang_thai)) {
+      throw new BadRequestException('Không thể lọc danh sách cho chuyến tham quan đã diễn ra hoặc đã bị hủy!');
+    }
 
     await this.scanAndMarkLatePayments();
 
@@ -4451,30 +4653,38 @@ export class KhoaService implements OnModuleInit {
       }
     }
 
-    const current = await this.pcGvhdRepo.findOne({
-      where: {
-        dot_kien_tap_sinh_vien_id: dotKienTapSinhVienId,
-        trang_thai: 'DangHoatDong',
-      },
+    return await this.dataSource.transaction(async (manager) => {
+      const pcGvhdRepo = manager.getRepository(PhanCongGVHD);
+
+      const current = await pcGvhdRepo.findOne({
+        where: {
+          dot_kien_tap_sinh_vien_id: dotKienTapSinhVienId,
+          trang_thai: 'DangHoatDong',
+        },
+      });
+      if (current) {
+        current.trang_thai = 'DaGo';
+        await pcGvhdRepo.save(current);
+      }
+
+      const pc = new PhanCongGVHD();
+      pc.dot_kien_tap_sinh_vien_id = dotKienTapSinhVienId;
+      pc.giang_vien_id = lecturerId;
+      pc.trang_thai = 'DangHoatDong';
+      pc.ngay_phan_cong = new Date();
+      await pcGvhdRepo.save(pc);
+
+      await this.assignGvhdToTuDoTrips(dksv.sinh_vien_id, lecturerId, manager);
+
+      // Đồng bộ cập nhật giang_vien_hd_id trên DiemPhieuThamQuan của các phiếu chưa khóa điểm thu hoạch
+      await this.syncLecturerGuideToStudentTrips(
+        dksv.sinh_vien_id,
+        lecturerId,
+        manager,
+      );
+
+      return { success: true, pc };
     });
-    if (current) {
-      current.trang_thai = 'DaGo';
-      await this.pcGvhdRepo.save(current);
-    }
-
-    const pc = new PhanCongGVHD();
-    pc.dot_kien_tap_sinh_vien_id = dotKienTapSinhVienId;
-    pc.giang_vien_id = lecturerId;
-    pc.trang_thai = 'DangHoatDong';
-    pc.ngay_phan_cong = new Date();
-    await this.pcGvhdRepo.save(pc);
-
-    await this.assignGvhdToTuDoTrips(dksv.sinh_vien_id, lecturerId);
-
-    // Đồng bộ cập nhật giang_vien_hd_id trên DiemPhieuThamQuan của các phiếu chưa khóa điểm thu hoạch
-    await this.syncLecturerGuideToStudentTrips(dksv.sinh_vien_id, lecturerId);
-
-    return { success: true, pc };
   }
 
   async getLecturersWithWorkload(dotKienTapId?: number) {
@@ -4659,14 +4869,39 @@ export class KhoaService implements OnModuleInit {
       );
     }
 
-    // Xóa tất cả phân công cũ của chuyến này để đảm bảo chỉ có 1 GV dẫn đoàn
-    await this.danDoanRepo.delete({ chuyen_tham_quan_id: tripId });
+    try {
+      return await this.dataSource.transaction(async (manager) => {
+        const danDoanRepo = manager.getRepository(PhanCongGiangVienDanDoan);
 
-    const dd = new PhanCongGiangVienDanDoan();
-    dd.chuyen_tham_quan_id = tripId;
-    dd.giang_vien_id = lecturerId;
-    dd.la_truong_doan = laTruongDoan;
-    return this.danDoanRepo.save(dd);
+        // Xóa tất cả phân công cũ của chuyến này để đảm bảo chỉ có 1 GV dẫn đoàn
+        await danDoanRepo.delete({ chuyen_tham_quan_id: tripId });
+
+        const dd = new PhanCongGiangVienDanDoan();
+        dd.chuyen_tham_quan_id = tripId;
+        dd.giang_vien_id = lecturerId;
+        dd.la_truong_doan = laTruongDoan;
+        return await danDoanRepo.save(dd);
+      });
+    } catch (error: any) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
+      const errMsg = error?.message || '';
+      const errNumber = error?.number || error?.driverError?.number;
+      if (
+        errNumber === 50000 ||
+        errMsg.includes('trg_GVDanDoan_ChanTrungNgay') ||
+        errMsg.includes('Giảng viên đã được phân công dẫn đoàn cho một chuyến khác trong cùng ngày')
+      ) {
+        throw new BadRequestException(
+          'Giảng viên đã được phân công dẫn đoàn cho một chuyến tham quan khác trong cùng ngày',
+        );
+      }
+      throw error;
+    }
   }
 
   async unassignTourLeader(tripId: number, lecturerId: number) {
@@ -5314,6 +5549,36 @@ export class KhoaService implements OnModuleInit {
 
   async assignStudentsToBoard(boardId: number, boChuyenIds: number[]) {
     if (!boChuyenIds || boChuyenIds.length === 0) return;
+
+    // BC12 & RBAC check (User note 4): Khi đổi Hội đồng, dọn dẹp các điểm nháp của hội đồng cũ nếu chưa khóa
+    if (this.rawDefaultDataSource) {
+      const ptqs = await this.rawDefaultDataSource.getRepository(PhieuThamQuan).find({
+        where: { bo_chuyen_bao_cao_id: In(boChuyenIds) },
+        select: { id: true },
+      });
+      const ptqIds = ptqs.map((p) => p.id);
+      if (ptqIds.length > 0) {
+        const diems = await this.rawDefaultDataSource.getRepository(DiemPhieuThamQuan).find({
+          where: { phieu_tham_quan_id: In(ptqIds) },
+        });
+        const unfinalizedPtqIds = diems
+          .filter((d) => !d.da_khoa_hoi_dong && !d.da_khoa)
+          .map((d) => d.phieu_tham_quan_id);
+
+        if (unfinalizedPtqIds.length > 0) {
+          await this.rawDefaultDataSource.getRepository(DiemHoiDong_ChiTiet).delete({
+            phieu_tham_quan_id: In(unfinalizedPtqIds),
+          });
+          await this.rawDefaultDataSource
+            .createQueryBuilder()
+            .update(DiemPhieuThamQuan)
+            .set({ diem_hoi_dong_final: null as any })
+            .where('phieu_tham_quan_id IN (:...unfinalizedPtqIds)', { unfinalizedPtqIds })
+            .execute();
+        }
+      }
+    }
+
     await this.boRepo.update(
       { id: In(boChuyenIds) },
       { hoi_dong_id: boardId }
@@ -5323,6 +5588,36 @@ export class KhoaService implements OnModuleInit {
 
   async unassignStudentsFromBoard(boardId: number, boChuyenIds: number[]) {
     if (!boChuyenIds || boChuyenIds.length === 0) return;
+
+    // BC12 & RBAC check (User note 4): Khi gỡ Hội đồng, dọn dẹp điểm nháp và reset diem_hoi_dong_final qua rawDefaultDataSource
+    if (this.rawDefaultDataSource) {
+      const ptqs = await this.rawDefaultDataSource.getRepository(PhieuThamQuan).find({
+        where: { bo_chuyen_bao_cao_id: In(boChuyenIds) },
+        select: { id: true },
+      });
+      const ptqIds = ptqs.map((p) => p.id);
+      if (ptqIds.length > 0) {
+        const diems = await this.rawDefaultDataSource.getRepository(DiemPhieuThamQuan).find({
+          where: { phieu_tham_quan_id: In(ptqIds) },
+        });
+        const unfinalizedPtqIds = diems
+          .filter((d) => !d.da_khoa_hoi_dong && !d.da_khoa)
+          .map((d) => d.phieu_tham_quan_id);
+
+        if (unfinalizedPtqIds.length > 0) {
+          await this.rawDefaultDataSource.getRepository(DiemHoiDong_ChiTiet).delete({
+            phieu_tham_quan_id: In(unfinalizedPtqIds),
+          });
+          await this.rawDefaultDataSource
+            .createQueryBuilder()
+            .update(DiemPhieuThamQuan)
+            .set({ diem_hoi_dong_final: null as any })
+            .where('phieu_tham_quan_id IN (:...unfinalizedPtqIds)', { unfinalizedPtqIds })
+            .execute();
+        }
+      }
+    }
+
     await this.boRepo.update(
       { id: In(boChuyenIds), hoi_dong_id: boardId },
       { hoi_dong_id: null as any }
