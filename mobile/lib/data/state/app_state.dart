@@ -1,2543 +1,2600 @@
-import 'dart:math';
-import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter/material.dart';
-import '../models/app_models.dart';
-import '../../core/services/notification_service.dart';
-import '../../core/network/api_service.dart';
-
-class AppState {
-  String? currentRole; // 'student', 'lecturer', or null
-  bool? phaiDoiMatKhau;
-
-  // Student state
-  StudentProfile studentProfile;
-  StudentDashboardStats? studentDashboardStats;
-  List<Trip> studentTrips;
-  List<StudentNotification> studentNotifications;
-  List<Submission> submissions;
-  List<Payment> payments;
-  List<RefundRequest> refunds;
-  List<TripProposal> proposals;
-  StudentTermGrade? termGrade;
-  List<StudentTermGrade> termGrades;
-  int selectedTermIndex;
-  RepresentativeTripsStatus? repStatus;
-
-  // Lecturer state
-  LecturerProfile lecturerProfile;
-  LecturerDashboardStats? lecturerDashboardStats;
-  List<LecturerStudent> lecturerStudents;
-  List<LecturerTour> lecturerTours;
-  List<CouncilSession> councilSessions;
-  List<LecturerNotification> lecturerNotifications;
-  Map<int, List<TripRegistrationStudent>> tripStudentsCache;
-  List<CouncilBoardItem> councilBoards;
-
-  AppState({
-    this.currentRole,
-    this.phaiDoiMatKhau,
-    required this.studentProfile,
-    this.studentDashboardStats,
-    required this.studentTrips,
-    required this.studentNotifications,
-    required this.submissions,
-    required this.payments,
-    required this.refunds,
-    this.proposals = const [],
-    this.termGrade,
-    this.termGrades = const [],
-    this.selectedTermIndex = 0,
-    this.repStatus,
-    required this.lecturerProfile,
-    this.lecturerDashboardStats,
-    required this.lecturerStudents,
-    required this.lecturerTours,
-    required this.councilSessions,
-    required this.lecturerNotifications,
-    this.tripStudentsCache = const {},
-    this.councilBoards = const [],
-  });
-
-  AppState copyWith({
-    String? currentRole,
-    bool? phaiDoiMatKhau,
-    StudentProfile? studentProfile,
-    StudentDashboardStats? studentDashboardStats,
-    List<Trip>? studentTrips,
-    List<StudentNotification>? studentNotifications,
-    List<Submission>? submissions,
-    List<Payment>? payments,
-    List<RefundRequest>? refunds,
-    List<TripProposal>? proposals,
-    StudentTermGrade? termGrade,
-    List<StudentTermGrade>? termGrades,
-    int? selectedTermIndex,
-    RepresentativeTripsStatus? repStatus,
-    LecturerProfile? lecturerProfile,
-    LecturerDashboardStats? lecturerDashboardStats,
-    List<LecturerStudent>? lecturerStudents,
-    List<LecturerTour>? lecturerTours,
-    List<CouncilSession>? councilSessions,
-    List<LecturerNotification>? lecturerNotifications,
-    Map<int, List<TripRegistrationStudent>>? tripStudentsCache,
-    List<CouncilBoardItem>? councilBoards,
-  }) {
-    return AppState(
-      currentRole: currentRole ?? this.currentRole,
-      phaiDoiMatKhau: phaiDoiMatKhau ?? this.phaiDoiMatKhau,
-      studentProfile: studentProfile ?? this.studentProfile,
-      studentDashboardStats:
-          studentDashboardStats ?? this.studentDashboardStats,
-      studentTrips: studentTrips ?? this.studentTrips,
-      studentNotifications: studentNotifications ?? this.studentNotifications,
-      submissions: submissions ?? this.submissions,
-      payments: payments ?? this.payments,
-      refunds: refunds ?? this.refunds,
-      proposals: proposals ?? this.proposals,
-      termGrade: termGrade ?? this.termGrade,
-      termGrades: termGrades ?? this.termGrades,
-      selectedTermIndex: selectedTermIndex ?? this.selectedTermIndex,
-      repStatus: repStatus ?? this.repStatus,
-      lecturerProfile: lecturerProfile ?? this.lecturerProfile,
-      lecturerDashboardStats:
-          lecturerDashboardStats ?? this.lecturerDashboardStats,
-      lecturerStudents: lecturerStudents ?? this.lecturerStudents,
-      lecturerTours: lecturerTours ?? this.lecturerTours,
-      councilSessions: councilSessions ?? this.councilSessions,
-      lecturerNotifications:
-          lecturerNotifications ?? this.lecturerNotifications,
-      tripStudentsCache: tripStudentsCache ?? this.tripStudentsCache,
-      councilBoards: councilBoards ?? this.councilBoards,
-    );
-  }
-
-  // --- Real-time Smart Reminders Engine (Computed purely from backend state) ---
-  List<SmartReminderItem> get activeStudentReminders {
-    final List<SmartReminderItem> reminders = [];
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-
-    // 1. Chuyen di khoi hanh trong vong 48h (Hom nay hoac Ngay mai)
-    for (var trip in studentTrips) {
-      if (trip.isRegistered &&
-          !trip.isCompleted &&
-          (trip.registrationStatus == null ||
-              ['HopLe', 'ChoDuyet'].contains(trip.registrationStatus))) {
-        DateTime? tripDt;
-        final rawDate = trip.date.trim();
-        if (rawDate.isNotEmpty && rawDate != 'N/A') {
-          tripDt = DateTime.tryParse(rawDate);
-          if (tripDt == null && rawDate.contains('/')) {
-            final parts = rawDate.split('/');
-            if (parts.length == 3) {
-              tripDt = DateTime.tryParse(
-                '${parts[2]}-${parts[1].padLeft(2, '0')}-${parts[0].padLeft(2, '0')}',
-              );
-            }
-          }
-        }
-        if (tripDt != null) {
-          final tripDateOnly = DateTime(tripDt.year, tripDt.month, tripDt.day);
-          final diffDays = tripDateOnly.difference(today).inDays;
-          if (diffDays == 0 || diffDays == 1) {
-            reminders.add(
-              SmartReminderItem(
-                id: 'trip-${trip.id}',
-                title: diffDays == 0
-                    ? 'Khởi hành HÔM NAY: ${trip.name}'
-                    : 'Khởi hành NGÀY MAI: ${trip.name}',
-                message:
-                    'Khởi hành lúc ${trip.time}. Vui lòng có mặt đúng giờ, trang phục chỉnh tề và mang theo thẻ sinh viên!',
-                severity: ReminderSeverity.urgent,
-                icon: Icons.directions_bus,
-                actionLabel: 'Xem chuyến',
-                actionType: 'trip',
-                targetId: trip.id,
-                deadline: tripDt,
-              ),
-            );
-          }
-        }
-      }
-    }
-
-    // 2. Nhac nho Le phi chua thanh toan
-    final unpaidInvoices = payments
-        .where((p) => p.rawStatus == 'ChuaDong' || p.status == 'Chưa đóng')
-        .toList();
-    if (unpaidInvoices.isNotEmpty) {
-      final firstUnpaid = unpaidInvoices.first;
-      reminders.add(
-        SmartReminderItem(
-          id: 'payment-${firstUnpaid.id}',
-          title: 'Nhắc nhở đóng lệ phí kiến tập',
-          message:
-              'Bạn có ${unpaidInvoices.length} khoản lệ phí chưa thanh toán (Hạn: ${firstUnpaid.dueDate}). Vui lòng hoàn tất đúng hạn!',
-          severity: ReminderSeverity.warning,
-          icon: Icons.account_balance_wallet,
-          actionLabel: 'Đóng lệ phí',
-          actionType: 'finance',
-          targetId: firstUnpaid.id,
-        ),
-      );
-    }
-
-    // 3. Nhac nho Nop bai thu hoach
-    for (var sub in submissions) {
-      if (sub.status == 'Chưa nộp' || sub.status == 'ChuaNop') {
-        reminders.add(
-          SmartReminderItem(
-            id: 'sub-${sub.id}',
-            title: 'Nhắc nhở nộp bài thu hoạch',
-            message:
-                'Bạn chưa nộp bài thu hoạch cho chuyến "${sub.tripName}". Hãy nộp file sớm để giảng viên chấm điểm!',
-            severity: ReminderSeverity.warning,
-            icon: Icons.upload_file,
-            actionLabel: 'Nộp bài ngay',
-            actionType: 'report',
-            targetId: sub.id,
-          ),
-        );
-      }
-    }
-
-    // 4. Nhac nho Lich bao cao Hoi dong
-    if (repStatus != null &&
-        repStatus!.councilTime != null &&
-        repStatus!.councilTime != 'Chưa có lịch') {
-      reminders.add(
-        SmartReminderItem(
-          id: 'council-rep',
-          title: 'Lịch bảo vệ Hội đồng kiến tập',
-          message:
-              'Hội đồng: ${repStatus!.councilSessionName ?? "Hội đồng khoa"} - Phòng: ${repStatus!.councilRoom ?? "Chưa xếp"} - Thời gian: ${repStatus!.councilTime}',
-          severity: ReminderSeverity.info,
-          icon: Icons.gavel,
-          actionLabel: 'Xem lịch',
-          actionType: 'council',
-        ),
-      );
-    }
-
-    // 5. Thong bao co loai "NhacNho" hoac "CanhBao" tu Backend
-    for (var notif in studentNotifications) {
-      if (notif.type == 'NhacNho' || notif.type == 'CanhBao') {
-        reminders.add(
-          SmartReminderItem(
-            id: 'notif-${notif.id}',
-            title: notif.title,
-            message: notif.content,
-            severity: notif.type == 'CanhBao'
-                ? ReminderSeverity.urgent
-                : ReminderSeverity.warning,
-            icon: notif.type == 'CanhBao'
-                ? Icons.warning_amber_rounded
-                : Icons.alarm_on,
-            actionLabel: 'Xem chi tiết',
-            actionType: 'notifications',
-            targetId: notif.id,
-          ),
-        );
-      }
-    }
-
-    return reminders;
-  }
-
-  List<SmartReminderItem> get activeLecturerReminders {
-    final List<SmartReminderItem> reminders = [];
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-
-    // 1. Nhac nho Bai thu hoach can cham
-    final ungradedStudents = lecturerStudents
-        .where((s) => !s.isGraded && !s.isScoreLocked)
-        .toList();
-    if (ungradedStudents.isNotEmpty) {
-      reminders.add(
-        SmartReminderItem(
-          id: 'gv-grade-pending',
-          title: 'Nhắc nhở chấm bài thu hoạch',
-          message:
-              'Thầy/Cô hiện có ${ungradedStudents.length} bài thu hoạch của sinh viên đang chờ chấm điểm!',
-          severity: ReminderSeverity.warning,
-          icon: Icons.assignment_late,
-          actionLabel: 'Chấm bài ngay',
-          actionType: 'grading',
-        ),
-      );
-    }
-
-    // 2. Nhac nho Chuyen dan doan sap toi (Hom nay hoac Ngay mai)
-    for (var tour in lecturerTours) {
-      if (tour.status != 'completed') {
-        DateTime? tourDt;
-        final rawDate = tour.date.trim();
-        if (rawDate.isNotEmpty && rawDate != 'N/A') {
-          tourDt = DateTime.tryParse(rawDate);
-          if (tourDt == null && rawDate.contains('/')) {
-            final parts = rawDate.split('/');
-            if (parts.length == 3) {
-              tourDt = DateTime.tryParse(
-                '${parts[2]}-${parts[1].padLeft(2, '0')}-${parts[0].padLeft(2, '0')}',
-              );
-            }
-          }
-        }
-        if (tourDt != null) {
-          final tourDateOnly = DateTime(tourDt.year, tourDt.month, tourDt.day);
-          final diffDays = tourDateOnly.difference(today).inDays;
-          if (diffDays == 0 || diffDays == 1) {
-            reminders.add(
-              SmartReminderItem(
-                id: 'tour-${tour.id}',
-                title: diffDays == 0
-                    ? 'Dẫn đoàn HÔM NAY: ${tour.name}'
-                    : 'Dẫn đoàn NGÀY MAI: ${tour.name}',
-                message:
-                    'Khởi hành: ${tour.timeRange}. Sĩ số: ${tour.registeredCount}/${tour.maxCount} sinh viên.',
-                severity: ReminderSeverity.urgent,
-                icon: Icons.groups,
-                actionLabel: 'Xem đoàn',
-                actionType: 'tour',
-                targetId: tour.id,
-              ),
-            );
-          }
-        }
-      }
-    }
-
-    // 3. Nhac nho Buoi cham Hoi dong
-    for (var board in councilBoards) {
-      if (!board.isBoardLocked && board.status != 'completed') {
-        reminders.add(
-          SmartReminderItem(
-            id: 'board-${board.sessionId}',
-            title: 'Buổi chấm Hội đồng: ${board.sessionName}',
-            message:
-                'Phòng: ${board.room} - Thời gian: ${board.date} (${board.timeRange}). Vai trò: ${board.role}.',
-            severity: ReminderSeverity.info,
-            icon: Icons.gavel,
-            actionLabel: 'Vào hội đồng',
-            actionType: 'board',
-            targetId: board.sessionId.toString(),
-          ),
-        );
-      }
-    }
-
-    // 4. Thong bao loai NhacNho hoac CanhBao gui cho GV
-    for (var notif in lecturerNotifications) {
-      if (notif.type == 'NhacNho' || notif.type == 'CanhBao') {
-        reminders.add(
-          SmartReminderItem(
-            id: 'gv-notif-${notif.id}',
-            title: notif.title,
-            message: notif.body,
-            severity: notif.type == 'CanhBao'
-                ? ReminderSeverity.urgent
-                : ReminderSeverity.warning,
-            icon: notif.type == 'CanhBao'
-                ? Icons.warning_amber_rounded
-                : Icons.alarm_on,
-            actionLabel: 'Xem chi tiết',
-            actionType: 'notifications',
-            targetId: notif.id,
-          ),
-        );
-      }
-    }
-
-    return reminders;
-  }
-}
-
-class AppStateProvider extends InheritedWidget {
-  final AppState state;
-  final AppStateProviderState stateWidget;
-
-  const AppStateProvider({
-    super.key,
-    required this.state,
-    required this.stateWidget,
-    required super.child,
-  });
-
-  static AppStateProviderState of(BuildContext context) {
-    final provider = context
-        .dependOnInheritedWidgetOfExactType<AppStateProvider>();
-    if (provider == null) {
-      throw Exception('AppStateProvider not found in context');
-    }
-    return provider.stateWidget;
-  }
-
-  @override
-  bool updateShouldNotify(AppStateProvider oldWidget) {
-    return true;
-  }
-}
-
-class AppStateContainer extends StatefulWidget {
-  final Widget child;
-
-  const AppStateContainer({super.key, required this.child});
-
-  @override
-  State<AppStateContainer> createState() => AppStateProviderState();
-}
-
-class AppStateProviderState extends State<AppStateContainer> {
-  late AppState _state;
-
-  AppState get state => _state;
-
-  @override
-  void initState() {
-    super.initState();
-    _resetToDefaults(notify: false);
-
-    // Bind 401 Unauthorized handler
-    ApiService.onUnauthorized = () {
-      logout();
-    };
-
-    // Lắng nghe mạng phục hồi để tự động đồng bộ và bắn thông báo đẩy tức thì
-    NotificationService.instance.onNetworkRestored = () {
-      final activeId = ApiService.profileId ?? ApiService.userId;
-      if (activeId != null) {
-        if (_state.currentRole == 'student') {
-          fetchStudentDataFromApi(activeId);
-        } else if (_state.currentRole == 'lecturer') {
-          _fetchLecturerDataFromApi(activeId);
-        }
-      }
-    };
-
-    // Attempt auto-login on startup
-    _tryRestoreSession();
-  }
-
-  Future<void> _tryRestoreSession() async {
-    final success = await ApiService.initSessionFromStorage();
-    if (success && ApiService.role != null && ApiService.userId != null) {
-      final activeId = ApiService.profileId ?? ApiService.userId!;
-      setState(() {
-        if (ApiService.role == 'SinhVien') {
-          _state.currentRole = 'student';
-          fetchStudentDataFromApi(activeId);
-        } else if (ApiService.role == 'GiangVien') {
-          _state.currentRole = 'lecturer';
-          _fetchLecturerDataFromApi(activeId);
-        }
-      });
-    }
-  }
-
-  void _resetToDefaults({bool notify = true}) {
-    final newState = AppState(
-      currentRole: null,
-      phaiDoiMatKhau: null,
-      studentProfile: StudentProfile(
-        name: '',
-        email: '',
-        studentId: '',
-        className: '',
-        major: '',
-        avatar: '',
-      ),
-      studentTrips: [],
-      studentNotifications: [],
-      submissions: [],
-      payments: [],
-      refunds: [],
-      proposals: [],
-      termGrade: null,
-      termGrades: [],
-      selectedTermIndex: 0,
-      repStatus: null,
-      lecturerProfile: LecturerProfile(
-        name: '',
-        email: '',
-        teacherId: '',
-        avatar: '',
-        department: '',
-      ),
-      lecturerStudents: [],
-      lecturerTours: [],
-      councilSessions: [],
-      lecturerNotifications: [],
-      tripStudentsCache: {},
-      councilBoards: [],
-    );
-
-    if (notify) {
-      setState(() {
-        _state = newState;
-      });
-    } else {
-      _state = newState;
-    }
-  }
-
-  // --- Hybrid API Helpers ---
-
-  static const String _cachedStudentNotifsKey = 'qlkt_cached_student_notifs';
-  static const String _cachedLecturerNotifsKey = 'qlkt_cached_lecturer_notifs';
-
-  Future<void> _saveStudentNotificationsCache(
-    List<StudentNotification> notifs,
-  ) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final jsonList = notifs
-          .map(
-            (n) => {
-              'id': n.id,
-              'title': n.title,
-              'content': n.content,
-              'timeText': n.timeText,
-              'isRead': n.isRead,
-              'type': n.type,
-              'attachment': n.attachment,
-              'fileUrl': n.fileUrl,
-              'senderName': n.senderName,
-              'targetAudience': n.targetAudience,
-              'isEdited': n.isEdited,
-              'editedAt': n.editedAt,
-            },
-          )
-          .toList();
-      await prefs.setString(_cachedStudentNotifsKey, jsonEncode(jsonList));
-    } catch (e) {
-      debugPrint('Error saving student notifications cache: $e');
-    }
-  }
-
-  Future<List<StudentNotification>> _loadStudentNotificationsCache() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final cachedStr = prefs.getString(_cachedStudentNotifsKey);
-      if (cachedStr != null && cachedStr.isNotEmpty) {
-        final List<dynamic> list = jsonDecode(cachedStr);
-        return list
-            .map(
-              (item) => StudentNotification(
-                id: item['id']?.toString() ?? '',
-                title: item['title'] ?? 'Thông báo',
-                content: item['content'] ?? '',
-                timeText: item['timeText'] ?? 'Ngoại tuyến',
-                isRead: item['isRead'] == true,
-                type: item['type'] ?? 'ThongBao',
-                attachment: item['attachment'],
-                fileUrl: item['fileUrl'],
-                senderName: item['senderName'] ?? 'Ban Chủ nhiệm Khoa',
-                targetAudience: item['targetAudience'] ?? 'STUDENT',
-                isEdited: item['isEdited'] == true,
-                editedAt: item['editedAt'],
-              ),
-            )
-            .toList();
-      }
-    } catch (e) {
-      debugPrint('Error loading student notifications cache: $e');
-    }
-    return [];
-  }
-
-  Future<void> _saveLecturerNotificationsCache(
-    List<LecturerNotification> notifs,
-  ) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final jsonList = notifs
-          .map(
-            (n) => {
-              'id': n.id,
-              'title': n.title,
-              'body': n.body,
-              'time': n.time,
-              'isUnread': n.isUnread,
-              'type': n.type,
-              'attachment': n.attachment,
-              'fileUrl': n.fileUrl,
-              'senderName': n.senderName,
-              'targetAudience': n.targetAudience,
-              'isEdited': n.isEdited,
-              'editedAt': n.editedAt,
-            },
-          )
-          .toList();
-      await prefs.setString(_cachedLecturerNotifsKey, jsonEncode(jsonList));
-    } catch (e) {
-      debugPrint('Error saving lecturer notifications cache: $e');
-    }
-  }
-
-  Future<List<LecturerNotification>> _loadLecturerNotificationsCache() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final cachedStr = prefs.getString(_cachedLecturerNotifsKey);
-      if (cachedStr != null && cachedStr.isNotEmpty) {
-        final List<dynamic> list = jsonDecode(cachedStr);
-        return list
-            .map(
-              (item) => LecturerNotification(
-                id: item['id']?.toString() ?? '',
-                title: item['title'] ?? 'Thông báo',
-                body: item['body'] ?? '',
-                time: item['time'] ?? 'Ngoại tuyến',
-                isUnread: item['isUnread'] == true,
-                type: item['type'] ?? 'ThongBao',
-                attachment: item['attachment'],
-                fileUrl: item['fileUrl'],
-                senderName: item['senderName'] ?? 'Ban Chủ nhiệm Khoa',
-                targetAudience: item['targetAudience'] ?? 'LECTURER',
-                isEdited: item['isEdited'] == true,
-                editedAt: item['editedAt'],
-              ),
-            )
-            .toList();
-      }
-    } catch (e) {
-      debugPrint('Error loading lecturer notifications cache: $e');
-    }
-    return [];
-  }
-
-  List<StudentNotification> _generateAutoRemindersForStudent() {
-    final List<StudentNotification> autoReminders = [];
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-
-    // 1. Chuyen di sap khoi hanh (Hom nay hoac Ngay mai)
-    for (var trip in _state.studentTrips) {
-      if (trip.isRegistered &&
-          !trip.isCompleted &&
-          (trip.registrationStatus == null ||
-              ['HopLe', 'ChoDuyet'].contains(trip.registrationStatus))) {
-        DateTime? tripDt;
-        final rawDate = trip.date.trim();
-        if (rawDate.isNotEmpty && rawDate != 'N/A') {
-          tripDt = DateTime.tryParse(rawDate);
-          if (tripDt == null && rawDate.contains('/')) {
-            final parts = rawDate.split('/');
-            if (parts.length == 3) {
-              tripDt = DateTime.tryParse(
-                '${parts[2]}-${parts[1].padLeft(2, '0')}-${parts[0].padLeft(2, '0')}',
-              );
-            }
-          }
-        }
-        if (tripDt != null) {
-          final tripDateOnly = DateTime(tripDt.year, tripDt.month, tripDt.day);
-          final diffDays = tripDateOnly.difference(today).inDays;
-          if (diffDays == 0 || diffDays == 1) {
-            final whenStr = diffDays == 0 ? 'HÔM NAY' : 'NGÀY MAI';
-            final timeTag = diffDays == 0 ? 'Hôm nay' : 'Ngày mai';
-            autoReminders.add(
-              StudentNotification(
-                id: 'auto-trip-${trip.id}',
-                title: '[Nhắc nhở] Khởi hành $whenStr: ${trip.name}',
-                content:
-                    'Chuyến tham quan "${trip.name}" sẽ khởi hành $timeTag lúc ${trip.time}. Địa điểm: ${trip.location}. Bạn vui lòng có mặt đúng giờ, mặc trang phục chỉnh tề và mang theo thẻ sinh viên!',
-                timeText: timeTag,
-                type: 'NhacNho',
-                senderName: 'Hệ thống tự động',
-                targetAudience: 'STUDENT',
-              ),
-            );
-          }
-        }
-      }
-    }
-
-    // 2. Nhac nho Dong le phi kien tap
-    final unpaidPayments = _state.payments
-        .where(
-          (p) =>
-              p.rawStatus == 'ChuaDong' ||
-              p.status == 'Chưa đóng' ||
-              p.status == 'Chưa thanh toán',
-        )
-        .toList();
-    for (var unpaid in unpaidPayments) {
-      autoReminders.add(
-        StudentNotification(
-          id: 'auto-fee-${unpaid.id}',
-          title: '[Nhắc nhở] Đóng lệ phí: ${unpaid.name}',
-          content:
-              'Bạn có khoản lệ phí ${unpaid.amount.toInt()} đ cho hóa đơn "${unpaid.name}" chưa thanh toán (Hạn chót: ${unpaid.dueDate}). Vui lòng hoàn tất đúng hạn!',
-          timeText: 'Chưa đóng',
-          type: 'TaiChinh',
-          senderName: 'Hệ thống tự động',
-          targetAudience: 'STUDENT',
-        ),
-      );
-    }
-
-    // 3. Nhac nho Nop bai thu hoach
-    for (var sub in _state.submissions) {
-      if (sub.status == 'Chưa nộp' || sub.status == 'ChuaNop') {
-        autoReminders.add(
-          StudentNotification(
-            id: 'auto-sub-${sub.id}',
-            title: '[Nhắc nhở] Nộp bài thu hoạch: ${sub.tripName}',
-            content:
-                'Bạn chưa nộp bài thu hoạch cho chuyến "${sub.tripName}". Hãy nộp file báo cáo sớm trên ứng dụng để giảng viên chấm điểm!',
-            timeText: 'Cần nộp',
-            type: 'NhacNho',
-            senderName: 'Hệ thống tự động',
-            targetAudience: 'STUDENT',
-          ),
-        );
-      }
-    }
-
-    // 4. Lich bao ve Hoi dong kien tap
-    if (_state.repStatus != null &&
-        _state.repStatus!.councilTime != null &&
-        _state.repStatus!.councilTime != 'Chưa có lịch') {
-      autoReminders.add(
-        StudentNotification(
-          id: 'auto-council-rep',
-          title: '[Nhắc nhở] Lịch bảo vệ Hội đồng kiến tập',
-          content:
-              'Hội đồng: ${_state.repStatus!.councilSessionName ?? "Hội đồng khoa"} - Phòng: ${_state.repStatus!.councilRoom ?? "Chưa xếp"} - Thời gian: ${_state.repStatus!.councilTime}',
-          timeText: 'Sắp diễn ra',
-          type: 'NhacNho',
-          senderName: 'Hệ thống tự động',
-          targetAudience: 'STUDENT',
-        ),
-      );
-    }
-
-    return autoReminders;
-  }
-
-  List<LecturerNotification> _generateAutoRemindersForLecturer() {
-    final List<LecturerNotification> autoReminders = [];
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-
-    // 1. Nhac nho cham bai
-    final ungraded = _state.lecturerStudents
-        .where((s) => !s.isGraded && !s.isScoreLocked)
-        .toList();
-    if (ungraded.isNotEmpty) {
-      autoReminders.add(
-        LecturerNotification(
-          id: 'auto-gv-grading',
-          title: '[Nhắc nhở] Chấm bài thu hoạch sinh viên',
-          body:
-              'Thầy/Cô hiện có ${ungraded.length} bài thu hoạch của sinh viên đang chờ chấm điểm. Vui lòng vào mục "Chấm bài" để hoàn tất!',
-          time: 'Cần chấm',
-          type: 'NhacNho',
-          senderName: 'Hệ thống tự động',
-          isUnread: true,
-        ),
-      );
-    }
-
-    // 2. Dan doan Hom nay / Ngay mai
-    for (var tour in _state.lecturerTours) {
-      if (tour.status != 'completed') {
-        DateTime? tourDt;
-        final rawDate = tour.date.trim();
-        if (rawDate.isNotEmpty && rawDate != 'N/A') {
-          tourDt = DateTime.tryParse(rawDate);
-          if (tourDt == null && rawDate.contains('/')) {
-            final parts = rawDate.split('/');
-            if (parts.length == 3) {
-              tourDt = DateTime.tryParse(
-                '${parts[2]}-${parts[1].padLeft(2, '0')}-${parts[0].padLeft(2, '0')}',
-              );
-            }
-          }
-        }
-        if (tourDt != null) {
-          final tourDateOnly = DateTime(tourDt.year, tourDt.month, tourDt.day);
-          final diffDays = tourDateOnly.difference(today).inDays;
-          if (diffDays == 0 || diffDays == 1) {
-            final whenStr = diffDays == 0 ? 'HÔM NAY' : 'NGÀY MAI';
-            final timeTag = diffDays == 0 ? 'Hôm nay' : 'Ngày mai';
-            autoReminders.add(
-              LecturerNotification(
-                id: 'auto-gv-tour-${tour.id}',
-                title: '[Nhắc nhở] Dẫn đoàn $whenStr: ${tour.name}',
-                body:
-                    'Thời gian khởi hành: ${tour.timeRange}. Sĩ số: ${tour.registeredCount}/${tour.maxCount} sinh viên. Thầy/Cô vui lòng có mặt đúng giờ để điểm danh sinh viên!',
-                time: timeTag,
-                type: 'NhacNho',
-                senderName: 'Hệ thống tự động',
-                isUnread: true,
-              ),
-            );
-          }
-        }
-      }
-    }
-
-    // 3. Hoi dong sap toi
-    for (var board in _state.councilBoards) {
-      if (!board.isBoardLocked && board.status != 'completed') {
-        autoReminders.add(
-          LecturerNotification(
-            id: 'auto-gv-board-${board.sessionId}',
-            title: '[Nhắc nhở] Buổi chấm Hội đồng: ${board.sessionName}',
-            body:
-                'Phòng: ${board.room} - Thời gian: ${board.date} (${board.timeRange}). Vai trò: ${board.role}.',
-            time: 'Sắp diễn ra',
-            type: 'NhacNho',
-            senderName: 'Hệ thống tự động',
-            isUnread: true,
-          ),
-        );
-      }
-    }
-
-    return autoReminders;
-  }
-
-  Future<void> fetchStudentDataFromApi(int studentId) async {
-    try {
-      // 1. Fetch all available trips and registered trips
-      final List<dynamic> availableTripsJson =
-          await ApiService.getAvailableTrips(studentId);
-      final List<dynamic> regTripsJson = await ApiService.getRegisteredTrips(
-        studentId,
-      );
-
-      // Combine available and registered to form the studentTrips list
-      List<Trip> realTrips = [];
-
-      // Process available trips (all trips available for regular or supplementary registration)
-      for (var t in availableTripsJson) {
-        final trip = _mapJsonToTrip(t, isRegistered: false);
-        realTrips.add(
-          trip.copyWith(
-            isRegistered: false,
-            daTungDangKy: t['da_tung_dang_ky'] == true,
-            trangThaiCu: t['trang_thai_cu'],
-            tripStatus: t['trang_thai'],
-          ),
-        );
-      }
-
-      // Process registered trips
-      List<Submission> realSubmissions = [];
-      for (var reg in regTripsJson) {
-        if (reg['chuyenThamQuan'] != null) {
-          final trip = _mapJsonToTrip(
-            reg['chuyenThamQuan'],
-            isRegistered: true,
-          );
-          final regStatus = reg['trang_thai']?.toString();
-          final tripStatus = reg['chuyenThamQuan']?['trang_thai']?.toString();
-          final isCompleted =
-              regStatus == 'HoanThanh' ||
-              regStatus == 'DaChamDiem' ||
-              regStatus == 'DaThamGia' ||
-              trip.isCompleted;
-
-          final bth =
-              reg['baiThuHoach'] ?? reg['phieuThamQuan']?['baiThuHoach'];
-          final fileXacNhan = bth?['file_xac_nhan_tham_quan'];
-          final cachToChuc = reg['chuyenThamQuan']?['cach_to_chuc'] ?? trip.cachToChuc;
-
-          realTrips.add(
-            trip.copyWith(
-              isRegistered: true,
-              isCompleted: isCompleted,
-              registrationId: reg['id'].toString(),
-              registrationStatus: regStatus,
-              tripStatus: tripStatus,
-              cachToChuc: cachToChuc,
-              fileXacNhanUrl: fileXacNhan,
-            ),
-          );
-
-          if (isCompleted || regStatus == 'HopLe' || regStatus == 'DaThamGia') {
-            final diemPhieu = reg['phieuThamQuan']?['diemPhieuThamQuan'];
-            final rawNgayThamQuan = reg['chuyenThamQuan']?['ngay_tham_quan'];
-            final tripDate = rawNgayThamQuan != null
-                ? DateTime.tryParse(rawNgayThamQuan.toString())
-                : null;
-
-            final rawScore = diemPhieu?['diem_thu_hoach'];
-            final double? reportScore = rawScore != null
-                ? double.tryParse(rawScore.toString())
-                : null;
-            final String? gvhdComment = diemPhieu?['nhan_xet_gvhd']?.toString();
-            final String? gvhdName =
-                (diemPhieu?['giangVienHD']?['ho_ten'] ??
-                        diemPhieu?['giangVien']?['ho_ten'])
-                    ?.toString();
-            final bool isScoreLocked =
-                diemPhieu?['da_khoa_thu_hoach'] == true ||
-                diemPhieu?['da_khoa'] == true;
-
-            final rawGradedAt =
-                diemPhieu?['ngay_cham_thu_hoach'] ?? diemPhieu?['updated_at'];
-            String? gradedAtText;
-            if (rawGradedAt != null) {
-              final dt = DateTime.tryParse(rawGradedAt.toString())?.toLocal();
-              if (dt != null) {
-                gradedAtText =
-                    '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
-              }
-            }
-
-            String? deadlineText;
-            if (tripDate != null) {
-              final dline = tripDate.add(const Duration(days: 10));
-              deadlineText =
-                  '${dline.day.toString().padLeft(2, '0')}/${dline.month.toString().padLeft(2, '0')}/${dline.year}';
-            }
-
-            final hasBaoCao = bth != null &&
-                bth['file_bao_cao'] != null &&
-                bth['file_bao_cao'].toString().isNotEmpty;
-
-            realSubmissions.add(
-              Submission(
-                id: reg['id'].toString(),
-                registrationId: reg['id'],
-                tripName: trip.name,
-                typeText: (trip.isTuDo || trip.cachToChuc == 'TuDo' || trip.type == 'TuDo' || trip.type == 'Tự do')
-                    ? 'Kiến tập tự do'
-                    : (trip.type == 'Trực tuyến' || trip.type == 'TrucTuyen')
-                    ? 'Kiến tập trực tuyến'
-                    : 'Kiến tập trực tiếp',
-                dateText: trip.date,
-                tripDate: tripDate,
-                status: hasBaoCao ? 'Đã nộp' : 'Chưa nộp',
-                fileName: hasBaoCao
-                    ? bth['file_bao_cao']?.toString().split('/').last
-                    : null,
-                fileSize: hasBaoCao ? 'N/A' : null,
-                submittedAt: bth?['ngay_nop'] != null
-                    ? DateTime.tryParse(
-                        bth['ngay_nop'].toString(),
-                      )?.toLocal().toString().substring(0, 16)
-                    : null,
-                hasConfirmationFile:
-                    bth != null && bth['file_xac_nhan_tham_quan'] != null && bth['file_xac_nhan_tham_quan'].toString().isNotEmpty,
-                confirmationFileName: bth?['file_xac_nhan_tham_quan']
-                    ?.split('/')
-                    .last,
-                fileBaoCaoUrl: hasBaoCao ? bth['file_bao_cao'] : null,
-                fileXacNhanUrl: bth?['file_xac_nhan_tham_quan'],
-                reportScore: reportScore,
-                gvhdComment: gvhdComment,
-                gvhdName: gvhdName,
-                isScoreLocked: isScoreLocked,
-                gradedAt: gradedAtText,
-                deadlineText: deadlineText,
-              ),
-            );
-          }
-        }
-      }
-
-      setState(() {
-        _state.studentTrips = realTrips;
-        _state.submissions = realSubmissions;
-      });
-
-      // 2. Fetch Invoices
-      final List<dynamic> invoicesJson = await ApiService.getInvoices(
-        studentId,
-      );
-      setState(() {
-        if (invoicesJson.isNotEmpty) {
-          _state.payments = invoicesJson.map((inv) {
-            final chuyen =
-                inv['chuyen_di'] ?? inv['phieuDangKy']?['chuyenThamQuan'] ?? {};
-            final nhaMay = chuyen['nhaMay'] ?? {};
-            final tenNhaMay =
-                nhaMay['ten_nha_may'] ??
-                chuyen['ten_chuyen_di'] ??
-                'Chuyến kiến tập';
-
-            final rawHan = inv['han_dong'] ?? inv['han_thanh_toan'];
-            String formattedDueDate = 'Chưa cập nhật';
-            if (rawHan != null) {
-              final dt = DateTime.tryParse(rawHan.toString())?.toLocal();
-              if (dt != null) {
-                formattedDueDate =
-                    '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
-              }
-            }
-
-            final rawStatus = inv['trang_thai']?.toString() ?? 'ChuaDong';
-            String displayStatus = 'Chưa đóng';
-            if (rawStatus == 'DaDongDungHan') {
-              displayStatus = 'Đã đóng đúng hạn';
-            } else if (rawStatus == 'DaDongTreHan') {
-              displayStatus = 'Đã đóng trễ hạn';
-            } else if (rawStatus == 'ViPham') {
-              displayStatus = 'Vi phạm';
-            } else if (rawStatus == 'DaHoanPhi') {
-              displayStatus = 'Đã hoàn phí';
-            }
-
-            final rawTripDate = chuyen['ngay_tham_quan'];
-            String formattedTripDate = '--';
-            if (rawTripDate != null) {
-              final dt = DateTime.tryParse(rawTripDate.toString())?.toLocal();
-              if (dt != null) {
-                formattedTripDate =
-                    '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
-              }
-            }
-
-            final rawPaidDate = inv['ngay_dong_thuc_te'];
-            String? formattedPaidDate;
-            if (rawPaidDate != null) {
-              final dt = DateTime.tryParse(rawPaidDate.toString())?.toLocal();
-              if (dt != null) {
-                formattedPaidDate =
-                    '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-              }
-            }
-
-            final hinhThuc = chuyen['hinh_thuc']?.toString();
-            final tripType =
-                (hinhThuc == 'TrucTuyen' || hinhThuc == 'Trực tuyến')
-                ? 'Trực tuyến'
-                : (hinhThuc == 'TuDo' || hinhThuc == 'Tự do')
-                ? 'Tự do'
-                : 'Trực tiếp';
-
-            // Transfer code: read directly from DB noi_dung_chuyen_khoan
-            final rawCode = inv['noi_dung_chuyen_khoan']?.toString().trim();
-            final transferContent = (rawCode != null && rawCode.isNotEmpty)
-                ? rawCode
-                : (inv['ma_hoa_don'] ?? 'KT-${inv['id']}');
-
-            return Payment(
-              id: inv['id'].toString(),
-              tripId: chuyen['id']?.toString() ?? '',
-              name: tenNhaMay,
-              code: transferContent,
-              amount:
-                  double.tryParse(inv['so_tien']?.toString() ?? '150000') ??
-                  150000,
-              dueDate: formattedDueDate,
-              status: displayStatus,
-              rawStatus: rawStatus,
-              tripDate: formattedTripDate,
-              tripType: tripType,
-              paidDate: formattedPaidDate,
-            );
-          }).toList();
-        } else {
-          _state.payments = [];
-        }
-      });
-
-      // 3. Fetch Refund Requests
-      try {
-        final List<dynamic> refundsJson = await ApiService.getRefundRequests(
-          studentId,
-        );
-        setState(() {
-          if (refundsJson.isNotEmpty) {
-            _state.refunds = refundsJson.map((ref) {
-              final invoice = ref['hoaDon'] ?? {};
-              String mappedStatus = 'Chờ xử lý';
-              final rawStatus = ref['trang_thai']?.toString() ?? '';
-              if (rawStatus == 'Approved' ||
-                  rawStatus == 'DaHoanTien' ||
-                  rawStatus == 'DaHoanPhi') {
-                mappedStatus = 'Đã hoàn tiền';
-              } else if (rawStatus == 'Rejected' || rawStatus == 'TuChoi') {
-                mappedStatus = 'Từ chối';
-              } else {
-                mappedStatus = 'Chờ xử lý';
-              }
-
-              final rawDate =
-                  ref['ngay_nop'] ?? ref['ngay_yeu_cau'] ?? ref['created_at'];
-              String dateText = 'N/A';
-              if (rawDate != null) {
-                final dt = DateTime.tryParse(rawDate.toString())?.toLocal();
-                if (dt != null) {
-                  dateText =
-                      '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
-                }
-              }
-
-              final amountNum =
-                  double.tryParse(invoice['so_tien']?.toString() ?? '0') ?? 0;
-              final amountFormatted = amountNum > 0
-                  ? amountNum.toInt().toString().replaceAllMapped(
-                      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-                      (Match m) => '${m[1]}.',
-                    )
-                  : (invoice['so_tien']?.toString() ?? '0');
-
-              return RefundRequest(
-                id: ref['id'].toString(),
-                invoiceName:
-                    invoice['ma_hoa_don'] ?? 'Hóa đơn #${invoice['id']}',
-                dateText: dateText,
-                amountText: '$amountFormatted đ',
-                status: mappedStatus,
-                lyDoTuChoi:
-                    ref['ly_do_tu_choi'] ?? ref['ghi_chu'] ?? ref['ly_do'],
-              );
-            }).toList();
-          } else {
-            _state.refunds = [];
-          }
-        });
-      } catch (e) {
-        print('Error fetching refund requests: $e');
-      }
-
-      final List<dynamic> notifsJson = await ApiService.getStudentNotifications(
-        studentId,
-      );
-      final List<StudentNotification> backendNotifs = notifsJson.isNotEmpty
-          ? notifsJson.map((n) {
-              final rawDate = n['ngay_gui'] ?? n['created_at'];
-              String formattedTime = 'Vừa xong';
-              if (rawDate != null) {
-                final dt = DateTime.tryParse(rawDate.toString())?.toLocal();
-                if (dt != null) {
-                  formattedTime =
-                      '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
-                }
-              }
-
-              final rawEditedDate = n['ngay_chinh_sua'];
-              String? formattedEditedTime;
-              if (rawEditedDate != null) {
-                final dt = DateTime.tryParse(
-                  rawEditedDate.toString(),
-                )?.toLocal();
-                if (dt != null) {
-                  formattedEditedTime =
-                      '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
-                }
-              }
-
-              return StudentNotification(
-                id: n['id'].toString(),
-                title: n['tieu_de'] ?? 'Thông báo',
-                content: n['noi_dung'] ?? '',
-                timeText: formattedTime,
-                attachment:
-                    n['file_dinh_kem'] ??
-                    (n['files'] != null && (n['files'] as List).isNotEmpty
-                        ? n['files'][0]['ten_file']
-                        : null),
-                fileUrl:
-                    n['file_url'] ??
-                    (n['files'] != null && (n['files'] as List).isNotEmpty
-                        ? n['files'][0]['duong_dan']
-                        : null),
-                type: n['loai_thong_bao'] ?? n['type'] ?? 'ThongBao',
-                senderName: n['nguoi_gui'] ?? 'Ban Chủ nhiệm Khoa',
-                targetAudience: n['doi_tuong_nhan'] ?? 'STUDENT',
-                isEdited: n['da_chinh_sua'] == true || n['da_chinh_sua'] == 1,
-                editedAt: formattedEditedTime,
-              );
-            }).toList()
-          : [];
-
-      final autoReminders = _generateAutoRemindersForStudent();
-      setState(() {
-        _state.studentNotifications = [...autoReminders, ...backendNotifs];
-      });
-      _saveStudentNotificationsCache(_state.studentNotifications);
-      NotificationService.instance.notifyStudentReminders(autoReminders);
-
-      final Map<String, dynamic> statsJson =
-          await ApiService.getStudentDashboardStats(studentId);
-      setState(() {
-        _state.studentDashboardStats = StudentDashboardStats(
-          registered: statsJson['registered'] ?? 0,
-          completed: statsJson['completed'] ?? 0,
-          pendingReports: statsJson['pendingReports'] ?? 0,
-          avgScore: statsJson['avgScore']?.toString() ?? 'Chưa có',
-        );
-      });
-
-      // Fetch Proposals, Grades & Representative Trips Status
-      await fetchStudentProposals(studentId);
-      await fetchStudentGrades(studentId);
-      await fetchRepresentativeTripsStatus();
-    } catch (e) {
-      print(
-        'Failed to load student data from backend (Offline mode active): $e',
-      );
-      if (_state.studentNotifications.isEmpty) {
-        final cached = await _loadStudentNotificationsCache();
-        if (cached.isNotEmpty) {
-          setState(() {
-            _state.studentNotifications = cached;
-          });
-        }
-      }
-    }
-  }
-
-  String _safeSub(dynamic val, int length, {int start = 0}) {
-    if (val == null) return '';
-    final str = val.toString();
-    if (str.isEmpty || str.length <= start) return '';
-    if (str.length < start + length) return str.substring(start);
-    return str.substring(start, start + length);
-  }
-
-  Trip _mapJsonToTrip(Map<String, dynamic> json, {required bool isRegistered}) {
-    final nhaMay = json['nhaMay'] ?? {};
-
-    return Trip(
-      id: json['id'].toString(),
-      name:
-          nhaMay['ten_nha_may'] ?? json['ten_chuyen_di'] ?? 'Chuyến tham quan',
-      date: json['ngay_tham_quan'] != null
-          ? (_safeSub(
-                  DateTime.tryParse(
-                    json['ngay_tham_quan'],
-                  )?.toLocal().toString(),
-                  10,
-                ).isNotEmpty
-                ? _safeSub(
-                    DateTime.tryParse(
-                      json['ngay_tham_quan'],
-                    )?.toLocal().toString(),
-                    10,
-                  )
-                : 'N/A')
-          : 'N/A',
-      time:
-          '${_safeSub(json['gio_bat_dau'], 5).isNotEmpty ? _safeSub(json['gio_bat_dau'], 5) : '08:00'} - ${_safeSub(json['gio_ket_thuc'], 5).isNotEmpty ? _safeSub(json['gio_ket_thuc'], 5) : '12:00'}',
-      type: (json['cach_to_chuc'] == 'TuDo' ||
-              json['cach_to_chuc'] == 'Tự do' ||
-              json['hinh_thuc'] == 'TuDo' ||
-              json['hinh_thuc'] == 'Tự do')
-          ? 'Tự do'
-          : (json['hinh_thuc'] == 'TrucTuyen' ||
-                  json['hinh_thuc'] == 'Trực tuyến')
-          ? 'Trực tuyến'
-          : 'Trực tiếp',
-      location: nhaMay['dia_chi'] ?? 'Địa chỉ chưa cập nhật',
-      industry: 'Công nghệ thực phẩm',
-      description: nhaMay['mo_ta'] ?? 'Chuyến tham quan thực tế doanh nghiệp',
-      heroImage: '',
-      isRegistered: isRegistered,
-      isCompleted:
-          json['trang_thai'] == 'DaDienRa' || json['trang_thai'] == 'HoanThanh',
-      cachToChuc: json['cach_to_chuc']?.toString(),
-    );
-  }
-
-  Future<void> fetchLecturerDataFromApi(int lecturerId) =>
-      _fetchLecturerDataFromApi(lecturerId);
-
-  Future<void> _fetchLecturerDataFromApi(int lecturerId) async {
-    try {
-      final reportsRes = await ApiService.getGuidedReports(
-        lecturerId,
-        limit: 100,
-      );
-      final List<dynamic> reportsJson = reportsRes['data'] ?? [];
-
-      setState(() {
-        _state.lecturerStudents = reportsJson.map((r) {
-          final phieuTQ = r['phieuThamQuan'] ?? {};
-          final phieu = phieuTQ['phieuDangKy'] ?? {};
-          final sv = phieu['sinhVien'] ?? {};
-          final chuyen = phieu['chuyenThamQuan'] ?? {};
-          final diem =
-              phieuTQ['diemPhieuThamQuan'] ?? r['diemPhieuThamQuan'] ?? {};
-          final diemDanh = phieuTQ['diemDanh'] ?? r['diemDanh'] ?? {};
-
-          final mssv = sv['mssv'] ?? sv['id']?.toString() ?? 'SV';
-          final uniqueId = r['id'] != null ? '${mssv}_${r['id']}' : mssv;
-
-          final dotKienTap = chuyen['lichKienTap']?['dotKienTap'] ??
-              chuyen['dotKienTap'] ??
-              {};
-          final dotId = chuyen['lichKienTap']?['dot_kien_tap_id'] ??
-              dotKienTap['id'] ??
-              chuyen['dot_kien_tap_id'] ??
-              chuyen['dotId'];
-          final termName = dotKienTap['ten_dot'] ??
-              (dotId == 1 ? 'Đợt 1' : (dotId == 7 ? 'Đợt 2' : (dotId != null ? 'Đợt $dotId' : 'N/A')));
-
-          final hasGrade = r['diem_thu_hoach'] != null ||
-              diem['diem_thu_hoach'] != null ||
-              r['trang_thai'] == 'DaCham';
-          final isScoreLocked = diem['da_khoa_thu_hoach'] == true ||
-              diem['da_khoa'] == true ||
-              r['da_khoa'] == true ||
-              r['da_khoa_thu_hoach'] == true ||
-              dotKienTap['trang_thai'] == 'DaKhoa' ||
-              dotKienTap['trang_thai'] == 'DaKetThuc';
-          final isGraded = hasGrade || isScoreLocked;
-          final papersLeft = isGraded ? 0 : 1;
-
-          return LecturerStudent(
-            id: uniqueId,
-            phieuId: phieu['id'],
-            reportId: r['id'],
-            name: sv['ho_ten'] ?? 'Sinh viên',
-            className: sv['lop'] ?? 'N/A',
-            company: chuyen['nhaMay']?['ten_nha_may'] ?? 'Doanh nghiệp',
-            completedTours: '1/1',
-            papersLeft: papersLeft,
-            avatar: sv['avatar'] ?? '',
-            submittedDate: r['ngay_nop'] != null
-                ? (_safeSub(
-                        DateTime.tryParse(
-                          r['ngay_nop'].toString(),
-                        )?.toLocal().toString(),
-                        10,
-                      ).isNotEmpty
-                      ? _safeSub(
-                          DateTime.tryParse(
-                            r['ngay_nop'].toString(),
-                          )?.toLocal().toString(),
-                          10,
-                        )
-                      : 'N/A')
-                : 'N/A',
-            dotKienTapId: dotId,
-            termName: termName,
-            attendanceStatus: diemDanh['trang_thai'] == 'CoMat'
-                ? 'present'
-                : (diemDanh['trang_thai'] == 'Vang' ? 'absent' : 'none'),
-            excuseReason: diemDanh['ghi_chu'] ?? diemDanh['ly_do_vang'],
-            prelimGrade:
-                double.tryParse(diem['diem_chuan_bi']?.toString() ?? '0') ?? 0,
-            extraGrade:
-                double.tryParse(diem['diem_cong']?.toString() ?? '0') ?? 0,
-            gvhdGrade:
-                double.tryParse(r['diem_thu_hoach']?.toString() ?? '0') ?? 0,
-            aiSuggestedGrade: diem['diem_ai_de_xuat'] != null
-                ? double.tryParse(diem['diem_ai_de_xuat'].toString())
-                : null,
-            comment: r['nhan_xet_cua_giang_vien'],
-            isGraded: isGraded,
-            tourId: chuyen['id']?.toString() ?? '',
-            reportFileUrl: r['file_bao_cao'],
-            confirmationFileUrl: r['file_xac_nhan_tham_quan'],
-            isScoreLocked: isScoreLocked,
-          );
-        }).toList();
-      });
-
-      final List<dynamic> tripsJson = await ApiService.getLedTrips(lecturerId);
-      setState(() {
-        _state.lecturerTours = tripsJson.map((t) {
-          final rawDate = t['ngay_tham_quan'] ?? t['ngay_khoi_hanh'];
-          final rawStart = t['gio_bat_dau'];
-          final parsedDate = rawDate != null
-              ? DateTime.tryParse(rawDate.toString())
-              : null;
-          final company = t['nhaMay']?['ten_nha_may'] ?? t['ten_nha_may'];
-          final tourName = company ?? t['ten_chuyen_di'] ?? 'Chuyến tham quan';
-
-          String formattedDate = 'N/A';
-          if (parsedDate != null) {
-            formattedDate =
-                '${parsedDate.day.toString().padLeft(2, '0')}/${parsedDate.month.toString().padLeft(2, '0')}/${parsedDate.year}';
-          }
-
-          return LecturerTour(
-            id: t['id'].toString(),
-            name: tourName,
-            date: formattedDate,
-            timeRange:
-                '${t['gio_bat_dau'] ?? '08:00'} - ${t['gio_ket_thuc'] ?? '12:00'}',
-            registeredCount:
-                t['so_luong_dang_ky_hien_tai'] ?? t['so_luong_dang_ky'] ?? 0,
-            maxCount:
-                t['so_luong_sinh_vien_toi_da'] ??
-                t['suc_chua'] ??
-                t['so_luong_toi_da'] ??
-                0,
-            status:
-                t['trang_thai'] == 'HoanThanh' || t['trang_thai'] == 'DaDienRa'
-                ? 'completed'
-                : 'upcoming',
-            rawTripDate: parsedDate,
-            rawStartTime: rawStart?.toString(),
-            rawStatus: t['trang_thai']?.toString(),
-            companyName: company?.toString(),
-          );
-        }).toList();
-      });
-
-      final Map<String, dynamic> statsJson =
-          await ApiService.getLecturerDashboardStats(lecturerId);
-      setState(() {
-        _state.lecturerDashboardStats = LecturerDashboardStats(
-          doanDangDan: statsJson['doanDangDan'] ?? 0,
-          baiCanCham: statsJson['baiCanCham'] ?? 0,
-          buoiBaoCao: statsJson['buoiBaoCao'] ?? 0,
-          tongSvHuongDan: statsJson['tongSvHuongDan'] ?? 0,
-        );
-      });
-
-      try {
-        final notifsJson = await ApiService.getLecturerNotifications(
-          lecturerId,
-        );
-        final List<LecturerNotification> backendLecturerNotifs =
-            (notifsJson is List && notifsJson.isNotEmpty)
-            ? notifsJson.map((n) {
-                final rawDate = n['ngay_gui'] ?? n['created_at'];
-                String formattedTime = 'Vừa xong';
-                if (rawDate != null) {
-                  final dt = DateTime.tryParse(rawDate.toString())?.toLocal();
-                  if (dt != null) {
-                    formattedTime =
-                        '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
-                  }
-                }
-
-                final rawEditedDate = n['ngay_chinh_sua'];
-                String? formattedEditedTime;
-                if (rawEditedDate != null) {
-                  final dt = DateTime.tryParse(
-                    rawEditedDate.toString(),
-                  )?.toLocal();
-                  if (dt != null) {
-                    formattedEditedTime =
-                        '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
-                  }
-                }
-
-                return LecturerNotification(
-                  id: n['id'].toString(),
-                  title: n['tieu_de'] ?? 'Thông báo',
-                  body: n['noi_dung'] ?? '',
-                  time: formattedTime,
-                  attachment:
-                      n['file_dinh_kem'] ??
-                      (n['files'] != null && (n['files'] as List).isNotEmpty
-                          ? n['files'][0]['ten_file']
-                          : null),
-                  fileUrl:
-                      n['file_url'] ??
-                      (n['files'] != null && (n['files'] as List).isNotEmpty
-                          ? n['files'][0]['duong_dan']
-                          : null),
-                  type: n['loai_thong_bao'] ?? n['type'] ?? 'ThongBao',
-                  senderName: n['nguoi_gui'] ?? 'Ban Chủ nhiệm Khoa',
-                  targetAudience: n['doi_tuong_nhan'] ?? 'LECTURER',
-                  isEdited: n['da_chinh_sua'] == true || n['da_chinh_sua'] == 1,
-                  editedAt: formattedEditedTime,
-                );
-              }).toList()
-            : [];
-
-        final autoLecturerReminders = _generateAutoRemindersForLecturer();
-        setState(() {
-          _state.lecturerNotifications = [
-            ...autoLecturerReminders,
-            ...backendLecturerNotifs,
-          ];
-        });
-        _saveLecturerNotificationsCache(_state.lecturerNotifications);
-        NotificationService.instance.notifyLecturerReminders(
-          autoLecturerReminders,
-        );
-      } catch (e) {
-        print('Error fetching notifications: $e');
-      }
-
-      try {
-        await fetchBoardSessions(lecturerId);
-      } catch (e) {
-        print('Error fetching board sessions: $e');
-      }
-    } catch (e) {
-      print(
-        'Failed to load lecturer data from backend (Offline mode active): $e',
-      );
-      if (_state.lecturerNotifications.isEmpty) {
-        final cached = await _loadLecturerNotificationsCache();
-        if (cached.isNotEmpty) {
-          setState(() {
-            _state.lecturerNotifications = cached;
-          });
-        }
-      }
-    }
-  }
-
-  // Auth Operations
-  Future<void> login(
-    String username,
-    String password, {
-    required VoidCallback onSuccess,
-    required Function(String) onError,
-  }) async {
-    try {
-      final res = await ApiService.login(username, password);
-      final user = res['user'];
-      final userRole = user?['vai_tro'];
-      final details = user?['details'];
-
-      final bool requiresPasswordChange =
-          user?['phai_doi_mat_khau'] == 1 || user?['phai_doi_mat_khau'] == true;
-
-      if (userRole == 'SinhVien') {
-        setState(() {
-          _state.currentRole = 'student';
-          _state.phaiDoiMatKhau = requiresPasswordChange;
-          if (details != null) {
-            _state.studentProfile = StudentProfile(
-              name: details['ho_ten'] ?? 'Sinh viên',
-              email: details['email'] ?? 'student@example.com',
-              studentId: details['mssv'] ?? username,
-              className: details['lop'] ?? 'N/A',
-              major: details['nganh'] ?? 'Công nghệ Thực phẩm',
-              avatar: details['avatar'] ?? '',
-            );
-          }
-        });
-
-        if (!requiresPasswordChange) {
-          final studentId = (details != null && details['id'] is int)
-              ? details['id'] as int
-              : ApiService.userId;
-          if (studentId != null) {
-            fetchStudentDataFromApi(studentId);
-          }
-        }
-        onSuccess();
-      } else if (userRole == 'GiangVien') {
-        setState(() {
-          _state.currentRole = 'lecturer';
-          _state.phaiDoiMatKhau = requiresPasswordChange;
-          if (details != null) {
-            _state.lecturerProfile = LecturerProfile(
-              name: details['ho_ten'] ?? 'Giảng viên',
-              email: details['email'] ?? 'lecturer@example.com',
-              teacherId: details['msgv'] ?? username,
-              avatar: details['avatar'] ?? '',
-              department: details['khoa'] ?? 'Khoa Công nghệ Thực phẩm',
-            );
-          }
-        });
-
-        if (!requiresPasswordChange) {
-          final lecturerId = (details != null && details['id'] is int)
-              ? details['id'] as int
-              : ApiService.userId;
-          if (lecturerId != null) {
-            _fetchLecturerDataFromApi(lecturerId);
-          }
-        }
-        onSuccess();
-      } else {
-        onError('Tài khoản không có quyền truy cập ứng dụng di động.');
-      }
-    } catch (e) {
-      final msg = e.toString().replaceAll('Exception: ', '');
-      onError(
-        msg.isNotEmpty
-            ? msg
-            : 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin tài khoản hoặc kết nối mạng.',
-      );
-    }
-  }
-
-  void completePasswordChange() {
-    setState(() {
-      _state.phaiDoiMatKhau = false;
-    });
-    final activeId = ApiService.profileId ?? ApiService.userId;
-    if (_state.currentRole == 'student' && activeId != null) {
-      fetchStudentDataFromApi(activeId);
-    } else if (_state.currentRole == 'lecturer' && activeId != null) {
-      _fetchLecturerDataFromApi(activeId);
-    }
-  }
-
-  void logout() {
-    ApiService.clearSession();
-    NotificationService.instance.clearNotificationHistory();
-    setState(() {
-      _resetToDefaults(notify: true);
-      _state.currentRole = null;
-      _state.phaiDoiMatKhau = null;
-    });
-  }
-
-  void resetData() {
-    _resetToDefaults();
-  }
-
-  // Student Operations
-  Future<void> registerTrip(String tripId) async {
-    final tId = int.tryParse(tripId);
-    if (tId == null) {
-      throw Exception('Mã chuyến đi không hợp lệ ($tripId).');
-    }
-
-    await ApiService.registerTrip(tId);
-
-    setState(() {
-      _state.studentTrips = _state.studentTrips.map((t) {
-        if (t.id == tripId) {
-          return t.copyWith(isRegistered: true);
-        }
-        return t;
-      }).toList();
-
-      final paymentExists = _state.payments.any((p) => p.tripId == tripId);
-      if (!paymentExists) {
-        final trip = _state.studentTrips.firstWhere(
-          (t) => t.id == tripId,
-          orElse: () => Trip(
-            id: tripId,
-            name: 'Chuyến tham quan',
-            date: '',
-            time: '',
-            type: 'Trực tiếp',
-            location: '',
-            industry: '',
-            description: '',
-            heroImage: '',
-            isRegistered: true,
-            isCompleted: false,
-          ),
-        );
-        final codeSuffix = Random().nextInt(90000) + 10000;
-        final nameAbbr = trip.name.length > 11
-            ? trip.name.substring(8, 11).toUpperCase()
-            : 'TRIP';
-        final newPayment = Payment(
-          id: 'pay-$tripId',
-          tripId: tripId,
-          name: 'Chuyến: ${trip.name}',
-          code: 'KT2026-$nameAbbr-$codeSuffix',
-          amount: 50000,
-          dueDate: '15/12/2026',
-          status: 'Chưa đóng',
-        );
-        _state.payments = [newPayment, ..._state.payments];
-      }
-    });
-  }
-
-  Future<void> proposeTrip({
-    int? factoryId,
-    String? companyName,
-    String? address,
-    String? description,
-    String? contactPerson,
-    String? contactPhone,
-    DateTime? visitDate,
-    String? startTime,
-    String? type,
-  }) async {
-    if (ApiService.userId == null) {
-      throw Exception('Chưa đăng nhập');
-    }
-    final vDate = visitDate ?? DateTime.now().add(const Duration(days: 7));
-    final sTime = startTime ?? '08:00';
-    final tType = type ?? 'TrucTiep';
-
-    await ApiService.proposeTrip(
-      nhaMayId: factoryId,
-      tenNhaMayDeXuat: companyName,
-      diaChiDeXuat: address,
-      nguoiLienHeDeXuat: contactPerson,
-      sdtLienHeDeXuat: contactPhone,
-      ngayThamQuan: vDate.toIso8601String().substring(0, 10),
-      gioBatDau: sTime,
-      hinhThuc: tType,
-    );
-
-    await fetchStudentProposals(ApiService.profileId ?? ApiService.userId!);
-  }
-
-  Future<void> cancelStudentProposal(int proposalId) async {
-    await ApiService.cancelProposal(proposalId);
-    setState(() {
-      _state.proposals = _state.proposals
-          .where((p) => p.id != proposalId)
-          .toList();
-    });
-  }
-
-  Future<String> cancelTripRegistration(
-    String tripId,
-    String? registrationId, {
-    required String lyDo,
-    String? fileMinhChung,
-  }) async {
-    final regId = int.tryParse(registrationId ?? '');
-    if (regId == null) {
-      throw Exception('Không tìm thấy mã phiếu đăng ký hợp lệ cho chuyến này.');
-    }
-
-    String? fileReference;
-    if (fileMinhChung != null) {
-      try {
-        final uploadRes = await ApiService.uploadFile(
-          'upload/attachment',
-          fileMinhChung,
-          'file',
-        );
-        fileReference = uploadRes['key'] ?? uploadRes['url'] ?? fileMinhChung;
-      } catch (e) {
-        print('uploadConfirmationFile file upload failed: $e');
-        fileReference = fileMinhChung;
-      }
-    }
-
-    final res = await ApiService.post('sinh-vien/request-cancel', {
-      'registrationId': regId,
-      'lyDo': lyDo,
-      if (fileReference != null && fileReference.isNotEmpty)
-        'fileMinhChung': fileReference,
-    });
-
-    final message = res is Map && res['message'] != null
-        ? res['message'].toString()
-        : 'Đã xử lý yêu cầu hủy thành công';
-
-    final activeId = ApiService.profileId ?? ApiService.userId;
-    if (activeId != null) {
-      await fetchStudentDataFromApi(activeId);
-    } else {
-      setState(() {
-        _state.studentTrips = _state.studentTrips.map((t) {
-          if (t.id == tripId) {
-            return t.copyWith(registrationStatus: 'DaHuy');
-          }
-          return t;
-        }).toList();
-
-        _state.payments = _state.payments.map((p) {
-          if (p.tripId == tripId) {
-            return p.copyWith(status: 'Đã hoàn phí');
-          }
-          return p;
-        }).toList();
-      });
-    }
-
-    return message;
-  }
-
-  Future<bool> uploadReport(
-    String submissionId,
-    String localPath,
-    String fileName,
-    String fileSize, {
-    String? extractedText,
-  }) async {
-    final regId = int.tryParse(submissionId);
-    if (regId == null) {
-      throw Exception('Mã bài nộp không hợp lệ ($submissionId).');
-    }
-
-    String fileReference = fileName;
-    try {
-      final uploadRes = await ApiService.uploadFile(
-        'upload/report',
-        localPath,
-        'file',
-      );
-      fileReference = uploadRes['key'] ?? uploadRes['url'] ?? fileName;
-    } catch (e) {
-      print('uploadReport file upload failed: $e');
-      rethrow;
-    }
-
-    final sub = _state.submissions.firstWhere(
-      (s) => s.id == submissionId,
-      orElse: () => Submission(
-        id: submissionId,
-        tripName: '',
-        typeText: 'Trực tiếp',
-        dateText: '',
-        status: 'Chưa nộp',
-        hasConfirmationFile: false,
-      ),
-    );
-    await ApiService.submitReport(
-      regId,
-      fileReference,
-      sub.fileXacNhanUrl,
-      extractedText: extractedText,
-    );
-
-    setState(() {
-      _state.submissions = _state.submissions.map((s) {
-        if (s.id == submissionId) {
-          return s.copyWith(
-            fileName: fileName,
-            fileSize: fileSize,
-            fileBaoCaoUrl: fileReference,
-            status: s.hasConfirmationFile || !s.tripName.contains('tự do')
-                ? 'Đã nộp'
-                : 'Chưa nộp',
-            submittedAt:
-                '${DateTime.now().hour}:${DateTime.now().minute} - ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
-          );
-        }
-        return s;
-      }).toList();
-    });
-
-    return true;
-  }
-
-  Future<bool> uploadConfirmationFile(
-    String submissionId,
-    String localPath,
-    String fileName,
-  ) async {
-    final regId = int.tryParse(submissionId);
-    if (regId == null) {
-      throw Exception('Mã bài nộp không hợp lệ ($submissionId).');
-    }
-
-    String fileReference = fileName;
-    try {
-      Map<String, dynamic> uploadRes;
-      try {
-        uploadRes = await ApiService.uploadFile(
-          'upload/attachment',
-          localPath,
-          'file',
-        );
-      } catch (_) {
-        uploadRes = await ApiService.uploadFile(
-          'upload/payment',
-          localPath,
-          'file',
-        );
-      }
-      fileReference = uploadRes['key'] ?? uploadRes['url'] ?? fileName;
-    } catch (e) {
-      print('uploadConfirmationFile file upload failed: $e');
-      rethrow;
-    }
-
-    await ApiService.submitConfirmationPaper(regId, fileReference);
-
-    setState(() {
-      _state.submissions = _state.submissions.map((s) {
-        if (s.id == submissionId || s.registrationId == regId) {
-          return s.copyWith(
-            hasConfirmationFile: true,
-            confirmationFileName: fileName,
-            fileXacNhanUrl: fileReference,
-            status: (s.fileBaoCaoUrl != null && s.fileBaoCaoUrl!.isNotEmpty)
-                ? 'Đã nộp'
-                : 'Chưa nộp',
-          );
-        }
-        return s;
-      }).toList();
-
-      _state.studentTrips = _state.studentTrips.map((t) {
-        if (t.registrationId == submissionId || t.registrationId == regId.toString()) {
-          return t.copyWith(fileXacNhanUrl: fileReference);
-        }
-        return t;
-      }).toList();
-    });
-
-    final activeId = ApiService.profileId ?? ApiService.userId;
-    if (activeId != null) {
-      await fetchStudentDataFromApi(activeId);
-    }
-
-    return true;
-  }
-
-  Future<void> deleteReport(String submissionId) async {
-    final regId = int.tryParse(submissionId);
-    if (regId != null) {
-      await ApiService.deleteReport(regId);
-      final activeId = ApiService.profileId ?? ApiService.userId;
-      if (activeId != null) {
-        await fetchStudentDataFromApi(activeId);
-      }
-    }
-  }
-
-  Future<void> payFee(String paymentId) async {
-    final payId = int.tryParse(paymentId);
-    if (payId == null) {
-      throw Exception('Mã hóa đơn thanh toán không hợp lệ ($paymentId).');
-    }
-
-    await ApiService.payInvoice(payId);
-
-    setState(() {
-      _state.payments = _state.payments.map((p) {
-        if (p.id == paymentId) {
-          return p.copyWith(status: 'Đã đóng đúng hạn');
-        }
-        return p;
-      }).toList();
-    });
-  }
-
-  Future<bool> addRefund(
-    String paymentId,
-    String invoiceName,
-    String amountText, {
-    String? localPath,
-    String? fileName,
-    String? bankName,
-    String? accountNumber,
-    String? accountName,
-    String? reason,
-  }) async {
-    final invoiceId = int.tryParse(paymentId);
-    if (invoiceId == null) {
-      throw Exception('Không tìm thấy mã hóa đơn cần hoàn phí.');
-    }
-
-    String fileReference = fileName ?? 'hoadon_daquet.pdf';
-    if (localPath != null) {
-      final uploadRes = await ApiService.uploadFile(
-        'upload/attachment',
-        localPath,
-        'file',
-      );
-      fileReference = uploadRes['key'] ?? uploadRes['url'] ?? fileReference;
-    }
-
-    await ApiService.requestRefund(
-      invoiceId,
-      fileReference,
-      bankName: bankName,
-      accountNumber: accountNumber,
-      accountName: accountName,
-      reason: reason,
-    );
-
-    setState(() {
-      final newRefund = RefundRequest(
-        id: 'ref-${DateTime.now().millisecondsSinceEpoch}',
-        invoiceName: invoiceName,
-        dateText:
-            '${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
-        amountText: amountText,
-        status: 'Chờ xử lý',
-      );
-      _state.refunds = [newRefund, ..._state.refunds];
-    });
-
-    final activeId = ApiService.profileId ?? ApiService.userId;
-    if (activeId != null) {
-      fetchStudentDataFromApi(activeId);
-    }
-
-    return true;
-  }
-
-  // Lecturer Operations
-  Future<void> updateAttendance(
-    String studentId,
-    String status, {
-    String? reason,
-  }) async {
-    final student = _state.lecturerStudents.firstWhere(
-      (s) => s.id == studentId,
-      orElse: () => throw Exception(
-        'Không tìm thấy sinh viên $studentId trong danh sách.',
-      ),
-    );
-
-    final tId = int.tryParse(student.tourId);
-    if (tId == null) {
-      throw Exception('Mã chuyến tham quan không hợp lệ (${student.tourId}).');
-    }
-
-    final phieuId = student.phieuId ?? int.tryParse(studentId);
-    if (phieuId == null) {
-      throw Exception(
-        'Không xác định được mã phiếu đăng ký của sinh viên $studentId.',
-      );
-    }
-
-    // Ánh xạ trạng thái điểm danh khớp đúng với DTO backend (CoMat, Vang, TuChoiThamGia)
-    final String backendStatus = status == 'present'
-        ? 'CoMat'
-        : (status == 'absent' ? 'Vang' : 'TuChoiThamGia');
-
-    await ApiService.takeAttendance(tId, [
-      {
-        'phieuId': phieuId,
-        'status': backendStatus,
-        if (reason != null && reason.isNotEmpty) 'note': reason,
-      },
-    ]);
-
-    setState(() {
-      _state.lecturerStudents = _state.lecturerStudents.map((s) {
-        if (s.id == studentId) {
-          return s.copyWith(
-            attendanceStatus: status,
-            excuseReason: reason ?? s.excuseReason,
-          );
-        }
-        return s;
-      }).toList();
-    });
-  }
-
-  Future<void> updateStudentGrade(
-    String studentId, {
-    double? prelimGrade,
-    double? extraGrade,
-    double? gvhdGrade,
-    String? comment,
-    bool? isGraded,
-  }) async {
-    final student = _state.lecturerStudents.firstWhere(
-      (s) => s.id == studentId,
-      orElse: () => throw Exception(
-        'Không tìm thấy sinh viên $studentId trong danh sách.',
-      ),
-    );
-
-    final phieuId = student.phieuId ?? int.tryParse(studentId);
-    if ((prelimGrade != null || extraGrade != null) && phieuId == null) {
-      throw Exception(
-        'Không xác định được mã phiếu đăng ký để nhập điểm quá trình.',
-      );
-    }
-
-    if (prelimGrade != null || extraGrade != null) {
-      await ApiService.gradePrepAndBonus(
-        phieuId!,
-        prelimGrade ?? student.prelimGrade,
-        extraGrade ?? student.extraGrade,
-      );
-    }
-
-    if (gvhdGrade != null || comment != null) {
-      final reportId = student.reportId ?? phieuId;
-      if (reportId == null) {
-        throw Exception('Không xác định được mã bài thu hoạch để chấm điểm.');
-      }
-      await ApiService.gradeReport(
-        reportId,
-        gvhdGrade ?? student.gvhdGrade,
-        comment ?? student.comment ?? '',
-      );
-    }
-
-    setState(() {
-      _state.lecturerStudents = _state.lecturerStudents.map((s) {
-        if (s.id == studentId) {
-          final newIsGraded = isGraded ?? (gvhdGrade != null ? true : s.isGraded);
-          return s.copyWith(
-            prelimGrade: prelimGrade ?? s.prelimGrade,
-            extraGrade: extraGrade ?? s.extraGrade,
-            gvhdGrade: gvhdGrade ?? s.gvhdGrade,
-            comment: comment ?? s.comment,
-            isGraded: newIsGraded,
-            papersLeft: newIsGraded ? 0 : 1,
-          );
-        }
-        return s;
-      }).toList();
-    });
-  }
-
-  Future<void> fetchStudentProposals(int studentId) async {
-    try {
-      final res = await ApiService.getProposals();
-      if (res is List) {
-        setState(() {
-          _state.proposals = res.map((p) {
-            final nhaMay = p['nhaMay'] ?? {};
-            return TripProposal(
-              id: p['id'] ?? 0,
-              tenDoanhNghiep:
-                  nhaMay['ten_nha_may'] ??
-                  p['ten_nha_may_de_xuat'] ??
-                  'Doanh nghiệp đề xuất',
-              diaChi: nhaMay['dia_chi'] ?? p['dia_chi_de_xuat'],
-              ngayThamQuan:
-                  (p['ngay_tham_quan_de_xuat'] ?? p['ngay_tham_quan']) != null
-                  ? _safeSub(
-                      DateTime.tryParse(
-                        (p['ngay_tham_quan_de_xuat'] ?? p['ngay_tham_quan'])
-                            .toString(),
-                      )?.toLocal().toString(),
-                      10,
-                    )
-                  : null,
-              gioBatDau: _safeSub(
-                p['gio_bat_dau_de_xuat'] ?? p['gio_bat_dau'],
-                5,
-              ),
-              hinhThuc: p['hinh_thuc'] == 'TrucTuyen'
-                  ? 'Trực tuyến'
-                  : 'Trực tiếp',
-              trangThai: p['trang_thai_duyet'] ?? p['trang_thai'] ?? 'ChoDuyet',
-              lyDo: p['ly_do'],
-              phanHoi: p['phan_hoi'],
-              lyDoTuChoi: p['ly_do_tu_choi'] ?? p['phan_hoi'] ?? p['ly_do'],
-            );
-          }).toList();
-        });
-      }
-    } catch (_) {
-      // Giữ nguyên danh sách hiện tại
-    }
-  }
-
-  void setSelectedTermIndex(int index) {
-    if (index >= 0 && index < _state.termGrades.length) {
-      setState(() {
-        _state.selectedTermIndex = index;
-        _state.termGrade = _state.termGrades[index];
-      });
-    }
-  }
-
-  Future<void> fetchStudentGrades(int studentId) async {
-    try {
-      final gradesRes = await ApiService.getStudentGrades(studentId);
-      if (gradesRes is List && gradesRes.isNotEmpty) {
-        final List<StudentTermGrade> terms = [];
-        for (var termData in gradesRes) {
-          final List<dynamic> rawTrips = termData['selectedTrips'] ?? [];
-
-          final tripGrades = rawTrips.map((t) {
-            return TripGradeItem(
-              id: t['id'] ?? 0,
-              tenNhaMay: t['ten_nha_may'] ?? 'Doanh nghiệp',
-              hinhThuc: t['hinh_thuc'] == 'TrucTuyen'
-                  ? 'Trực tuyến'
-                  : 'Trực tiếp',
-              diemChuanBi: t['diem_chuan_bi'] != null
-                  ? double.tryParse(t['diem_chuan_bi'].toString())
-                  : null,
-              diemBaiThuHoach: t['diem_bai_thu_hoach'] != null
-                  ? double.tryParse(t['diem_bai_thu_hoach'].toString())
-                  : null,
-              diemBaoCaoTQNM: t['diem_bao_cao_tqnm'] != null
-                  ? double.tryParse(t['diem_bao_cao_tqnm'].toString())
-                  : null,
-              diemCong: t['diem_cong'] != null
-                  ? double.tryParse(t['diem_cong'].toString())
-                  : null,
-              diemTongChuyen: t['diem_tong_chuyen'] != null
-                  ? double.tryParse(t['diem_tong_chuyen'].toString())
-                  : null,
-              ketQua: t['ket_qua'],
-              daKhoaChuanBi: t['da_khoa_chuan_bi'] == true,
-              daKhoaThuHoach: t['da_khoa_thu_hoach'] == true,
-              daKhoaHoiDong: t['da_khoa_hoi_dong'] == true,
-              daKhoa: t['da_khoa'] == true,
-            );
-          }).toList();
-
-          final double? dtk = termData['diem_tong_ket'] != null
-              ? double.tryParse(termData['diem_tong_ket'].toString())
-              : null;
-
-          terms.add(
-            StudentTermGrade(
-              dotKienTapId: termData['dot_kien_tap_id'],
-              tenDot: termData['ten_dot']?.toString(),
-              namHoc: termData['nam_hoc']?.toString(),
-              hocKy: termData['hoc_ky']?.toString(),
-              lanDangKy: termData['lan_dang_ky'] != null
-                  ? int.tryParse(termData['lan_dang_ky'].toString())
-                  : null,
-              diemTongKet: dtk,
-              trangThai: termData['trang_thai'] ?? termData['ket_qua'],
-              isScoreLocked: dtk != null,
-              tripGrades: tripGrades,
-            ),
-          );
-        }
-
-        setState(() {
-          _state.termGrades = terms;
-          _state.selectedTermIndex = 0;
-          _state.termGrade = terms.isNotEmpty ? terms[0] : null;
-        });
-      }
-    } catch (e) {
-      // Fallback
-    }
-  }
-
-  Future<void> fetchRepresentativeTripsStatus() async {
-    try {
-      final res = await ApiService.getRepresentativeTripsStatus();
-      if (res != null) {
-        final List<dynamic> regIds = res['selectedRegistrationIds'] ?? [];
-        final council =
-            res['assignedCouncil'] ?? res['hoiDong'] ?? res['council'];
-        final List<dynamic> members = council?['thanhVien'] ?? [];
-
-        setState(() {
-          _state.repStatus = RepresentativeTripsStatus(
-            selectedRegistrationIds: regIds
-                .map((id) => int.tryParse(id.toString()) ?? 0)
-                .where((id) => id > 0)
-                .toList(),
-            isLockedByKhoa: res['isLockedByKhoa'] == true,
-            lockReason: res['lockReason'] as String?,
-            canEdit: res['canEdit'] ?? !(res['isLockedByKhoa'] == true),
-            councilSessionName:
-                council?['tenHoiDong'] ??
-                council?['ten_hoi_dong'] ??
-                council?['ten_buoi'],
-            councilRoom:
-                council?['diaDiem'] ??
-                council?['dia_diem'] ??
-                council?['phong'] ??
-                'Chưa xếp phòng',
-            councilTime:
-                council?['ngayBaoCao'] ??
-                council?['thoi_gian'] ??
-                council?['ngayCham'] ??
-                'Chưa có lịch',
-            councilMembers: members
-                .map(
-                  (m) =>
-                      (m['hoTen'] ?? m['ho_ten'] ?? m['giangVien']?['ho_ten'])
-                          ?.toString() ??
-                      '',
-                )
-                .where((m) => m.isNotEmpty)
-                .toList(),
-          );
-        });
-      }
-    } catch (e) {
-      print('Failed to fetch representative trips status: $e');
-    }
-  }
-
-  Future<void> selectRepresentativeTrips(List<int> registrationIds) async {
-    await ApiService.selectRepresentativeTrips(registrationIds);
-    await fetchRepresentativeTripsStatus();
-  }
-
-  Future<List<TripRegistrationStudent>> fetchTripRegistrations(
-    int tripId,
-  ) async {
-    try {
-      final res = await ApiService.getTripRegistrations(tripId);
-      if (res is List) {
-        final list = res.map((r) {
-          final sv = r['sinhVien'] ?? {};
-          final phieuTQ = r['phieuThamQuan'] ?? {};
-          final diemDanh = r['diemDanh'] ?? phieuTQ['diemDanh'] ?? {};
-          final diem =
-              r['diemPhieuThamQuan'] ?? phieuTQ['diemPhieuThamQuan'] ?? {};
-          final hoaDon = r['hoaDon'] ?? {};
-
-          return TripRegistrationStudent(
-            phieuId: r['id'] ?? 0,
-            sinhVienId: sv['id'] ?? 0,
-            mssv: sv['mssv'] ?? '',
-            hoTen: sv['ho_ten'] ?? 'Sinh viên',
-            className: sv['lop'] ?? 'N/A',
-            soDienThoai: sv['so_dien_thoai'] ?? sv['sdt'],
-            email: sv['email'],
-            avatar: sv['avatar'] ?? '',
-            feeStatus:
-                hoaDon['trang_thai'] ??
-                (r['trang_thai'] == 'HopLe' || r['trang_thai'] == 'DaThamGia'
-                    ? 'DaDongDungHan'
-                    : 'ChuaDong'),
-            attendanceStatus: diemDanh['trang_thai'] ?? 'ChuaDiemDanh',
-            excuseReason: diemDanh['ghi_chu'] ?? diemDanh['ly_do_vang'],
-            prelimGrade:
-                double.tryParse(diem['diem_chuan_bi']?.toString() ?? '0') ??
-                0.0,
-            extraGrade:
-                double.tryParse(
-                  (diem['diem_cong_final'] ?? diem['diem_cong'])?.toString() ??
-                      '0',
-                ) ??
-                0.0,
-            isLockedPrep:
-                diem['da_khoa_chuan_bi'] == true ||
-                diem['da_khoa'] == true ||
-                phieuTQ['is_locked_prep'] == true,
-            fileXacNhanUrl: r['file_xac_nhan_tham_quan'],
-            cachToChuc: r['cach_to_chuc'],
-          );
-        }).toList();
-
-        setState(() {
-          final newCache = Map<int, List<TripRegistrationStudent>>.from(
-            _state.tripStudentsCache,
-          );
-          newCache[tripId] = list;
-          _state.tripStudentsCache = newCache;
-        });
-        return list;
-      }
-    } catch (e) {
-      print('Failed to fetch trip registrations: $e');
-    }
-    return _state.tripStudentsCache[tripId] ?? [];
-  }
-
-  Future<TripBusInfo?> fetchTripBusInfo(int tripId) async {
-    try {
-      final res = await ApiService.getTripInfo(tripId);
-      if (res != null) {
-        final chuyen = res['chuyenThamQuan'] ?? res;
-        final List<dynamic> rawStudents = res['students'] ?? [];
-        final List<dynamic> rawLecturers = res['lecturers'] ?? [];
-
-        final students = rawStudents
-            .map(
-              (s) => TripBusMember(
-                id: s['id'] ?? 0,
-                hoTen: s['ho_ten'] ?? s['name'] ?? '',
-                mssv: s['mssv'] ?? '',
-                isLeader: s['truong_nhom'] == true,
-              ),
-            )
-            .toList();
-
-        final leadGv = rawLecturers.isNotEmpty ? rawLecturers[0] : null;
-        final enterpriseContact = res['enterpriseContact'] is Map
-            ? res['enterpriseContact']
-            : null;
-        final enterprisePerson = enterpriseContact?['nguoi_lien_he']
-            ?.toString();
-        final enterprisePhone = enterpriseContact?['sdt_lien_he']?.toString();
-
-        return TripBusInfo(
-          tripId: tripId,
-          tenChuyenDi:
-              chuyen['ten_nha_may'] ??
-              chuyen['ten_chuyen_di'] ??
-              'Chuyến tham quan',
-          gioBatDau: _safeSub(chuyen['gio_bat_dau'], 5).isNotEmpty
-              ? _safeSub(chuyen['gio_bat_dau'], 5)
-              : '08:00',
-          gioKetThuc: _safeSub(chuyen['gio_ket_thuc'], 5).isNotEmpty
-              ? _safeSub(chuyen['gio_ket_thuc'], 5)
-              : '12:00',
-          hinhThuc: chuyen['hinh_thuc'] ?? 'TrucTiep',
-          lecturerName: leadGv?['ho_ten'],
-          lecturerPhone: leadGv?['so_dien_thoai'],
-          students: students,
-          enterpriseContactPerson: enterprisePerson,
-          enterpriseContactPhone: enterprisePhone,
-        );
-      }
-    } catch (e) {
-      print('Failed to fetch trip bus info: $e');
-    }
-    return null;
-  }
-
-  Future<void> lockTripPrepGrades(int tripId) async {
-    await ApiService.lockTripPrepGrades(tripId);
-    await fetchTripRegistrations(tripId);
-  }
-
-  Future<void> saveTripPrepGradesBatch(
-    int tripId,
-    List<Map<String, dynamic>> records,
-  ) async {
-    await ApiService.gradePrepAndBonusBatch(tripId, records);
-    await fetchTripRegistrations(tripId);
-  }
-
-  Future<Map<String, dynamic>> importPrepGradesExcel(
-    int tripId,
-    String filePath, {
-    bool saveImmediately = false,
-  }) async {
-    final res = await ApiService.importPrepGradesExcel(
-      tripId,
-      filePath,
-      saveImmediately: saveImmediately,
-    );
-    if (saveImmediately) {
-      await fetchTripRegistrations(tripId);
-    }
-    return res;
-  }
-
-  Future<void> lockGuidedReportsGrades(int dotKienTapId) async {
-    await ApiService.lockGuidedReportsGrades(dotKienTapId);
-    final activeId = ApiService.profileId ?? ApiService.userId;
-    if (activeId != null) {
-      await _fetchLecturerDataFromApi(activeId);
-    }
-  }
-
-  Future<void> fetchBoardSessions(int lecturerId) async {
-    try {
-      final res = await ApiService.getBoardSessions(lecturerId);
-      if (res is List) {
-        final boards = res.map((b) {
-          final session = b['session'] ?? {};
-          final isBoardLocked =
-              b['isBoardLocked'] == true || session['isBoardLocked'] == true;
-          final List<dynamic> rawStudents =
-              b['students'] ?? b['registrations'] ?? [];
-
-          final students = rawStudents.map((st) {
-            final List<dynamic> rawTrips = st['trips'] ?? [];
-            final trips = rawTrips
-                .map(
-                  (t) => CouncilStudentTripItem(
-                    phieuId: t['phieuThamQuanId'] ?? t['id'] ?? 0,
-                    tenNhaMay:
-                        t['tenNhaMay'] ?? t['ten_nha_may'] ?? 'Doanh nghiệp',
-                    hinhThuc: t['hinh_thuc'] ?? 'TrucTiep',
-                    myScore: t['myScore'] != null
-                        ? double.tryParse(t['myScore'].toString())
-                        : null,
-                    diemTong: t['diem_bao_cao_tqnm'] != null
-                        ? double.tryParse(t['diem_bao_cao_tqnm'].toString())
-                        : null,
-                    isLocked:
-                        isBoardLocked ||
-                        t['daKhoa'] == true ||
-                        t['daKhoaHoiDong'] == true,
-                  ),
-                )
-                .toList();
-
-            final isStudentLocked =
-                isBoardLocked ||
-                st['daKhoaHoiDong'] == true ||
-                st['da_khoa_hoi_dong'] == true ||
-                st['isGradeLocked'] == true;
-
-            final sv = st['sinhVien'] is Map ? st['sinhVien'] : st;
-            return CouncilStudentItem(
-              studentId: sv['id'] ?? st['id'] ?? 0,
-              mssv: sv['mssv'] ?? st['mssv'] ?? '',
-              hoTen:
-                  sv['ho_ten'] ??
-                  sv['name'] ??
-                  st['ho_ten'] ??
-                  st['name'] ??
-                  'Sinh viên',
-              className: sv['lop'] ?? st['lop'] ?? 'N/A',
-              topic: st['de_tai'] ?? st['topic'],
-              trips: trips,
-              isGradeLocked: isStudentLocked,
-              councilNote:
-                  st['ghi_chu_hoi_dong'] ?? st['councilNote'] ?? st['ghiChu'],
-              boChuyenId: st['boChuyenId'] ?? st['bo_chuyen_id'] ?? st['id'],
-            );
-          }).toList();
-
-          return CouncilBoardItem(
-            sessionId: session['id'] ?? 0,
-            memberId: b['memberId'] ?? 0,
-            sessionName:
-                session['ten_buoi'] ??
-                session['ten_hoi_dong'] ??
-                'Buổi chấm hội đồng',
-            room: session['phong'] ?? 'Phòng bảo vệ',
-            date: session['ngay_bao_cao'] != null
-                ? (_safeSub(session['ngay_bao_cao'], 10).isNotEmpty
-                      ? _safeSub(session['ngay_bao_cao'], 10)
-                      : 'N/A')
-                : 'N/A',
-            timeRange:
-                '${_safeSub(session['gio_bat_dau'], 5).isNotEmpty ? _safeSub(session['gio_bat_dau'], 5) : '08:00'} - ${_safeSub(session['gio_ket_thuc'], 5).isNotEmpty ? _safeSub(session['gio_ket_thuc'], 5) : '11:30'}',
-            role: (b['vai_tro'] == 'ChuTich' || b['role'] == 'ChuTich')
-                ? 'Chủ tịch'
-                : (b['vai_tro'] == 'ThuKy' || b['role'] == 'ThuKy')
-                ? 'Thư ký'
-                : 'Ủy viên',
-            status: session['trang_thai'] == 'HoanThanh'
-                ? 'completed'
-                : (session['trang_thai'] == 'DangDienRa'
-                      ? 'ongoing'
-                      : 'upcoming'),
-            isBoardLocked: isBoardLocked,
-            students: students,
-          );
-        }).toList();
-
-        setState(() {
-          _state.councilBoards = boards;
-        });
-      }
-    } catch (_) {
-      // Bỏ qua lỗi mạng khi load background
-    }
-  }
-
-  Future<void> submitBoardScore(int memberId, int phieuId, double score) async {
-    await ApiService.submitBoardScore(memberId, phieuId, score);
-    final activeId = ApiService.profileId ?? ApiService.userId;
-    if (activeId != null) {
-      await fetchBoardSessions(activeId);
-    }
-  }
-
-  Future<void> submitBoardScoresBatch(
-    int memberId,
-    List<int> phieuIds,
-    double score,
-  ) async {
-    await ApiService.submitBoardScoresBatch(memberId, phieuIds, score);
-    if (ApiService.userId != null) {
-      await fetchBoardSessions(ApiService.userId!);
-    }
-  }
-
-  Future<void> lockCouncilGrade({required int boardId, int? boChuyenId}) async {
-    await ApiService.lockCouncilGrade({
-      'boardId': boardId,
-      if (boChuyenId != null) 'boChuyenId': boChuyenId,
-    });
-    if (ApiService.userId != null) {
-      await fetchBoardSessions(ApiService.userId!);
-    }
-  }
-
-  Future<void> updateCouncilStudentNote({
-    required int boardId,
-    required int boChuyenId,
-    required String ghiChu,
-  }) async {
-    await ApiService.updateCouncilStudentNote({
-      'boChuyenId': boChuyenId,
-      'ghiChu': ghiChu,
-    });
-    final activeId = ApiService.profileId ?? ApiService.userId;
-    if (activeId != null) {
-      await fetchBoardSessions(activeId);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AppStateProvider(
-      state: _state,
-      stateWidget: this,
-      child: widget.child,
-    );
-  }
-}
+import 'dart:math';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/material.dart';
+import '../models/app_models.dart';
+import '../../core/services/notification_service.dart';
+import '../../core/network/api_service.dart';
+
+class AppState {
+  String? currentRole; // 'student', 'lecturer', or null
+  bool? phaiDoiMatKhau;
+
+  // Student state
+  StudentProfile studentProfile;
+  StudentDashboardStats? studentDashboardStats;
+  List<Trip> studentTrips;
+  List<StudentNotification> studentNotifications;
+  List<Submission> submissions;
+  List<Payment> payments;
+  List<RefundRequest> refunds;
+  List<TripProposal> proposals;
+  StudentTermGrade? termGrade;
+  List<StudentTermGrade> termGrades;
+  int selectedTermIndex;
+  RepresentativeTripsStatus? repStatus;
+
+  // Lecturer state
+  LecturerProfile lecturerProfile;
+  LecturerDashboardStats? lecturerDashboardStats;
+  List<LecturerStudent> lecturerStudents;
+  List<LecturerTour> lecturerTours;
+  List<CouncilSession> councilSessions;
+  List<LecturerNotification> lecturerNotifications;
+  Map<int, List<TripRegistrationStudent>> tripStudentsCache;
+  List<CouncilBoardItem> councilBoards;
+
+  AppState({
+    this.currentRole,
+    this.phaiDoiMatKhau,
+    required this.studentProfile,
+    this.studentDashboardStats,
+    required this.studentTrips,
+    required this.studentNotifications,
+    required this.submissions,
+    required this.payments,
+    required this.refunds,
+    this.proposals = const [],
+    this.termGrade,
+    this.termGrades = const [],
+    this.selectedTermIndex = 0,
+    this.repStatus,
+    required this.lecturerProfile,
+    this.lecturerDashboardStats,
+    required this.lecturerStudents,
+    required this.lecturerTours,
+    required this.councilSessions,
+    required this.lecturerNotifications,
+    this.tripStudentsCache = const {},
+    this.councilBoards = const [],
+  });
+
+  AppState copyWith({
+    String? currentRole,
+    bool? phaiDoiMatKhau,
+    StudentProfile? studentProfile,
+    StudentDashboardStats? studentDashboardStats,
+    List<Trip>? studentTrips,
+    List<StudentNotification>? studentNotifications,
+    List<Submission>? submissions,
+    List<Payment>? payments,
+    List<RefundRequest>? refunds,
+    List<TripProposal>? proposals,
+    StudentTermGrade? termGrade,
+    List<StudentTermGrade>? termGrades,
+    int? selectedTermIndex,
+    RepresentativeTripsStatus? repStatus,
+    LecturerProfile? lecturerProfile,
+    LecturerDashboardStats? lecturerDashboardStats,
+    List<LecturerStudent>? lecturerStudents,
+    List<LecturerTour>? lecturerTours,
+    List<CouncilSession>? councilSessions,
+    List<LecturerNotification>? lecturerNotifications,
+    Map<int, List<TripRegistrationStudent>>? tripStudentsCache,
+    List<CouncilBoardItem>? councilBoards,
+  }) {
+    return AppState(
+      currentRole: currentRole ?? this.currentRole,
+      phaiDoiMatKhau: phaiDoiMatKhau ?? this.phaiDoiMatKhau,
+      studentProfile: studentProfile ?? this.studentProfile,
+      studentDashboardStats:
+          studentDashboardStats ?? this.studentDashboardStats,
+      studentTrips: studentTrips ?? this.studentTrips,
+      studentNotifications: studentNotifications ?? this.studentNotifications,
+      submissions: submissions ?? this.submissions,
+      payments: payments ?? this.payments,
+      refunds: refunds ?? this.refunds,
+      proposals: proposals ?? this.proposals,
+      termGrade: termGrade ?? this.termGrade,
+      termGrades: termGrades ?? this.termGrades,
+      selectedTermIndex: selectedTermIndex ?? this.selectedTermIndex,
+      repStatus: repStatus ?? this.repStatus,
+      lecturerProfile: lecturerProfile ?? this.lecturerProfile,
+      lecturerDashboardStats:
+          lecturerDashboardStats ?? this.lecturerDashboardStats,
+      lecturerStudents: lecturerStudents ?? this.lecturerStudents,
+      lecturerTours: lecturerTours ?? this.lecturerTours,
+      councilSessions: councilSessions ?? this.councilSessions,
+      lecturerNotifications:
+          lecturerNotifications ?? this.lecturerNotifications,
+      tripStudentsCache: tripStudentsCache ?? this.tripStudentsCache,
+      councilBoards: councilBoards ?? this.councilBoards,
+    );
+  }
+
+  // --- Real-time Smart Reminders Engine (Computed purely from backend state) ---
+  List<SmartReminderItem> get activeStudentReminders {
+    final List<SmartReminderItem> reminders = [];
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    // 1. Chuyen di khoi hanh trong vong 48h (Hom nay hoac Ngay mai)
+    for (var trip in studentTrips) {
+      if (trip.isRegistered &&
+          !trip.isCompleted &&
+          (trip.registrationStatus == null ||
+              ['HopLe', 'ChoDuyet'].contains(trip.registrationStatus))) {
+        DateTime? tripDt;
+        final rawDate = trip.date.trim();
+        if (rawDate.isNotEmpty && rawDate != 'N/A') {
+          tripDt = DateTime.tryParse(rawDate);
+          if (tripDt == null && rawDate.contains('/')) {
+            final parts = rawDate.split('/');
+            if (parts.length == 3) {
+              tripDt = DateTime.tryParse(
+                '${parts[2]}-${parts[1].padLeft(2, '0')}-${parts[0].padLeft(2, '0')}',
+              );
+            }
+          }
+        }
+        if (tripDt != null) {
+          final tripDateOnly = DateTime(tripDt.year, tripDt.month, tripDt.day);
+          final diffDays = tripDateOnly.difference(today).inDays;
+          if (diffDays == 0 || diffDays == 1) {
+            reminders.add(
+              SmartReminderItem(
+                id: 'trip-${trip.id}',
+                title: diffDays == 0
+                    ? 'Khởi hành HÔM NAY: ${trip.name}'
+                    : 'Khởi hành NGÀY MAI: ${trip.name}',
+                message:
+                    'Khởi hành lúc ${trip.time}. Vui lòng có mặt đúng giờ, trang phục chỉnh tề và mang theo thẻ sinh viên!',
+                severity: ReminderSeverity.urgent,
+                icon: Icons.directions_bus,
+                actionLabel: 'Xem chuyến',
+                actionType: 'trip',
+                targetId: trip.id,
+                deadline: tripDt,
+              ),
+            );
+          }
+        }
+      }
+    }
+
+    // 2. Nhac nho Le phi chua thanh toan
+    final unpaidInvoices = payments
+        .where((p) => p.rawStatus == 'ChuaDong' || p.status == 'Chưa đóng')
+        .toList();
+    if (unpaidInvoices.isNotEmpty) {
+      final firstUnpaid = unpaidInvoices.first;
+      reminders.add(
+        SmartReminderItem(
+          id: 'payment-${firstUnpaid.id}',
+          title: 'Nhắc nhở đóng lệ phí kiến tập',
+          message:
+              'Bạn có ${unpaidInvoices.length} khoản lệ phí chưa thanh toán (Hạn: ${firstUnpaid.dueDate}). Vui lòng hoàn tất đúng hạn!',
+          severity: ReminderSeverity.warning,
+          icon: Icons.account_balance_wallet,
+          actionLabel: 'Đóng lệ phí',
+          actionType: 'finance',
+          targetId: firstUnpaid.id,
+        ),
+      );
+    }
+
+    // 3. Nhac nho Nop bai thu hoach
+    for (var sub in submissions) {
+      if (sub.status == 'Chưa nộp' || sub.status == 'ChuaNop') {
+        reminders.add(
+          SmartReminderItem(
+            id: 'sub-${sub.id}',
+            title: 'Nhắc nhở nộp bài thu hoạch',
+            message:
+                'Bạn chưa nộp bài thu hoạch cho chuyến "${sub.tripName}". Hãy nộp file sớm để giảng viên chấm điểm!',
+            severity: ReminderSeverity.warning,
+            icon: Icons.upload_file,
+            actionLabel: 'Nộp bài ngay',
+            actionType: 'report',
+            targetId: sub.id,
+          ),
+        );
+      }
+    }
+
+    // 4. Nhac nho Lich bao cao Hoi dong
+    if (repStatus != null &&
+        repStatus!.councilTime != null &&
+        repStatus!.councilTime != 'Chưa có lịch') {
+      reminders.add(
+        SmartReminderItem(
+          id: 'council-rep',
+          title: 'Lịch bảo vệ Hội đồng kiến tập',
+          message:
+              'Hội đồng: ${repStatus!.councilSessionName ?? "Hội đồng khoa"} - Phòng: ${repStatus!.councilRoom ?? "Chưa xếp"} - Thời gian: ${repStatus!.councilTime}',
+          severity: ReminderSeverity.info,
+          icon: Icons.gavel,
+          actionLabel: 'Xem lịch',
+          actionType: 'council',
+        ),
+      );
+    }
+
+    // 5. Thong bao co loai "NhacNho" hoac "CanhBao" tu Backend
+    for (var notif in studentNotifications) {
+      if (notif.type == 'NhacNho' || notif.type == 'CanhBao') {
+        reminders.add(
+          SmartReminderItem(
+            id: 'notif-${notif.id}',
+            title: notif.title,
+            message: notif.content,
+            severity: notif.type == 'CanhBao'
+                ? ReminderSeverity.urgent
+                : ReminderSeverity.warning,
+            icon: notif.type == 'CanhBao'
+                ? Icons.warning_amber_rounded
+                : Icons.alarm_on,
+            actionLabel: 'Xem chi tiết',
+            actionType: 'notifications',
+            targetId: notif.id,
+          ),
+        );
+      }
+    }
+
+    return reminders;
+  }
+
+  List<SmartReminderItem> get activeLecturerReminders {
+    final List<SmartReminderItem> reminders = [];
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    // 1. Nhac nho Bai thu hoach can cham
+    final ungradedStudents = lecturerStudents
+        .where((s) => !s.isGraded && !s.isScoreLocked)
+        .toList();
+    if (ungradedStudents.isNotEmpty) {
+      reminders.add(
+        SmartReminderItem(
+          id: 'gv-grade-pending',
+          title: 'Nhắc nhở chấm bài thu hoạch',
+          message:
+              'Thầy/Cô hiện có ${ungradedStudents.length} bài thu hoạch của sinh viên đang chờ chấm điểm!',
+          severity: ReminderSeverity.warning,
+          icon: Icons.assignment_late,
+          actionLabel: 'Chấm bài ngay',
+          actionType: 'grading',
+        ),
+      );
+    }
+
+    // 2. Nhac nho Chuyen dan doan sap toi (Hom nay hoac Ngay mai)
+    for (var tour in lecturerTours) {
+      if (tour.status != 'completed') {
+        DateTime? tourDt;
+        final rawDate = tour.date.trim();
+        if (rawDate.isNotEmpty && rawDate != 'N/A') {
+          tourDt = DateTime.tryParse(rawDate);
+          if (tourDt == null && rawDate.contains('/')) {
+            final parts = rawDate.split('/');
+            if (parts.length == 3) {
+              tourDt = DateTime.tryParse(
+                '${parts[2]}-${parts[1].padLeft(2, '0')}-${parts[0].padLeft(2, '0')}',
+              );
+            }
+          }
+        }
+        if (tourDt != null) {
+          final tourDateOnly = DateTime(tourDt.year, tourDt.month, tourDt.day);
+          final diffDays = tourDateOnly.difference(today).inDays;
+          if (diffDays == 0 || diffDays == 1) {
+            reminders.add(
+              SmartReminderItem(
+                id: 'tour-${tour.id}',
+                title: diffDays == 0
+                    ? 'Dẫn đoàn HÔM NAY: ${tour.name}'
+                    : 'Dẫn đoàn NGÀY MAI: ${tour.name}',
+                message:
+                    'Khởi hành: ${tour.timeRange}. Sĩ số: ${tour.registeredCount}/${tour.maxCount} sinh viên.',
+                severity: ReminderSeverity.urgent,
+                icon: Icons.groups,
+                actionLabel: 'Xem đoàn',
+                actionType: 'tour',
+                targetId: tour.id,
+              ),
+            );
+          }
+        }
+      }
+    }
+
+    // 3. Nhac nho Buoi cham Hoi dong
+    for (var board in councilBoards) {
+      if (!board.isBoardLocked && board.status != 'completed') {
+        reminders.add(
+          SmartReminderItem(
+            id: 'board-${board.sessionId}',
+            title: 'Buổi chấm Hội đồng: ${board.sessionName}',
+            message:
+                'Phòng: ${board.room} - Thời gian: ${board.date} (${board.timeRange}). Vai trò: ${board.role}.',
+            severity: ReminderSeverity.info,
+            icon: Icons.gavel,
+            actionLabel: 'Vào hội đồng',
+            actionType: 'board',
+            targetId: board.sessionId.toString(),
+          ),
+        );
+      }
+    }
+
+    // 4. Thong bao loai NhacNho hoac CanhBao gui cho GV
+    for (var notif in lecturerNotifications) {
+      if (notif.type == 'NhacNho' || notif.type == 'CanhBao') {
+        reminders.add(
+          SmartReminderItem(
+            id: 'gv-notif-${notif.id}',
+            title: notif.title,
+            message: notif.body,
+            severity: notif.type == 'CanhBao'
+                ? ReminderSeverity.urgent
+                : ReminderSeverity.warning,
+            icon: notif.type == 'CanhBao'
+                ? Icons.warning_amber_rounded
+                : Icons.alarm_on,
+            actionLabel: 'Xem chi tiết',
+            actionType: 'notifications',
+            targetId: notif.id,
+          ),
+        );
+      }
+    }
+
+    return reminders;
+  }
+}
+
+class AppStateProvider extends InheritedWidget {
+  final AppState state;
+  final AppStateProviderState stateWidget;
+
+  const AppStateProvider({
+    super.key,
+    required this.state,
+    required this.stateWidget,
+    required super.child,
+  });
+
+  static AppStateProviderState of(BuildContext context) {
+    final provider = context
+        .dependOnInheritedWidgetOfExactType<AppStateProvider>();
+    if (provider == null) {
+      throw Exception('AppStateProvider not found in context');
+    }
+    return provider.stateWidget;
+  }
+
+  @override
+  bool updateShouldNotify(AppStateProvider oldWidget) {
+    return true;
+  }
+}
+
+class AppStateContainer extends StatefulWidget {
+  final Widget child;
+
+  const AppStateContainer({super.key, required this.child});
+
+  @override
+  State<AppStateContainer> createState() => AppStateProviderState();
+}
+
+class AppStateProviderState extends State<AppStateContainer> {
+  late AppState _state;
+
+  AppState get state => _state;
+
+  @override
+  void initState() {
+    super.initState();
+    _resetToDefaults(notify: false);
+
+    // Bind 401 Unauthorized handler
+    ApiService.onUnauthorized = () {
+      logout();
+    };
+
+    // Lắng nghe mạng phục hồi để tự động đồng bộ và bắn thông báo đẩy tức thì
+    NotificationService.instance.onNetworkRestored = () {
+      final activeId = ApiService.profileId ?? ApiService.userId;
+      if (activeId != null) {
+        if (_state.currentRole == 'student') {
+          fetchStudentDataFromApi(activeId);
+        } else if (_state.currentRole == 'lecturer') {
+          _fetchLecturerDataFromApi(activeId);
+        }
+      }
+    };
+
+    // Attempt auto-login on startup
+    _tryRestoreSession();
+  }
+
+  Future<void> _tryRestoreSession() async {
+    final success = await ApiService.initSessionFromStorage();
+    if (success && ApiService.role != null && ApiService.userId != null) {
+      final activeId = ApiService.profileId ?? ApiService.userId!;
+      setState(() {
+        if (ApiService.role == 'SinhVien') {
+          _state.currentRole = 'student';
+          fetchStudentDataFromApi(activeId);
+        } else if (ApiService.role == 'GiangVien') {
+          _state.currentRole = 'lecturer';
+          _fetchLecturerDataFromApi(activeId);
+        }
+      });
+    }
+  }
+
+  void _resetToDefaults({bool notify = true}) {
+    final newState = AppState(
+      currentRole: null,
+      phaiDoiMatKhau: null,
+      studentProfile: StudentProfile(
+        name: '',
+        email: '',
+        studentId: '',
+        className: '',
+        major: '',
+        avatar: '',
+      ),
+      studentTrips: [],
+      studentNotifications: [],
+      submissions: [],
+      payments: [],
+      refunds: [],
+      proposals: [],
+      termGrade: null,
+      termGrades: [],
+      selectedTermIndex: 0,
+      repStatus: null,
+      lecturerProfile: LecturerProfile(
+        name: '',
+        email: '',
+        teacherId: '',
+        avatar: '',
+        department: '',
+      ),
+      lecturerStudents: [],
+      lecturerTours: [],
+      councilSessions: [],
+      lecturerNotifications: [],
+      tripStudentsCache: {},
+      councilBoards: [],
+    );
+
+    if (notify) {
+      setState(() {
+        _state = newState;
+      });
+    } else {
+      _state = newState;
+    }
+  }
+
+  // --- Hybrid API Helpers ---
+
+  static const String _cachedStudentNotifsKey = 'qlkt_cached_student_notifs';
+  static const String _cachedLecturerNotifsKey = 'qlkt_cached_lecturer_notifs';
+
+  Future<void> _saveStudentNotificationsCache(
+    List<StudentNotification> notifs,
+  ) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonList = notifs
+          .map(
+            (n) => {
+              'id': n.id,
+              'title': n.title,
+              'content': n.content,
+              'timeText': n.timeText,
+              'isRead': n.isRead,
+              'type': n.type,
+              'attachment': n.attachment,
+              'fileUrl': n.fileUrl,
+              'senderName': n.senderName,
+              'targetAudience': n.targetAudience,
+              'isEdited': n.isEdited,
+              'editedAt': n.editedAt,
+            },
+          )
+          .toList();
+      await prefs.setString(_cachedStudentNotifsKey, jsonEncode(jsonList));
+    } catch (e) {
+      debugPrint('Error saving student notifications cache: $e');
+    }
+  }
+
+  Future<List<StudentNotification>> _loadStudentNotificationsCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedStr = prefs.getString(_cachedStudentNotifsKey);
+      if (cachedStr != null && cachedStr.isNotEmpty) {
+        final List<dynamic> list = jsonDecode(cachedStr);
+        return list
+            .map(
+              (item) => StudentNotification(
+                id: item['id']?.toString() ?? '',
+                title: item['title'] ?? 'Thông báo',
+                content: item['content'] ?? '',
+                timeText: item['timeText'] ?? 'Ngoại tuyến',
+                isRead: item['isRead'] == true,
+                type: item['type'] ?? 'ThongBao',
+                attachment: item['attachment'],
+                fileUrl: item['fileUrl'],
+                senderName: item['senderName'] ?? 'Ban Chủ nhiệm Khoa',
+                targetAudience: item['targetAudience'] ?? 'STUDENT',
+                isEdited: item['isEdited'] == true,
+                editedAt: item['editedAt'],
+              ),
+            )
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('Error loading student notifications cache: $e');
+    }
+    return [];
+  }
+
+  Future<void> _saveLecturerNotificationsCache(
+    List<LecturerNotification> notifs,
+  ) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonList = notifs
+          .map(
+            (n) => {
+              'id': n.id,
+              'title': n.title,
+              'body': n.body,
+              'time': n.time,
+              'isUnread': n.isUnread,
+              'type': n.type,
+              'attachment': n.attachment,
+              'fileUrl': n.fileUrl,
+              'senderName': n.senderName,
+              'targetAudience': n.targetAudience,
+              'isEdited': n.isEdited,
+              'editedAt': n.editedAt,
+            },
+          )
+          .toList();
+      await prefs.setString(_cachedLecturerNotifsKey, jsonEncode(jsonList));
+    } catch (e) {
+      debugPrint('Error saving lecturer notifications cache: $e');
+    }
+  }
+
+  Future<List<LecturerNotification>> _loadLecturerNotificationsCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedStr = prefs.getString(_cachedLecturerNotifsKey);
+      if (cachedStr != null && cachedStr.isNotEmpty) {
+        final List<dynamic> list = jsonDecode(cachedStr);
+        return list
+            .map(
+              (item) => LecturerNotification(
+                id: item['id']?.toString() ?? '',
+                title: item['title'] ?? 'Thông báo',
+                body: item['body'] ?? '',
+                time: item['time'] ?? 'Ngoại tuyến',
+                isUnread: item['isUnread'] == true,
+                type: item['type'] ?? 'ThongBao',
+                attachment: item['attachment'],
+                fileUrl: item['fileUrl'],
+                senderName: item['senderName'] ?? 'Ban Chủ nhiệm Khoa',
+                targetAudience: item['targetAudience'] ?? 'LECTURER',
+                isEdited: item['isEdited'] == true,
+                editedAt: item['editedAt'],
+              ),
+            )
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('Error loading lecturer notifications cache: $e');
+    }
+    return [];
+  }
+
+  List<StudentNotification> _generateAutoRemindersForStudent() {
+    final List<StudentNotification> autoReminders = [];
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    // 1. Chuyen di sap khoi hanh (Hom nay hoac Ngay mai)
+    for (var trip in _state.studentTrips) {
+      if (trip.isRegistered &&
+          !trip.isCompleted &&
+          (trip.registrationStatus == null ||
+              ['HopLe', 'ChoDuyet'].contains(trip.registrationStatus))) {
+        DateTime? tripDt;
+        final rawDate = trip.date.trim();
+        if (rawDate.isNotEmpty && rawDate != 'N/A') {
+          tripDt = DateTime.tryParse(rawDate);
+          if (tripDt == null && rawDate.contains('/')) {
+            final parts = rawDate.split('/');
+            if (parts.length == 3) {
+              tripDt = DateTime.tryParse(
+                '${parts[2]}-${parts[1].padLeft(2, '0')}-${parts[0].padLeft(2, '0')}',
+              );
+            }
+          }
+        }
+        if (tripDt != null) {
+          final tripDateOnly = DateTime(tripDt.year, tripDt.month, tripDt.day);
+          final diffDays = tripDateOnly.difference(today).inDays;
+          if (diffDays == 0 || diffDays == 1) {
+            final whenStr = diffDays == 0 ? 'HÔM NAY' : 'NGÀY MAI';
+            final timeTag = diffDays == 0 ? 'Hôm nay' : 'Ngày mai';
+            autoReminders.add(
+              StudentNotification(
+                id: 'auto-trip-${trip.id}',
+                title: '[Nhắc nhở] Khởi hành $whenStr: ${trip.name}',
+                content:
+                    'Chuyến tham quan "${trip.name}" sẽ khởi hành $timeTag lúc ${trip.time}. Địa điểm: ${trip.location}. Bạn vui lòng có mặt đúng giờ, mặc trang phục chỉnh tề và mang theo thẻ sinh viên!',
+                timeText: timeTag,
+                type: 'NhacNho',
+                senderName: 'Hệ thống tự động',
+                targetAudience: 'STUDENT',
+              ),
+            );
+          }
+        }
+      }
+    }
+
+    // 2. Nhac nho Dong le phi kien tap
+    final unpaidPayments = _state.payments
+        .where(
+          (p) =>
+              p.rawStatus == 'ChuaDong' ||
+              p.status == 'Chưa đóng' ||
+              p.status == 'Chưa thanh toán',
+        )
+        .toList();
+    for (var unpaid in unpaidPayments) {
+      autoReminders.add(
+        StudentNotification(
+          id: 'auto-fee-${unpaid.id}',
+          title: '[Nhắc nhở] Đóng lệ phí: ${unpaid.name}',
+          content:
+              'Bạn có khoản lệ phí ${unpaid.amount.toInt()} đ cho hóa đơn "${unpaid.name}" chưa thanh toán (Hạn chót: ${unpaid.dueDate}). Vui lòng hoàn tất đúng hạn!',
+          timeText: 'Chưa đóng',
+          type: 'TaiChinh',
+          senderName: 'Hệ thống tự động',
+          targetAudience: 'STUDENT',
+        ),
+      );
+    }
+
+    // 3. Nhac nho Nop bai thu hoach
+    for (var sub in _state.submissions) {
+      if (sub.status == 'Chưa nộp' || sub.status == 'ChuaNop') {
+        autoReminders.add(
+          StudentNotification(
+            id: 'auto-sub-${sub.id}',
+            title: '[Nhắc nhở] Nộp bài thu hoạch: ${sub.tripName}',
+            content:
+                'Bạn chưa nộp bài thu hoạch cho chuyến "${sub.tripName}". Hãy nộp file báo cáo sớm trên ứng dụng để giảng viên chấm điểm!',
+            timeText: 'Cần nộp',
+            type: 'NhacNho',
+            senderName: 'Hệ thống tự động',
+            targetAudience: 'STUDENT',
+          ),
+        );
+      }
+    }
+
+    // 4. Lich bao ve Hoi dong kien tap
+    if (_state.repStatus != null &&
+        _state.repStatus!.councilTime != null &&
+        _state.repStatus!.councilTime != 'Chưa có lịch') {
+      autoReminders.add(
+        StudentNotification(
+          id: 'auto-council-rep',
+          title: '[Nhắc nhở] Lịch bảo vệ Hội đồng kiến tập',
+          content:
+              'Hội đồng: ${_state.repStatus!.councilSessionName ?? "Hội đồng khoa"} - Phòng: ${_state.repStatus!.councilRoom ?? "Chưa xếp"} - Thời gian: ${_state.repStatus!.councilTime}',
+          timeText: 'Sắp diễn ra',
+          type: 'NhacNho',
+          senderName: 'Hệ thống tự động',
+          targetAudience: 'STUDENT',
+        ),
+      );
+    }
+
+    return autoReminders;
+  }
+
+  List<LecturerNotification> _generateAutoRemindersForLecturer() {
+    final List<LecturerNotification> autoReminders = [];
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    // 1. Nhac nho cham bai
+    final ungraded = _state.lecturerStudents
+        .where((s) => !s.isGraded && !s.isScoreLocked)
+        .toList();
+    if (ungraded.isNotEmpty) {
+      autoReminders.add(
+        LecturerNotification(
+          id: 'auto-gv-grading',
+          title: '[Nhắc nhở] Chấm bài thu hoạch sinh viên',
+          body:
+              'Thầy/Cô hiện có ${ungraded.length} bài thu hoạch của sinh viên đang chờ chấm điểm. Vui lòng vào mục "Chấm bài" để hoàn tất!',
+          time: 'Cần chấm',
+          type: 'NhacNho',
+          senderName: 'Hệ thống tự động',
+          isUnread: true,
+        ),
+      );
+    }
+
+    // 2. Dan doan Hom nay / Ngay mai
+    for (var tour in _state.lecturerTours) {
+      if (tour.status != 'completed') {
+        DateTime? tourDt;
+        final rawDate = tour.date.trim();
+        if (rawDate.isNotEmpty && rawDate != 'N/A') {
+          tourDt = DateTime.tryParse(rawDate);
+          if (tourDt == null && rawDate.contains('/')) {
+            final parts = rawDate.split('/');
+            if (parts.length == 3) {
+              tourDt = DateTime.tryParse(
+                '${parts[2]}-${parts[1].padLeft(2, '0')}-${parts[0].padLeft(2, '0')}',
+              );
+            }
+          }
+        }
+        if (tourDt != null) {
+          final tourDateOnly = DateTime(tourDt.year, tourDt.month, tourDt.day);
+          final diffDays = tourDateOnly.difference(today).inDays;
+          if (diffDays == 0 || diffDays == 1) {
+            final whenStr = diffDays == 0 ? 'HÔM NAY' : 'NGÀY MAI';
+            final timeTag = diffDays == 0 ? 'Hôm nay' : 'Ngày mai';
+            autoReminders.add(
+              LecturerNotification(
+                id: 'auto-gv-tour-${tour.id}',
+                title: '[Nhắc nhở] Dẫn đoàn $whenStr: ${tour.name}',
+                body:
+                    'Thời gian khởi hành: ${tour.timeRange}. Sĩ số: ${tour.registeredCount}/${tour.maxCount} sinh viên. Thầy/Cô vui lòng có mặt đúng giờ để điểm danh sinh viên!',
+                time: timeTag,
+                type: 'NhacNho',
+                senderName: 'Hệ thống tự động',
+                isUnread: true,
+              ),
+            );
+          }
+        }
+      }
+    }
+
+    // 3. Hoi dong sap toi
+    for (var board in _state.councilBoards) {
+      if (!board.isBoardLocked && board.status != 'completed') {
+        autoReminders.add(
+          LecturerNotification(
+            id: 'auto-gv-board-${board.sessionId}',
+            title: '[Nhắc nhở] Buổi chấm Hội đồng: ${board.sessionName}',
+            body:
+                'Phòng: ${board.room} - Thời gian: ${board.date} (${board.timeRange}). Vai trò: ${board.role}.',
+            time: 'Sắp diễn ra',
+            type: 'NhacNho',
+            senderName: 'Hệ thống tự động',
+            isUnread: true,
+          ),
+        );
+      }
+    }
+
+    return autoReminders;
+  }
+
+  Future<void> fetchStudentDataFromApi(int studentId) async {
+    try {
+      // 1. Fetch all available trips and registered trips
+      final List<dynamic> availableTripsJson =
+          await ApiService.getAvailableTrips(studentId);
+      final List<dynamic> regTripsJson = await ApiService.getRegisteredTrips(
+        studentId,
+      );
+
+      // Combine available and registered to form the studentTrips list
+      List<Trip> realTrips = [];
+
+      // Process available trips (all trips available for regular or supplementary registration)
+      for (var t in availableTripsJson) {
+        final trip = _mapJsonToTrip(t, isRegistered: false);
+        realTrips.add(
+          trip.copyWith(
+            isRegistered: false,
+            daTungDangKy: t['da_tung_dang_ky'] == true,
+            trangThaiCu: t['trang_thai_cu'],
+            tripStatus: t['trang_thai'],
+          ),
+        );
+      }
+
+      // Process registered trips
+      List<Submission> realSubmissions = [];
+      for (var reg in regTripsJson) {
+        final chuyenJson = _extractMap(reg['chuyenThamQuan']);
+        if (chuyenJson != null) {
+          final trip = _mapJsonToTrip(
+            chuyenJson,
+            isRegistered: true,
+          );
+          final regStatus = reg['trang_thai']?.toString();
+          final tripStatus = chuyenJson['trang_thai']?.toString();
+          final isCompleted =
+              regStatus == 'HoanThanh' ||
+              regStatus == 'DaChamDiem' ||
+              regStatus == 'DaThamGia' ||
+              trip.isCompleted;
+
+          final ptq = _extractMap(reg['phieuThamQuan']);
+          final bth = _extractMap(reg['baiThuHoach']) ?? _extractMap(ptq?['baiThuHoach']);
+          final diemDanh = _extractMap(ptq?['diemDanh']);
+          final hoaDon = _extractMap(reg['hoaDon']);
+          final diemPhieu = _extractMap(ptq?['diemPhieuThamQuan']);
+
+          final fileXacNhan = bth?['file_xac_nhan_tham_quan']?.toString();
+          final cachToChuc = chuyenJson['cach_to_chuc']?.toString() ?? trip.cachToChuc;
+          final isTuDo = cachToChuc == 'TuDo' || chuyenJson['loai_chuyen'] == 'tu_do' || trip.isTuDo;
+          final diemDanhStatus = diemDanh?['trang_thai']?.toString();
+
+          realTrips.add(
+            trip.copyWith(
+              isRegistered: true,
+              isCompleted: isCompleted,
+              registrationId: reg['id'].toString(),
+              registrationStatus: regStatus,
+              tripStatus: tripStatus,
+              cachToChuc: cachToChuc,
+              fileXacNhanUrl: fileXacNhan,
+            ),
+          );
+
+          if (isCompleted || regStatus == 'HopLe' || regStatus == 'DaThamGia') {
+            final rawNgayThamQuan = chuyenJson['ngay_tham_quan'];
+            final tripDate = rawNgayThamQuan != null
+                ? DateTime.tryParse(rawNgayThamQuan.toString())
+                : null;
+
+            final rawScore = diemPhieu?['diem_thu_hoach'];
+            final double? reportScore = rawScore != null
+                ? double.tryParse(rawScore.toString())
+                : null;
+            final String? gvhdComment = diemPhieu?['nhan_xet_gvhd']?.toString() ?? diemPhieu?['nhan_xet_thu_hoach']?.toString();
+            final gvhdMap = _extractMap(diemPhieu?['giangVienHD']) ?? _extractMap(diemPhieu?['giangVien']);
+            final String? gvhdName = gvhdMap?['ho_ten']?.toString();
+            final bool isScoreLocked =
+                diemPhieu?['da_khoa_thu_hoach'] == true ||
+                diemPhieu?['da_khoa'] == true;
+
+            final rawGradedAt =
+                diemPhieu?['ngay_cham_thu_hoach'] ?? diemPhieu?['updated_at'];
+            String? gradedAtText;
+            if (rawGradedAt != null) {
+              final dt = DateTime.tryParse(rawGradedAt.toString())?.toLocal();
+              if (dt != null) {
+                gradedAtText =
+                    '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+              }
+            }
+
+            String? deadlineText;
+            if (tripDate != null) {
+              final dline = tripDate.add(const Duration(days: 10));
+              deadlineText =
+                  '${dline.day.toString().padLeft(2, '0')}/${dline.month.toString().padLeft(2, '0')}/${dline.year}';
+            }
+
+            final bthBaoCao = bth?['file_bao_cao']?.toString();
+            final bthNgayNop = bth?['ngay_nop'];
+            final hasBaoCao = bthBaoCao != null && bthBaoCao.isNotEmpty;
+            final hasXacNhan = fileXacNhan != null && fileXacNhan.isNotEmpty;
+
+            // Tinh toan day du 100% trang thai theo dung quy che he thong & web:
+            String calculatedStatus = 'Chưa nộp';
+            final bthStatus = bth?['trang_thai']?.toString();
+            if (hasBaoCao) {
+              if (isTuDo && diemDanhStatus != 'CoMat') {
+                calculatedStatus = 'Chờ duyệt điểm danh';
+              } else if (bthStatus == 'TreHan') {
+                calculatedStatus = 'Trễ hạn - trừ điểm';
+              } else if (bthStatus == 'ChoBoSung') {
+                calculatedStatus = 'Chờ bổ sung';
+              } else {
+                calculatedStatus = 'Đã nộp';
+              }
+            } else if (hasXacNhan) {
+              calculatedStatus = 'Chờ duyệt điểm danh';
+            } else {
+              calculatedStatus = 'Chưa nộp';
+            }
+
+            realSubmissions.add(
+              Submission(
+                id: reg['id'].toString(),
+                registrationId: reg['id'],
+                tripName: trip.name,
+                typeText: isTuDo
+                    ? 'Kiến tập tự do'
+                    : (trip.type == 'Trực tuyến' || trip.type == 'TrucTuyen')
+                        ? 'Kiến tập trực tuyến'
+                        : 'Kiến tập trực tiếp',
+                dateText: trip.date,
+                tripDate: tripDate,
+                status: calculatedStatus,
+                fileName: hasBaoCao
+                    ? bthBaoCao.split('/').last
+                    : null,
+                fileSize: hasBaoCao ? 'N/A' : null,
+                submittedAt: bthNgayNop != null
+                    ? DateTime.tryParse(
+                        bthNgayNop.toString(),
+                      )?.toLocal().toString().substring(0, 16)
+                    : null,
+                hasConfirmationFile: hasXacNhan,
+                confirmationFileName: hasXacNhan
+                    ? fileXacNhan.split('/').last
+                    : null,
+                fileBaoCaoUrl: hasBaoCao ? bthBaoCao : null,
+                fileXacNhanUrl: fileXacNhan,
+                reportScore: reportScore,
+                gvhdComment: gvhdComment,
+                gvhdName: gvhdName,
+                isScoreLocked: isScoreLocked,
+                gradedAt: gradedAtText,
+                deadlineText: deadlineText,
+                cachToChuc: cachToChuc,
+                diemDanhStatus: diemDanhStatus,
+                hasPhieuThamQuan: ptq != null,
+                hoaDonStatus: hoaDon?['trang_thai']?.toString(),
+                reportStatus: bthStatus,
+              ),
+            );
+          }
+        }
+      }
+
+      setState(() {
+        _state.studentTrips = realTrips;
+        _state.submissions = realSubmissions;
+      });
+
+      // 2. Fetch Invoices
+      final List<dynamic> invoicesJson = await ApiService.getInvoices(
+        studentId,
+      );
+      setState(() {
+        if (invoicesJson.isNotEmpty) {
+          _state.payments = invoicesJson.map((inv) {
+            final chuyen =
+                inv['chuyen_di'] ?? inv['phieuDangKy']?['chuyenThamQuan'] ?? {};
+            final nhaMay = chuyen['nhaMay'] ?? {};
+            final tenNhaMay =
+                nhaMay['ten_nha_may'] ??
+                chuyen['ten_chuyen_di'] ??
+                'Chuyến kiến tập';
+
+            final rawHan = inv['han_dong'] ?? inv['han_thanh_toan'];
+            String formattedDueDate = 'Chưa cập nhật';
+            if (rawHan != null) {
+              final dt = DateTime.tryParse(rawHan.toString())?.toLocal();
+              if (dt != null) {
+                formattedDueDate =
+                    '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+              }
+            }
+
+            final rawStatus = inv['trang_thai']?.toString() ?? 'ChuaDong';
+            String displayStatus = 'Chưa đóng';
+            if (rawStatus == 'DaDongDungHan') {
+              displayStatus = 'Đã đóng đúng hạn';
+            } else if (rawStatus == 'DaDongTreHan') {
+              displayStatus = 'Đã đóng trễ hạn';
+            } else if (rawStatus == 'ViPham') {
+              displayStatus = 'Vi phạm';
+            } else if (rawStatus == 'DaHoanPhi') {
+              displayStatus = 'Đã hoàn phí';
+            }
+
+            final rawTripDate = chuyen['ngay_tham_quan'];
+            String formattedTripDate = '--';
+            if (rawTripDate != null) {
+              final dt = DateTime.tryParse(rawTripDate.toString())?.toLocal();
+              if (dt != null) {
+                formattedTripDate =
+                    '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+              }
+            }
+
+            final rawPaidDate = inv['ngay_dong_thuc_te'];
+            String? formattedPaidDate;
+            if (rawPaidDate != null) {
+              final dt = DateTime.tryParse(rawPaidDate.toString())?.toLocal();
+              if (dt != null) {
+                formattedPaidDate =
+                    '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+              }
+            }
+
+            final hinhThuc = chuyen['hinh_thuc']?.toString();
+            final tripType =
+                (hinhThuc == 'TrucTuyen' || hinhThuc == 'Trực tuyến')
+                ? 'Trực tuyến'
+                : (hinhThuc == 'TuDo' || hinhThuc == 'Tự do')
+                ? 'Tự do'
+                : 'Trực tiếp';
+
+            // Transfer code: read directly from DB noi_dung_chuyen_khoan
+            final rawCode = inv['noi_dung_chuyen_khoan']?.toString().trim();
+            final transferContent = (rawCode != null && rawCode.isNotEmpty)
+                ? rawCode
+                : (inv['ma_hoa_don'] ?? 'KT-${inv['id']}');
+
+            return Payment(
+              id: inv['id'].toString(),
+              tripId: chuyen['id']?.toString() ?? '',
+              name: tenNhaMay,
+              code: transferContent,
+              amount:
+                  double.tryParse(inv['so_tien']?.toString() ?? '150000') ??
+                  150000,
+              dueDate: formattedDueDate,
+              status: displayStatus,
+              rawStatus: rawStatus,
+              tripDate: formattedTripDate,
+              tripType: tripType,
+              paidDate: formattedPaidDate,
+            );
+          }).toList();
+        } else {
+          _state.payments = [];
+        }
+      });
+
+      // 3. Fetch Refund Requests
+      try {
+        final List<dynamic> refundsJson = await ApiService.getRefundRequests(
+          studentId,
+        );
+        setState(() {
+          if (refundsJson.isNotEmpty) {
+            _state.refunds = refundsJson.map((ref) {
+              final invoice = ref['hoaDon'] ?? {};
+              String mappedStatus = 'Chờ xử lý';
+              final rawStatus = ref['trang_thai']?.toString() ?? '';
+              if (rawStatus == 'Approved' ||
+                  rawStatus == 'DaHoanTien' ||
+                  rawStatus == 'DaHoanPhi') {
+                mappedStatus = 'Đã hoàn tiền';
+              } else if (rawStatus == 'Rejected' || rawStatus == 'TuChoi') {
+                mappedStatus = 'Từ chối';
+              } else {
+                mappedStatus = 'Chờ xử lý';
+              }
+
+              final rawDate =
+                  ref['ngay_nop'] ?? ref['ngay_yeu_cau'] ?? ref['created_at'];
+              String dateText = 'N/A';
+              if (rawDate != null) {
+                final dt = DateTime.tryParse(rawDate.toString())?.toLocal();
+                if (dt != null) {
+                  dateText =
+                      '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+                }
+              }
+
+              final amountNum =
+                  double.tryParse(invoice['so_tien']?.toString() ?? '0') ?? 0;
+              final amountFormatted = amountNum > 0
+                  ? amountNum.toInt().toString().replaceAllMapped(
+                      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+                      (Match m) => '${m[1]}.',
+                    )
+                  : (invoice['so_tien']?.toString() ?? '0');
+
+              return RefundRequest(
+                id: ref['id'].toString(),
+                invoiceName:
+                    invoice['ma_hoa_don'] ?? 'Hóa đơn #${invoice['id']}',
+                dateText: dateText,
+                amountText: '$amountFormatted đ',
+                status: mappedStatus,
+                lyDoTuChoi:
+                    ref['ly_do_tu_choi'] ?? ref['ghi_chu'] ?? ref['ly_do'],
+              );
+            }).toList();
+          } else {
+            _state.refunds = [];
+          }
+        });
+      } catch (e) {
+        print('Error fetching refund requests: $e');
+      }
+
+      final List<dynamic> notifsJson = await ApiService.getStudentNotifications(
+        studentId,
+      );
+      final List<StudentNotification> backendNotifs = notifsJson.isNotEmpty
+          ? notifsJson.map((n) {
+              final rawDate = n['ngay_gui'] ?? n['created_at'];
+              String formattedTime = 'Vừa xong';
+              if (rawDate != null) {
+                final dt = DateTime.tryParse(rawDate.toString())?.toLocal();
+                if (dt != null) {
+                  formattedTime =
+                      '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+                }
+              }
+
+              final rawEditedDate = n['ngay_chinh_sua'];
+              String? formattedEditedTime;
+              if (rawEditedDate != null) {
+                final dt = DateTime.tryParse(
+                  rawEditedDate.toString(),
+                )?.toLocal();
+                if (dt != null) {
+                  formattedEditedTime =
+                      '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+                }
+              }
+
+              return StudentNotification(
+                id: n['id'].toString(),
+                title: n['tieu_de'] ?? 'Thông báo',
+                content: n['noi_dung'] ?? '',
+                timeText: formattedTime,
+                attachment:
+                    n['file_dinh_kem'] ??
+                    (n['files'] != null && (n['files'] as List).isNotEmpty
+                        ? n['files'][0]['ten_file']
+                        : null),
+                fileUrl:
+                    n['file_url'] ??
+                    (n['files'] != null && (n['files'] as List).isNotEmpty
+                        ? n['files'][0]['duong_dan']
+                        : null),
+                type: n['loai_thong_bao'] ?? n['type'] ?? 'ThongBao',
+                senderName: n['nguoi_gui'] ?? 'Ban Chủ nhiệm Khoa',
+                targetAudience: n['doi_tuong_nhan'] ?? 'STUDENT',
+                isEdited: n['da_chinh_sua'] == true || n['da_chinh_sua'] == 1,
+                editedAt: formattedEditedTime,
+              );
+            }).toList()
+          : [];
+
+      final autoReminders = _generateAutoRemindersForStudent();
+      setState(() {
+        _state.studentNotifications = [...autoReminders, ...backendNotifs];
+      });
+      _saveStudentNotificationsCache(_state.studentNotifications);
+      NotificationService.instance.notifyStudentReminders(autoReminders);
+
+      final Map<String, dynamic> statsJson =
+          await ApiService.getStudentDashboardStats(studentId);
+      setState(() {
+        _state.studentDashboardStats = StudentDashboardStats(
+          registered: statsJson['registered'] ?? 0,
+          completed: statsJson['completed'] ?? 0,
+          pendingReports: statsJson['pendingReports'] ?? 0,
+          avgScore: statsJson['avgScore']?.toString() ?? 'Chưa có',
+        );
+      });
+
+      // Fetch Proposals, Grades & Representative Trips Status
+      await fetchStudentProposals(studentId);
+      await fetchStudentGrades(studentId);
+      await fetchRepresentativeTripsStatus();
+    } catch (e) {
+      print(
+        'Failed to load student data from backend (Offline mode active): $e',
+      );
+      if (_state.studentNotifications.isEmpty) {
+        final cached = await _loadStudentNotificationsCache();
+        if (cached.isNotEmpty) {
+          setState(() {
+            _state.studentNotifications = cached;
+          });
+        }
+      }
+    }
+  }
+
+  Map<String, dynamic>? _extractMap(dynamic value) {
+    if (value == null) return null;
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) return Map<String, dynamic>.from(value);
+    if (value is List && value.isNotEmpty) {
+      final first = value.first;
+      if (first is Map<String, dynamic>) return first;
+      if (first is Map) return Map<String, dynamic>.from(first);
+    }
+    return null;
+  }
+
+  String _safeSub(dynamic val, int length, {int start = 0}) {
+    if (val == null) return '';
+    final str = val.toString();
+    if (str.isEmpty || str.length <= start) return '';
+    if (str.length < start + length) return str.substring(start);
+    return str.substring(start, start + length);
+  }
+
+  Trip _mapJsonToTrip(Map<String, dynamic> json, {required bool isRegistered}) {
+    final nhaMay = json['nhaMay'] ?? {};
+
+    return Trip(
+      id: json['id'].toString(),
+      name:
+          nhaMay['ten_nha_may'] ?? json['ten_chuyen_di'] ?? 'Chuyến tham quan',
+      date: json['ngay_tham_quan'] != null
+          ? (_safeSub(
+                  DateTime.tryParse(
+                    json['ngay_tham_quan'],
+                  )?.toLocal().toString(),
+                  10,
+                ).isNotEmpty
+                ? _safeSub(
+                    DateTime.tryParse(
+                      json['ngay_tham_quan'],
+                    )?.toLocal().toString(),
+                    10,
+                  )
+                : 'N/A')
+          : 'N/A',
+      time:
+          '${_safeSub(json['gio_bat_dau'], 5).isNotEmpty ? _safeSub(json['gio_bat_dau'], 5) : '08:00'} - ${_safeSub(json['gio_ket_thuc'], 5).isNotEmpty ? _safeSub(json['gio_ket_thuc'], 5) : '12:00'}',
+      type: (json['cach_to_chuc'] == 'TuDo' ||
+              json['cach_to_chuc'] == 'Tự do' ||
+              json['hinh_thuc'] == 'TuDo' ||
+              json['hinh_thuc'] == 'Tự do')
+          ? 'Tự do'
+          : (json['hinh_thuc'] == 'TrucTuyen' ||
+                  json['hinh_thuc'] == 'Trực tuyến')
+          ? 'Trực tuyến'
+          : 'Trực tiếp',
+      location: nhaMay['dia_chi'] ?? 'Địa chỉ chưa cập nhật',
+      industry: 'Công nghệ thực phẩm',
+      description: nhaMay['mo_ta'] ?? 'Chuyến tham quan thực tế doanh nghiệp',
+      heroImage: '',
+      isRegistered: isRegistered,
+      isCompleted:
+          json['trang_thai'] == 'DaDienRa' || json['trang_thai'] == 'HoanThanh',
+      cachToChuc: json['cach_to_chuc']?.toString(),
+    );
+  }
+
+  Future<void> fetchLecturerDataFromApi(int lecturerId) =>
+      _fetchLecturerDataFromApi(lecturerId);
+
+  Future<void> _fetchLecturerDataFromApi(int lecturerId) async {
+    try {
+      final reportsRes = await ApiService.getGuidedReports(
+        lecturerId,
+        limit: 100,
+      );
+      final List<dynamic> reportsJson = reportsRes['data'] ?? [];
+
+      setState(() {
+        _state.lecturerStudents = reportsJson.map((r) {
+          final phieuTQ = r['phieuThamQuan'] ?? {};
+          final phieu = phieuTQ['phieuDangKy'] ?? {};
+          final sv = phieu['sinhVien'] ?? {};
+          final chuyen = phieu['chuyenThamQuan'] ?? {};
+          final diem =
+              phieuTQ['diemPhieuThamQuan'] ?? r['diemPhieuThamQuan'] ?? {};
+          final diemDanh = phieuTQ['diemDanh'] ?? r['diemDanh'] ?? {};
+
+          final mssv = sv['mssv'] ?? sv['id']?.toString() ?? 'SV';
+          final uniqueId = r['id'] != null ? '${mssv}_${r['id']}' : mssv;
+
+          final dotKienTap = chuyen['lichKienTap']?['dotKienTap'] ??
+              chuyen['dotKienTap'] ??
+              {};
+          final dotId = chuyen['lichKienTap']?['dot_kien_tap_id'] ??
+              dotKienTap['id'] ??
+              chuyen['dot_kien_tap_id'] ??
+              chuyen['dotId'];
+          final termName = dotKienTap['ten_dot'] ??
+              (dotId == 1 ? 'Đợt 1' : (dotId == 7 ? 'Đợt 2' : (dotId != null ? 'Đợt $dotId' : 'N/A')));
+
+          final hasGrade = r['diem_thu_hoach'] != null ||
+              diem['diem_thu_hoach'] != null ||
+              r['trang_thai'] == 'DaCham';
+          final isScoreLocked = diem['da_khoa_thu_hoach'] == true ||
+              diem['da_khoa'] == true ||
+              r['da_khoa'] == true ||
+              r['da_khoa_thu_hoach'] == true ||
+              dotKienTap['trang_thai'] == 'DaKhoa' ||
+              dotKienTap['trang_thai'] == 'DaKetThuc';
+          final isGraded = hasGrade || isScoreLocked;
+          final papersLeft = isGraded ? 0 : 1;
+
+          return LecturerStudent(
+            id: uniqueId,
+            phieuId: phieu['id'],
+            reportId: r['id'],
+            name: sv['ho_ten'] ?? 'Sinh viên',
+            className: sv['lop'] ?? 'N/A',
+            company: chuyen['nhaMay']?['ten_nha_may'] ?? 'Doanh nghiệp',
+            completedTours: '1/1',
+            papersLeft: papersLeft,
+            avatar: sv['avatar'] ?? '',
+            submittedDate: r['ngay_nop'] != null
+                ? (_safeSub(
+                        DateTime.tryParse(
+                          r['ngay_nop'].toString(),
+                        )?.toLocal().toString(),
+                        10,
+                      ).isNotEmpty
+                      ? _safeSub(
+                          DateTime.tryParse(
+                            r['ngay_nop'].toString(),
+                          )?.toLocal().toString(),
+                          10,
+                        )
+                      : 'N/A')
+                : 'N/A',
+            dotKienTapId: dotId,
+            termName: termName,
+            attendanceStatus: diemDanh['trang_thai'] == 'CoMat'
+                ? 'present'
+                : (diemDanh['trang_thai'] == 'Vang' ? 'absent' : 'none'),
+            excuseReason: diemDanh['ghi_chu'] ?? diemDanh['ly_do_vang'],
+            prelimGrade:
+                double.tryParse(diem['diem_chuan_bi']?.toString() ?? '0') ?? 0,
+            extraGrade:
+                double.tryParse(diem['diem_cong']?.toString() ?? '0') ?? 0,
+            gvhdGrade:
+                double.tryParse(r['diem_thu_hoach']?.toString() ?? '0') ?? 0,
+            aiSuggestedGrade: diem['diem_ai_de_xuat'] != null
+                ? double.tryParse(diem['diem_ai_de_xuat'].toString())
+                : null,
+            comment: r['nhan_xet_cua_giang_vien'],
+            isGraded: isGraded,
+            tourId: chuyen['id']?.toString() ?? '',
+            reportFileUrl: r['file_bao_cao'],
+            confirmationFileUrl: r['file_xac_nhan_tham_quan'],
+            isScoreLocked: isScoreLocked,
+          );
+        }).toList();
+      });
+
+      final List<dynamic> tripsJson = await ApiService.getLedTrips(lecturerId);
+      setState(() {
+        _state.lecturerTours = tripsJson.map((t) {
+          final rawDate = t['ngay_tham_quan'] ?? t['ngay_khoi_hanh'];
+          final rawStart = t['gio_bat_dau'];
+          final parsedDate = rawDate != null
+              ? DateTime.tryParse(rawDate.toString())
+              : null;
+          final company = t['nhaMay']?['ten_nha_may'] ?? t['ten_nha_may'];
+          final tourName = company ?? t['ten_chuyen_di'] ?? 'Chuyến tham quan';
+
+          String formattedDate = 'N/A';
+          if (parsedDate != null) {
+            formattedDate =
+                '${parsedDate.day.toString().padLeft(2, '0')}/${parsedDate.month.toString().padLeft(2, '0')}/${parsedDate.year}';
+          }
+
+          return LecturerTour(
+            id: t['id'].toString(),
+            name: tourName,
+            date: formattedDate,
+            timeRange:
+                '${t['gio_bat_dau'] ?? '08:00'} - ${t['gio_ket_thuc'] ?? '12:00'}',
+            registeredCount:
+                t['so_luong_dang_ky_hien_tai'] ?? t['so_luong_dang_ky'] ?? 0,
+            maxCount:
+                t['so_luong_sinh_vien_toi_da'] ??
+                t['suc_chua'] ??
+                t['so_luong_toi_da'] ??
+                0,
+            status:
+                t['trang_thai'] == 'HoanThanh' || t['trang_thai'] == 'DaDienRa'
+                ? 'completed'
+                : 'upcoming',
+            rawTripDate: parsedDate,
+            rawStartTime: rawStart?.toString(),
+            rawStatus: t['trang_thai']?.toString(),
+            companyName: company?.toString(),
+          );
+        }).toList();
+      });
+
+      final Map<String, dynamic> statsJson =
+          await ApiService.getLecturerDashboardStats(lecturerId);
+      setState(() {
+        _state.lecturerDashboardStats = LecturerDashboardStats(
+          doanDangDan: statsJson['doanDangDan'] ?? 0,
+          baiCanCham: statsJson['baiCanCham'] ?? 0,
+          buoiBaoCao: statsJson['buoiBaoCao'] ?? 0,
+          tongSvHuongDan: statsJson['tongSvHuongDan'] ?? 0,
+        );
+      });
+
+      try {
+        final notifsJson = await ApiService.getLecturerNotifications(
+          lecturerId,
+        );
+        final List<LecturerNotification> backendLecturerNotifs =
+            (notifsJson is List && notifsJson.isNotEmpty)
+            ? notifsJson.map((n) {
+                final rawDate = n['ngay_gui'] ?? n['created_at'];
+                String formattedTime = 'Vừa xong';
+                if (rawDate != null) {
+                  final dt = DateTime.tryParse(rawDate.toString())?.toLocal();
+                  if (dt != null) {
+                    formattedTime =
+                        '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+                  }
+                }
+
+                final rawEditedDate = n['ngay_chinh_sua'];
+                String? formattedEditedTime;
+                if (rawEditedDate != null) {
+                  final dt = DateTime.tryParse(
+                    rawEditedDate.toString(),
+                  )?.toLocal();
+                  if (dt != null) {
+                    formattedEditedTime =
+                        '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+                  }
+                }
+
+                return LecturerNotification(
+                  id: n['id'].toString(),
+                  title: n['tieu_de'] ?? 'Thông báo',
+                  body: n['noi_dung'] ?? '',
+                  time: formattedTime,
+                  attachment:
+                      n['file_dinh_kem'] ??
+                      (n['files'] != null && (n['files'] as List).isNotEmpty
+                          ? n['files'][0]['ten_file']
+                          : null),
+                  fileUrl:
+                      n['file_url'] ??
+                      (n['files'] != null && (n['files'] as List).isNotEmpty
+                          ? n['files'][0]['duong_dan']
+                          : null),
+                  type: n['loai_thong_bao'] ?? n['type'] ?? 'ThongBao',
+                  senderName: n['nguoi_gui'] ?? 'Ban Chủ nhiệm Khoa',
+                  targetAudience: n['doi_tuong_nhan'] ?? 'LECTURER',
+                  isEdited: n['da_chinh_sua'] == true || n['da_chinh_sua'] == 1,
+                  editedAt: formattedEditedTime,
+                );
+              }).toList()
+            : [];
+
+        final autoLecturerReminders = _generateAutoRemindersForLecturer();
+        setState(() {
+          _state.lecturerNotifications = [
+            ...autoLecturerReminders,
+            ...backendLecturerNotifs,
+          ];
+        });
+        _saveLecturerNotificationsCache(_state.lecturerNotifications);
+        NotificationService.instance.notifyLecturerReminders(
+          autoLecturerReminders,
+        );
+      } catch (e) {
+        print('Error fetching notifications: $e');
+      }
+
+      try {
+        await fetchBoardSessions(lecturerId);
+      } catch (e) {
+        print('Error fetching board sessions: $e');
+      }
+    } catch (e) {
+      print(
+        'Failed to load lecturer data from backend (Offline mode active): $e',
+      );
+      if (_state.lecturerNotifications.isEmpty) {
+        final cached = await _loadLecturerNotificationsCache();
+        if (cached.isNotEmpty) {
+          setState(() {
+            _state.lecturerNotifications = cached;
+          });
+        }
+      }
+    }
+  }
+
+  // Auth Operations
+  Future<void> login(
+    String username,
+    String password, {
+    required VoidCallback onSuccess,
+    required Function(String) onError,
+  }) async {
+    try {
+      final res = await ApiService.login(username, password);
+      final user = res['user'];
+      final userRole = user?['vai_tro'];
+      final details = user?['details'];
+
+      final bool requiresPasswordChange =
+          user?['phai_doi_mat_khau'] == 1 || user?['phai_doi_mat_khau'] == true;
+
+      if (userRole == 'SinhVien') {
+        setState(() {
+          _state.currentRole = 'student';
+          _state.phaiDoiMatKhau = requiresPasswordChange;
+          if (details != null) {
+            _state.studentProfile = StudentProfile(
+              name: details['ho_ten'] ?? 'Sinh viên',
+              email: details['email'] ?? 'student@example.com',
+              studentId: details['mssv'] ?? username,
+              className: details['lop'] ?? 'N/A',
+              major: details['nganh'] ?? 'Công nghệ Thực phẩm',
+              avatar: details['avatar'] ?? '',
+            );
+          }
+        });
+
+        if (!requiresPasswordChange) {
+          final studentId = (details != null && details['id'] is int)
+              ? details['id'] as int
+              : ApiService.userId;
+          if (studentId != null) {
+            fetchStudentDataFromApi(studentId);
+          }
+        }
+        onSuccess();
+      } else if (userRole == 'GiangVien') {
+        setState(() {
+          _state.currentRole = 'lecturer';
+          _state.phaiDoiMatKhau = requiresPasswordChange;
+          if (details != null) {
+            _state.lecturerProfile = LecturerProfile(
+              name: details['ho_ten'] ?? 'Giảng viên',
+              email: details['email'] ?? 'lecturer@example.com',
+              teacherId: details['msgv'] ?? username,
+              avatar: details['avatar'] ?? '',
+              department: details['khoa'] ?? 'Khoa Công nghệ Thực phẩm',
+            );
+          }
+        });
+
+        if (!requiresPasswordChange) {
+          final lecturerId = (details != null && details['id'] is int)
+              ? details['id'] as int
+              : ApiService.userId;
+          if (lecturerId != null) {
+            _fetchLecturerDataFromApi(lecturerId);
+          }
+        }
+        onSuccess();
+      } else {
+        onError('Tài khoản không có quyền truy cập ứng dụng di động.');
+      }
+    } catch (e) {
+      final msg = e.toString().replaceAll('Exception: ', '');
+      onError(
+        msg.isNotEmpty
+            ? msg
+            : 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin tài khoản hoặc kết nối mạng.',
+      );
+    }
+  }
+
+  void completePasswordChange() {
+    setState(() {
+      _state.phaiDoiMatKhau = false;
+    });
+    final activeId = ApiService.profileId ?? ApiService.userId;
+    if (_state.currentRole == 'student' && activeId != null) {
+      fetchStudentDataFromApi(activeId);
+    } else if (_state.currentRole == 'lecturer' && activeId != null) {
+      _fetchLecturerDataFromApi(activeId);
+    }
+  }
+
+  void logout() {
+    ApiService.clearSession();
+    NotificationService.instance.clearNotificationHistory();
+    setState(() {
+      _resetToDefaults(notify: true);
+      _state.currentRole = null;
+      _state.phaiDoiMatKhau = null;
+    });
+  }
+
+  void resetData() {
+    _resetToDefaults();
+  }
+
+  // Student Operations
+  Future<void> registerTrip(String tripId) async {
+    final tId = int.tryParse(tripId);
+    if (tId == null) {
+      throw Exception('Mã chuyến đi không hợp lệ ($tripId).');
+    }
+
+    await ApiService.registerTrip(tId);
+
+    setState(() {
+      _state.studentTrips = _state.studentTrips.map((t) {
+        if (t.id == tripId) {
+          return t.copyWith(isRegistered: true);
+        }
+        return t;
+      }).toList();
+
+      final paymentExists = _state.payments.any((p) => p.tripId == tripId);
+      if (!paymentExists) {
+        final trip = _state.studentTrips.firstWhere(
+          (t) => t.id == tripId,
+          orElse: () => Trip(
+            id: tripId,
+            name: 'Chuyến tham quan',
+            date: '',
+            time: '',
+            type: 'Trực tiếp',
+            location: '',
+            industry: '',
+            description: '',
+            heroImage: '',
+            isRegistered: true,
+            isCompleted: false,
+          ),
+        );
+        final codeSuffix = Random().nextInt(90000) + 10000;
+        final nameAbbr = trip.name.length > 11
+            ? trip.name.substring(8, 11).toUpperCase()
+            : 'TRIP';
+        final newPayment = Payment(
+          id: 'pay-$tripId',
+          tripId: tripId,
+          name: 'Chuyến: ${trip.name}',
+          code: 'KT2026-$nameAbbr-$codeSuffix',
+          amount: 50000,
+          dueDate: '15/12/2026',
+          status: 'Chưa đóng',
+        );
+        _state.payments = [newPayment, ..._state.payments];
+      }
+    });
+  }
+
+  Future<void> proposeTrip({
+    int? factoryId,
+    String? companyName,
+    String? address,
+    String? description,
+    String? contactPerson,
+    String? contactPhone,
+    DateTime? visitDate,
+    String? startTime,
+    String? type,
+  }) async {
+    if (ApiService.userId == null) {
+      throw Exception('Chưa đăng nhập');
+    }
+    final vDate = visitDate ?? DateTime.now().add(const Duration(days: 7));
+    final sTime = startTime ?? '08:00';
+    final tType = type ?? 'TrucTiep';
+
+    await ApiService.proposeTrip(
+      nhaMayId: factoryId,
+      tenNhaMayDeXuat: companyName,
+      diaChiDeXuat: address,
+      nguoiLienHeDeXuat: contactPerson,
+      sdtLienHeDeXuat: contactPhone,
+      ngayThamQuan: vDate.toIso8601String().substring(0, 10),
+      gioBatDau: sTime,
+      hinhThuc: tType,
+    );
+
+    await fetchStudentProposals(ApiService.profileId ?? ApiService.userId!);
+  }
+
+  Future<void> cancelStudentProposal(int proposalId) async {
+    await ApiService.cancelProposal(proposalId);
+    setState(() {
+      _state.proposals = _state.proposals
+          .where((p) => p.id != proposalId)
+          .toList();
+    });
+  }
+
+  Future<String> cancelTripRegistration(
+    String tripId,
+    String? registrationId, {
+    required String lyDo,
+    String? fileMinhChung,
+  }) async {
+    final regId = int.tryParse(registrationId ?? '');
+    if (regId == null) {
+      throw Exception('Không tìm thấy mã phiếu đăng ký hợp lệ cho chuyến này.');
+    }
+
+    String? fileReference;
+    if (fileMinhChung != null) {
+      try {
+        final uploadRes = await ApiService.uploadFile(
+          'upload/attachment',
+          fileMinhChung,
+          'file',
+        );
+        fileReference = uploadRes['key'] ?? uploadRes['url'] ?? fileMinhChung;
+      } catch (e) {
+        print('uploadConfirmationFile file upload failed: $e');
+        fileReference = fileMinhChung;
+      }
+    }
+
+    final res = await ApiService.post('sinh-vien/request-cancel', {
+      'registrationId': regId,
+      'lyDo': lyDo,
+      if (fileReference != null && fileReference.isNotEmpty)
+        'fileMinhChung': fileReference,
+    });
+
+    final message = res is Map && res['message'] != null
+        ? res['message'].toString()
+        : 'Đã xử lý yêu cầu hủy thành công';
+
+    final activeId = ApiService.profileId ?? ApiService.userId;
+    if (activeId != null) {
+      await fetchStudentDataFromApi(activeId);
+    } else {
+      setState(() {
+        _state.studentTrips = _state.studentTrips.map((t) {
+          if (t.id == tripId) {
+            return t.copyWith(registrationStatus: 'DaHuy');
+          }
+          return t;
+        }).toList();
+
+        _state.payments = _state.payments.map((p) {
+          if (p.tripId == tripId) {
+            return p.copyWith(status: 'Đã hoàn phí');
+          }
+          return p;
+        }).toList();
+      });
+    }
+
+    return message;
+  }
+
+  Future<bool> uploadReport(
+    String submissionId,
+    String localPath,
+    String fileName,
+    String fileSize, {
+    String? extractedText,
+    String? fileXacNhanUrl,
+    String? localConfirmationPath,
+    String? confirmationFileName,
+  }) async {
+    final regId = int.tryParse(submissionId);
+    if (regId == null) {
+      throw Exception('Mã bài nộp không hợp lệ ($submissionId).');
+    }
+
+    String fileReference = fileName;
+    try {
+      final uploadRes = await ApiService.uploadFile(
+        'upload/report',
+        localPath,
+        'file',
+      );
+      fileReference = uploadRes['key'] ?? uploadRes['url'] ?? fileName;
+    } catch (e) {
+      print('uploadReport file upload failed: $e');
+      rethrow;
+    }
+
+    String? finalConfirmationRef = fileXacNhanUrl;
+    if (localConfirmationPath != null && localConfirmationPath.isNotEmpty) {
+      try {
+        Map<String, dynamic> uploadRes;
+        try {
+          uploadRes = await ApiService.uploadFile(
+            'upload/attachment',
+            localConfirmationPath,
+            'file',
+          );
+        } catch (_) {
+          uploadRes = await ApiService.uploadFile(
+            'upload/payment',
+            localConfirmationPath,
+            'file',
+          );
+        }
+        finalConfirmationRef = uploadRes['key'] ?? uploadRes['url'] ?? confirmationFileName;
+      } catch (e) {
+        print('upload confirmation file in uploadReport failed: $e');
+        rethrow;
+      }
+    }
+
+    final sub = _state.submissions.firstWhere(
+      (s) => s.id == submissionId,
+      orElse: () => Submission(
+        id: submissionId,
+        tripName: '',
+        typeText: 'Trực tiếp',
+        dateText: '',
+        status: 'Chưa nộp',
+        hasConfirmationFile: false,
+      ),
+    );
+
+    final finalConfUrl = finalConfirmationRef ?? sub.fileXacNhanUrl;
+
+    await ApiService.submitReport(
+      regId,
+      fileReference,
+      finalConfUrl,
+      extractedText: extractedText,
+    );
+
+    final activeId = ApiService.profileId ?? ApiService.userId;
+    if (activeId != null) {
+      await fetchStudentDataFromApi(activeId);
+    }
+
+    return true;
+  }
+
+  Future<bool> uploadConfirmationFile(
+    String submissionId,
+    String localPath,
+    String fileName,
+  ) async {
+    final regId = int.tryParse(submissionId);
+    if (regId == null) {
+      throw Exception('Mã bài nộp không hợp lệ ($submissionId).');
+    }
+
+    String fileReference = fileName;
+    try {
+      Map<String, dynamic> uploadRes;
+      try {
+        uploadRes = await ApiService.uploadFile(
+          'upload/attachment',
+          localPath,
+          'file',
+        );
+      } catch (_) {
+        uploadRes = await ApiService.uploadFile(
+          'upload/payment',
+          localPath,
+          'file',
+        );
+      }
+      fileReference = uploadRes['key'] ?? uploadRes['url'] ?? fileName;
+    } catch (e) {
+      print('uploadConfirmationFile file upload failed: $e');
+      rethrow;
+    }
+
+    await ApiService.submitConfirmationPaper(regId, fileReference);
+
+    setState(() {
+      _state.submissions = _state.submissions.map((s) {
+        if (s.id == submissionId || s.registrationId == regId) {
+          return s.copyWith(
+            hasConfirmationFile: true,
+            confirmationFileName: fileName,
+            fileXacNhanUrl: fileReference,
+            status: (s.fileBaoCaoUrl != null && s.fileBaoCaoUrl!.isNotEmpty)
+                ? 'Đã nộp'
+                : 'Chưa nộp',
+          );
+        }
+        return s;
+      }).toList();
+
+      _state.studentTrips = _state.studentTrips.map((t) {
+        if (t.registrationId == submissionId || t.registrationId == regId.toString()) {
+          return t.copyWith(fileXacNhanUrl: fileReference);
+        }
+        return t;
+      }).toList();
+    });
+
+    final activeId = ApiService.profileId ?? ApiService.userId;
+    if (activeId != null) {
+      await fetchStudentDataFromApi(activeId);
+    }
+
+    return true;
+  }
+
+  Future<void> deleteReport(String submissionId) async {
+    final regId = int.tryParse(submissionId);
+    if (regId != null) {
+      await ApiService.deleteReport(regId);
+      final activeId = ApiService.profileId ?? ApiService.userId;
+      if (activeId != null) {
+        await fetchStudentDataFromApi(activeId);
+      }
+    }
+  }
+
+  Future<void> payFee(String paymentId) async {
+    final payId = int.tryParse(paymentId);
+    if (payId == null) {
+      throw Exception('Mã hóa đơn thanh toán không hợp lệ ($paymentId).');
+    }
+
+    await ApiService.payInvoice(payId);
+
+    setState(() {
+      _state.payments = _state.payments.map((p) {
+        if (p.id == paymentId) {
+          return p.copyWith(status: 'Đã đóng đúng hạn');
+        }
+        return p;
+      }).toList();
+    });
+  }
+
+  Future<bool> addRefund(
+    String paymentId,
+    String invoiceName,
+    String amountText, {
+    String? localPath,
+    String? fileName,
+    String? bankName,
+    String? accountNumber,
+    String? accountName,
+    String? reason,
+  }) async {
+    final invoiceId = int.tryParse(paymentId);
+    if (invoiceId == null) {
+      throw Exception('Không tìm thấy mã hóa đơn cần hoàn phí.');
+    }
+
+    String fileReference = fileName ?? 'hoadon_daquet.pdf';
+    if (localPath != null) {
+      final uploadRes = await ApiService.uploadFile(
+        'upload/attachment',
+        localPath,
+        'file',
+      );
+      fileReference = uploadRes['key'] ?? uploadRes['url'] ?? fileReference;
+    }
+
+    await ApiService.requestRefund(
+      invoiceId,
+      fileReference,
+      bankName: bankName,
+      accountNumber: accountNumber,
+      accountName: accountName,
+      reason: reason,
+    );
+
+    setState(() {
+      final newRefund = RefundRequest(
+        id: 'ref-${DateTime.now().millisecondsSinceEpoch}',
+        invoiceName: invoiceName,
+        dateText:
+            '${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
+        amountText: amountText,
+        status: 'Chờ xử lý',
+      );
+      _state.refunds = [newRefund, ..._state.refunds];
+    });
+
+    final activeId = ApiService.profileId ?? ApiService.userId;
+    if (activeId != null) {
+      fetchStudentDataFromApi(activeId);
+    }
+
+    return true;
+  }
+
+  // Lecturer Operations
+  Future<void> updateAttendance(
+    String studentId,
+    String status, {
+    String? reason,
+  }) async {
+    final student = _state.lecturerStudents.firstWhere(
+      (s) => s.id == studentId,
+      orElse: () => throw Exception(
+        'Không tìm thấy sinh viên $studentId trong danh sách.',
+      ),
+    );
+
+    final tId = int.tryParse(student.tourId);
+    if (tId == null) {
+      throw Exception('Mã chuyến tham quan không hợp lệ (${student.tourId}).');
+    }
+
+    final phieuId = student.phieuId ?? int.tryParse(studentId);
+    if (phieuId == null) {
+      throw Exception(
+        'Không xác định được mã phiếu đăng ký của sinh viên $studentId.',
+      );
+    }
+
+    // Ánh xạ trạng thái điểm danh khớp đúng với DTO backend (CoMat, Vang, TuChoiThamGia)
+    final String backendStatus = status == 'present'
+        ? 'CoMat'
+        : (status == 'absent' ? 'Vang' : 'TuChoiThamGia');
+
+    await ApiService.takeAttendance(tId, [
+      {
+        'phieuId': phieuId,
+        'status': backendStatus,
+        if (reason != null && reason.isNotEmpty) 'note': reason,
+      },
+    ]);
+
+    setState(() {
+      _state.lecturerStudents = _state.lecturerStudents.map((s) {
+        if (s.id == studentId) {
+          return s.copyWith(
+            attendanceStatus: status,
+            excuseReason: reason ?? s.excuseReason,
+          );
+        }
+        return s;
+      }).toList();
+    });
+  }
+
+  Future<void> updateStudentGrade(
+    String studentId, {
+    double? prelimGrade,
+    double? extraGrade,
+    double? gvhdGrade,
+    String? comment,
+    bool? isGraded,
+  }) async {
+    final student = _state.lecturerStudents.firstWhere(
+      (s) => s.id == studentId,
+      orElse: () => throw Exception(
+        'Không tìm thấy sinh viên $studentId trong danh sách.',
+      ),
+    );
+
+    final phieuId = student.phieuId ?? int.tryParse(studentId);
+    if ((prelimGrade != null || extraGrade != null) && phieuId == null) {
+      throw Exception(
+        'Không xác định được mã phiếu đăng ký để nhập điểm quá trình.',
+      );
+    }
+
+    if (prelimGrade != null || extraGrade != null) {
+      await ApiService.gradePrepAndBonus(
+        phieuId!,
+        prelimGrade ?? student.prelimGrade,
+        extraGrade ?? student.extraGrade,
+      );
+    }
+
+    if (gvhdGrade != null || comment != null) {
+      final reportId = student.reportId ?? phieuId;
+      if (reportId == null) {
+        throw Exception('Không xác định được mã bài thu hoạch để chấm điểm.');
+      }
+      await ApiService.gradeReport(
+        reportId,
+        gvhdGrade ?? student.gvhdGrade,
+        comment ?? student.comment ?? '',
+      );
+    }
+
+    setState(() {
+      _state.lecturerStudents = _state.lecturerStudents.map((s) {
+        if (s.id == studentId) {
+          final newIsGraded = isGraded ?? (gvhdGrade != null ? true : s.isGraded);
+          return s.copyWith(
+            prelimGrade: prelimGrade ?? s.prelimGrade,
+            extraGrade: extraGrade ?? s.extraGrade,
+            gvhdGrade: gvhdGrade ?? s.gvhdGrade,
+            comment: comment ?? s.comment,
+            isGraded: newIsGraded,
+            papersLeft: newIsGraded ? 0 : 1,
+          );
+        }
+        return s;
+      }).toList();
+    });
+  }
+
+  Future<void> fetchStudentProposals(int studentId) async {
+    try {
+      final res = await ApiService.getProposals();
+      if (res is List) {
+        setState(() {
+          _state.proposals = res.map((p) {
+            final nhaMay = p['nhaMay'] ?? {};
+            return TripProposal(
+              id: p['id'] ?? 0,
+              tenDoanhNghiep:
+                  nhaMay['ten_nha_may'] ??
+                  p['ten_nha_may_de_xuat'] ??
+                  'Doanh nghiệp đề xuất',
+              diaChi: nhaMay['dia_chi'] ?? p['dia_chi_de_xuat'],
+              ngayThamQuan:
+                  (p['ngay_tham_quan_de_xuat'] ?? p['ngay_tham_quan']) != null
+                  ? _safeSub(
+                      DateTime.tryParse(
+                        (p['ngay_tham_quan_de_xuat'] ?? p['ngay_tham_quan'])
+                            .toString(),
+                      )?.toLocal().toString(),
+                      10,
+                    )
+                  : null,
+              gioBatDau: _safeSub(
+                p['gio_bat_dau_de_xuat'] ?? p['gio_bat_dau'],
+                5,
+              ),
+              hinhThuc: p['hinh_thuc'] == 'TrucTuyen'
+                  ? 'Trực tuyến'
+                  : 'Trực tiếp',
+              trangThai: p['trang_thai_duyet'] ?? p['trang_thai'] ?? 'ChoDuyet',
+              lyDo: p['ly_do'],
+              phanHoi: p['phan_hoi'],
+              lyDoTuChoi: p['ly_do_tu_choi'] ?? p['phan_hoi'] ?? p['ly_do'],
+            );
+          }).toList();
+        });
+      }
+    } catch (_) {
+      // Giữ nguyên danh sách hiện tại
+    }
+  }
+
+  void setSelectedTermIndex(int index) {
+    if (index >= 0 && index < _state.termGrades.length) {
+      setState(() {
+        _state.selectedTermIndex = index;
+        _state.termGrade = _state.termGrades[index];
+      });
+    }
+  }
+
+  Future<void> fetchStudentGrades(int studentId) async {
+    try {
+      final gradesRes = await ApiService.getStudentGrades(studentId);
+      if (gradesRes is List && gradesRes.isNotEmpty) {
+        final List<StudentTermGrade> terms = [];
+        for (var termData in gradesRes) {
+          final List<dynamic> rawTrips = termData['selectedTrips'] ?? [];
+
+          final tripGrades = rawTrips.map((t) {
+            return TripGradeItem(
+              id: t['id'] ?? 0,
+              tenNhaMay: t['ten_nha_may'] ?? 'Doanh nghiệp',
+              hinhThuc: t['hinh_thuc'] == 'TrucTuyen'
+                  ? 'Trực tuyến'
+                  : 'Trực tiếp',
+              diemChuanBi: t['diem_chuan_bi'] != null
+                  ? double.tryParse(t['diem_chuan_bi'].toString())
+                  : null,
+              diemBaiThuHoach: t['diem_bai_thu_hoach'] != null
+                  ? double.tryParse(t['diem_bai_thu_hoach'].toString())
+                  : null,
+              diemBaoCaoTQNM: t['diem_bao_cao_tqnm'] != null
+                  ? double.tryParse(t['diem_bao_cao_tqnm'].toString())
+                  : null,
+              diemCong: t['diem_cong'] != null
+                  ? double.tryParse(t['diem_cong'].toString())
+                  : null,
+              diemTongChuyen: t['diem_tong_chuyen'] != null
+                  ? double.tryParse(t['diem_tong_chuyen'].toString())
+                  : null,
+              ketQua: t['ket_qua'],
+              daKhoaChuanBi: t['da_khoa_chuan_bi'] == true,
+              daKhoaThuHoach: t['da_khoa_thu_hoach'] == true,
+              daKhoaHoiDong: t['da_khoa_hoi_dong'] == true,
+              daKhoa: t['da_khoa'] == true,
+            );
+          }).toList();
+
+          final double? dtk = termData['diem_tong_ket'] != null
+              ? double.tryParse(termData['diem_tong_ket'].toString())
+              : null;
+
+          terms.add(
+            StudentTermGrade(
+              dotKienTapId: termData['dot_kien_tap_id'],
+              tenDot: termData['ten_dot']?.toString(),
+              namHoc: termData['nam_hoc']?.toString(),
+              hocKy: termData['hoc_ky']?.toString(),
+              lanDangKy: termData['lan_dang_ky'] != null
+                  ? int.tryParse(termData['lan_dang_ky'].toString())
+                  : null,
+              diemTongKet: dtk,
+              trangThai: termData['trang_thai'] ?? termData['ket_qua'],
+              isScoreLocked: dtk != null,
+              tripGrades: tripGrades,
+            ),
+          );
+        }
+
+        setState(() {
+          _state.termGrades = terms;
+          _state.selectedTermIndex = 0;
+          _state.termGrade = terms.isNotEmpty ? terms[0] : null;
+        });
+      }
+    } catch (e) {
+      // Fallback
+    }
+  }
+
+  Future<void> fetchRepresentativeTripsStatus() async {
+    try {
+      final res = await ApiService.getRepresentativeTripsStatus();
+      if (res != null) {
+        final List<dynamic> regIds = res['selectedRegistrationIds'] ?? [];
+        final council =
+            res['assignedCouncil'] ?? res['hoiDong'] ?? res['council'];
+        final List<dynamic> members = council?['thanhVien'] ?? [];
+
+        setState(() {
+          _state.repStatus = RepresentativeTripsStatus(
+            selectedRegistrationIds: regIds
+                .map((id) => int.tryParse(id.toString()) ?? 0)
+                .where((id) => id > 0)
+                .toList(),
+            isLockedByKhoa: res['isLockedByKhoa'] == true,
+            lockReason: res['lockReason'] as String?,
+            canEdit: res['canEdit'] ?? !(res['isLockedByKhoa'] == true),
+            councilSessionName:
+                council?['tenHoiDong'] ??
+                council?['ten_hoi_dong'] ??
+                council?['ten_buoi'],
+            councilRoom:
+                council?['diaDiem'] ??
+                council?['dia_diem'] ??
+                council?['phong'] ??
+                'Chưa xếp phòng',
+            councilTime:
+                council?['ngayBaoCao'] ??
+                council?['thoi_gian'] ??
+                council?['ngayCham'] ??
+                'Chưa có lịch',
+            councilMembers: members
+                .map(
+                  (m) =>
+                      (m['hoTen'] ?? m['ho_ten'] ?? m['giangVien']?['ho_ten'])
+                          ?.toString() ??
+                      '',
+                )
+                .where((m) => m.isNotEmpty)
+                .toList(),
+          );
+        });
+      }
+    } catch (e) {
+      print('Failed to fetch representative trips status: $e');
+    }
+  }
+
+  Future<void> selectRepresentativeTrips(List<int> registrationIds) async {
+    await ApiService.selectRepresentativeTrips(registrationIds);
+    await fetchRepresentativeTripsStatus();
+  }
+
+  Future<List<TripRegistrationStudent>> fetchTripRegistrations(
+    int tripId,
+  ) async {
+    try {
+      final res = await ApiService.getTripRegistrations(tripId);
+      if (res is List) {
+        final list = res.map((r) {
+          final sv = r['sinhVien'] ?? {};
+          final phieuTQ = r['phieuThamQuan'] ?? {};
+          final diemDanh = r['diemDanh'] ?? phieuTQ['diemDanh'] ?? {};
+          final diem =
+              r['diemPhieuThamQuan'] ?? phieuTQ['diemPhieuThamQuan'] ?? {};
+          final hoaDon = r['hoaDon'] ?? {};
+
+          return TripRegistrationStudent(
+            phieuId: r['id'] ?? 0,
+            sinhVienId: sv['id'] ?? 0,
+            mssv: sv['mssv'] ?? '',
+            hoTen: sv['ho_ten'] ?? 'Sinh viên',
+            className: sv['lop'] ?? 'N/A',
+            soDienThoai: sv['so_dien_thoai'] ?? sv['sdt'],
+            email: sv['email'],
+            avatar: sv['avatar'] ?? '',
+            feeStatus:
+                hoaDon['trang_thai'] ??
+                (r['trang_thai'] == 'HopLe' || r['trang_thai'] == 'DaThamGia'
+                    ? 'DaDongDungHan'
+                    : 'ChuaDong'),
+            attendanceStatus: diemDanh['trang_thai'] ?? 'ChuaDiemDanh',
+            excuseReason: diemDanh['ghi_chu'] ?? diemDanh['ly_do_vang'],
+            prelimGrade:
+                double.tryParse(diem['diem_chuan_bi']?.toString() ?? '0') ??
+                0.0,
+            extraGrade:
+                double.tryParse(
+                  (diem['diem_cong_final'] ?? diem['diem_cong'])?.toString() ??
+                      '0',
+                ) ??
+                0.0,
+            isLockedPrep:
+                diem['da_khoa_chuan_bi'] == true ||
+                diem['da_khoa'] == true ||
+                phieuTQ['is_locked_prep'] == true,
+            fileXacNhanUrl: r['file_xac_nhan_tham_quan'],
+            cachToChuc: r['cach_to_chuc'],
+          );
+        }).toList();
+
+        setState(() {
+          final newCache = Map<int, List<TripRegistrationStudent>>.from(
+            _state.tripStudentsCache,
+          );
+          newCache[tripId] = list;
+          _state.tripStudentsCache = newCache;
+        });
+        return list;
+      }
+    } catch (e) {
+      print('Failed to fetch trip registrations: $e');
+    }
+    return _state.tripStudentsCache[tripId] ?? [];
+  }
+
+  Future<TripBusInfo?> fetchTripBusInfo(int tripId) async {
+    try {
+      final res = await ApiService.getTripInfo(tripId);
+      if (res != null) {
+        final chuyen = res['chuyenThamQuan'] ?? res;
+        final List<dynamic> rawStudents = res['students'] ?? [];
+        final List<dynamic> rawLecturers = res['lecturers'] ?? [];
+
+        final students = rawStudents
+            .map(
+              (s) => TripBusMember(
+                id: s['id'] ?? 0,
+                hoTen: s['ho_ten'] ?? s['name'] ?? '',
+                mssv: s['mssv'] ?? '',
+                isLeader: s['truong_nhom'] == true,
+              ),
+            )
+            .toList();
+
+        final leadGv = rawLecturers.isNotEmpty ? rawLecturers[0] : null;
+        final enterpriseContact = res['enterpriseContact'] is Map
+            ? res['enterpriseContact']
+            : null;
+        final enterprisePerson = enterpriseContact?['nguoi_lien_he']
+            ?.toString();
+        final enterprisePhone = enterpriseContact?['sdt_lien_he']?.toString();
+
+        return TripBusInfo(
+          tripId: tripId,
+          tenChuyenDi:
+              chuyen['ten_nha_may'] ??
+              chuyen['ten_chuyen_di'] ??
+              'Chuyến tham quan',
+          gioBatDau: _safeSub(chuyen['gio_bat_dau'], 5).isNotEmpty
+              ? _safeSub(chuyen['gio_bat_dau'], 5)
+              : '08:00',
+          gioKetThuc: _safeSub(chuyen['gio_ket_thuc'], 5).isNotEmpty
+              ? _safeSub(chuyen['gio_ket_thuc'], 5)
+              : '12:00',
+          hinhThuc: chuyen['hinh_thuc'] ?? 'TrucTiep',
+          lecturerName: leadGv?['ho_ten'],
+          lecturerPhone: leadGv?['so_dien_thoai'],
+          students: students,
+          enterpriseContactPerson: enterprisePerson,
+          enterpriseContactPhone: enterprisePhone,
+        );
+      }
+    } catch (e) {
+      print('Failed to fetch trip bus info: $e');
+    }
+    return null;
+  }
+
+  Future<void> lockTripPrepGrades(int tripId) async {
+    await ApiService.lockTripPrepGrades(tripId);
+    await fetchTripRegistrations(tripId);
+  }
+
+  Future<void> saveTripPrepGradesBatch(
+    int tripId,
+    List<Map<String, dynamic>> records,
+  ) async {
+    await ApiService.gradePrepAndBonusBatch(tripId, records);
+    await fetchTripRegistrations(tripId);
+  }
+
+  Future<Map<String, dynamic>> importPrepGradesExcel(
+    int tripId,
+    String filePath, {
+    bool saveImmediately = false,
+  }) async {
+    final res = await ApiService.importPrepGradesExcel(
+      tripId,
+      filePath,
+      saveImmediately: saveImmediately,
+    );
+    if (saveImmediately) {
+      await fetchTripRegistrations(tripId);
+    }
+    return res;
+  }
+
+  Future<void> lockGuidedReportsGrades(int dotKienTapId) async {
+    await ApiService.lockGuidedReportsGrades(dotKienTapId);
+    final activeId = ApiService.profileId ?? ApiService.userId;
+    if (activeId != null) {
+      await _fetchLecturerDataFromApi(activeId);
+    }
+  }
+
+  Future<void> fetchBoardSessions(int lecturerId) async {
+    try {
+      final res = await ApiService.getBoardSessions(lecturerId);
+      if (res is List) {
+        final boards = res.map((b) {
+          final session = b['session'] ?? {};
+          final isBoardLocked =
+              b['isBoardLocked'] == true || session['isBoardLocked'] == true;
+          final List<dynamic> rawStudents =
+              b['students'] ?? b['registrations'] ?? [];
+
+          final students = rawStudents.map((st) {
+            final List<dynamic> rawTrips = st['trips'] ?? [];
+            final trips = rawTrips
+                .map(
+                  (t) => CouncilStudentTripItem(
+                    phieuId: t['phieuThamQuanId'] ?? t['id'] ?? 0,
+                    tenNhaMay:
+                        t['tenNhaMay'] ?? t['ten_nha_may'] ?? 'Doanh nghiệp',
+                    hinhThuc: t['hinh_thuc'] ?? 'TrucTiep',
+                    myScore: t['myScore'] != null
+                        ? double.tryParse(t['myScore'].toString())
+                        : null,
+                    diemTong: t['diem_bao_cao_tqnm'] != null
+                        ? double.tryParse(t['diem_bao_cao_tqnm'].toString())
+                        : null,
+                    isLocked:
+                        isBoardLocked ||
+                        t['daKhoa'] == true ||
+                        t['daKhoaHoiDong'] == true,
+                  ),
+                )
+                .toList();
+
+            final isStudentLocked =
+                isBoardLocked ||
+                st['daKhoaHoiDong'] == true ||
+                st['da_khoa_hoi_dong'] == true ||
+                st['isGradeLocked'] == true;
+
+            final sv = st['sinhVien'] is Map ? st['sinhVien'] : st;
+            return CouncilStudentItem(
+              studentId: sv['id'] ?? st['id'] ?? 0,
+              mssv: sv['mssv'] ?? st['mssv'] ?? '',
+              hoTen:
+                  sv['ho_ten'] ??
+                  sv['name'] ??
+                  st['ho_ten'] ??
+                  st['name'] ??
+                  'Sinh viên',
+              className: sv['lop'] ?? st['lop'] ?? 'N/A',
+              topic: st['de_tai'] ?? st['topic'],
+              trips: trips,
+              isGradeLocked: isStudentLocked,
+              councilNote:
+                  st['ghi_chu_hoi_dong'] ?? st['councilNote'] ?? st['ghiChu'],
+              boChuyenId: st['boChuyenId'] ?? st['bo_chuyen_id'] ?? st['id'],
+            );
+          }).toList();
+
+          return CouncilBoardItem(
+            sessionId: session['id'] ?? 0,
+            memberId: b['memberId'] ?? 0,
+            sessionName:
+                session['ten_buoi'] ??
+                session['ten_hoi_dong'] ??
+                'Buổi chấm hội đồng',
+            room: session['phong'] ?? 'Phòng bảo vệ',
+            date: session['ngay_bao_cao'] != null
+                ? (_safeSub(session['ngay_bao_cao'], 10).isNotEmpty
+                      ? _safeSub(session['ngay_bao_cao'], 10)
+                      : 'N/A')
+                : 'N/A',
+            timeRange:
+                '${_safeSub(session['gio_bat_dau'], 5).isNotEmpty ? _safeSub(session['gio_bat_dau'], 5) : '08:00'} - ${_safeSub(session['gio_ket_thuc'], 5).isNotEmpty ? _safeSub(session['gio_ket_thuc'], 5) : '11:30'}',
+            role: (b['vai_tro'] == 'ChuTich' || b['role'] == 'ChuTich')
+                ? 'Chủ tịch'
+                : (b['vai_tro'] == 'ThuKy' || b['role'] == 'ThuKy')
+                ? 'Thư ký'
+                : 'Ủy viên',
+            status: session['trang_thai'] == 'HoanThanh'
+                ? 'completed'
+                : (session['trang_thai'] == 'DangDienRa'
+                      ? 'ongoing'
+                      : 'upcoming'),
+            isBoardLocked: isBoardLocked,
+            students: students,
+          );
+        }).toList();
+
+        setState(() {
+          _state.councilBoards = boards;
+        });
+      }
+    } catch (_) {
+      // Bỏ qua lỗi mạng khi load background
+    }
+  }
+
+  Future<void> submitBoardScore(int memberId, int phieuId, double score) async {
+    await ApiService.submitBoardScore(memberId, phieuId, score);
+    final activeId = ApiService.profileId ?? ApiService.userId;
+    if (activeId != null) {
+      await fetchBoardSessions(activeId);
+    }
+  }
+
+  Future<void> submitBoardScoresBatch(
+    int memberId,
+    List<int> phieuIds,
+    double score,
+  ) async {
+    await ApiService.submitBoardScoresBatch(memberId, phieuIds, score);
+    if (ApiService.userId != null) {
+      await fetchBoardSessions(ApiService.userId!);
+    }
+  }
+
+  Future<void> lockCouncilGrade({required int boardId, int? boChuyenId}) async {
+    await ApiService.lockCouncilGrade({
+      'boardId': boardId,
+      if (boChuyenId != null) 'boChuyenId': boChuyenId,
+    });
+    if (ApiService.userId != null) {
+      await fetchBoardSessions(ApiService.userId!);
+    }
+  }
+
+  Future<void> updateCouncilStudentNote({
+    required int boardId,
+    required int boChuyenId,
+    required String ghiChu,
+  }) async {
+    await ApiService.updateCouncilStudentNote({
+      'boChuyenId': boChuyenId,
+      'ghiChu': ghiChu,
+    });
+    final activeId = ApiService.profileId ?? ApiService.userId;
+    if (activeId != null) {
+      await fetchBoardSessions(activeId);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AppStateProvider(
+      state: _state,
+      stateWidget: this,
+      child: widget.child,
+    );
+  }
+}
