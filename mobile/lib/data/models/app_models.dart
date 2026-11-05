@@ -263,6 +263,11 @@ class Submission {
   final bool isScoreLocked;
   final String? gradedAt;
   final String? deadlineText;
+  final String? cachToChuc;
+  final String? diemDanhStatus;
+  final bool hasPhieuThamQuan;
+  final String? hoaDonStatus;
+  final String? reportStatus;
 
   Submission({
     required this.id,
@@ -285,10 +290,30 @@ class Submission {
     this.isScoreLocked = false,
     this.gradedAt,
     this.deadlineText,
+    this.cachToChuc,
+    this.diemDanhStatus,
+    this.hasPhieuThamQuan = true,
+    this.hoaDonStatus,
+    this.reportStatus,
   });
 
   bool get isGraded => reportScore != null;
-  bool get isTuDo => typeText.toLowerCase().contains('tự do') || typeText.toLowerCase().contains('tudo');
+  bool get isTuDo => cachToChuc == 'TuDo' || typeText.toLowerCase().contains('tự do') || typeText.toLowerCase().contains('tudo');
+  bool get isChoDuyetDiemDanh => status == 'Chờ duyệt điểm danh';
+  bool get canSubmitReport {
+    if (!hasPhieuThamQuan) return false;
+    if (isTuDo) return true;
+    return diemDanhStatus == 'CoMat';
+  }
+  String? get disabledReason {
+    if (!hasPhieuThamQuan) {
+      return (hoaDonStatus == 'ChuaDong' ? 'Chưa đóng phí' : 'Chưa có PTQ');
+    }
+    if (!isTuDo && diemDanhStatus != 'CoMat') {
+      return 'Chưa điểm danh';
+    }
+    return null;
+  }
 
   Submission copyWith({
     int? registrationId,
@@ -307,6 +332,11 @@ class Submission {
     bool? isScoreLocked,
     String? gradedAt,
     String? deadlineText,
+    String? cachToChuc,
+    String? diemDanhStatus,
+    bool? hasPhieuThamQuan,
+    String? hoaDonStatus,
+    String? reportStatus,
   }) {
     return Submission(
       id: id,
@@ -329,6 +359,11 @@ class Submission {
       isScoreLocked: isScoreLocked ?? this.isScoreLocked,
       gradedAt: gradedAt ?? this.gradedAt,
       deadlineText: deadlineText ?? this.deadlineText,
+      cachToChuc: cachToChuc ?? this.cachToChuc,
+      diemDanhStatus: diemDanhStatus ?? this.diemDanhStatus,
+      hasPhieuThamQuan: hasPhieuThamQuan ?? this.hasPhieuThamQuan,
+      hoaDonStatus: hoaDonStatus ?? this.hoaDonStatus,
+      reportStatus: reportStatus ?? this.reportStatus,
     );
   }
 }

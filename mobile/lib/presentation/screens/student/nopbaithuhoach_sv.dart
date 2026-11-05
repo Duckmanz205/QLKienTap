@@ -56,6 +56,95 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
     }
   }
 
+  void _handleToggleTripSelection(Submission s, List<Submission> allSubs) {
+    final appStateProvider = AppStateProvider.of(context);
+    final repStatus = appStateProvider.state.repStatus;
+
+    if (repStatus?.isLockedByKhoa == true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Quản lý Khoa đã khóa cổng đăng ký / thay đổi bộ chuyến.'),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+      return;
+    }
+
+    if (_campaignSelectedTrips.contains(s.id)) {
+      setState(() {
+        _campaignSelectedTrips.remove(s.id);
+      });
+    } else {
+      if (_campaignSelectedTrips.length >= 3) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Chỉ được chọn đúng 3 chuyến làm bộ chuyến báo cáo.'),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+        return;
+      }
+
+      final currentSelected = allSubs
+          .where((item) => _campaignSelectedTrips.contains(item.id))
+          .toList();
+
+      final isOnline = s.typeText.toLowerCase().contains('trực tuyến') ||
+          s.typeText.toLowerCase().contains('tructuyen');
+      final isDirect = !isOnline;
+
+      final currentDirectCount = currentSelected
+          .where((item) =>
+              !item.typeText.toLowerCase().contains('trực tuyến') &&
+              !item.typeText.toLowerCase().contains('tructuyen'))
+          .length;
+      final currentOnlineCount = currentSelected.length - currentDirectCount;
+
+      if (isDirect && currentDirectCount >= 2) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Bạn đã chọn đủ 2 chuyến Trực tiếp. Vui lòng bỏ chọn chuyến khác trước.',
+            ),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+        return;
+      }
+
+      if (isOnline && currentOnlineCount >= 1) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Bạn đã chọn đủ 1 chuyến Trực tuyến. Vui lòng bỏ chọn chuyến khác trước.',
+            ),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+        return;
+      }
+
+      final existingSameFactory = currentSelected.any(
+        (item) => item.tripName.trim().toLowerCase() == s.tripName.trim().toLowerCase(),
+      );
+      if (existingSameFactory) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Trùng nhà máy/chuyến "${s.tripName}". Quy định yêu cầu chọn 3 nhà máy khác nhau!',
+            ),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+        return;
+      }
+
+      setState(() {
+        _campaignSelectedTrips.add(s.id);
+      });
+    }
+  }
+
   Future<void> _handleSaveRepresentativeTrips(List<Submission> allSubs) async {
     final appStateProvider = AppStateProvider.of(context);
     final repStatus = appStateProvider.state.repStatus;
@@ -118,16 +207,17 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
       }
     }
 
-    // 2. Kiểm tra tối thiểu 2 chuyến trực tiếp
+    // 2. Kiểm tra tối thiểu 2 chuyến trực tiếp và 1 chuyến trực tuyến
     final directCount = selectedSubs.where((s) {
       final lower = s.typeText.toLowerCase();
-      return lower.contains('trực tiếp') || lower.contains('tructiep');
+      return !lower.contains('trực tuyến') && !lower.contains('tructuyen');
     }).length;
+    final onlineCount = selectedSubs.length - directCount;
 
-    if (directCount < 2) {
+    if (directCount != 2 || onlineCount != 1) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Quy định: Cần tối thiểu 2 chuyến kiến tập trực tiếp.'),
+          content: Text('Cơ cấu bắt buộc: Đúng 2 chuyến Trực tiếp và 1 chuyến Trực tuyến.'),
           backgroundColor: AppColors.danger,
         ),
       );
@@ -139,7 +229,7 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
     if (uniqueTripNames.length < 3) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Các chuyến tham quan được chọn không được trùng nhà máy.'),
+          content: Text('Các chuyến tham quan được chọn phải thuộc 3 nhà máy/doanh nghiệp khác nhau.'),
           backgroundColor: AppColors.danger,
         ),
       );
@@ -409,7 +499,13 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
       items: appState.submissions,
       searchHint: 'Tìm chuyến đi...',
       dropdownTitle: 'Trạng thái',
-      dropdownOptions: const ['Tất cả', 'Đã nộp', 'Chưa nộp', 'Trễ hạn - trừ điểm'],
+      dropdownOptions: const [
+        'Tất cả',
+        'Đã nộp',
+        'Chờ duyệt điểm danh',
+        'Chưa nộp',
+        'Trễ hạn - trừ điểm',
+      ],
       itemName: 'bài thu hoạch',
       filter: (sub, query, status) {
         final matchQuery = sub.tripName.toLowerCase().contains(query.toLowerCase());
@@ -543,7 +639,7 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
               ),
               const SizedBox(height: 6),
               const Text(
-                'Quy định: Chọn tối thiểu 2 chuyến trực tiếp + 1 chuyến trực tuyến/tự do tại các doanh nghiệp khác nhau để gửi hội đồng.',
+                'Quy định: Chọn đúng 2 chuyến trực tiếp + 1 chuyến trực tuyến tại 3 doanh nghiệp khác nhau (chỉ áp dụng chuyến đã nộp bài).',
                 style: TextStyle(fontSize: 11, color: AppColors.textMuted),
               ),
               if (isLocked) ...[
@@ -579,6 +675,7 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
 
               ...appState.submissions.map((s) {
                 final isSelected = _campaignSelectedTrips.contains(s.id);
+                final isEligible = s.status == 'Đã nộp' || s.isGraded;
                 
                 DateTime? tripDate = s.tripDate;
                 if (tripDate == null && s.dateText.isNotEmpty) {
@@ -594,51 +691,58 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
                 final now = DateTime.now();
                 final eighteenMonthsAgo = DateTime(now.year, now.month - 18, now.day);
                 final isExpired = tripDate != null && tripDate.isBefore(eighteenMonthsAgo);
+                final canToggle = !isLocked && !isExpired && isEligible;
 
                 return Material(
                   color: Colors.transparent,
                   child: CheckboxListTile(
-                  value: isSelected,
-                  onChanged: (isLocked || isExpired)
-                      ? null
-                      : (val) {
-                          setState(() {
-                            if (val == true) {
-                              if (_campaignSelectedTrips.length < 3) {
-                                _campaignSelectedTrips.add(s.id);
-                              } else {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Chỉ được chọn tối đa 3 chuyến tham quan báo cáo.')),
-                                );
-                              }
-                            } else {
-                              _campaignSelectedTrips.remove(s.id);
-                            }
-                          });
-                        },
-                  title: Row(
-                    children: [
-                      Expanded(
-                        child: Text(s.tripName, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isExpired ? Colors.grey : AppColors.darkSlate)),
-                      ),
-                      if (isExpired)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppColors.danger.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(4),
+                    value: isSelected,
+                    onChanged: canToggle
+                        ? (_) => _handleToggleTripSelection(s, appState.submissions)
+                        : null,
+                    title: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            s.tripName,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: (!isEligible || isExpired) ? Colors.grey : AppColors.darkSlate,
+                            ),
                           ),
-                          child: const Text('Quá 18 tháng', style: TextStyle(color: AppColors.danger, fontSize: 10, fontWeight: FontWeight.bold)),
                         ),
-                    ],
+                        if (isExpired) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.danger.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text('Quá 18 tháng', style: TextStyle(color: AppColors.danger, fontSize: 10, fontWeight: FontWeight.bold)),
+                          ),
+                        ] else if (!isEligible) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade200,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              s.status == 'Chờ duyệt điểm danh' ? 'Chờ duyệt ĐD' : 'Chưa nộp bài',
+                              style: TextStyle(color: Colors.grey.shade700, fontSize: 10, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    subtitle: Text('${s.typeText} • ${s.dateText}', style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
                   ),
-                  subtitle: Text('${s.typeText} • ${s.dateText}', style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
-                  controlAffinity: ListTileControlAffinity.leading,
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                ),
-              );
-            }),
+                );
+              }),
               const SizedBox(height: 16),
 
               ElevatedButton(
@@ -662,9 +766,16 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
         ),
       ),
       itemBuilder: (sub) {
-        Color statusColor = AppColors.warning;
-        if (sub.status == 'Đã nộp') statusColor = AppColors.secondary;
-        if (sub.status == 'Trễ hạn - trừ điểm') statusColor = AppColors.danger;
+        Color statusColor = Colors.amber.shade700;
+        if (sub.status == 'Đã nộp') {
+          statusColor = AppColors.secondary;
+        } else if (sub.status == 'Chờ duyệt điểm danh') {
+          statusColor = const Color(0xFF4F46E5); // Indigo
+        } else if (sub.status == 'Trễ hạn - trừ điểm') {
+          statusColor = AppColors.danger;
+        } else if (sub.status == 'Chờ bổ sung') {
+          statusColor = AppColors.warning;
+        }
 
         final isUploaded = _uploadedReports.containsKey(sub.id) || sub.fileName != null;
         final isConfirmUploaded = _uploadedConfirms.containsKey(sub.id) || sub.hasConfirmationFile;
@@ -714,15 +825,16 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: statusColor.withValues(alpha: 0.1),
+                            color: statusColor.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: statusColor.withValues(alpha: 0.3)),
                           ),
                           child: Text(
                             sub.status,
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
-                              color: statusColor == AppColors.warning ? AppColors.darkSlate : statusColor,
+                              color: statusColor,
                             ),
                           ),
                         ),
@@ -789,6 +901,7 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
 
                 const Divider(height: 24),
 
+                // Card 1: Báo cáo thu hoạch cá nhân (PDF)
                 _buildUploadDropzone(
                   title: 'Bài báo cáo thu hoạch (PDF)',
                   isUploaded: isUploaded,
@@ -796,11 +909,16 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
                   fileName: _uploadedReports[sub.id] ?? sub.fileName,
                   fileSize: _reportFileSizes[sub.id] ?? sub.fileSize,
                   onViewTap: sub.fileBaoCaoUrl != null
-                      ? () async {
-                          final uri = Uri.parse(sub.fileBaoCaoUrl!);
-                          if (await canLaunchUrl(uri)) {
-                            await launchUrl(uri, mode: LaunchMode.externalApplication);
-                          }
+                      ? () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => PdfViewerScreen(
+                                title: 'Bài thu hoạch - ${sub.tripName}',
+                                pdfUrl: sub.fileBaoCaoUrl!,
+                              ),
+                            ),
+                          );
                         }
                       : null,
                   onDeleteTap: canDelete ? () => _confirmDeleteReport(sub) : null,
@@ -812,10 +930,12 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
                       );
                       return;
                     }
-                    if (sub.isTuDo && !isConfirmUploaded && (sub.fileXacNhanUrl == null || sub.fileXacNhanUrl!.isEmpty)) {
+
+                    // Kiểm tra điều kiện nộp đối với chuyến Khoa
+                    if (!sub.canSubmitReport) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: const Text('Chuyến tự do bắt buộc phải nộp Giấy xác nhận tham quan doanh nghiệp trước khi nộp bài thu hoạch.'),
+                          content: Text('Không thể nộp bài: ${sub.disabledReason ?? "Chưa đủ điều kiện tham gia"}'),
                           backgroundColor: Colors.orange.shade800,
                         ),
                       );
@@ -832,13 +952,12 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
                         final sizeInMb = file.size / (1024 * 1024);
                         final fileSizeStr = '${sizeInMb.toStringAsFixed(1)} MB';
 
-                        // ML5: Chặn tệp vượt quá 5MB
                         if (file.size > 5 * 1024 * 1024) {
                           if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text('Dung lượng tệp ($fileSizeStr) vượt quá giới hạn 5MB. Vui lòng nén file PDF trước khi nộp.'),
-                              backgroundColor: Colors.red,
+                              backgroundColor: AppColors.danger,
                             ),
                           );
                           return;
@@ -853,6 +972,9 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
                               filePath: file.path!,
                               fileName: file.name,
                               fileSize: fileSizeStr,
+                              isTuDo: sub.isTuDo,
+                              fileXacNhanUrl: sub.fileXacNhanUrl,
+                              confirmationFileName: sub.confirmationFileName,
                             ),
                           ),
                         );
@@ -911,7 +1033,8 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
                   ],
                 ),
 
-                if (sub.isTuDo || sub.tripName.contains('Cát Lái') || sub.typeText.contains('tự do')) ...[
+                // Card 2: Giấy xác nhận tham quan doanh nghiệp (Dành cho chuyến Tự do)
+                if (sub.isTuDo || sub.tripName.toLowerCase().contains('tự do') || sub.typeText.toLowerCase().contains('tự do')) ...[
                   const SizedBox(height: 12),
                   _buildUploadDropzone(
                     title: 'Giấy xác nhận tham quan (bắt buộc)',
@@ -919,6 +1042,7 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
                     isUploading: isUploadingConfirm,
                     fileName: _uploadedConfirms[sub.id] ?? sub.confirmationFileName,
                     fileSize: isConfirmUploaded ? 'Đã đính kèm' : null,
+                    badgeColor: const Color(0xFF4F46E5),
                     onViewTap: sub.fileXacNhanUrl != null
                         ? () {
                             Navigator.push(
@@ -937,10 +1061,21 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
                       try {
                         final pickerResult = await FilePicker.pickFiles(
                           type: FileType.custom,
-                          allowedExtensions: ['pdf', 'docx', 'doc', 'jpg', 'jpeg', 'png'],
+                          allowedExtensions: ['pdf', 'png', 'jpg', 'jpeg'],
                         );
                         if (pickerResult != null && pickerResult.files.single.path != null) {
                           final file = pickerResult.files.single;
+                          if (file.size > 5 * 1024 * 1024) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Dung lượng giấy xác nhận tối đa là 5MB.'),
+                                backgroundColor: AppColors.danger,
+                              ),
+                            );
+                            return;
+                          }
+
                           setState(() {
                             _uploadingConfirms[sub.id] = true;
                           });
@@ -962,7 +1097,11 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
 
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text(success ? 'Nộp giấy xác nhận thành công!' : 'Nộp giấy xác nhận thất bại.'),
+                              content: Text(
+                                success
+                                    ? 'Nộp giấy xác nhận thành công! Đang chờ Giảng viên duyệt điểm danh.'
+                                    : 'Nộp giấy xác nhận thất bại.',
+                              ),
                               backgroundColor: success ? AppColors.secondary : AppColors.danger,
                             ),
                           );
@@ -996,7 +1135,10 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
     required VoidCallback onTap,
     VoidCallback? onViewTap,
     VoidCallback? onDeleteTap,
+    Color? badgeColor,
   }) {
+    final activeColor = badgeColor ?? (isUploaded ? AppColors.secondary : AppColors.primary);
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -1005,7 +1147,7 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
           color: Colors.grey.shade50,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isUploaded ? AppColors.secondary.withValues(alpha: 0.5) : AppColors.beigeBorder,
+            color: isUploaded ? activeColor.withValues(alpha: 0.5) : AppColors.beigeBorder,
             style: BorderStyle.solid,
             width: 1.5,
           ),
@@ -1013,14 +1155,14 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
         child: Row(
           children: [
             isUploading
-                ? const SizedBox(
+                ? SizedBox(
                     width: 28,
                     height: 28,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                    child: CircularProgressIndicator(strokeWidth: 2, color: activeColor),
                   )
                 : Icon(
                     isUploaded ? Icons.check_circle : Icons.cloud_upload_outlined,
-                    color: isUploaded ? AppColors.secondary : AppColors.primary,
+                    color: activeColor,
                     size: 28,
                   ),
             const SizedBox(width: 12),
@@ -1033,7 +1175,7 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
-                      color: isUploaded ? AppColors.secondary : AppColors.darkSlate,
+                      color: isUploaded ? activeColor : AppColors.darkSlate,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -1051,7 +1193,7 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
                 children: [
                   if (onViewTap != null)
                     IconButton(
-                      icon: const Icon(Icons.remove_red_eye_outlined, size: 20, color: AppColors.primary),
+                      icon: Icon(Icons.remove_red_eye_outlined, size: 20, color: activeColor),
                       onPressed: onViewTap,
                       tooltip: 'Xem tài liệu',
                       padding: EdgeInsets.zero,
