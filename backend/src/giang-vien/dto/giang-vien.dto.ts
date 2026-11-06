@@ -193,4 +193,20 @@ export class UpdateCouncilStudentNoteDto {
   ghiChu: string;
 }
 
+export class ExtendReportDeadlineDto {
+  @IsInt()
+  @Min(1)
+  phieuThamQuanId: number;
+
+  @IsString()
+  @IsIn(['DungHan', 'Khoa', 'CaHai'], {
+    message: 'Loại gia hạn phải là DungHan, Khoa hoặc CaHai',
+  })
+  loaiGiaHan: string;
+
+  @IsString({ message: 'Ngày gia hạn mới không được để trống' })
+  ngayGiaHanMoi: string;
+}
+
+
 

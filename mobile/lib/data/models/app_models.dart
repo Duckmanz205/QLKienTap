@@ -268,6 +268,9 @@ class Submission {
   final bool hasPhieuThamQuan;
   final String? hoaDonStatus;
   final String? reportStatus;
+  final DateTime? hanNopDate;
+  final DateTime? hanKhoaDate;
+  final bool isExtended;
 
   Submission({
     required this.id,
@@ -295,19 +298,28 @@ class Submission {
     this.hasPhieuThamQuan = true,
     this.hoaDonStatus,
     this.reportStatus,
+    this.hanNopDate,
+    this.hanKhoaDate,
+    this.isExtended = false,
   });
 
   bool get isGraded => reportScore != null;
   bool get isTuDo => cachToChuc == 'TuDo' || typeText.toLowerCase().contains('tự do') || typeText.toLowerCase().contains('tudo');
   bool get isChoDuyetDiemDanh => status == 'Chờ duyệt điểm danh';
+  bool get isPastLock => hanKhoaDate != null && DateTime.now().isAfter(hanKhoaDate!);
+  bool get isPastOnTime => hanNopDate != null && DateTime.now().isAfter(hanNopDate!);
   bool get canSubmitReport {
     if (!hasPhieuThamQuan) return false;
+    if (isPastLock) return false;
     if (isTuDo) return true;
     return diemDanhStatus == 'CoMat';
   }
   String? get disabledReason {
     if (!hasPhieuThamQuan) {
       return (hoaDonStatus == 'ChuaDong' ? 'Chưa đóng phí' : 'Chưa có PTQ');
+    }
+    if (isPastLock) {
+      return 'Đã khóa cổng';
     }
     if (!isTuDo && diemDanhStatus != 'CoMat') {
       return 'Chưa điểm danh';
@@ -337,6 +349,9 @@ class Submission {
     bool? hasPhieuThamQuan,
     String? hoaDonStatus,
     String? reportStatus,
+    DateTime? hanNopDate,
+    DateTime? hanKhoaDate,
+    bool? isExtended,
   }) {
     return Submission(
       id: id,
@@ -364,6 +379,9 @@ class Submission {
       hasPhieuThamQuan: hasPhieuThamQuan ?? this.hasPhieuThamQuan,
       hoaDonStatus: hoaDonStatus ?? this.hoaDonStatus,
       reportStatus: reportStatus ?? this.reportStatus,
+      hanNopDate: hanNopDate ?? this.hanNopDate,
+      hanKhoaDate: hanKhoaDate ?? this.hanKhoaDate,
+      isExtended: isExtended ?? this.isExtended,
     );
   }
 }
@@ -631,7 +649,7 @@ class TripRegistrationStudent {
   final String feeStatus; // 'DaDongDungHan', 'ChuaDong', 'ViPham'
   final String attendanceStatus; // 'CoMat', 'Vang', 'TuChoiThamGia', 'ChuaDiemDanh'
   final String? excuseReason;
-  final double prelimGrade; // Điểm chuẩn bị
+  final double? prelimGrade; // Điểm chuẩn bị
   final double extraGrade;  // Điểm cộng
   final bool isLockedPrep;
   final String? fileXacNhanUrl;
@@ -649,7 +667,7 @@ class TripRegistrationStudent {
     required this.feeStatus,
     required this.attendanceStatus,
     this.excuseReason,
-    this.prelimGrade = 0.0,
+    this.prelimGrade,
     this.extraGrade = 0.0,
     this.isLockedPrep = false,
     this.fileXacNhanUrl,
@@ -794,7 +812,7 @@ class LecturerStudent {
   final String submittedDate;
   final String attendanceStatus; // 'present', 'absent', 'excused', 'none'
   final String? excuseReason;
-  final double prelimGrade; // Điểm chuẩn bị
+  final double? prelimGrade; // Điểm chuẩn bị
   final double extraGrade;  // Điểm cộng (max 1.0)
   final double gvhdGrade;   // Điểm GVHD chấm
   final double? aiSuggestedGrade;
@@ -806,6 +824,9 @@ class LecturerStudent {
   final String? reportFileUrl;
   final String? confirmationFileUrl;
   final bool isScoreLocked;
+  final int? phieuThamQuanId;
+  final String? hanNopBaoCao;
+  final String? trangThaiNop;
 
   LecturerStudent({
     required this.id,
@@ -820,7 +841,7 @@ class LecturerStudent {
     required this.submittedDate,
     required this.attendanceStatus,
     this.excuseReason,
-    required this.prelimGrade,
+    this.prelimGrade,
     required this.extraGrade,
     required this.gvhdGrade,
     this.aiSuggestedGrade,
@@ -832,6 +853,9 @@ class LecturerStudent {
     this.reportFileUrl,
     this.confirmationFileUrl,
     this.isScoreLocked = false,
+    this.phieuThamQuanId,
+    this.hanNopBaoCao,
+    this.trangThaiNop,
   });
 
   LecturerStudent copyWith({
@@ -850,6 +874,9 @@ class LecturerStudent {
     String? reportFileUrl,
     String? confirmationFileUrl,
     bool? isScoreLocked,
+    int? phieuThamQuanId,
+    String? hanNopBaoCao,
+    String? trangThaiNop,
   }) {
     return LecturerStudent(
       id: id,
@@ -876,6 +903,9 @@ class LecturerStudent {
       reportFileUrl: reportFileUrl ?? this.reportFileUrl,
       confirmationFileUrl: confirmationFileUrl ?? this.confirmationFileUrl,
       isScoreLocked: isScoreLocked ?? this.isScoreLocked,
+      phieuThamQuanId: phieuThamQuanId ?? this.phieuThamQuanId,
+      hanNopBaoCao: hanNopBaoCao ?? this.hanNopBaoCao,
+      trangThaiNop: trangThaiNop ?? this.trangThaiNop,
     );
   }
 }

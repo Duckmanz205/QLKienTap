@@ -47,6 +47,7 @@ import {
   GetEnrollmentsQueryDto,
   AssignGvddDto,
   LockGradesDto,
+  ImportGvhdAssignmentsDto,
 } from '../shared/dto/khoa.dto';
 
 @Controller('clb')
@@ -213,6 +214,14 @@ export class ClbController {
     );
   }
 
+  @Post('import-gvhd-assignments')
+  async importGvhdAssignments(@Body() body: ImportGvhdAssignmentsDto) {
+    return this.khoaService.importGvhdAssignments(
+      body.dotKienTapId,
+      body.assignments,
+    );
+  }
+
   @Post('assign-gvdd')
   async assignGvdd(@Body() body: AssignGvddDto) {
     return this.khoaService.assignTourLeader(
@@ -362,6 +371,7 @@ export class ClbController {
       refundId,
       approverId,
       isApproved,
+      body.reason,
     );
   }
 

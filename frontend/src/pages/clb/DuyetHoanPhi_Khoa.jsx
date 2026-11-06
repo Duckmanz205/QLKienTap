@@ -1,7 +1,8 @@
 import toast from 'react-hot-toast';
 import React, { useState, useEffect } from 'react';
 import { 
-  Paperclip, CheckCircle2, XCircle, AlertTriangle, Search, ChevronDown, Check
+  Paperclip, CheckCircle2, XCircle, AlertTriangle, Search, ChevronDown, Check,
+  Copy, CreditCard, Building2, ExternalLink
 } from 'lucide-react';
 import { khoaApi } from '../../services/api';
 import SearchableDropdown from '../../components/SearchableDropdown';
@@ -28,6 +29,12 @@ export default function DuyetHoanPhi_Khoa() {
     } catch (err) {
       console.error(err);
     }
+  };
+
+  const handleCopy = (text, label = 'nội dung') => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    toast.success(`Đã copy ${label}: ${text}`);
   };
 
   const handleApprove = async (id) => {
@@ -100,7 +107,9 @@ export default function DuyetHoanPhi_Khoa() {
 
   const filteredRefunds = refunds.filter(r => {
     const sv = r.hoaDon?.phieuDangKy?.sinhVien || {};
-    const maHd = r.hoaDon?.ma_hoa_don || '';
+    const factoryName = r.hoaDon?.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || '';
+    const bankInfo = `${r.ngan_hang_nhan || ''} ${r.so_tai_khoan_nhan || ''} ${r.ten_chu_tai_khoan_nhan || ''}`;
+    const hdId = String(r.hoa_don_id || r.hoaDon?.id || '');
 
     if (selectedStatus && r.trang_thai !== selectedStatus) return false;
 
@@ -108,8 +117,10 @@ export default function DuyetHoanPhi_Khoa() {
       const term = searchTerm.toLowerCase();
       const matchMssv = sv.mssv?.toLowerCase().includes(term);
       const matchName = sv.ho_ten?.toLowerCase().includes(term);
-      const matchHd = maHd.toLowerCase().includes(term);
-      if (!matchMssv && !matchName && !matchHd) return false;
+      const matchFactory = factoryName.toLowerCase().includes(term);
+      const matchBank = bankInfo.toLowerCase().includes(term);
+      const matchHd = hdId.includes(term);
+      if (!matchMssv && !matchName && !matchFactory && !matchBank && !matchHd) return false;
     }
     return true;
   });
@@ -120,10 +131,13 @@ export default function DuyetHoanPhi_Khoa() {
   const paginatedRefunds = filteredRefunds.slice((validCurrentPage - 1) * limit, validCurrentPage * limit);
 
   return (
-    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 animate-in fade-in duration-300">
+    <div className="bg-[#E7E0C4]/20 min-h-[calc(100vh-80px)] p-4 sm:p-6 animate-in fade-in duration-300">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-800">Duyệt hoàn phí</h1>
+        <p className="text-xs text-slate-500 mt-1">
+          Xét duyệt và chuyển khoản hoàn tiền cho sinh viên có đơn xin hoàn lệ phí hợp lệ.
+        </p>
       </div>
 
       {/* Filter Bar */}
@@ -133,7 +147,7 @@ export default function DuyetHoanPhi_Khoa() {
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
-            placeholder="Tìm theo MSSV, Họ tên, Mã hóa đơn..."
+            placeholder="Tìm theo MSSV, Họ tên, Nhà máy, Số tài khoản..."
             value={searchTerm}
             onChange={e => {
               setSearchTerm(e.target.value);
@@ -163,69 +177,110 @@ export default function DuyetHoanPhi_Khoa() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-[#E7E0C4] text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
-                <th className="p-4 pl-6">MSSV</th>
-                <th className="p-4">Họ tên</th>
-                <th className="p-4">Hóa đơn liên quan</th>
-                <th className="p-4 text-center">File đơn đã duyệt</th>
-                <th className="p-4">Ngày nộp</th>
-                <th className="p-4 text-center">Trạng thái</th>
-                <th className="p-4 text-right pr-6 min-w-[220px]">Thao tác</th>
+                <th className="p-4 pl-6 min-w-[110px]">MSSV</th>
+                <th className="p-4 min-w-[160px]">Họ tên sinh viên</th>
+                <th className="p-4 min-w-[200px]">Chuyến đi / Hóa đơn</th>
+                <th className="p-4 min-w-[120px]">Số tiền hoàn</th>
+                <th className="p-4 min-w-[230px]">Tài khoản nhận tiền</th>
+                <th className="p-4 text-center min-w-[110px]">Minh chứng</th>
+                <th className="p-4 min-w-[110px]">Ngày nộp</th>
+                <th className="p-4 text-center min-w-[120px]">Trạng thái</th>
+                <th className="p-4 text-right pr-6 min-w-[180px]">Thao tác</th>
               </tr>
             </thead>
             <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
               {paginatedRefunds.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-8 text-slate-400 font-bold text-sm">
+                  <td colSpan={9} className="text-center py-8 text-slate-400 font-bold text-sm">
                     {refunds.length === 0 ? 'Không có hồ sơ hoàn phí nào!' : 'Không tìm thấy hồ sơ hoàn phí phù hợp.'}
                   </td>
                 </tr>
               ) : (
                 paginatedRefunds.map(r => {
                   const sv = r.hoaDon?.phieuDangKy?.sinhVien || {};
+                  const factoryName = r.hoaDon?.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Chuyến tham quan';
                   return (
                     <tr key={r.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="p-4 pl-6 font-mono font-bold text-[#407F3E]">{sv.mssv}</td>
-                      <td className="p-4 font-bold text-slate-800">{sv.ho_ten}</td>
-                      <td className="p-4 font-medium text-slate-600">{r.hoaDon?.ma_hoa_don || 'Hóa đơn'}</td>
-                      <td className="p-4 text-center">
+                      <td className="p-4 pl-6 font-mono font-bold text-[#407F3E] whitespace-nowrap">{sv.mssv || '--'}</td>
+                      <td className="p-4 font-bold text-slate-800 whitespace-nowrap">{sv.ho_ten || '--'}</td>
+                      <td className="p-4">
+                        <p className="font-bold text-slate-800 line-clamp-1">{factoryName}</p>
+                        <p className="text-xs text-slate-500 font-mono mt-0.5">Hóa đơn #{r.hoa_don_id}</p>
+                      </td>
+                      <td className="p-4 whitespace-nowrap">
+                        <span className="font-bold text-[#407F3E] text-sm">
+                          {r.hoaDon?.so_tien ? `${Number(r.hoaDon.so_tien).toLocaleString('vi-VN')} đ` : '--'}
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        <div className="text-xs space-y-1">
+                          <span className="inline-block font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                            {r.ngan_hang_nhan}
+                          </span>
+                          <div className="flex items-center gap-1.5 font-mono font-bold text-slate-800">
+                            <span>{r.so_tai_khoan_nhan}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleCopy(r.so_tai_khoan_nhan, 'Số tài khoản')}
+                              className="text-slate-400 hover:text-[#407F3E] p-0.5 rounded transition-colors cursor-pointer"
+                              title="Copy số tài khoản"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                          <p className="text-[11px] text-slate-500 font-semibold uppercase">{r.ten_chu_tai_khoan_nhan}</p>
+                        </div>
+                      </td>
+                      <td className="p-4 text-center whitespace-nowrap">
                         <button 
                           onClick={() => window.open(r.file_don_da_duyet, '_blank', 'noopener,noreferrer')}
                           disabled={!r.file_don_da_duyet}
-                          className="inline-flex items-center gap-1.5 text-xs font-bold text-[#407F3E] hover:underline bg-[#407F3E]/10 px-2 py-1 rounded transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
+                          className="inline-flex items-center gap-1.5 text-xs font-bold text-[#407F3E] hover:underline bg-[#407F3E]/10 hover:bg-[#407F3E]/20 px-2.5 py-1 rounded-lg transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
                           title={r.file_don_da_duyet || 'Chưa có file'}
                         >
                           <Paperclip className="w-3.5 h-3.5" />
                           Xem file
                         </button>
                       </td>
-                      <td className="p-4 font-medium text-slate-500">{new Date(r.ngay_nop).toLocaleDateString('vi-VN')}</td>
-                      <td className="p-4 text-center">
+                      <td className="p-4 font-medium text-slate-500 whitespace-nowrap">
+                        {new Date(r.ngay_nop).toLocaleDateString('vi-VN')}
+                      </td>
+                      <td className="p-4 text-center whitespace-nowrap">
                         {getStatusBadge(r.trang_thai)}
                       </td>
-                      <td className="p-4 text-right pr-6">
+                      <td className="p-4 text-right pr-6 whitespace-nowrap">
                         {r.trang_thai === 'ChoXuLy' ? (
                           <div className="flex items-center justify-end gap-2">
                             <button 
                               onClick={() => handleApprove(r.id)}
-                              className="px-2.5 py-1 whitespace-nowrap bg-[#89B449] hover:bg-[#89B449]/90 text-white rounded-lg text-[11px] uppercase tracking-wider font-bold transition-colors shadow-sm flex items-center gap-1 cursor-pointer"
+                              className="px-3 py-1.5 whitespace-nowrap bg-[#89B449] hover:bg-[#89B449]/90 text-white rounded-lg text-xs uppercase tracking-wider font-bold transition-colors shadow-sm flex items-center gap-1 cursor-pointer"
                             >
                               <CheckCircle2 className="w-3.5 h-3.5" />
                               Hoàn tiền
                             </button>
                             <button 
                               onClick={() => setRejectionTarget(r)}
-                              className="px-2.5 py-1 whitespace-nowrap border border-[#E68A8C] text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg text-[11px] uppercase tracking-wider font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                              className="px-3 py-1.5 whitespace-nowrap border border-[#E68A8C] text-[#E68A8C] hover:bg-[#E68A8C]/10 rounded-lg text-xs uppercase tracking-wider font-bold transition-colors flex items-center gap-1 cursor-pointer"
                             >
                               <XCircle className="w-3.5 h-3.5" />
                               Từ chối
                             </button>
                           </div>
+                        ) : r.trang_thai === 'TuChoi' ? (
+                          <div className="text-right">
+                            <span className="text-xs font-bold text-rose-600 block">Đã từ chối</span>
+                            {r.ly_do_tu_choi && (
+                              <span className="text-[11px] text-slate-400 italic block line-clamp-1 max-w-[160px] ml-auto" title={r.ly_do_tu_choi}>
+                                {r.ly_do_tu_choi}
+                              </span>
+                            )}
+                          </div>
                         ) : (
-                          <span className="text-xs font-bold text-slate-300 italic">Đã xử lý</span>
+                          <span className="text-xs font-bold text-emerald-600 italic">Đã hoàn tiền</span>
                         )}
                       </td>
                     </tr>
-                  )
+                  );
                 })
               )}
             </tbody>

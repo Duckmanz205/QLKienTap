@@ -5,6 +5,7 @@ import {
   Param,
   Res,
   Query,
+  Body,
   UseInterceptors,
   UploadedFile,
   ParseFilePipe,
@@ -29,6 +30,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser, JwtPayloadUser } from '../auth/decorators/user.decorator';
 import { SinhVien, GiangVien, PhanCongGVHD } from '../entities/qlkt.entity';
+import { activeExtractions } from './extraction-lock.util';
 
 export class CustomFileTypeValidator extends FileValidator<{
   fileType: RegExp | string;
@@ -266,6 +268,12 @@ export class UploadController {
     originalName: string,
     keyTxt: string,
   ) {
+    if (activeExtractions.has(keyTxt)) {
+      console.log(`[Upload Background AI] Đang có tiến trình OCR chạy cho file ${keyTxt}, bỏ qua gọi trùng.`);
+      return;
+    }
+    activeExtractions.add(keyTxt);
+
     try {
       let extractedText = '';
       if (originalName.toLowerCase().endsWith('.pdf')) {
@@ -279,7 +287,7 @@ export class UploadController {
         const response = await fetch(`${aiBaseUrl}/process-pdf`, {
           method: 'POST',
           body: formData,
-          signal: AbortSignal.timeout(180000),
+          signal: AbortSignal.timeout(300000), // 5 phút an toàn
         });
 
         if (response.ok) {
@@ -291,25 +299,30 @@ export class UploadController {
         }
       }
 
-      const txtContent = extractedText || 'Không thể trích xuất văn bản từ file này.';
-      const txtBuffer = Buffer.from('\uFEFF' + txtContent, 'utf-8');
-
-      if (this.r2.isReady() && keyTxt) {
-        await this.r2.uploadFile(
-          this.r2.BUCKET_REPORTS,
-          keyTxt,
-          txtBuffer,
-          'text/plain; charset=utf-8',
-        );
-        console.log(`[Upload Background AI] Đã lưu file TXT lên Cloudflare R2: ${keyTxt}`);
+      // Task 3: Không bao giờ lưu file .txt rỗng hoặc câu lỗi kỹ thuật lên R2
+      if (!extractedText || extractedText.length < 10) {
+        console.warn(`[Upload Background AI] Trích xuất rỗng hoặc quá ngắn (<10 ký tự) cho: ${originalName}. KHÔNG lưu file txt giả lên R2.`);
       } else {
-        const txtPath = pdfPath.replace(/\.\w+$/, '.txt');
-        require('fs').writeFileSync(txtPath, txtBuffer);
-        console.log(`[Upload Background AI] Đã lưu file TXT local: ${txtPath}`);
+        const txtBuffer = Buffer.from('\uFEFF' + extractedText, 'utf-8');
+
+        if (this.r2.isReady() && keyTxt) {
+          await this.r2.uploadFile(
+            this.r2.BUCKET_REPORTS,
+            keyTxt,
+            txtBuffer,
+            'text/plain; charset=utf-8',
+          );
+          console.log(`[Upload Background AI] Đã lưu file TXT lên Cloudflare R2: ${keyTxt}`);
+        } else {
+          const txtPath = pdfPath.replace(/\.\w+$/, '.txt');
+          require('fs').writeFileSync(txtPath, txtBuffer);
+          console.log(`[Upload Background AI] Đã lưu file TXT local: ${txtPath}`);
+        }
       }
     } catch (err: any) {
       console.error(`[Upload Background AI] Lỗi trong quá trình trích xuất ngầm cho ${originalName}:`, err?.message || err);
     } finally {
+      activeExtractions.delete(keyTxt);
       try {
         if (require('fs').existsSync(pdfPath)) {
           require('fs').unlinkSync(pdfPath);
@@ -318,6 +331,131 @@ export class UploadController {
         console.error('Failed to cleanup local PDF:', e);
       }
     }
+  }
+
+  /**
+   * Tự động cứu hộ (Self-Healing) hoặc trích xuất lại OCR cho file PDF lưu trên Cloudflare R2
+   */
+  public async processAiExtractionFromR2(keyPdf: string, keyTxt: string, force: boolean = false): Promise<boolean> {
+    if (activeExtractions.has(keyTxt)) {
+      console.log(`[Self-Healing AI OCR] Đang có tiến trình OCR chạy cho file ${keyTxt}, bỏ qua gọi trùng.`);
+      return true;
+    }
+
+    if (!force && this.r2.isReady()) {
+      try {
+        const existing = await this.r2.getFileStream(this.r2.BUCKET_REPORTS, keyTxt);
+        if (existing && existing.contentLength && existing.contentLength > 100) {
+          console.log(`[Self-Healing AI OCR] File TXT hợp lệ đã tồn tại trên R2 (${keyTxt}), không cần chạy lại.`);
+          return true;
+        }
+      } catch {
+        // Chưa có -> tiếp tục chạy
+      }
+    }
+
+    activeExtractions.add(keyTxt);
+
+    try {
+      console.log(`[Self-Healing AI OCR] Bắt đầu tự động trích xuất OCR từ R2 (force=${force}): ${keyPdf}`);
+      if (!this.r2.isReady()) {
+        console.warn('[Self-Healing AI OCR] R2 chưa sẵn sàng.');
+        return false;
+      }
+
+      const signedUrl = await this.r2.getSignedUrl(
+        this.r2.BUCKET_REPORTS,
+        keyPdf,
+        3600,
+      );
+      const fileRes = await fetch(signedUrl);
+      if (!fileRes.ok) {
+        console.error(`[Self-Healing AI OCR] Không thể tải PDF từ R2: HTTP ${fileRes.status}`);
+        return false;
+      }
+
+      const pdfBuffer = await fileRes.arrayBuffer();
+      const fileName = keyPdf.split('/').pop() || 'report.pdf';
+
+      const formData = new FormData();
+      const fileBlob = new Blob([pdfBuffer], { type: 'application/pdf' });
+      formData.append('file', fileBlob, fileName);
+
+      const aiBaseUrl = (process.env.AI_SERVICE_URL || 'http://127.0.0.1:8000').replace(/\/+$/, '');
+      const aiResponse = await fetch(`${aiBaseUrl}/process-pdf`, {
+        method: 'POST',
+        body: formData,
+        signal: AbortSignal.timeout(300000), // 5 phút an toàn
+      });
+
+      if (aiResponse.ok) {
+        const aiData: any = await aiResponse.json();
+        const extractedText = (aiData?.extracted_text || '').trim();
+        if (!extractedText || extractedText.length < 10) {
+          console.warn(`[Self-Healing AI OCR] Kết quả OCR rỗng hoặc quá ngắn cho: ${keyPdf}. Không lưu file.`);
+          return false;
+        }
+
+        const txtBuffer = Buffer.from('\uFEFF' + extractedText, 'utf-8');
+        await this.r2.uploadFile(
+          this.r2.BUCKET_REPORTS,
+          keyTxt,
+          txtBuffer,
+          'text/plain; charset=utf-8',
+        );
+        console.log(`[Self-Healing AI OCR] Đã tạo thành công file TXT trên R2: ${keyTxt} (${extractedText.length} ký tự)`);
+        return true;
+      } else {
+        console.error(`[Self-Healing AI OCR] AI Service trả lỗi ${aiResponse.status}:`, await aiResponse.text());
+        return false;
+      }
+    } catch (err: any) {
+      console.error(`[Self-Healing AI OCR] Lỗi xử lý cho ${keyPdf}:`, err?.message || err);
+      return false;
+    } finally {
+      activeExtractions.delete(keyTxt);
+    }
+  }
+
+  // ============================================================
+  //   TRÍCH XUẤT LẠI OCR BÀI THU HOẠCH (Chủ động kích hoạt)
+  // ============================================================
+  @Post('re-extract')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('GiangVien', 'QuanLyKhoa', 'Khoa', 'SinhVien')
+  async reExtractReport(
+    @Body('fileBaoCao') fileBaoCao: string,
+    @Body('force') force: boolean = true,
+    @CurrentUser() user: JwtPayloadUser,
+  ) {
+    if (!fileBaoCao) {
+      throw new BadRequestException('Vui lòng cung cấp đường dẫn file bài thu hoạch.');
+    }
+    let r2Key = fileBaoCao.trim();
+    if (r2Key.includes('?')) r2Key = r2Key.split('?')[0];
+    if (r2Key.includes('://')) {
+      try {
+        r2Key = new URL(r2Key).pathname;
+      } catch {}
+    }
+    r2Key = r2Key.replace(/^\/+/, '');
+    if (r2Key.startsWith('api/upload/file/')) r2Key = r2Key.replace(/^api\/upload\/file\//, '');
+    if (r2Key.startsWith('upload/file/')) r2Key = r2Key.replace(/^upload\/file\//, '');
+    if (!r2Key.toLowerCase().endsWith('.pdf')) {
+      throw new BadRequestException('File bài thu hoạch phải là tệp PDF.');
+    }
+    const txtKey = r2Key.replace(/\.\w+$/, '.txt');
+
+    // Force = true đảm bảo chạy lại OCR và ghi đè file .txt kể cả khi file cũ đã tồn tại > 100 bytes
+    this.processAiExtractionFromR2(r2Key, txtKey, force !== false).catch(e =>
+      console.error('[Re-extract] Lỗi:', e),
+    );
+
+    return {
+      success: true,
+      status: 'PROCESSING',
+      message: 'Đã kích hoạt tiến trình trích xuất lại văn bản OCR dưới nền.'
+    };
   }
 
   // ============================================================
@@ -786,9 +924,37 @@ export class UploadController {
         if (type === 'reports') bucketName = this.r2.BUCKET_REPORTS;
         if (type === 'payments') bucketName = this.r2.BUCKET_PAYMENTS;
 
+        const isTxtReport = type === 'reports' && extname(filename).toLowerCase() === '.txt';
+
+        // 1. Nếu tiến trình OCR đang chạy trong bộ nhớ
+        if (isTxtReport && activeExtractions.has(key)) {
+          res.status(202);
+          res.setHeader('X-Extraction-Status', 'PROCESSING');
+          return res.json({
+            status: 'PROCESSING',
+            message: 'Hệ thống đang nhận diện chữ viết tay từ bản scan (OCR)...',
+          });
+        }
+
         try {
           const { stream, contentType, contentLength } =
             await this.r2.getFileStream(bucketName, key);
+
+          // Nếu là file txt bài thu hoạch mà contentLength quá nhỏ (< 100 bytes)
+          // Có thể là file lỗi cũ ("Không thể trích xuất...") -> kích hoạt Self-Healing quét lại
+          if (isTxtReport && contentLength && contentLength < 100) {
+            const keyPdf = key.replace(/\.txt$/i, '.pdf');
+            this.processAiExtractionFromR2(keyPdf, key).catch(e =>
+              console.error('[Self-Healing Retry] Lỗi:', e),
+            );
+            res.status(202);
+            res.setHeader('X-Extraction-Status', 'PROCESSING');
+            return res.json({
+              status: 'PROCESSING',
+              message: 'Hệ thống đang trích xuất lại văn bản OCR do file cũ bị lỗi...',
+            });
+          }
+
           let finalContentType = contentType || 'application/octet-stream';
           if (
             extname(filename).toLowerCase() === '.txt' &&
@@ -819,6 +985,31 @@ export class UploadController {
           }
           return stream.pipe(res);
         } catch (err) {
+          // Task 4: Self-Healing: Nếu file .txt chưa có trên R2 nhưng file .pdf gốc CÓ trên R2
+          if (isTxtReport) {
+            const keyPdf = key.replace(/\.txt$/i, '.pdf');
+            let hasPdf = false;
+            try {
+              const headPdf = await this.r2.getFileStream(this.r2.BUCKET_REPORTS, keyPdf);
+              if (headPdf && headPdf.contentLength && headPdf.contentLength > 0) {
+                hasPdf = true;
+              }
+            } catch {
+              hasPdf = false;
+            }
+
+            if (hasPdf) {
+              this.processAiExtractionFromR2(keyPdf, key).catch(e =>
+                console.error('[Self-Healing] Error:', e),
+              );
+              res.status(202);
+              res.setHeader('X-Extraction-Status', 'PROCESSING');
+              return res.json({
+                status: 'PROCESSING',
+                message: 'Hệ thống đang nhận diện chữ viết tay từ bản scan (OCR)...',
+              });
+            }
+          }
           throw new NotFoundException('Tệp không tồn tại trên lưu trữ R2.');
         }
       }

@@ -1006,3 +1006,62 @@ export const exportPhanCongGVHD = (enrollments = [], tenDot = '') => {
   XLSX.writeFile(wb, `PhanCong_GVHD_${sanitizeFileName(tenDot || 'DanhSach')}.xlsx`);
 };
 
+/**
+ * MẪU TẢI VỀ: File mẫu Excel phục vụ Import phân công GVHD
+ */
+export const exportPhanCongGVHDTemplate = (enrollments = [], tenDot = '') => {
+  const rows = [
+    ['BỘ CÔNG THƯƠNG', '', '', 'CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM', '', ''],
+    ['TRƯỜNG ĐẠI HỌC CÔNG THƯƠNG TP.HCM', '', '', 'Độc lập - Tự do - Hạnh phúc', '', ''],
+    [],
+    ['MẪU PHÂN CÔNG GIẢNG VIÊN HƯỚNG DẪN KIẾN TẬP', '', '', '', '', ''],
+    [],
+    ['STT', 'Mã HS-SV', 'Họ đệm', 'Tên', 'Lớp học', 'Giảng viên Hướng dẫn (Mã GV hoặc Họ tên)']
+  ];
+
+  if (enrollments && enrollments.length > 0) {
+    enrollments.forEach((e, idx) => {
+      const sv = e.sinhVien || {};
+      const { hoDem, ten } = getHoDemAndTen(sv.ho_ten || e.ho_ten || '');
+      const gvhd = sv.details?.giangVienHuongDan?.ho_ten || e.giangVienHuongDan?.ho_ten || e.gvhd || '';
+      const lop = sv.ten_lop || sv.lop || e.ten_lop || '';
+
+      rows.push([
+        idx + 1,
+        sv.mssv || e.mssv || '',
+        hoDem,
+        ten,
+        lop,
+        gvhd
+      ]);
+    });
+  } else {
+    rows.push([1, '2001200001', 'Nguyễn Văn', 'An', '12DHTH01', 'GV001 - TS. Lê Văn C']);
+    rows.push([2, '2001200002', 'Trần Thị', 'Bình', '12DHTH01', 'GV002']);
+    rows.push([3, '2001200003', 'Lê Hoàng', 'Cúc', '12DHTH02', 'Nguyễn Thị D']);
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+
+  ws['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 2 } },
+    { s: { r: 0, c: 3 }, e: { r: 0, c: 5 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 2 } },
+    { s: { r: 1, c: 3 }, e: { r: 1, c: 5 } },
+    { s: { r: 3, c: 0 }, e: { r: 3, c: 5 } }
+  ];
+
+  ws['!cols'] = [
+    { wch: 8 },  // STT
+    { wch: 16 }, // Mã HS-SV
+    { wch: 22 }, // Họ đệm
+    { wch: 12 }, // Tên
+    { wch: 16 }, // Lớp học
+    { wch: 38 }  // Giảng viên Hướng dẫn
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Mau_Phan_Cong');
+  XLSX.writeFile(wb, `Mau_PhanCong_GVHD_${sanitizeFileName(tenDot || 'Chuan')}.xlsx`);
+};
+

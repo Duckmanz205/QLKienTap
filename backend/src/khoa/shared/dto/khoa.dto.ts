@@ -890,3 +890,24 @@ export class ConfirmAutoAssignGvhdDto {
   @IsArray()
   assignments: { dotKienTapSinhVienId: number; lecturerId: number }[];
 }
+
+export class ImportGvhdItemDto {
+  @IsString()
+  @IsNotEmpty()
+  mssv: string;
+
+  @IsString()
+  @IsNotEmpty()
+  lecturerIdentifier: string;
+}
+
+export class ImportGvhdAssignmentsDto {
+  @IsInt()
+  @Min(1)
+  dotKienTapId: number;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ImportGvhdItemDto)
+  assignments: ImportGvhdItemDto[];
+}

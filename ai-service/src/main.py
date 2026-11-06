@@ -147,9 +147,94 @@ def pil_to_base64(img: Image.Image) -> str:
     return f"data:image/jpeg;base64,{base64.b64encode(buffered.getvalue()).decode('utf-8')}"
 
 
+def is_blank_page(img: Image.Image) -> bool:
+    """Kiểm tra nhanh trang trắng/trống hoàn toàn để tiết kiệm chi phí và thời gian gọi API."""
+    try:
+        gray = img.convert('L')
+        extrema = gray.getextrema()
+        if extrema and extrema[0] >= 250:
+            return True
+        stat = gray.histogram()
+        total_pixels = img.width * img.height
+        if total_pixels == 0:
+            return True
+        white_pixels = sum(stat[245:])
+        if (white_pixels / total_pixels) > 0.998:
+            return True
+        return False
+    except Exception:
+        return False
+
+
+async def ocr_single_page(
+    page_idx: int,
+    pil_img: Image.Image,
+    semaphore: asyncio.Semaphore,
+    vlm_prompt: str
+) -> tuple[int, str]:
+    """Hàm OCR song song từng trang PDF scan có giới hạn Semaphore và Retry 2 lần"""
+    if is_blank_page(pil_img):
+        return (page_idx, "")
+
+    b64_url = pil_to_base64(pil_img)
+    model_name = ACTIVE_OCR_PROFILE.get("model_name", "deepseek-v4.1-flash")
+    temperature = ACTIVE_OCR_PROFILE.get("temperature", 0.01)
+    max_tokens = ACTIVE_OCR_PROFILE.get("max_tokens", 4000)
+    extra_body = ACTIVE_OCR_PROFILE.get("extra_body", {"enable_thinking": False})
+
+    async with semaphore:
+        for attempt in range(2):
+            try:
+                response = await client.chat.completions.create(
+                    model=model_name,
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": vlm_prompt},
+                                {"type": "image_url", "image_url": {"url": b64_url}}
+                            ]
+                        }
+                    ],
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    stream=False,
+                    extra_body=extra_body
+                )
+
+                ocr_text = ""
+                if response.choices and len(response.choices) > 0:
+                    msg = response.choices[0].message
+                    if hasattr(msg, "content") and msg.content:
+                        ocr_text = msg.content.strip()
+
+                if "EMPTY" not in ocr_text.upper() and len(ocr_text) >= 3:
+                    ocr_text = re.sub(r'(?i)^(.*?trích xuất.*?:|.*?như sau:)\s*', '', ocr_text)
+                    if ocr_text.startswith("```markdown"):
+                        ocr_text = ocr_text.replace('```markdown\n', '')
+                    if ocr_text.startswith("```"):
+                        ocr_text = ocr_text.replace('```\n', '').replace('```', '')
+                    if ocr_text.endswith("```"):
+                        ocr_text = ocr_text[:-3]
+                    ocr_text = ocr_text.strip()
+                    if ocr_text:
+                        return (page_idx, ocr_text)
+
+                return (page_idx, "")
+            except Exception as e:
+                print(f"[OCR Page {page_idx + 1}] Lỗi thử lần {attempt + 1}: {str(e)}")
+                if attempt == 0:
+                    await asyncio.sleep(1.5)
+                else:
+                    # Tuyệt đối không ghi thông báo lỗi kỹ thuật vào bài làm sinh viên
+                    return (page_idx, "")
+
+    return (page_idx, "")
+
+
 @app.post("/process-pdf")
 async def process_pdf_endpoint(file: UploadFile = File(...)):
-    """API Nhận file PDF và trả về 1 cục văn bản thô dạng JSON"""
+    """API Nhận file PDF scan chữ viết tay và trả về toàn bộ văn bản qua Vision OCR song song 4 luồng"""
     pdf_bytes = await file.read()
     elements = extract_sequential_elements(pdf_bytes)
 
@@ -163,58 +248,35 @@ async def process_pdf_endpoint(file: UploadFile = File(...)):
         "Nếu bức ảnh KHÔNG có chữ, trả về duy nhất chữ: EMPTY"
     )
 
-    final_text = ""
+    # Sử dụng Semaphore để gọi đồng thời tối đa 4 trang cùng lúc
+    semaphore = asyncio.Semaphore(4)
+    tasks = []
 
+    for idx, elem in enumerate(elements):
+        if elem.get("type") == "handwritten_image":
+            tasks.append(ocr_single_page(idx, elem["content"], semaphore, vlm_prompt))
+
+    # Chạy song song toàn bộ các trang
+    results = await asyncio.gather(*tasks)
+
+    # Sắp xếp lại theo đúng thứ tự số trang (page_idx: 0, 1, 2...)
+    sorted_results = sorted(results, key=lambda x: x[0])
+
+    extracted_pages = []
+    for _, page_text in sorted_results:
+        if page_text and page_text.strip():
+            extracted_pages.append(page_text.strip())
+
+    final_text = "\n\n".join(extracted_pages).strip()
+
+    # Dọn dẹp bộ nhớ ảnh sau khi xử lý xong
     for elem in elements:
-        if elem["type"] == "machine_text":
-            final_text += elem["content"] + "\n\n"
-        elif elem["type"] == "handwritten_image":
-            raw_img = elem["content"]
-            b64_url = pil_to_base64(raw_img)
+        if "content" in elem:
+            del elem["content"]
+    del elements
+    gc.collect()
 
-            try:
-                response = await client.chat.completions.create(
-                    model=ACTIVE_OCR_PROFILE["model_name"],
-                    messages=[
-                        {
-                            "role": "user",
-                            "content": [
-                                {"type": "text", "text": vlm_prompt},
-                                {"type": "image_url", "image_url": {"url": b64_url}}
-                            ]
-                        }
-                    ],
-                    temperature=ACTIVE_OCR_PROFILE.get("temperature", 0.01),
-                    max_tokens=ACTIVE_OCR_PROFILE.get("max_tokens", 4000),
-                    stream=ACTIVE_OCR_PROFILE.get("stream", True),
-                    extra_body=ACTIVE_OCR_PROFILE.get("extra_body", {"enable_thinking": False})
-                )
-
-                ocr_text = ""
-                async for chunk in response:
-                    if chunk.choices:
-                        delta = chunk.choices[0].delta
-                        if hasattr(delta, 'content') and delta.content:
-                            ocr_text += delta.content
-
-                ocr_text = ocr_text.strip()
-
-                if "EMPTY" not in ocr_text.upper() and len(ocr_text) >= 3:
-                    ocr_text = re.sub(r'(?i)^(.*?trích xuất.*?:|.*?như sau:)\s*', '', ocr_text)
-                    if ocr_text.startswith("```markdown"):
-                        ocr_text = ocr_text.replace('```markdown\n', '')
-                        if ocr_text.endswith("```"):
-                            ocr_text = ocr_text[:-3]
-                    if ocr_text.strip():
-                        final_text += ocr_text.strip() + "\n\n"
-
-            except Exception as e:
-                final_text += f"[Lỗi trích xuất ảnh qua Qwen Cloud: {str(e)}]\n\n"
-
-            del raw_img
-            gc.collect()
-
-    return {"extracted_text": final_text.strip()}
+    return {"extracted_text": final_text}
 
 
 # ==========================================

@@ -5,7 +5,7 @@ import {
   CheckCircle2, XCircle, Filter, Download, X,
   MapPin, Calendar, Clock, Search, Eye, ArrowUp, ArrowDown, ArrowUpDown,
   User, Building2, FileText, AlertCircle, Laptop, Banknote, Info,
-  AlertTriangle, CreditCard
+  AlertTriangle, CreditCard, Ban
 } from 'lucide-react';
 import { khoaApi } from '../../services/api';
 import * as XLSX from 'xlsx';
@@ -79,6 +79,29 @@ export default function RegistrationManagement_Khoa() {
   };
   const closeConfirm = () => setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: null });
 
+  // Helper kiểm tra chuyến đã bị khóa / chốt điểm (bao quát cả trạng thái Lịch và Đợt kiến tập)
+  const isTripLocked = (trip) => {
+    if (!trip) return false;
+    const tripStatus = trip.trang_thai;
+    const lichStatus = trip.lichKienTap?.trang_thai;
+    const dotStatus = trip.lichKienTap?.dotKienTap?.trang_thai;
+    return (
+      ['DaDienRa', 'DaKetThuc', 'HoanThanh', 'DaKhoa', 'DaHuy'].includes(tripStatus) ||
+      lichStatus === 'DaKhoa' ||
+      dotStatus === 'DaKhoa'
+    );
+  };
+
+  // Helper kiểm tra chuyến có hiển thị Tab 3 "Danh sách sinh viên đã chốt"
+  const hasFinalizedTab = (trip) => {
+    if (!trip) return false;
+    const tripStatus = trip.trang_thai;
+    return (
+      ['DaChotDanhSach', 'DaDienRa', 'DaKetThuc', 'HoanThanh', 'DaKhoa'].includes(tripStatus) ||
+      isTripLocked(trip)
+    );
+  };
+
   useEffect(() => {
     fetchTrips();
     fetchGlobalCancelRequests();
@@ -106,7 +129,7 @@ export default function RegistrationManagement_Khoa() {
       const res = await khoaApi.getTrips();
       const allTrips = Array.isArray(res.data) ? res.data : (res.data?.data || []);
       // Filter only trips that have opened registration or further
-      const openTrips = allTrips.filter(t => ['MoDangKy', 'DaChotDanhSach', 'DaDienRa', 'DaHuy'].includes(t.trang_thai));
+      const openTrips = allTrips.filter(t => ['MoDangKy', 'DaChotDanhSach', 'DaDienRa', 'DaKetThuc', 'HoanThanh', 'DaKhoa', 'DaHuy'].includes(t.trang_thai));
       setTrips(openTrips);
     } catch (err) {
       console.error(err);
@@ -158,26 +181,55 @@ export default function RegistrationManagement_Khoa() {
       const accepted = previewRes.data?.suggestedAccepted || [];
       const rejected = previewRes.data?.suggestedRejected || [];
 
-      const reasonMap = {};
+      const previewMap = {};
+      accepted.forEach(r => {
+        const svId = r.sinhVien?.id || r.sinh_vien_id;
+        if (svId) {
+          previewMap[svId] = {
+            so_chuyen_da_di: r.so_chuyen_da_di != null ? r.so_chuyen_da_di : 0,
+            ly_do_uu_tien: r.ly_do_uu_tien || '',
+            ly_do_loai: '',
+            isBlacklisted: false,
+            remainingPenaltyTrips: 0
+          };
+        }
+      });
       rejected.forEach(r => {
-        if (r.ly_do_loai) reasonMap[r.sinh_vien_id || r.sinhVien?.id] = r.ly_do_loai;
+        const svId = r.sinhVien?.id || r.sinh_vien_id;
+        if (svId) {
+          previewMap[svId] = {
+            so_chuyen_da_di: r.so_chuyen_da_di != null ? r.so_chuyen_da_di : 0,
+            ly_do_uu_tien: '',
+            ly_do_loai: r.ly_do_loai || '',
+            isBlacklisted: Boolean(r.isBlacklisted || (r.ly_do_loai && r.ly_do_loai.includes('[DANH SÁCH ĐEN]'))),
+            remainingPenaltyTrips: r.remainingPenaltyTrips || 0
+          };
+        }
       });
 
-      const enrichedData = data.map(r => ({
-        ...r,
-        ly_do_loai: reasonMap[r.sinhVien?.id || r.sinh_vien_id] || ''
-      }));
+      const enrichedData = data.map(r => {
+        const svId = r.sinhVien?.id || r.sinh_vien_id;
+        const info = previewMap[svId] || {};
+        return {
+          ...r,
+          so_chuyen_da_di: info.so_chuyen_da_di ?? r.so_chuyen_da_di ?? 0,
+          ly_do_uu_tien: info.ly_do_uu_tien || r.ly_do_uu_tien || '',
+          ly_do_loai: info.ly_do_loai || r.ly_do_loai || '',
+          isBlacklisted: info.isBlacklisted ?? Boolean(r.ly_do_loai && r.ly_do_loai.includes('[DANH SÁCH ĐEN]')),
+          remainingPenaltyTrips: info.remainingPenaltyTrips ?? 0
+        };
+      });
 
       setRegistrations(enrichedData);
 
-      const acceptedSet = new Set(accepted.map(r => r.sinhVien?.id || r.sinh_vien_id));
-      const rejectedSet = new Set(rejected.map(r => r.sinhVien?.id || r.sinh_vien_id));
+      const acceptedSet = new Set(accepted.map(r => r.sinhVien?.id || r.sinh_vien_id).filter(Boolean));
+      const rejectedSet = new Set(rejected.map(r => r.sinhVien?.id || r.sinh_vien_id).filter(Boolean));
 
       setSelectedStudentIds(acceptedSet);
       setRejectedStudentIds(rejectedSet);
     } catch (err) {
       console.error(err);
-      showPopup('Lỗi khi tải dữ liệu lọc dự kiến', 'error');
+      showPopup(err.response?.data?.message || 'Lỗi khi tải dữ liệu lọc dự kiến', 'error');
     } finally {
       setLoadingRegs(false);
       setIsFiltering(false);
@@ -199,8 +251,8 @@ export default function RegistrationManagement_Khoa() {
 
   const handleConfirmAssignStudents = async () => {
     if (!selectedTripForReg) return;
-    if (selectedTripForReg.trang_thai === 'DaDienRa' || selectedTripForReg.trang_thai === 'DaHuy') {
-      showPopup('Chuyến đi đã diễn ra hoặc đã bị hủy, không thể chốt lại danh sách', 'error');
+    if (isTripLocked(selectedTripForReg)) {
+      showPopup('Chuyến đi đã diễn ra, đã kết thúc hoặc đã khóa sổ điểm, không thể chốt lại danh sách', 'error');
       return;
     }
 
@@ -277,6 +329,13 @@ export default function RegistrationManagement_Khoa() {
 
   const moveStudent = (studentId, toAccepted) => {
     if (toAccepted) {
+      const currentReg = registrations.find(r => (r.sinhVien?.id || r.sinh_vien_id) === studentId);
+      const isBl = currentReg?.isBlacklisted || (currentReg?.ly_do_loai && currentReg.ly_do_loai.includes('[DANH SÁCH ĐEN]'));
+      if (isBl) {
+        showPopup('Không thể chuyển sinh viên đang thi hành án phạt [DANH SÁCH ĐEN] sang danh sách Hợp lệ!', 'error');
+        return;
+      }
+
       const maxCapacity = selectedTripForReg?.suc_chua || 0;
       if (maxCapacity > 0 && selectedStudentIds.size >= maxCapacity) {
         showPopup(
@@ -287,11 +346,34 @@ export default function RegistrationManagement_Khoa() {
       }
       setRejectedStudentIds(prev => { const s = new Set(prev); s.delete(studentId); return s; });
       setSelectedStudentIds(prev => { const s = new Set(prev); s.add(studentId); return s; });
-      showPopup('Đã thêm sinh viên vào danh sách Hợp lệ dự kiến', 'success');
+      setRegistrations(prev => prev.map(r => {
+        const id = r.sinhVien?.id || r.sinh_vien_id;
+        if (id === studentId) {
+          return {
+            ...r,
+            ly_do_uu_tien: r.ly_do_uu_tien ? `${r.ly_do_uu_tien} (Chọn lại)` : 'Quản trị viên chọn bổ sung thủ công',
+            ly_do_loai: '',
+            is_manual_override: true
+          };
+        }
+        return r;
+      }));
+      showPopup('Đã thêm sinh viên vào danh sách Hợp lệ dự kiến (Lý do: Quản trị viên chọn bổ sung thủ công)', 'success');
     } else {
       setSelectedStudentIds(prev => { const s = new Set(prev); s.delete(studentId); return s; });
       setRejectedStudentIds(prev => { const s = new Set(prev); s.add(studentId); return s; });
-      showPopup('Đã chuyển sinh viên sang danh sách Bị loại dự kiến', 'success');
+      setRegistrations(prev => prev.map(r => {
+        const id = r.sinhVien?.id || r.sinh_vien_id;
+        if (id === studentId) {
+          return {
+            ...r,
+            ly_do_loai: 'Quản trị viên loại thủ công',
+            is_manual_override: true
+          };
+        }
+        return r;
+      }));
+      showPopup('Đã chuyển sinh viên sang danh sách Bị loại dự kiến (Lý do: Quản trị viên loại thủ công)', 'success');
     }
   };
 
@@ -307,6 +389,8 @@ export default function RegistrationManagement_Khoa() {
       case 'Vắng mặt':
       case 'VangMat': return <span className="bg-amber-600 text-white text-xs px-2.5 py-1 rounded-full font-bold shadow-sm inline-flex items-center gap-1">Vắng mặt</span>;
       case 'Bị loại': return <span className="bg-[#E68A8C] text-white text-xs px-2.5 py-1 rounded-full font-bold shadow-sm inline-flex items-center gap-1"><XCircle className="w-3.5 h-3.5" />Bị loại</span>;
+      case 'Không đạt':
+      case 'KhongDat': return <span className="bg-rose-600 text-white text-xs px-2.5 py-1 rounded-full font-bold shadow-sm inline-flex items-center gap-1"><XCircle className="w-3.5 h-3.5" />Không đạt</span>;
       case 'Đã hủy': return <span className="bg-slate-200 text-slate-600 text-xs px-2.5 py-1 rounded-full font-bold shadow-sm inline-flex items-center gap-1">Đã hủy</span>;
       default: return <span className="bg-slate-100 text-slate-600 text-xs px-2.5 py-1 rounded-full font-bold shadow-sm">{statusStr || 'Không rõ'}</span>;
     }
@@ -321,6 +405,8 @@ export default function RegistrationManagement_Khoa() {
     'ATTENDED': 'Đã tham gia',
     'HoanThanh': 'Hoàn thành',
     'COMPLETED': 'Hoàn thành',
+    'KhongDat': 'Không đạt',
+    'FAILED': 'Không đạt',
     'VangMat': 'Vắng mặt',
     'ABSENT': 'Vắng mặt',
     'REJECTED': 'Bị loại',
@@ -406,7 +492,8 @@ export default function RegistrationManagement_Khoa() {
       const mssvMatch = (r.sinhVien?.mssv || '').toLowerCase().includes(s);
       const tenMatch = (r.sinhVien?.ho_ten || '').toLowerCase().includes(s);
       const lopMatch = (r.sinhVien?.ten_lop || '').toLowerCase().includes(s);
-      if (!mssvMatch && !tenMatch && !lopMatch) return false;
+      const reasonMatch = (r.ly_do_uu_tien || '').toLowerCase().includes(s) || (r.ly_do_loai || '').toLowerCase().includes(s);
+      if (!mssvMatch && !tenMatch && !lopMatch && !reasonMatch) return false;
     }
     return true;
   });
@@ -543,7 +630,7 @@ export default function RegistrationManagement_Khoa() {
                             key={trip.id}
                             onClick={() => {
                               setSelectedTripForReg(trip);
-                              const defaultTab = ['DaChotDanhSach', 'DaDienRa'].includes(trip.trang_thai) ? 'dachot' : 'danhsach';
+                              const defaultTab = hasFinalizedTab(trip) ? 'dachot' : 'danhsach';
                               setActiveTab(defaultTab);
                             }}
                             className="hover:bg-slate-50 transition-colors cursor-pointer group"
@@ -583,7 +670,7 @@ export default function RegistrationManagement_Khoa() {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setSelectedTripForReg(trip);
-                                  const defaultTab = ['DaChotDanhSach', 'DaDienRa'].includes(trip.trang_thai) ? 'dachot' : 'danhsach';
+                                  const defaultTab = hasFinalizedTab(trip) ? 'dachot' : 'danhsach';
                                   setActiveTab(defaultTab);
                                 }}
                                 className="px-3 py-1.5 bg-slate-100 text-slate-600 group-hover:bg-[#407F3E] group-hover:text-white rounded-lg text-xs font-bold transition-all shadow-sm inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
@@ -915,7 +1002,7 @@ export default function RegistrationManagement_Khoa() {
                     <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[#89B449] rounded-t-full"></div>
                   )}
                 </button>
-                {['DaChotDanhSach', 'DaDienRa'].includes(selectedTripForReg.trang_thai) && (
+                {hasFinalizedTab(selectedTripForReg) && (
                   <button
                     onClick={() => setActiveTab('dachot')}
                     className={`pb-3 text-sm font-bold transition-all relative cursor-pointer ${activeTab === 'dachot' ? 'text-[#89B449]' : 'text-slate-500 hover:text-slate-700'
@@ -1096,10 +1183,10 @@ export default function RegistrationManagement_Khoa() {
                     </div>
 
                     <div className="flex items-center gap-3 shrink-0">
-                      {selectedTripForReg?.trang_thai === 'DaDienRa' ? (
+                      {isTripLocked(selectedTripForReg) ? (
                         <span className="px-4 py-2 bg-slate-100 text-slate-500 rounded-xl text-xs sm:text-sm font-bold border border-slate-200 flex items-center gap-2 cursor-not-allowed">
                           <CheckCircle2 className="w-4 h-4 text-slate-400" />
-                          Chuyến đã diễn ra (Đã khóa danh sách)
+                          Chuyến đã diễn ra / Đã khóa danh sách
                         </span>
                       ) : (
                         <button
@@ -1113,11 +1200,11 @@ export default function RegistrationManagement_Khoa() {
                     </div>
                   </div>
 
-                  {selectedTripForReg?.trang_thai === 'DaDienRa' && (
+                  {isTripLocked(selectedTripForReg) && (
                     <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-xl p-3.5 text-xs sm:text-sm flex items-center gap-2.5">
                       <Info className="w-4 h-4 text-blue-600 shrink-0" />
                       <span>
-                        Chuyến tham quan này <strong>đã diễn ra</strong>. Danh sách sinh viên đã được chốt và khóa cố định, không thể thay đổi. Vui lòng chuyển sang tab <strong>"Danh sách sinh viên đã chốt"</strong> để xem hoặc xuất Excel danh sách sinh viên chính thức.
+                        Chuyến tham quan này <strong>đã diễn ra hoặc đã khóa sổ điểm</strong>. Danh sách sinh viên đã được chốt và khóa cố định, không thể thay đổi. Vui lòng chuyển sang tab <strong>"Danh sách sinh viên đã chốt"</strong> để xem hoặc xuất Excel danh sách sinh viên chính thức.
                       </span>
                     </div>
                   )}
@@ -1185,15 +1272,17 @@ export default function RegistrationManagement_Khoa() {
                   {/* Main Unified Table */}
                   <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden relative z-10">
                     <div className="overflow-x-auto">
-                      <table className="w-full text-left border-collapse min-w-[950px]">
+                      <table className="w-full text-left border-collapse min-w-[1150px]">
                         <thead>
                           <tr className="bg-slate-50 text-slate-700 text-[11px] font-bold uppercase tracking-wider border-b border-slate-200 select-none">
                             <th className="py-3 pl-4 pr-2 text-center w-12 whitespace-nowrap">STT</th>
                             <th className="py-3 px-3 whitespace-nowrap">MSSV</th>
                             <th className="py-3 px-3 whitespace-nowrap">Họ tên</th>
                             <th className="py-3 px-3 whitespace-nowrap">Lớp</th>
+                            <th className="py-3 px-3 text-center whitespace-nowrap">Số chuyến đã đi</th>
                             <th className="py-3 px-3 text-center whitespace-nowrap">Trạng thái hiện tại</th>
-                            <th className="py-3 px-3 whitespace-nowrap">Kết quả lọc dự kiến</th>
+                            <th className="py-3 px-3 text-center whitespace-nowrap">Kết quả lọc dự kiến</th>
+                            <th className="py-3 px-3 whitespace-nowrap">Lý do ưu tiên / Lý do loại</th>
                             <th
                               onClick={toggleSortChotTime}
                               className="py-3 px-3 text-center cursor-pointer select-none group hover:bg-slate-100 transition-colors whitespace-nowrap"
@@ -1213,13 +1302,15 @@ export default function RegistrationManagement_Khoa() {
                         </thead>
                         <tbody className="text-sm text-slate-700 divide-y divide-slate-100">
                           {isFiltering ? (
-                            <tr><td colSpan="8" className="text-center py-10 text-slate-500 italic">Đang lọc dự kiến...</td></tr>
+                            <tr><td colSpan="10" className="text-center py-10 text-slate-500 italic">Đang lọc dự kiến...</td></tr>
                           ) : paginatedChotList.length === 0 ? (
-                            <tr><td colSpan="8" className="text-center py-10 text-slate-500 font-medium">Không tìm thấy sinh viên nào phù hợp với bộ lọc.</td></tr>
+                            <tr><td colSpan="10" className="text-center py-10 text-slate-500 font-medium">Không tìm thấy sinh viên nào phù hợp với bộ lọc.</td></tr>
                           ) : (
                             paginatedChotList.map((r, idx) => {
                               const studentId = r.sinhVien?.id || r.sinh_vien_id;
                               const isAccepted = selectedStudentIds.has(studentId);
+                              const countAttended = r.so_chuyen_da_di ?? 0;
+                              const isBlacklisted = r.isBlacklisted || (r.ly_do_loai && r.ly_do_loai.includes('[DANH SÁCH ĐEN]'));
 
                               return (
                                 <tr
@@ -1240,21 +1331,60 @@ export default function RegistrationManagement_Khoa() {
                                     {r.sinhVien?.ten_lop || '--'}
                                   </td>
                                   <td className="py-3 px-3 text-center whitespace-nowrap">
+                                    {countAttended === 0 ? (
+                                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-xs" title="Chưa tham gia chuyến nào (Diện ưu tiên cao)">
+                                        0/3 chuyến
+                                      </span>
+                                    ) : countAttended < 3 ? (
+                                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 shadow-xs" title={`Đã tham gia ${countAttended} chuyến`}>
+                                        {countAttended}/3 chuyến
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600 border border-slate-300 shadow-xs" title="Đã hoàn thành tối đa 3 chuyến">
+                                        3/3 (Đã đủ)
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="py-3 px-3 text-center whitespace-nowrap">
                                     {getStatusBadge(statusMap[r.trang_thai] || r.trang_thai)}
                                   </td>
-                                  <td className="py-3 px-3 whitespace-nowrap">
+                                  <td className="py-3 px-3 text-center whitespace-nowrap">
                                     {isAccepted ? (
                                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-[#407F3E]/10 text-[#407F3E] border border-[#407F3E]/20">
                                         <CheckCircle2 className="w-3.5 h-3.5" /> Hợp lệ dự kiến
                                       </span>
                                     ) : (
-                                      <div className="flex flex-col gap-0.5">
-                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-[#E68A8C]/15 text-[#E68A8C] border border-[#E68A8C]/30 w-fit">
-                                          <XCircle className="w-3.5 h-3.5" /> Bị loại dự kiến
+                                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-[#E68A8C]/15 text-[#E68A8C] border border-[#E68A8C]/30">
+                                        <XCircle className="w-3.5 h-3.5" /> Bị loại dự kiến
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="py-3 px-3 min-w-[220px] max-w-[320px]">
+                                    {isAccepted ? (
+                                      <div className="flex flex-wrap items-center gap-1.5">
+                                        <span className="text-xs font-medium text-slate-700" title={r.ly_do_uu_tien || 'Quản trị viên chọn bổ sung thủ công'}>
+                                          {r.ly_do_uu_tien || 'Quản trị viên chọn bổ sung thủ công'}
                                         </span>
-                                        {r.ly_do_loai && (
-                                          <span className="text-[11px] text-slate-400 italic truncate max-w-[200px]" title={r.ly_do_loai}>
-                                            Lý do: {r.ly_do_loai}
+                                        {r.is_manual_override && (
+                                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 font-semibold shrink-0">
+                                            Điều chỉnh
+                                          </span>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <div className="flex flex-wrap items-center gap-1.5">
+                                        {isBlacklisted ? (
+                                          <span className="text-xs font-bold text-rose-700 bg-rose-50 px-2.5 py-1 rounded-md border border-rose-200 block w-full leading-relaxed shadow-xs" title={r.ly_do_loai}>
+                                            {r.ly_do_loai}
+                                          </span>
+                                        ) : (
+                                          <span className="text-xs font-medium text-rose-600" title={r.ly_do_loai || 'Quản trị viên loại thủ công'}>
+                                            {r.ly_do_loai || 'Quản trị viên loại thủ công'}
+                                          </span>
+                                        )}
+                                        {r.is_manual_override && (
+                                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200 font-semibold shrink-0">
+                                            Thủ công
                                           </span>
                                         )}
                                       </div>
@@ -1264,7 +1394,7 @@ export default function RegistrationManagement_Khoa() {
                                     {r.ngay_dang_ky ? new Date(r.ngay_dang_ky).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }) : '--'}
                                   </td>
                                   <td className="py-3 pr-6 pl-3 text-right" onClick={(e) => e.stopPropagation()}>
-                                    {selectedTripForReg?.trang_thai !== 'DaDienRa' && (
+                                    {!isTripLocked(selectedTripForReg) && (
                                       isAccepted ? (
                                         <button
                                           onClick={(e) => { e.stopPropagation(); moveStudent(studentId, false); }}
@@ -1272,6 +1402,14 @@ export default function RegistrationManagement_Khoa() {
                                           title="Chuyển sang danh sách bị loại"
                                         >
                                           Loại <ArrowDown className="w-3.5 h-3.5" />
+                                        </button>
+                                      ) : isBlacklisted ? (
+                                        <button
+                                          disabled
+                                          className="px-3 py-1.5 bg-slate-100 text-slate-400 rounded-lg text-xs font-bold cursor-not-allowed flex items-center gap-1 ml-auto border border-slate-200 opacity-70 select-none shadow-none"
+                                          title={`Không thể duyệt: ${r.ly_do_loai || 'Sinh viên đang thi hành án phạt Danh sách đen'}`}
+                                        >
+                                          <Ban className="w-3.5 h-3.5" /> Bị cấm
                                         </button>
                                       ) : (
                                         <button
@@ -1560,6 +1698,19 @@ export default function RegistrationManagement_Khoa() {
                       </div>
                     )}
 
+                    {/* Alert Box nếu có thông tin ưu tiên */}
+                    {viewingDetail.ly_do_uu_tien && !isRejected && (
+                      <div className="bg-emerald-50/90 border border-emerald-200 text-emerald-900 rounded-xl p-4 flex items-start gap-3 shadow-xs">
+                        <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                        <div className="flex-1 text-sm">
+                          <p className="font-bold text-emerald-900 mb-0.5">Tiêu chí ưu tiên xét duyệt</p>
+                          <p className="text-emerald-700 text-xs font-medium leading-relaxed">
+                            {viewingDetail.ly_do_uu_tien}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Alert Box nếu có yêu cầu hủy */}
                     {cancelReq && (
                       <div className="bg-amber-50/90 border border-amber-200 text-amber-900 rounded-xl p-4 flex items-start gap-3 shadow-xs">
@@ -1620,6 +1771,13 @@ export default function RegistrationManagement_Khoa() {
                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Số điện thoại</span>
                           <span className="text-xs font-medium text-slate-700 block mt-1">
                             {student.sdt || '--'}
+                          </span>
+                        </div>
+
+                        <div className="bg-slate-50/70 p-2.5 rounded-lg border border-slate-100 sm:col-span-3">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Số chuyến đã đi</span>
+                          <span className="text-xs font-bold text-slate-800 block mt-1">
+                            {viewingDetail.so_chuyen_da_di != null ? `${viewingDetail.so_chuyen_da_di}/3 chuyến` : '--'}
                           </span>
                         </div>
                       </div>

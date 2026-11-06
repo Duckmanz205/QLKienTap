@@ -73,6 +73,7 @@ export const khoaApi = {
   batchAssignGvhd: (data) => api.post(`${getAdminPrefix()}/batch-assign-gvhd`, data),
   previewAutoAssignGvhd: (data) => api.post(`${getAdminPrefix()}/preview-auto-assign-gvhd`, data),
   confirmAutoAssignGvhd: (data) => api.post(`${getAdminPrefix()}/confirm-auto-assign-gvhd`, data),
+  importGvhdAssignments: (data) => api.post(`${getAdminPrefix()}/import-gvhd-assignments`, data),
   getLecturersWithWorkload: (dotKienTapId) => api.get(`${getAdminPrefix()}/lecturers-with-workload`, { params: { dotKienTapId } }),
   assignGvdd: (data) => api.post(`${getAdminPrefix()}/assign-gvdd`, data),
   unassignGvdd: (tripId, lecturerId) => api.delete(`${getAdminPrefix()}/assign-gvdd/${tripId}/${lecturerId}`),

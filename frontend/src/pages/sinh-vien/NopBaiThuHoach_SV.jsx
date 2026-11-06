@@ -89,10 +89,28 @@ export default function NopBaiThuHoach_SV() {
         }
         
         let hanNopStr = 'Chưa xác định';
-        if (trip.chuyenThamQuan?.ngay_tham_quan) {
-          const dateObj = new Date(trip.chuyenThamQuan.ngay_tham_quan);
-          dateObj.setDate(dateObj.getDate() + 10);
-          hanNopStr = dateObj.toLocaleDateString('vi-VN');
+        let hanNopDate = null;
+        let hanKhoaDate = null;
+        let isExtended = false;
+
+        if (trip.phieuThamQuan?.han_nop_bao_cao) {
+          hanNopDate = new Date(trip.phieuThamQuan.han_nop_bao_cao);
+          hanKhoaDate = new Date(hanNopDate.getTime() + 10 * 86400000);
+          hanNopStr = hanNopDate.toLocaleDateString('vi-VN');
+
+          if (trip.chuyenThamQuan?.ngay_tham_quan) {
+            const originalDeadline = new Date(trip.chuyenThamQuan.ngay_tham_quan);
+            originalDeadline.setDate(originalDeadline.getDate() + 10);
+            originalDeadline.setHours(23, 59, 59, 999);
+            if (Math.abs(hanNopDate.getTime() - originalDeadline.getTime()) > 86400000) {
+              isExtended = true;
+            }
+          }
+        } else if (trip.chuyenThamQuan?.ngay_tham_quan) {
+          hanNopDate = new Date(trip.chuyenThamQuan.ngay_tham_quan);
+          hanNopDate.setDate(hanNopDate.getDate() + 10);
+          hanKhoaDate = new Date(hanNopDate.getTime() + 10 * 86400000);
+          hanNopStr = hanNopDate.toLocaleDateString('vi-VN');
         }
 
         const isGradedAndLocked = Boolean(
@@ -105,10 +123,14 @@ export default function NopBaiThuHoach_SV() {
           id: trip.id,
           nhaMay: trip.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Chưa xác định',
           ngayThamQuan: trip.chuyenThamQuan?.ngay_tham_quan ? new Date(trip.chuyenThamQuan.ngay_tham_quan).toLocaleDateString('vi-VN') : '--',
+          ngayThamQuanRaw: trip.chuyenThamQuan?.ngay_tham_quan,
           loaiChuyen: trip.chuyenThamQuan?.loai_chuyen || 'khoa',
           hinhThuc: trip.chuyenThamQuan?.hinh_thuc === 'TrucTuyen' ? 'Trực tuyến' : 'Trực tiếp',
           trangThai: status,
           hanNop: hanNopStr,
+          hanNopDate: hanNopDate,
+          hanKhoaDate: hanKhoaDate,
+          isExtended: isExtended,
           baiThuHoach: baiThuHoach,
           cachToChuc: trip.chuyenThamQuan?.cach_to_chuc,
           hoaDonStatus: trip.hoaDon?.trang_thai,
@@ -187,6 +209,7 @@ export default function NopBaiThuHoach_SV() {
         size: (file.size / (1024 * 1024)).toFixed(1) + ' MB',
         text: res.data.extractedText || "",
         url: url,
+        key: res.data.key,
         previewUrl: previewUrl,
         rawFile: file
       });
@@ -281,7 +304,7 @@ export default function NopBaiThuHoach_SV() {
     try {
       await sinhVienApi.submitReport({
         registrationId: selectedTrip.id,
-        fileBaoCaoUrl: uploadedFile.url || uploadedFile.name,
+        fileBaoCaoUrl: uploadedFile.key || uploadedFile.url || uploadedFile.name,
         fileXacNhanUrl: uploadedConfirmationFile ? (uploadedConfirmationFile.url || uploadedConfirmationFile.key) : null,
         extractedText: uploadedFile.text,
       });
@@ -337,12 +360,25 @@ export default function NopBaiThuHoach_SV() {
           const txtApiPath = cleanPath.replace(/\.\w+$/, '.txt');
           try {
             const respTxt = await api.get(txtApiPath, { responseType: 'text' });
-            if (respTxt.data) {
-              extractedText = respTxt.data;
+            const data = respTxt.data;
+            const strData = typeof data === 'string' ? data : JSON.stringify(data || '');
+            const isProcessing = respTxt.status === 202 ||
+              strData.includes('"PROCESSING"') ||
+              strData.includes('PROCESSING') ||
+              (typeof data === 'object' && data?.status === 'PROCESSING');
+
+            if (!isProcessing && data && typeof data === 'string' && data.trim().length > 10 && !data.includes('Không thể trích xuất văn bản') && !data.includes('"PROCESSING"')) {
+              extractedText = data;
+            } else if (trip.baiThuHoach.noi_dung_trich_xuat) {
+              extractedText = trip.baiThuHoach.noi_dung_trich_xuat;
+            } else {
+              extractedText = '⏳ Hệ thống đang nhận diện chữ viết tay từ bản scan (OCR)...';
             }
           } catch (txtErr) {
             if (trip.baiThuHoach.noi_dung_trich_xuat) {
               extractedText = trip.baiThuHoach.noi_dung_trich_xuat;
+            } else {
+              extractedText = '⏳ Hệ thống đang nhận diện chữ viết tay từ bản scan (OCR)...';
             }
           }
         }
@@ -417,12 +453,19 @@ export default function NopBaiThuHoach_SV() {
               let canSubmit = true;
               let disabledReason = '';
               
+              const now = new Date();
+              const isPastLock = trip.hanKhoaDate && now > trip.hanKhoaDate;
+              const isPastOnTime = trip.hanNopDate && now > trip.hanNopDate;
+
               if (!trip.hasPhieuThamQuan) {
                 canSubmit = false;
                 disabledReason = isDoKhoa && trip.hoaDonStatus === 'ChuaDong' ? 'Chưa đóng lệ phí' : 'Chưa có PTQ';
               } else if (isDoKhoa && trip.diemDanhStatus !== 'CoMat') {
                 canSubmit = false;
                 disabledReason = 'Chưa điểm danh';
+              } else if (isPastLock) {
+                canSubmit = false;
+                disabledReason = 'Đã khóa cổng nộp';
               }
               
               return (
@@ -476,10 +519,18 @@ export default function NopBaiThuHoach_SV() {
                           <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                           <span>Ngày đi: <strong className="text-slate-700 font-bold">{trip.ngayThamQuan}</strong></span>
                         </div>
-                        <div className="flex items-center gap-1.5 font-medium">
-                          <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span>Hạn nộp: <strong className="text-slate-700 font-bold">{trip.hanNop}</strong></span>
-                        </div>
+                        {trip.hanNopDate && (
+                          <div className="flex items-center gap-1.5 font-medium">
+                            <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            {now <= trip.hanNopDate ? (
+                              <span>Hạn đúng hạn: <strong className="text-[#407F3E] font-bold">23:59 {trip.hanNop}</strong></span>
+                            ) : now <= trip.hanKhoaDate ? (
+                              <span>Đóng cổng nộp bù: <strong className="text-amber-700 font-bold">23:59 {trip.hanKhoaDate.toLocaleDateString('vi-VN')}</strong></span>
+                            ) : (
+                              <span className="text-red-600 font-bold">Đã đóng cổng ({trip.hanKhoaDate.toLocaleDateString('vi-VN')})</span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -495,7 +546,11 @@ export default function NopBaiThuHoach_SV() {
                               {trip.baiThuHoach.file_bao_cao_url || trip.baiThuHoach.file_bao_cao.split('/').pop() || 'BaoCao_ThuHoach.pdf'}
                             </p>
                             <p className="text-[11px] text-slate-500">
-                              {trip.trangThai === 'Chờ duyệt điểm danh' ? 'Đã nộp bài • Đang chờ duyệt điểm danh' : 'Đã nộp thành công lên hệ thống'}
+                              {trip.baiThuHoach.trang_thai === 'TreHan'
+                                ? 'Đã nộp bài (Trễ hạn) • Đã được ghi nhận'
+                                : trip.trangThai === 'Chờ duyệt điểm danh'
+                                ? 'Đã nộp bài • Đang chờ duyệt điểm danh'
+                                : 'Đã nộp thành công lên hệ thống'}
                             </p>
                           </div>
                         </div>
@@ -506,12 +561,47 @@ export default function NopBaiThuHoach_SV() {
                         )}
                       </div>
                     ) : (
-                      <div className="bg-amber-50/70 border border-amber-200/90 rounded-xl p-2.5 px-3 flex items-center gap-2 text-xs text-amber-800 mt-1">
-                        <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-                        <span className="text-[11px] font-medium">
-                          Chưa nộp file báo cáo. Vui lòng nộp bài trước hạn chót <strong>{trip.hanNop}</strong>.
-                        </span>
-                      </div>
+                      (() => {
+                        if (isPastLock) {
+                          return (
+                            <div className="bg-red-50 border border-red-200 rounded-xl p-2.5 px-3 flex items-center gap-2 text-xs text-red-800 mt-1">
+                              <Lock className="w-4 h-4 text-red-600 shrink-0" />
+                              <span className="text-[11px] font-medium">
+                                Đã quá thời hạn nộp bài (Cổng đã khóa vào 23:59 ngày {trip.hanKhoaDate?.toLocaleDateString('vi-VN')}). Không thể nộp bài.
+                              </span>
+                            </div>
+                          );
+                        } else if (isPastOnTime) {
+                          return (
+                            <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 px-3 flex items-center gap-2 text-xs text-amber-800 mt-1">
+                              <Unlock className="w-4 h-4 text-amber-600 shrink-0" />
+                              <span className="text-[11px] font-medium">
+                                {trip.isExtended
+                                  ? `🔓 Đã được GVHD mở khóa Nộp bù (Trễ hạn) đến 23:59 ngày ${trip.hanKhoaDate?.toLocaleDateString('vi-VN')}.`
+                                  : `Cổng nộp bù (Trễ hạn) đang mở đến 23:59 ngày ${trip.hanKhoaDate?.toLocaleDateString('vi-VN')}.`}
+                              </span>
+                            </div>
+                          );
+                        } else if (trip.isExtended) {
+                          return (
+                            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 px-3 flex items-center gap-2 text-xs text-emerald-800 mt-1">
+                              <Clock className="w-4 h-4 text-[#407F3E] shrink-0" />
+                              <span className="text-[11px] font-medium">
+                                🎉 Đã được GVHD gia hạn nộp Đúng hạn đến 23:59 ngày <strong>{trip.hanNop}</strong>.
+                              </span>
+                            </div>
+                          );
+                        } else {
+                          return (
+                            <div className="bg-amber-50/70 border border-amber-200/90 rounded-xl p-2.5 px-3 flex items-center gap-2 text-xs text-amber-800 mt-1">
+                              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                              <span className="text-[11px] font-medium">
+                                Chưa nộp file báo cáo. Vui lòng nộp bài trước hạn chót <strong>{trip.hanNop}</strong>.
+                              </span>
+                            </div>
+                          );
+                        }
+                      })()
                     )}
                   </div>
 

@@ -574,6 +574,19 @@ class ApiService {
     });
   }
 
+  // Lecturer extend report submission deadline
+  static Future<dynamic> extendReportDeadline({
+    required int phieuThamQuanId,
+    required String loaiGiaHan,
+    required String ngayGiaHanMoi,
+  }) async {
+    return await post('giang-vien/extend-report-deadline', {
+      'phieuThamQuanId': phieuThamQuanId,
+      'loaiGiaHan': loaiGiaHan,
+      'ngayGiaHanMoi': ngayGiaHanMoi,
+    });
+  }
+
   // Lecturer save AI suggested grade
   static Future<dynamic> saveAIGrade(
       int reportId, double score, String comment) async {

@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
-  ChevronDown, Check, Info, Search, UserCircle, RefreshCw, X, Filter, AlertCircle, ChevronLeft, ChevronRight, UserPlus, Users, Download, FileSpreadsheet
+  ChevronDown, Check, Info, Search, UserCircle, RefreshCw, X, Filter, AlertCircle, ChevronLeft, ChevronRight, UserPlus, Users, Download, FileSpreadsheet, Upload, CheckCircle2, AlertTriangle
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { khoaApi } from '../../services/api';
 import Toast from '../../components/Toast';
 import EdgeToEdgeContainer from '../../components/EdgeToEdgeContainer';
 import SearchableDropdown from '../../components/SearchableDropdown';
-import { exportPhanCongGVHD } from '../../utils/exportExcel';
+import { exportPhanCongGVHD, exportPhanCongGVHDTemplate } from '../../utils/exportExcel';
 import useClickOutside from '../../hooks/useClickOutside';
 
 export default function SupervisorAssignment_Khoa() {
@@ -52,6 +53,16 @@ export default function SupervisorAssignment_Khoa() {
   // Export Menu State
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
   const exportMenuRef = useClickOutside(() => setIsExportDropdownOpen(false), isExportDropdownOpen);
+
+  // Import Excel State
+  const fileInputRef = useRef(null);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importFileName, setImportFileName] = useState('');
+  const [importParsedList, setImportParsedList] = useState([]);
+  const [importWorkloadList, setImportWorkloadList] = useState([]);
+  const [importActiveTab, setImportActiveTab] = useState('students'); // 'students' | 'workload'
+  const [importFilterStatus, setImportFilterStatus] = useState('ALL'); // 'ALL' | 'VALID' | 'UNCHANGED' | 'ERROR'
+  const [isImporting, setIsImporting] = useState(false);
 
   useEffect(() => {
     fetchInitialData();
@@ -320,6 +331,347 @@ export default function SupervisorAssignment_Khoa() {
     autoAssignCurrentPage * autoAssignLimit
   );
 
+  // Helper chuẩn hóa họ tên giảng viên (loại bỏ học hàm/học vị)
+  const normalizeLecturerName = (name) => {
+    return (name || '')
+      .replace(/\b(PGS\.TS\.|PGS\.|GS\.TS\.|GS\.|TS\.|ThS\.|CN\.|KS\.|ThS|TS|PGS|GS|Thạc sĩ|Tiến sĩ)\b/gi, '')
+      .replace(/[-_]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+  };
+
+  // Helper nhận diện giảng viên từ text
+  const matchLecturer = (rawId, allLecturers) => {
+    const clean = (rawId || '').trim();
+    if (!clean) return { lecturer: null, error: 'Chưa có thông tin giảng viên' };
+
+    // Case 1: Chuỗi kết hợp "Mã GV - Tên GV"
+    const dashParts = clean.split(/[-:]/);
+    if (dashParts.length >= 2) {
+      const potentialCode = dashParts[0].trim().toUpperCase();
+      const foundByCode = allLecturers.find(g => (g.ma_gv || '').trim().toUpperCase() === potentialCode);
+      if (foundByCode) return { lecturer: foundByCode, error: null };
+    }
+
+    // Case 2: Khớp theo Mã GV chính xác
+    const upperClean = clean.toUpperCase();
+    const byCode = allLecturers.find(g => (g.ma_gv || '').trim().toUpperCase() === upperClean);
+    if (byCode) return { lecturer: byCode, error: null };
+
+    // Case 3: Khớp theo Họ tên (loại bỏ học hàm/học vị)
+    const normInput = normalizeLecturerName(clean);
+    const matched = allLecturers.filter(g => normalizeLecturerName(g.ho_ten || '') === normInput);
+
+    if (matched.length === 1) {
+      return { lecturer: matched[0], error: null };
+    }
+    if (matched.length > 1) {
+      return {
+        lecturer: null,
+        error: `Có ${matched.length} giảng viên trùng tên "${clean}". Vui lòng ghi kèm Mã GV (Ví dụ: ${matched[0].ma_gv} - ${matched[0].ho_ten})`
+      };
+    }
+
+    return { lecturer: null, error: `Không tìm thấy giảng viên "${clean}" trong danh sách khoa` };
+  };
+
+  // Tải file mẫu phân công GVHD
+  const handleDownloadTemplate = () => {
+    if (!selectedCampaign) {
+      showToast('Vui lòng chọn đợt kiến tập trước khi tải file mẫu', 'warning');
+      return;
+    }
+    const currentCamp = campaigns.find(c => c.id === Number(selectedCampaign));
+    exportPhanCongGVHDTemplate(enrollments, currentCamp?.ten_dot || '');
+    showToast('Đã tải xuống file mẫu phân công GVHD (.xlsx)');
+  };
+
+  // Xử lý đọc và phân tích file Excel
+  const handleFileSelected = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!selectedCampaign) {
+      showToast('Vui lòng chọn đợt kiến tập trước khi nhập file Excel', 'warning');
+      e.target.value = '';
+      return;
+    }
+
+    setImportFileName(file.name);
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+      const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+      if (!rawRows || rawRows.length === 0) {
+        showToast('File Excel trống không có dữ liệu', 'warning');
+        e.target.value = '';
+        return;
+      }
+
+      // Quét tìm dòng tiêu đề chứa MSSV
+      let headerRowIndex = -1;
+      for (let i = 0; i < Math.min(rawRows.length, 25); i++) {
+        const rowStr = (rawRows[i] || []).map(cell => String(cell || '').toLowerCase().trim()).join(' ');
+        if (rowStr.includes('mssv') || rowStr.includes('mã hs-sv') || rowStr.includes('mã sv') || rowStr.includes('mã sinh viên')) {
+          headerRowIndex = i;
+          break;
+        }
+      }
+
+      if (headerRowIndex === -1) {
+        showToast('Không tìm thấy dòng tiêu đề chứa cột MSSV trong file Excel', 'error');
+        e.target.value = '';
+        return;
+      }
+
+      const headers = (rawRows[headerRowIndex] || []).map(cell => String(cell || '').toLowerCase().trim());
+      const colMssv = headers.findIndex(h => h.includes('mssv') || h.includes('mã hs-sv') || h.includes('mã sinh viên') || h.includes('mã sv'));
+      const colName = headers.findIndex(h => h.includes('họ và tên') || h.includes('họ tên') || h.includes('tên sinh viên'));
+      const colClass = headers.findIndex(h => h.includes('lớp') || h.includes('tên lớp') || h.includes('mã lớp'));
+      const colGvCode = headers.findIndex(h => h === 'mã gv' || h.includes('mã gv') || h.includes('mã giảng viên') || h.includes('magv'));
+      const colGvName = headers.findIndex(h => h.includes('giảng viên hướng dẫn') || h.includes('gvhd') || h.includes('tên gv') || h.includes('giảng viên'));
+
+      const dataRows = rawRows.slice(headerRowIndex + 1);
+
+      // Tạo map enrollment hiện tại theo MSSV
+      const enrollmentMap = new Map();
+      enrollments.forEach(en => {
+        if (en.sinhVien?.mssv) {
+          enrollmentMap.set(String(en.sinhVien.mssv).trim().toUpperCase(), en);
+        }
+      });
+
+      // Khởi tạo map tải trọng giảng viên
+      const workloadMap = {};
+      lecturers.forEach(gv => {
+        workloadMap[gv.id] = {
+          id: gv.id,
+          ma_gv: gv.ma_gv,
+          ho_ten: gv.ho_ten,
+          currentCount: gv.so_sv_dang_huong_dan || 0,
+          delta: 0,
+          projectedCount: gv.so_sv_dang_huong_dan || 0,
+          maxQuota: gv.so_sv_toi_da_huong_dan || 40,
+          hasQuotaLimit: Boolean(gv.so_sv_toi_da_huong_dan),
+          isOverloaded: false
+        };
+      });
+
+      const parsedList = [];
+
+      for (let idx = 0; idx < dataRows.length; idx++) {
+        const row = dataRows[idx];
+        const rawMssv = colMssv !== -1 ? String(row[colMssv] || '').trim() : '';
+        if (!rawMssv) continue; // Bỏ qua dòng trống MSSV
+
+        const rowName = colName !== -1 ? String(row[colName] || '').trim() : '';
+        const rowClass = colClass !== -1 ? String(row[colClass] || '').trim() : '';
+        const rowGvCode = colGvCode !== -1 ? String(row[colGvCode] || '').trim() : '';
+        const rowGvName = colGvName !== -1 ? String(row[colGvName] || '').trim() : '';
+
+        const mssvKey = rawMssv.toUpperCase();
+        const en = enrollmentMap.get(mssvKey);
+
+        const svName = en?.sinhVien?.ho_ten || rowName || 'Chưa rõ';
+        const svClass = en?.sinhVien?.ten_lop || rowClass || 'N/A';
+
+        // Lấy GV hiện tại của sinh viên
+        const currentAdvisorObj = en?.sinhVien?.details?.giangVienHuongDan || en?.giangVienHuongDan;
+        const currentAdvisorName = currentAdvisorObj?.ho_ten || en?.gvhd || 'Chưa phân công';
+        const currentAdvisorId = currentAdvisorObj?.id || null;
+
+        // Xác định thông tin giảng viên chỉ định trong file
+        const rawGvText = (rowGvCode ? `${rowGvCode}${rowGvName ? ' - ' + rowGvName : ''}` : rowGvName).trim();
+
+        if (!en) {
+          parsedList.push({
+            id: `row-${idx}`,
+            mssv: rawMssv,
+            ho_ten: svName,
+            ten_lop: svClass,
+            currentAdvisor: currentAdvisorName,
+            assignedGvText: rawGvText || '—',
+            status: 'ERROR',
+            reason: 'Sinh viên không thuộc đợt kiến tập này',
+            matchedLecturer: null
+          });
+          continue;
+        }
+
+        if (!rawGvText) {
+          // Bỏ qua / giữ nguyên phân công hiện tại
+          parsedList.push({
+            id: `row-${idx}`,
+            mssv: rawMssv,
+            ho_ten: svName,
+            ten_lop: svClass,
+            currentAdvisor: currentAdvisorName,
+            assignedGvText: '—',
+            status: 'UNCHANGED',
+            reason: 'Không chỉ định GVHD (Giữ nguyên phân công hiện tại)',
+            matchedLecturer: null
+          });
+          continue;
+        }
+
+        // Nhận diện giảng viên
+        const matchRes = matchLecturer(rowGvCode || rowGvName || rawGvText, lecturers);
+        if (matchRes.error || !matchRes.lecturer) {
+          parsedList.push({
+            id: `row-${idx}`,
+            mssv: rawMssv,
+            ho_ten: svName,
+            ten_lop: svClass,
+            currentAdvisor: currentAdvisorName,
+            assignedGvText: rawGvText,
+            status: 'ERROR',
+            reason: matchRes.error || `Không tìm thấy giảng viên "${rawGvText}"`,
+            matchedLecturer: null
+          });
+          continue;
+        }
+
+        const newLec = matchRes.lecturer;
+
+        // Nếu sinh viên đã có GVHD và GV mới đúng bằng GV cũ
+        if (currentAdvisorId === newLec.id) {
+          parsedList.push({
+            id: `row-${idx}`,
+            mssv: rawMssv,
+            ho_ten: svName,
+            ten_lop: svClass,
+            currentAdvisor: currentAdvisorName,
+            assignedGvText: `${newLec.ma_gv} - ${newLec.ho_ten}`,
+            status: 'UNCHANGED',
+            reason: 'Giữ nguyên (Đã được phân công cho GV này)',
+            matchedLecturer: newLec
+          });
+          continue;
+        }
+
+        // Nếu đổi sang GVHD mới: Kiểm tra khóa điểm bài thu hoạch
+        if (en.isHarvestGradeLocked) {
+          parsedList.push({
+            id: `row-${idx}`,
+            mssv: rawMssv,
+            ho_ten: svName,
+            ten_lop: svClass,
+            currentAdvisor: currentAdvisorName,
+            assignedGvText: `${newLec.ma_gv} - ${newLec.ho_ten}`,
+            status: 'ERROR',
+            reason: 'Đã khóa điểm bài thu hoạch, không thể đổi GVHD',
+            matchedLecturer: newLec
+          });
+          continue;
+        }
+
+        // Hợp lệ -> đưa vào danh sách để mô phỏng tải
+        parsedList.push({
+          id: `row-${idx}`,
+          mssv: rawMssv,
+          ho_ten: svName,
+          ten_lop: svClass,
+          currentAdvisor: currentAdvisorName,
+          assignedGvText: `${newLec.ma_gv} - ${newLec.ho_ten}`,
+          status: 'VALID',
+          reason: 'Hợp lệ',
+          matchedLecturer: newLec,
+          oldLecturerId: currentAdvisorId
+        });
+      }
+
+      if (parsedList.length === 0) {
+        showToast('Không đọc được dữ liệu sinh viên nào từ file Excel', 'warning');
+        e.target.value = '';
+        return;
+      }
+
+      // Mô phỏng tải trọng (Delta workload)
+      parsedList.forEach(item => {
+        if (item.status === 'VALID' && item.matchedLecturer) {
+          if (item.oldLecturerId && workloadMap[item.oldLecturerId]) {
+            workloadMap[item.oldLecturerId].delta -= 1;
+          }
+          if (workloadMap[item.matchedLecturer.id]) {
+            workloadMap[item.matchedLecturer.id].delta += 1;
+          }
+        }
+      });
+
+      // Kiểm tra định mức sau khi cộng dồn
+      let anyOverload = false;
+      Object.values(workloadMap).forEach(w => {
+        w.projectedCount = w.currentCount + w.delta;
+        const quota = w.maxQuota || 40;
+        if (w.projectedCount > quota) {
+          w.isOverloaded = true;
+          anyOverload = true;
+        }
+      });
+
+      // Nếu có GV bị vượt định mức -> Đánh dấu lỗi cho các sinh viên được gán vào GV đó
+      if (anyOverload) {
+        parsedList.forEach(item => {
+          if (item.status === 'VALID' && item.matchedLecturer) {
+            const gvWork = workloadMap[item.matchedLecturer.id];
+            if (gvWork && gvWork.isOverloaded) {
+              item.status = 'ERROR';
+              item.reason = `Lỗi vượt định mức: GV ${item.matchedLecturer.ho_ten} vượt tải (${gvWork.projectedCount}/${gvWork.maxQuota || 40} SV)`;
+            }
+          }
+        });
+      }
+
+      setImportParsedList(parsedList);
+      setImportWorkloadList(Object.values(workloadMap));
+      setImportActiveTab('students');
+      setImportFilterStatus('ALL');
+      setIsImportModalOpen(true);
+    } catch (err) {
+      console.error(err);
+      showToast('Lỗi khi đọc file Excel: ' + (err.message || 'File không đúng định dạng'), 'error');
+    } finally {
+      e.target.value = '';
+    }
+  };
+
+  // Xác nhận phân công từ file Excel
+  const handleConfirmImport = async () => {
+    const validItems = importParsedList.filter(item => item.status === 'VALID' && item.matchedLecturer);
+    if (validItems.length === 0) {
+      showToast('Không có bản ghi hợp lệ nào để phân công', 'warning');
+      return;
+    }
+
+    try {
+      setIsImporting(true);
+      const payload = {
+        dotKienTapId: Number(selectedCampaign),
+        assignments: validItems.map(item => ({
+          mssv: item.mssv,
+          lecturerIdentifier: item.matchedLecturer.ma_gv || String(item.matchedLecturer.id)
+        }))
+      };
+
+      const res = await khoaApi.importGvhdAssignments(payload);
+      const data = res.data;
+      showToast(`Nhập dữ liệu thành công: Đã phân công ${data?.success || validItems.length} sinh viên!`, 'success');
+      setIsImportModalOpen(false);
+      fetchEnrollments();
+    } catch (err) {
+      console.error(err);
+      const msg = err.response?.data?.message || err.message || 'Lỗi khi nhập phân công từ Excel';
+      showToast(typeof msg === 'string' ? msg : 'Lỗi khi nhập phân công từ Excel', 'error');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   return (
     <EdgeToEdgeContainer className="bg-[#E7E0C4]/20 animate-in fade-in duration-300">
       {toast.show && <Toast message={toast.message} type={toast.type} onClose={() => setToast({ show: false, message: '', type: 'success' })} />}
@@ -333,6 +685,26 @@ export default function SupervisorAssignment_Khoa() {
           </div>
 
           <div className="flex flex-wrap items-end gap-3 w-full lg:w-auto">
+            {/* Input file ẩn cho Import Excel */}
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileSelected}
+              accept=".xlsx, .xls"
+              className="hidden"
+            />
+
+            {/* Nút Nhập Excel gọn gàng cạnh Xuất báo cáo */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={!selectedCampaign || loading}
+              className="px-4 py-2 bg-white text-[#407F3E] border border-[#407F3E] hover:bg-[#407F3E]/5 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+              title="Nhập danh sách phân công GVHD từ file Excel"
+            >
+              <Upload className="w-4 h-4" />
+              Nhập Excel
+            </button>
+
             {/* Nút Xuất báo cáo (Đồng bộ chuẩn theo trang Kết quả kiến tập) */}
             <div className="relative" ref={exportMenuRef}>
               <button
@@ -918,6 +1290,311 @@ export default function SupervisorAssignment_Khoa() {
                 {loadingAutoAssign ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                 Xác nhận phân công
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import Excel Preview Modal */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95">
+            {/* Modal Header */}
+            <div className="bg-slate-50 border-b border-slate-200 px-5 py-3.5 flex justify-between items-center shrink-0">
+              <div>
+                <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                  <FileSpreadsheet className="w-5 h-5 text-[#407F3E]" />
+                  Xem trước phân công GVHD từ Excel
+                </h3>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">
+                  File: <span className="font-semibold text-slate-700">{importFileName}</span> • Tổng số: <span className="font-semibold text-slate-700">{importParsedList.length}</span> dòng
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleDownloadTemplate}
+                  className="px-3 py-1.5 bg-white border border-[#407F3E] text-[#407F3E] hover:bg-[#407F3E]/5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                  title="Tải file Excel mẫu chuẩn"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Tải file mẫu (.xlsx)
+                </button>
+                <button
+                  onClick={() => setIsImportModalOpen(false)}
+                  className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Switchable Tabs & Filter Pills */}
+            <div className="px-5 pt-3 pb-2 border-b border-slate-200 bg-white flex flex-wrap items-center justify-between gap-2 shrink-0">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setImportActiveTab('students')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    importActiveTab === 'students'
+                      ? 'bg-[#407F3E] text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  Danh sách sinh viên ({importParsedList.length})
+                </button>
+                <button
+                  onClick={() => setImportActiveTab('workload')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    importActiveTab === 'workload'
+                      ? 'bg-[#407F3E] text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  <UserCircle className="w-3.5 h-3.5" />
+                  Tải trọng giảng viên ({importWorkloadList.length})
+                  {importWorkloadList.some(w => w.isOverloaded) && (
+                    <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" title="Có giảng viên vượt định mức"></span>
+                  )}
+                </button>
+              </div>
+
+              {/* Filter Pills when on Tab 1 */}
+              {importActiveTab === 'students' && (
+                <div className="flex items-center gap-1 flex-wrap">
+                  <button
+                    onClick={() => setImportFilterStatus('ALL')}
+                    className={`px-2.5 py-1 rounded text-xs font-bold cursor-pointer transition-colors ${
+                      importFilterStatus === 'ALL'
+                        ? 'bg-slate-800 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    Tất cả ({importParsedList.length})
+                  </button>
+                  <button
+                    onClick={() => setImportFilterStatus('VALID')}
+                    className={`px-2.5 py-1 rounded text-xs font-bold cursor-pointer transition-colors ${
+                      importFilterStatus === 'VALID'
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                    }`}
+                  >
+                    Hợp lệ ({importParsedList.filter(i => i.status === 'VALID').length})
+                  </button>
+                  <button
+                    onClick={() => setImportFilterStatus('UNCHANGED')}
+                    className={`px-2.5 py-1 rounded text-xs font-bold cursor-pointer transition-colors ${
+                      importFilterStatus === 'UNCHANGED'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                    }`}
+                  >
+                    Giữ nguyên ({importParsedList.filter(i => i.status === 'UNCHANGED').length})
+                  </button>
+                  <button
+                    onClick={() => setImportFilterStatus('ERROR')}
+                    className={`px-2.5 py-1 rounded text-xs font-bold cursor-pointer transition-colors ${
+                      importFilterStatus === 'ERROR'
+                        ? 'bg-red-600 text-white shadow-xs'
+                        : 'bg-red-50 text-red-700 hover:bg-red-100'
+                    }`}
+                  >
+                    Lỗi ({importParsedList.filter(i => i.status === 'ERROR').length})
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-4 bg-slate-50/50">
+              {importActiveTab === 'students' ? (
+                /* Tab 1: Danh sách sinh viên */
+                <div className="border border-[#E7E0C4] rounded-xl overflow-hidden shadow-xs bg-white">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="sticky top-0 bg-[#E7E0C4]/40 backdrop-blur-md text-slate-800 text-[10px] font-bold uppercase tracking-wider z-20 shadow-xs">
+                      <tr>
+                        <th className="p-3 pl-4 w-12 text-center">STT</th>
+                        <th className="p-3 w-28">MSSV</th>
+                        <th className="p-3">Họ tên sinh viên</th>
+                        <th className="p-3 w-24">Lớp</th>
+                        <th className="p-3">GVHD Hiện tại</th>
+                        <th className="p-3">GVHD Chỉ định</th>
+                        <th className="p-3">Trạng thái / Ghi chú</th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-xs text-slate-700 divide-y divide-slate-100">
+                      {importParsedList
+                        .filter(item => {
+                          if (importFilterStatus === 'ALL') return true;
+                          return item.status === importFilterStatus;
+                        })
+                        .map((item, idx) => {
+                          let badgeBg = 'bg-slate-100 text-slate-600 border-slate-200';
+                          let badgeText = item.reason;
+                          let icon = null;
+
+                          if (item.status === 'VALID') {
+                            badgeBg = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                            badgeText = 'Hợp lệ';
+                            icon = <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />;
+                          } else if (item.status === 'UNCHANGED') {
+                            badgeBg = 'bg-blue-50 text-blue-700 border-blue-200';
+                            badgeText = item.reason || 'Giữ nguyên';
+                            icon = <Info className="w-3.5 h-3.5 text-blue-600 shrink-0" />;
+                          } else if (item.status === 'ERROR') {
+                            badgeBg = 'bg-red-50 text-red-700 border-red-200';
+                            badgeText = item.reason || 'Lỗi';
+                            icon = <AlertTriangle className="w-3.5 h-3.5 text-red-600 shrink-0" />;
+                          }
+
+                          return (
+                            <tr key={item.id || idx} className="hover:bg-slate-50 transition-colors">
+                              <td className="p-3 pl-4 text-center font-medium text-slate-400">{idx + 1}</td>
+                              <td className="p-3 font-mono font-bold text-slate-700">{item.mssv}</td>
+                              <td className="p-3 font-bold text-slate-800">{item.ho_ten}</td>
+                              <td className="p-3 text-slate-600">{item.ten_lop}</td>
+                              <td className="p-3 text-slate-600">
+                                <span className="truncate block max-w-[140px]" title={item.currentAdvisor}>
+                                  {item.currentAdvisor}
+                                </span>
+                              </td>
+                              <td className="p-3 font-semibold text-[#407F3E]">
+                                <span className="truncate block max-w-[160px]" title={item.assignedGvText}>
+                                  {item.assignedGvText}
+                                </span>
+                              </td>
+                              <td className="p-3">
+                                <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[11px] font-medium ${badgeBg}`}>
+                                  {icon}
+                                  <span>{badgeText}</span>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                /* Tab 2: Tải trọng giảng viên */
+                <div className="space-y-3">
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-center gap-2">
+                    <Info className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>
+                      Bảng tải trọng mô phỏng số lượng sinh viên thay đổi cho từng giảng viên nếu xác nhận import danh sách hợp lệ.
+                    </span>
+                  </div>
+                  <div className="border border-[#E7E0C4] rounded-xl overflow-hidden shadow-xs bg-white">
+                    <table className="w-full text-left border-collapse">
+                      <thead className="sticky top-0 bg-[#E7E0C4]/40 backdrop-blur-md text-slate-800 text-[10px] font-bold uppercase tracking-wider z-20 shadow-xs">
+                        <tr>
+                          <th className="p-3 pl-4 w-12 text-center">STT</th>
+                          <th className="p-3 w-28">Mã GV</th>
+                          <th className="p-3">Họ tên giảng viên</th>
+                          <th className="p-3 text-center">SV Hiện tại</th>
+                          <th className="p-3 text-center">Thay đổi (+/-)</th>
+                          <th className="p-3 text-center">Dự kiến sau import</th>
+                          <th className="p-3 text-center">Định mức</th>
+                          <th className="p-3 text-center">Trạng thái tải</th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-xs text-slate-700 divide-y divide-slate-100">
+                        {importWorkloadList.map((gv, idx) => {
+                          const quota = gv.maxQuota || 40;
+                          let loadBadge = (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              An toàn
+                            </span>
+                          );
+
+                          if (gv.isOverloaded) {
+                            loadBadge = (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">
+                                <AlertTriangle className="w-3 h-3 text-red-600" />
+                                Vượt định mức
+                              </span>
+                            );
+                          } else if (gv.projectedCount === quota) {
+                            loadBadge = (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                Đầy tải ({quota}/{quota})
+                              </span>
+                            );
+                          }
+
+                          return (
+                            <tr key={gv.id} className={`hover:bg-slate-50 transition-colors ${gv.isOverloaded ? 'bg-red-50/40' : ''}`}>
+                              <td className="p-3 pl-4 text-center font-medium text-slate-400">{idx + 1}</td>
+                              <td className="p-3 font-mono font-bold text-slate-700">{gv.ma_gv}</td>
+                              <td className="p-3 font-bold text-slate-800">{gv.ho_ten}</td>
+                              <td className="p-3 text-center font-semibold text-slate-600">{gv.currentCount}</td>
+                              <td className="p-3 text-center font-bold">
+                                {gv.delta > 0 ? (
+                                  <span className="text-emerald-600">+{gv.delta}</span>
+                                ) : gv.delta < 0 ? (
+                                  <span className="text-amber-600">{gv.delta}</span>
+                                ) : (
+                                  <span className="text-slate-400">0</span>
+                                )}
+                              </td>
+                              <td className="p-3 text-center font-bold text-[#407F3E]">
+                                {gv.projectedCount}
+                              </td>
+                              <td className="p-3 text-center text-slate-600 font-medium">
+                                {gv.maxQuota || '40'}
+                              </td>
+                              <td className="p-3 text-center">
+                                {loadBadge}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer (Pinned at bottom) */}
+            <div className="p-4 border-t border-slate-200 bg-white flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+              <div className="text-xs text-slate-600">
+                Tổng cộng: <strong className="text-emerald-600">{importParsedList.filter(i => i.status === 'VALID').length} hợp lệ</strong>,{' '}
+                <strong className="text-blue-600">{importParsedList.filter(i => i.status === 'UNCHANGED').length} giữ nguyên</strong>
+                {importParsedList.filter(i => i.status === 'ERROR').length > 0 && (
+                  <>, <strong className="text-red-600">{importParsedList.filter(i => i.status === 'ERROR').length} lỗi</strong></>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setIsImportModalOpen(false);
+                    if (fileInputRef.current) fileInputRef.current.value = '';
+                  }}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 bg-white border border-slate-300 hover:bg-slate-50 transition-colors shadow-xs cursor-pointer"
+                >
+                  Đóng
+                </button>
+                <button
+                  onClick={handleConfirmImport}
+                  disabled={
+                    isImporting ||
+                    importParsedList.filter(i => i.status === 'VALID').length === 0 ||
+                    importWorkloadList.some(w => w.isOverloaded)
+                  }
+                  className={`px-4 py-2 rounded-xl text-xs font-bold text-white transition-all flex items-center gap-1.5 shadow-sm ${
+                    isImporting ||
+                    importParsedList.filter(i => i.status === 'VALID').length === 0 ||
+                    importWorkloadList.some(w => w.isOverloaded)
+                      ? 'bg-slate-300 border border-slate-300 cursor-not-allowed opacity-70'
+                      : 'bg-[#407F3E] border border-[#407F3E] hover:bg-[#2b5829] cursor-pointer'
+                  }`}
+                >
+                  {isImporting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                  Xác nhận phân công ({importParsedList.filter(i => i.status === 'VALID').length} hợp lệ)
+                </button>
+              </div>
             </div>
           </div>
         </div>

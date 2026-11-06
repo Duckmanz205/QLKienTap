@@ -33,6 +33,7 @@ import {
 } from '../entities/qlkt.entity';
 import { R2StorageService } from '../upload/r2-storage.service';
 import { CompanyMatcher } from '../common/company-matcher.util';
+import { activeExtractions } from '../upload/extraction-lock.util';
 
 function toDateOnlyString(date: Date | string | null | undefined): string {
   if (!date) return '';
@@ -154,29 +155,61 @@ export class SinhVienService {
     demotedPriority: boolean;
     remainingBannedTrips: number;
     remainingDemotedTrips: number;
+    totalRemainingTrips: number;
+    reasons: string[];
+    reasonSummary: string;
   }> {
+    const eighteenMonthsAgo = new Date();
+    eighteenMonthsAgo.setMonth(eighteenMonthsAgo.getMonth() - 18);
+
     const blacklistRecords = await this.blackListRepo.find({
       where: { sinh_vien_id: studentId, con_hieu_luc: true },
+      order: { ngay_ghi_nhan: 'ASC', id: 'ASC' },
     });
 
-    let demotedPriority = false;
-    let remainingDemotedTrips = 0;
+    let totalRemainingTrips = 0;
+    const rawReasons: string[] = [];
 
     for (const record of blacklistRecords) {
+      // Tự động xóa án nếu bản ghi đã quá 18 tháng bảo lưu
+      if (record.ngay_ghi_nhan && new Date(record.ngay_ghi_nhan) < eighteenMonthsAgo) {
+        if (record.so_chuyen_con_lai > 0) {
+          await this.blackListRepo.update(record.id, { so_chuyen_con_lai: 0 });
+          record.so_chuyen_con_lai = 0;
+        }
+        continue;
+      }
+
       if (record.so_chuyen_con_lai > 0) {
-        demotedPriority = true;
-        remainingDemotedTrips = Math.max(
-          remainingDemotedTrips,
-          record.so_chuyen_con_lai,
-        );
+        totalRemainingTrips += record.so_chuyen_con_lai;
+        rawReasons.push(record.ly_do);
       }
     }
 
+    const formatReason = (r: string) => {
+      switch (r) {
+        case 'HuyKhongMinhChung':
+          return 'Hủy chuyến không minh chứng (-3 chuyến)';
+        case 'KhongDongPhi':
+          return 'Không đóng lệ phí tham quan (-5 chuyến)';
+        case 'DangKyKhongThamGia':
+          return 'Vắng mặt không phép khi tham quan (-5 chuyến)';
+        default:
+          return r || 'Vi phạm quy định';
+      }
+    };
+
+    const reasons = Array.from(new Set(rawReasons.map(formatReason)));
+    const reasonSummary = reasons.length > 0 ? reasons.join('; ') : 'Vi phạm quy định';
+
     return {
-      bannedFromRegistration: false, // Theo Mục 5 đặc tả: không chặn đăng ký, chuyển sang Ưu tiên 6
-      demotedPriority,
-      remainingBannedTrips: 0,
-      remainingDemotedTrips,
+      bannedFromRegistration: false, // Sinh viên vẫn được tạo phiếu ChoDuyet để vào danh sách lọc và trừ án
+      demotedPriority: totalRemainingTrips > 0,
+      remainingBannedTrips: totalRemainingTrips,
+      remainingDemotedTrips: totalRemainingTrips,
+      totalRemainingTrips,
+      reasons,
+      reasonSummary,
     };
   }
 
@@ -223,13 +256,6 @@ export class SinhVienService {
     const phieuMap = new Map<number, PhieuDangKy>();
     studentPhieus.forEach(p => phieuMap.set(p.chuyen_tham_quan_id, p));
 
-    const activeLichIds = new Set(
-      studentPhieus
-        .filter(p => ['ChoDuyet', 'HopLe'].includes(p.trang_thai))
-        .map(p => p.chuyenThamQuan?.lich_kien_tap_id)
-        .filter(id => id != null)
-    );
-
     // Xac dinh cac ngay da co chuyen dang ky con hieu luc (ChoDuyet, HopLe, ChoHuy, DaThamGia, HoanThanh)
     const activeDateMap = new Map<string, { tenNhaMay: string; trangThai: string }>();
     studentPhieus
@@ -272,8 +298,6 @@ export class SinhVienService {
     for (const trip of trips) {
       // Bo qua neu dang co phieu hop le/cho duyet/da tham gia o chuyen nay
       if (activeRegisteredTripIds.has(trip.id)) continue;
-      // Bo qua neu da co 1 dang ky khac (dang cho duyet hoac hop le) trong cung lich
-      if (trip.lich_kien_tap_id && activeLichIds.has(trip.lich_kien_tap_id)) continue;
 
       const tripDateStr = toDateOnlyString(trip.ngay_tham_quan);
       const dateConflict = tripDateStr ? activeDateMap.get(tripDateStr) : null;
@@ -527,16 +551,13 @@ export class SinhVienService {
         relations: { chuyenThamQuan: { nhaMay: true } },
       });
 
-      // 1. Kiem tra khong duoc dang ky qua 1 chuyen trong cung 1 lich kien tap
-      const hasSameLich = activePhieus.some(
-        (p) =>
-          p.chuyen_tham_quan_id !== tripId &&
-          p.chuyenThamQuan?.lich_kien_tap_id != null &&
-          p.chuyenThamQuan?.lich_kien_tap_id === trip.lich_kien_tap_id,
-      );
-      if (hasSameLich) {
+      // 1. Kiem tra khong duoc vuot qua toi da 3 chuyen da duoc duyet hoac hoan thanh
+      const confirmedCount = activePhieus.filter((p) =>
+        ['HopLe', 'DaThamGia', 'HoanThanh'].includes(p.trang_thai),
+      ).length;
+      if (confirmedCount >= 3) {
         throw new BadRequestException(
-          'Bạn chỉ được phép đăng ký tối đa 1 chuyến trong cùng một Lịch kiến tập.',
+          'Bạn đã hoàn thành đủ 3 chuyến tham quan theo quy định của học phần.',
         );
       }
 
@@ -1514,10 +1535,15 @@ export class SinhVienService {
       );
     }
 
-    if (phieuTQ.han_nop_bao_cao && new Date() > phieuTQ.han_nop_bao_cao) {
-      throw new BadRequestException(
-        'Đã hết hạn 10 ngày để chỉnh sửa. Bài nộp đã được gửi cho giảng viên và không thể thu hồi.',
+    if (phieuTQ.han_nop_bao_cao) {
+      const lockDeadline = new Date(
+        new Date(phieuTQ.han_nop_bao_cao).getTime() + 10 * 86400000,
       );
+      if (new Date() > lockDeadline) {
+        throw new BadRequestException(
+          'Đã quá thời hạn nộp bài (cổng nộp bài đã khóa). Bạn không thể xóa hoặc thu hồi bài nộp.',
+        );
+      }
     }
 
     // Kiểm tra xem đã có điểm chưa hoặc đã khóa điểm bài thu hoạch chưa
@@ -2680,21 +2706,9 @@ export class SinhVienService {
 
     // Xử lý kiểm tra kỷ luật / danh sách đen
     const penalty = await this.checkAndUpdatePenalties(studentId);
-    const blacklistRecords = await this.blackListRepo.find({
-      where: { sinh_vien_id: studentId, con_hieu_luc: true },
-    });
-
-    let bannedTripsCount = penalty.remainingBannedTrips || 0;
-    if (bannedTripsCount === 0 && blacklistRecords.length > 0) {
-      bannedTripsCount = blacklistRecords.reduce(
-        (max, r) => Math.max(max, r.so_chuyen_con_lai || 0),
-        0,
-      );
-    }
-    const isBlacklisted =
-      penalty.bannedFromRegistration || blacklistRecords.length > 0;
-    const blacklistReason =
-      blacklistRecords.length > 0 ? blacklistRecords[0].ly_do : null;
+    const isBlacklisted = penalty.totalRemainingTrips > 0;
+    const bannedTripsCount = penalty.totalRemainingTrips;
+    const blacklistReason = penalty.reasonSummary || null;
 
     return {
       totalTrips: registered,
@@ -2707,7 +2721,13 @@ export class SinhVienService {
       bannedTripsCount,
       isBlacklisted,
       blacklistReason,
-      remainingDemotedTrips: penalty.remainingDemotedTrips || 0,
+      remainingDemotedTrips: penalty.totalRemainingTrips,
+      penaltyInfo: {
+        isBlacklisted,
+        remainingTrips: penalty.totalRemainingTrips,
+        reasons: penalty.reasons,
+        reasonSummary: penalty.reasonSummary,
+      },
       avgScore,
       termStatus,
       boChuyenStatus,
@@ -2719,7 +2739,7 @@ export class SinhVienService {
       where: {
         sinh_vien_id: studentId,
         chuyen_tham_quan_id: tripId,
-        trang_thai: In(['HopLe', 'DaThamGia', 'HoanThanh']),
+        trang_thai: In(['HopLe', 'DaThamGia', 'HoanThanh', 'KhongDat']),
       },
     });
 
@@ -2751,7 +2771,7 @@ export class SinhVienService {
     const dsSinhVien = await this.phieuRepo.find({
       where: {
         chuyen_tham_quan_id: tripId,
-        trang_thai: In(['HopLe', 'DaThamGia', 'HoanThanh']),
+        trang_thai: In(['HopLe', 'DaThamGia', 'HoanThanh', 'KhongDat']),
       },
       relations: { sinhVien: true },
     });
@@ -2826,15 +2846,21 @@ export class SinhVienService {
 
       const txtKey = r2Key.replace(/\.\w+$/, '.txt');
 
-      // 0. Kiểm tra nếu file .txt đã tồn tại trên R2 thì bỏ qua
+      // Task 2: Chặn Race Condition nếu tiến trình OCR đang chạy
+      if (activeExtractions.has(txtKey)) {
+        console.log(`[Background AI OCR] Đang có tiến trình OCR chạy cho file ${txtKey}, bỏ qua gọi trùng.`);
+        return true;
+      }
+
+      // 0. Kiểm tra nếu file .txt đã tồn tại trên R2 (dung lượng hợp lệ > 100 bytes) thì bỏ qua
       if (this.r2Storage.isReady()) {
         try {
           const existing = await this.r2Storage.getFileStream(
             this.r2Storage.BUCKET_REPORTS,
             txtKey,
           );
-          if (existing && existing.contentLength && existing.contentLength > 10) {
-            console.log(`[Background AI OCR] File TXT đã tồn tại trên R2 (${txtKey}), không cần chạy lại.`);
+          if (existing && existing.contentLength && existing.contentLength > 100) {
+            console.log(`[Background AI OCR] File TXT hợp lệ đã tồn tại trên R2 (${txtKey}), không cần chạy lại.`);
             return true;
           }
         } catch {
@@ -2842,58 +2868,69 @@ export class SinhVienService {
         }
       }
 
-      // 1. Download file PDF từ R2
-      console.log(`[Background AI OCR] Đang tải PDF từ R2 để gửi sang AI Service: ${r2Key}`);
-      const signedUrl = await this.r2Storage.getSignedUrl(
-        this.r2Storage.BUCKET_REPORTS,
-        r2Key,
-        3600,
-      );
+      activeExtractions.add(txtKey);
 
-      const fileRes = await fetch(signedUrl);
-      if (!fileRes.ok) {
-        console.error(`[Background AI OCR] Không thể tải file từ R2: HTTP ${fileRes.status}`);
-        return false;
-      }
-
-      const pdfBuffer = await fileRes.arrayBuffer();
-      const fileName = r2Key.split('/').pop() || 'report.pdf';
-
-      // 2. Gửi sang Python OCR Microservice (timeout 180s)
-      const formData = new FormData();
-      const fileBlob = new Blob([pdfBuffer], { type: 'application/pdf' });
-      formData.append('file', fileBlob, fileName);
-
-      console.log(`[Background AI OCR] Đang gửi PDF (${pdfBuffer.byteLength} bytes) sang AI Service...`);
-      const aiBaseUrl = (process.env.AI_SERVICE_URL || 'http://127.0.0.1:8000').replace(/\/+$/, '');
-      const aiResponse = await fetch(`${aiBaseUrl}/process-pdf`, {
-        method: 'POST',
-        body: formData,
-        signal: AbortSignal.timeout(180000),
-      });
-
-      if (aiResponse.ok) {
-        const aiData: any = await aiResponse.json();
-        const extractedText = (aiData?.extracted_text || '').trim();
-        const txtContent = extractedText || 'Không thể trích xuất văn bản từ file này.';
-        const txtBuffer = Buffer.from('\uFEFF' + txtContent, 'utf-8');
-
-        console.log(`[Background AI OCR] Trích xuất thành công (${txtContent.length} ký tự). Đang đẩy lên R2...`);
-
-        // 3. Upload file txt lên R2
-        await this.r2Storage.uploadFile(
+      try {
+        // 1. Download file PDF từ R2
+        console.log(`[Background AI OCR] Đang tải PDF từ R2 để gửi sang AI Service: ${r2Key}`);
+        const signedUrl = await this.r2Storage.getSignedUrl(
           this.r2Storage.BUCKET_REPORTS,
-          txtKey,
-          txtBuffer,
-          'text/plain; charset=utf-8',
+          r2Key,
+          3600,
         );
 
-        console.log(`[Background AI OCR] Đã tải lên file TXT thành công lên R2: ${txtKey}`);
-        return true;
-      } else {
-        const errText = await aiResponse.text();
-        console.error(`[Background AI OCR] Lỗi từ AI Service (HTTP ${aiResponse.status}):`, errText);
-        return false;
+        const fileRes = await fetch(signedUrl);
+        if (!fileRes.ok) {
+          console.error(`[Background AI OCR] Không thể tải file từ R2: HTTP ${fileRes.status}`);
+          return false;
+        }
+
+        const pdfBuffer = await fileRes.arrayBuffer();
+        const fileName = r2Key.split('/').pop() || 'report.pdf';
+
+        // 2. Gửi sang Python OCR Microservice (timeout 300s an toàn)
+        const formData = new FormData();
+        const fileBlob = new Blob([pdfBuffer], { type: 'application/pdf' });
+        formData.append('file', fileBlob, fileName);
+
+        console.log(`[Background AI OCR] Đang gửi PDF (${pdfBuffer.byteLength} bytes) sang AI Service...`);
+        const aiBaseUrl = (process.env.AI_SERVICE_URL || 'http://127.0.0.1:8000').replace(/\/+$/, '');
+        const aiResponse = await fetch(`${aiBaseUrl}/process-pdf`, {
+          method: 'POST',
+          body: formData,
+          signal: AbortSignal.timeout(300000),
+        });
+
+        if (aiResponse.ok) {
+          const aiData: any = await aiResponse.json();
+          const extractedText = (aiData?.extracted_text || '').trim();
+
+          // Task 3: Không bao giờ lưu file .txt rỗng hoặc lỗi giả lên R2
+          if (!extractedText || extractedText.length < 10) {
+            console.warn(`[Background AI OCR] Trích xuất trả về rỗng hoặc quá ngắn (<10 ký tự) cho: ${r2Key}. KHÔNG lưu file txt giả lên R2.`);
+            return false;
+          }
+
+          const txtBuffer = Buffer.from('\uFEFF' + extractedText, 'utf-8');
+          console.log(`[Background AI OCR] Trích xuất thành công (${extractedText.length} ký tự). Đang đẩy lên R2...`);
+
+          // 3. Upload file txt lên R2
+          await this.r2Storage.uploadFile(
+            this.r2Storage.BUCKET_REPORTS,
+            txtKey,
+            txtBuffer,
+            'text/plain; charset=utf-8',
+          );
+
+          console.log(`[Background AI OCR] Đã tải lên file TXT thành công lên R2: ${txtKey}`);
+          return true;
+        } else {
+          const errText = await aiResponse.text();
+          console.error(`[Background AI OCR] Lỗi từ AI Service (HTTP ${aiResponse.status}):`, errText);
+          return false;
+        }
+      } finally {
+        activeExtractions.delete(txtKey);
       }
     } catch (err: any) {
       console.error('[Background AI OCR] Lỗi quá trình trích xuất ngầm:', err?.message || err);

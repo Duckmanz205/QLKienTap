@@ -64,10 +64,26 @@ class _DiemDanhSVGVScreenState extends State<DiemDanhSVGVScreen> {
     }
   }
 
+  bool get _isTripLocked {
+    if (_selectedTour?.rawStatus == 'DaKhoa' || _selectedTour?.rawStatus == 'DaKetThuc') return true;
+    if (_students.isNotEmpty && _students.every((s) => s.isLockedPrep)) return true;
+    return false;
+  }
+
   Future<void> _saveAttendance() async {
     if (_selectedTour == null || _students.isEmpty) return;
     final tourId = int.tryParse(_selectedTour!.id) ?? 0;
     if (tourId <= 0) return;
+
+    if (_isTripLocked) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Chuyến tham quan đã khóa sổ điểm. Không thể lưu điểm danh.'),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+      return;
+    }
 
     if (!_selectedTour!.isStarted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -123,6 +139,15 @@ class _DiemDanhSVGVScreenState extends State<DiemDanhSVGVScreen> {
   }
 
   Future<void> _markAllPresent() async {
+    if (_isTripLocked) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Chuyến tham quan đã khóa sổ điểm. Không thể điểm danh.'),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+      return;
+    }
     if (_selectedTour != null && !_selectedTour!.isStarted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -170,6 +195,15 @@ class _DiemDanhSVGVScreenState extends State<DiemDanhSVGVScreen> {
   }
 
   Future<void> _updateStudentAttendance(int phieuId, String newStatus, {String? reason}) async {
+    if (_isTripLocked) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Chuyến tham quan đã khóa sổ điểm. Không thể điểm danh.'),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+      return;
+    }
     if (_selectedTour != null && !_selectedTour!.isStarted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -369,6 +403,41 @@ class _DiemDanhSVGVScreenState extends State<DiemDanhSVGVScreen> {
                   ),
                 ],
 
+                if (_selectedTour != null && _isTripLocked) ...[
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.grey.shade400),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Icon(Icons.lock_outline, color: Colors.black54, size: 20),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Chuyến tham quan đã kết thúc và chốt sổ điểm',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                'Dữ liệu điểm danh của chuyến tham quan này đã được khóa. Giao diện đang ở chế độ chỉ đọc để tra cứu thông tin.',
+                                style: TextStyle(fontSize: 11, color: Colors.black54),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
                 // Search Bar
                 TextField(
                   onChanged: (val) => setState(() => _searchQuery = val),
@@ -395,7 +464,7 @@ class _DiemDanhSVGVScreenState extends State<DiemDanhSVGVScreen> {
                     ),
                     const SizedBox(width: 8),
                     TextButton(
-                      onPressed: isTourStarted ? _markAllPresent : null,
+                      onPressed: (isTourStarted && !_isTripLocked) ? _markAllPresent : null,
                       style: TextButton.styleFrom(
                         padding: EdgeInsets.zero,
                         minimumSize: Size.zero,
@@ -406,7 +475,7 @@ class _DiemDanhSVGVScreenState extends State<DiemDanhSVGVScreen> {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: isTourStarted ? AppColors.primary : Colors.grey,
+                          color: (isTourStarted && !_isTripLocked) ? AppColors.primary : Colors.grey,
                         ),
                       ),
                     ),
@@ -543,7 +612,7 @@ class _DiemDanhSVGVScreenState extends State<DiemDanhSVGVScreen> {
                                             label: 'Có',
                                             isActive: isPresent,
                                             activeColor: AppColors.secondary,
-                                            isEnabled: isTourStarted,
+                                            isEnabled: isTourStarted && !_isTripLocked && !student.isLockedPrep,
                                             onTap: () => _updateStudentAttendance(student.phieuId, 'CoMat'),
                                           ),
                                           const SizedBox(width: 6),
@@ -552,7 +621,7 @@ class _DiemDanhSVGVScreenState extends State<DiemDanhSVGVScreen> {
                                             label: 'Vắng',
                                             isActive: isAbsent,
                                             activeColor: AppColors.danger,
-                                            isEnabled: isTourStarted,
+                                            isEnabled: isTourStarted && !_isTripLocked && !student.isLockedPrep,
                                             onTap: () => _showReasonDialog(student, 'Vang'),
                                           ),
                                           const SizedBox(width: 6),
@@ -561,7 +630,7 @@ class _DiemDanhSVGVScreenState extends State<DiemDanhSVGVScreen> {
                                             label: 'Từ chối',
                                             isActive: isRefused,
                                             activeColor: Colors.orange,
-                                            isEnabled: isTourStarted,
+                                            isEnabled: isTourStarted && !_isTripLocked && !student.isLockedPrep,
                                             onTap: () => _showReasonDialog(student, 'TuChoiThamGia'),
                                           ),
                                         ],
@@ -600,9 +669,9 @@ class _DiemDanhSVGVScreenState extends State<DiemDanhSVGVScreen> {
             padding: const EdgeInsets.all(16),
             color: Colors.white,
             child: ElevatedButton(
-              onPressed: (!isTourStarted || _isSaving) ? null : _saveAttendance,
+              onPressed: (!isTourStarted || _isSaving || _isTripLocked) ? null : _saveAttendance,
               style: ElevatedButton.styleFrom(
-                backgroundColor: isTourStarted ? AppColors.primary : Colors.grey.shade400,
+                backgroundColor: (isTourStarted && !_isTripLocked) ? AppColors.primary : Colors.grey.shade400,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -610,7 +679,9 @@ class _DiemDanhSVGVScreenState extends State<DiemDanhSVGVScreen> {
               child: _isSaving
                   ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                   : Text(
-                      isTourStarted ? 'LƯU KẾT QUẢ ĐIỂM DANH' : 'CHƯA ĐẾN GIỜ ĐIỂM DANH',
+                      _isTripLocked
+                          ? 'CHUYẾN ĐI ĐÃ KHÓA SỔ ĐIỂM (CHỈ ĐỌC)'
+                          : (isTourStarted ? 'LƯU KẾT QUẢ ĐIỂM DANH' : 'CHƯA ĐẾN GIỜ ĐIỂM DANH'),
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                     ),
             ),

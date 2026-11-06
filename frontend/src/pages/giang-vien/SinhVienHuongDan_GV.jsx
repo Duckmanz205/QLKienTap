@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Search, ChevronDown, Check, Eye, Edit3, X, FileText
+  Search, ChevronDown, Check, Eye, Edit3, X, FileText, Calendar, Clock, Lock
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { giangVienApi } from '../../services/api';
 import SearchableDropdown from '../../components/SearchableDropdown';
+import ExtendDeadlineModal from '../../components/ExtendDeadlineModal';
 
 export default function SinhVienHuongDan_GV() {
   const navigate = useNavigate();
@@ -15,6 +16,10 @@ export default function SinhVienHuongDan_GV() {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedStudentProfile, setSelectedStudentProfile] = useState(null);
+  const [studentTrips, setStudentTrips] = useState([]);
+  const [loadingTrips, setLoadingTrips] = useState(false);
+  const [extendModalOpen, setExtendModalOpen] = useState(false);
+  const [selectedTripForExtend, setSelectedTripForExtend] = useState(null);
 
   // Filter Popover States
   const [selectedClass, setSelectedClass] = useState('ALL');
@@ -23,6 +28,21 @@ export default function SinhVienHuongDan_GV() {
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const [limit, setLimit] = useState(15);
+
+  const handleOpenProfile = async (student) => {
+    setSelectedStudentProfile(student);
+    if (!student?.rawSv?.id) return;
+    setLoadingTrips(true);
+    try {
+      const res = await giangVienApi.getGuidedStudentTrips(student.rawSv.id);
+      setStudentTrips(res.data || []);
+    } catch (err) {
+      console.error('Lỗi khi tải lịch sử chuyến đi của sinh viên:', err);
+      setStudentTrips([]);
+    } finally {
+      setLoadingTrips(false);
+    }
+  };
 
   useEffect(() => {
     const userJson = localStorage.getItem('user');
@@ -240,7 +260,7 @@ export default function SinhVienHuongDan_GV() {
                       {/* Hành động */}
                       <td className="p-4 pr-6 text-right">
                         <button 
-                          onClick={() => setSelectedStudentProfile(student)}
+                          onClick={() => handleOpenProfile(student)}
                           className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-lg text-xs font-bold transition-colors shadow-sm cursor-pointer"
                         >
                           <FileText className="w-3.5 h-3.5" />
@@ -337,34 +357,80 @@ export default function SinhVienHuongDan_GV() {
               
               {/* Section 1: Lịch sử chuyến đi */}
               <div className="space-y-4">
-                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                  <div className="w-1.5 h-5 bg-[#89B449] rounded-full"></div>
-                  Lịch sử chuyến tham quan ({selectedStudentProfile.soChuyenHT}/3)
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <div className="w-1.5 h-5 bg-[#89B449] rounded-full"></div>
+                    Lịch sử chuyến tham quan ({studentTrips.length > 0 ? studentTrips.length : selectedStudentProfile.soChuyenHT}/3)
+                  </h3>
+                  {loadingTrips && (
+                    <span className="text-xs text-slate-400 italic">Đang cập nhật dữ liệu...</span>
+                  )}
+                </div>
                 <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
                   <table className="w-full text-left text-sm">
                     <thead className="bg-slate-50 border-b border-slate-200 text-slate-600">
                       <tr>
-                        <th className="p-4 font-bold">Nhà máy</th>
+                        <th className="p-4 font-bold">Nhà máy / Chuyến đi</th>
                         <th className="p-4 font-bold">Ngày đi</th>
                         <th className="p-4 font-bold text-center">Điểm danh</th>
                         <th className="p-4 font-bold text-center">Điểm chuẩn bị</th>
+                        <th className="p-4 font-bold">Hạn nộp bài</th>
+                        <th className="p-4 font-bold text-center">Thao tác</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {selectedStudentProfile.studentReports.length === 0 ? (
-                        <tr><td colSpan="4" className="p-6 text-center text-slate-500">Chưa tham gia chuyến đi nào.</td></tr>
+                      {loadingTrips ? (
+                        <tr><td colSpan="6" className="p-6 text-center text-slate-400 italic">Đang tải lịch sử chuyến đi...</td></tr>
+                      ) : studentTrips.length === 0 ? (
+                        <tr><td colSpan="6" className="p-6 text-center text-slate-500">Chưa tham gia chuyến đi nào.</td></tr>
                       ) : (
-                        selectedStudentProfile.studentReports.map((report, idx) => {
-                          const nhaMay = report.phieuThamQuan?.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || 'N/A';
-                          const thoiGian = report.phieuThamQuan?.phieuDangKy?.chuyenThamQuan?.ngay_tham_quan;
-                          const diemDanh = report.phieuThamQuan?.diemDanh?.trang_thai;
-                          const diemChuanBi = report.phieuThamQuan?.diemPhieuThamQuan?.diem_chuan_bi;
+                        studentTrips.map((trip, idx) => {
+                          const nhaMay = trip.tenNhaMay || trip.tenChuyen || 'N/A';
+                          const thoiGian = trip.ngayThamQuan;
+                          const diemDanh = trip.trangThaiDiemDanh;
+                          const diemChuanBi = trip.diemChuanBi;
+                          const isLocked = trip.daKhoaThuHoach || trip.daKhoa;
                           
+                          // Deadline badge calculation
+                          let deadlineBadge = <span className="text-slate-400 text-xs italic">Chưa xác định</span>;
+                          if (trip.hanNopBaoCao) {
+                            const deadline = new Date(trip.hanNopBaoCao);
+                            const now = new Date();
+                            const deadlineLock = new Date(deadline.getTime() + 10 * 86400000);
+                            const dStr = deadline.toLocaleDateString('vi-VN');
+                            const lStr = deadlineLock.toLocaleDateString('vi-VN');
+
+                            if (now <= deadline) {
+                              deadlineBadge = (
+                                <div className="flex flex-col gap-0.5">
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-green-50 text-green-700 border border-green-200">
+                                    <Clock className="w-3 h-3 text-green-600" /> Đúng hạn: 23:59 {dStr}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400">Khóa cổng: 23:59 {lStr}</span>
+                                </div>
+                              );
+                            } else if (now <= deadlineLock) {
+                              deadlineBadge = (
+                                <div className="flex flex-col gap-0.5">
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                    <Clock className="w-3 h-3 text-amber-600" /> Nộp bù: đến 23:59 {lStr}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400">Đã hết hạn đúng ({dStr})</span>
+                                </div>
+                              );
+                            } else {
+                              deadlineBadge = (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-red-50 text-red-700 border border-red-200">
+                                  <Lock className="w-3 h-3 text-red-500" /> Khóa cổng ({lStr})
+                                </span>
+                              );
+                            }
+                          }
+
                           return (
-                            <tr key={idx} className="hover:bg-slate-50">
+                            <tr key={idx} className="hover:bg-slate-50 transition-colors">
                               <td className="p-4 font-bold text-slate-700">{nhaMay}</td>
-                              <td className="p-4 text-slate-600">{thoiGian ? new Date(thoiGian).toLocaleDateString('vi-VN') : '--'}</td>
+                              <td className="p-4 text-slate-600 whitespace-nowrap">{thoiGian ? new Date(thoiGian).toLocaleDateString('vi-VN') : '--'}</td>
                               <td className="p-4 text-center">
                                 {diemDanh === 'CoMat' ? (
                                   <span className="inline-flex items-center px-2 py-1 rounded bg-green-100 text-green-700 text-xs font-bold">Có mặt</span>
@@ -378,6 +444,28 @@ export default function SinhVienHuongDan_GV() {
                               </td>
                               <td className="p-4 text-center font-bold text-slate-700">
                                 {diemChuanBi !== undefined && diemChuanBi !== null ? diemChuanBi : '--'}
+                              </td>
+                              <td className="p-4">
+                                {deadlineBadge}
+                              </td>
+                              <td className="p-4 text-center">
+                                <button
+                                  type="button"
+                                  disabled={isLocked}
+                                  onClick={() => {
+                                    setSelectedTripForExtend(trip);
+                                    setExtendModalOpen(true);
+                                  }}
+                                  title={isLocked ? 'Điểm bài thu hoạch đã bị khóa, không thể gia hạn' : 'Gia hạn nộp bài'}
+                                  className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                    isLocked
+                                      ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+                                      : 'bg-[#407F3E]/10 border border-[#407F3E]/30 text-[#407F3E] hover:bg-[#407F3E] hover:text-white cursor-pointer'
+                                  }`}
+                                >
+                                  {isLocked ? <Lock className="w-3.5 h-3.5" /> : <Calendar className="w-3.5 h-3.5" />}
+                                  <span>Gia hạn</span>
+                                </button>
                               </td>
                             </tr>
                           );
@@ -405,35 +493,47 @@ export default function SinhVienHuongDan_GV() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {selectedStudentProfile.studentReports.length === 0 ? (
+                      {loadingTrips ? (
+                        <tr><td colSpan="4" className="p-6 text-center text-slate-400 italic">Đang tải tiến độ...</td></tr>
+                      ) : studentTrips.length === 0 ? (
                         <tr><td colSpan="4" className="p-6 text-center text-slate-500">Chưa nộp bài thu hoạch nào.</td></tr>
                       ) : (
-                        selectedStudentProfile.studentReports.map((report, idx) => {
-                          const tenBai = report.file_bao_cao?.split('/').pop() || 'Báo cáo chưa rõ tên';
-                          const trangThai = report.diem_thu_hoach !== null ? 'Đã chấm' : 'Chờ chấm';
+                        studentTrips.map((trip, idx) => {
+                          const bth = trip.baiThuHoach;
+                          const tenBai = bth?.fileBaoCao?.split('/').pop() || `${trip.tenNhaMay || trip.tenChuyen} (Chưa nộp)`;
+                          const daNop = !!bth;
+                          const isTreHan = bth?.trangThai === 'TreHan';
                           
                           return (
-                            <tr key={idx} className="hover:bg-slate-50">
+                            <tr key={idx} className="hover:bg-slate-50 transition-colors">
                               <td className="p-4 text-slate-700 font-medium truncate max-w-[200px]" title={tenBai}>
                                 <div className="flex items-center gap-2">
-                                  <FileText className="w-4 h-4 text-[#407F3E] shrink-0" />
+                                  <FileText className={`w-4 h-4 shrink-0 ${daNop ? 'text-[#407F3E]' : 'text-slate-400'}`} />
                                   <span className="truncate">{tenBai}</span>
                                 </div>
                               </td>
                               <td className="p-4 text-center">
-                                <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-bold ${
-                                  trangThai === 'Đã chấm' ? 'bg-[#89B449]/20 text-[#407F3E]' : 'bg-[#DBD468]/30 text-slate-700'
-                                }`}>
-                                  {trangThai}
-                                </span>
+                                {!daNop ? (
+                                  <span className="inline-flex items-center px-2 py-1 rounded text-xs font-bold bg-slate-100 text-slate-500">
+                                    Chưa nộp
+                                  </span>
+                                ) : isTreHan ? (
+                                  <span className="inline-flex items-center px-2 py-1 rounded text-xs font-bold bg-amber-100 text-amber-700">
+                                    Trễ hạn
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center px-2 py-1 rounded text-xs font-bold bg-green-100 text-green-700">
+                                    Đúng hạn
+                                  </span>
+                                )}
                               </td>
                               <td className="p-4 text-center">
                                 <span className="font-black text-lg text-[#407F3E]">
-                                  {report.diem_thu_hoach !== null ? report.diem_thu_hoach : '--'}
+                                  {trip.diemThuHoach !== null && trip.diemThuHoach !== undefined ? trip.diemThuHoach : '--'}
                                 </span>
                               </td>
-                              <td className="p-4 text-slate-600 text-xs italic max-w-[250px] truncate" title={report.nhan_xet}>
-                                {report.nhan_xet || 'Chưa có nhận xét'}
+                              <td className="p-4 text-slate-600 text-xs italic max-w-[250px] truncate" title={bth?.nhanXet || ''}>
+                                {bth?.nhanXet || 'Chưa có nhận xét'}
                               </td>
                             </tr>
                           );
@@ -447,6 +547,30 @@ export default function SinhVienHuongDan_GV() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal Gia hạn nộp bài */}
+      {extendModalOpen && selectedTripForExtend && (
+        <ExtendDeadlineModal
+          isOpen={extendModalOpen}
+          onClose={() => {
+            setExtendModalOpen(false);
+            setSelectedTripForExtend(null);
+          }}
+          phieuThamQuanId={selectedTripForExtend.phieuThamQuanId}
+          currentDeadline={selectedTripForExtend.hanNopBaoCao}
+          studentName={selectedStudentProfile?.name}
+          studentMssv={selectedStudentProfile?.mssv}
+          tripName={selectedTripForExtend.tenNhaMay || selectedTripForExtend.tenChuyen}
+          onSuccess={() => {
+            if (selectedStudentProfile) {
+              handleOpenProfile(selectedStudentProfile);
+            }
+            if (lecturer) {
+              fetchData(lecturer.id);
+            }
+          }}
+        />
       )}
 
     </div>
