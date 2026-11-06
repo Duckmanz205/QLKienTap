@@ -1194,7 +1194,7 @@ export default function LichDanDoan_GV() {
                 onClick={() => {
                   const tripId = selectedTripModal.id;
                   setSelectedTripModal(null);
-                  navigate('/giang-vien/preparation', { state: { selectedTripId: tripId } });
+                  navigate(`/giang-vien/preparation?tripId=${tripId}`, { state: { selectedTripId: tripId } });
                 }}
                 className="px-4 py-2 rounded-xl text-xs font-bold text-slate-800 bg-[#DBD468]/30 hover:bg-[#DBD468]/60 border border-[#DBD468] transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
               >
@@ -1206,7 +1206,7 @@ export default function LichDanDoan_GV() {
                 onClick={() => {
                   const tripId = selectedTripModal.id;
                   setSelectedTripModal(null);
-                  navigate('/giang-vien/attendance', { state: { selectedTripId: tripId } });
+                  navigate(`/giang-vien/attendance?tripId=${tripId}`, { state: { selectedTripId: tripId } });
                 }}
                 className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-[#407F3E] hover:bg-[#407F3E]/90 transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
               >

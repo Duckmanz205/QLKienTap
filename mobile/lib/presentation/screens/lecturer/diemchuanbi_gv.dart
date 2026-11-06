@@ -54,7 +54,11 @@ class _DiemChuanBiGVScreenState extends State<DiemChuanBiGVScreen> {
         _prepControllers.clear();
         _extraGrades.clear();
         for (var s in list) {
-          _prepControllers[s.phieuId] = TextEditingController(text: s.prelimGrade > 0 ? s.prelimGrade.toString() : '');
+          _prepControllers[s.phieuId] = TextEditingController(
+            text: s.prelimGrade != null
+                ? (s.prelimGrade! % 1 == 0 ? s.prelimGrade!.toInt().toString() : s.prelimGrade!.toString())
+                : '',
+          );
           _extraGrades[s.phieuId] = s.extraGrade;
         }
         setState(() {

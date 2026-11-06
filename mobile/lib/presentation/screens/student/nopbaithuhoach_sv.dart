@@ -855,12 +855,85 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
                       const Icon(Icons.schedule, size: 12, color: AppColors.textMuted),
                       const SizedBox(width: 4),
                       Text(
-                        'Hạn: ${sub.deadlineText}',
+                        sub.isPastOnTime && !sub.isPastLock
+                            ? 'Khóa cổng: ${sub.hanKhoaDate != null ? "${sub.hanKhoaDate!.day.toString().padLeft(2, '0')}/${sub.hanKhoaDate!.month.toString().padLeft(2, '0')}/${sub.hanKhoaDate!.year}" : ""}'
+                            : 'Hạn: ${sub.deadlineText}',
                         style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontWeight: FontWeight.w500),
                       ),
                     ],
                   ],
                 ),
+
+                // Banner thông báo hạn nộp & gia hạn
+                if (!isUploaded) ...[
+                  const SizedBox(height: 8),
+                  if (sub.isPastLock) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF2F2),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFFCA5A5)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.lock, size: 14, color: AppColors.danger),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'Đã quá hạn nộp bài (Cổng đã khóa vào 23:59 ngày ${sub.hanKhoaDate != null ? "${sub.hanKhoaDate!.day.toString().padLeft(2, '0')}/${sub.hanKhoaDate!.month.toString().padLeft(2, '0')}/${sub.hanKhoaDate!.year}" : ""}). Không thể nộp.',
+                              style: const TextStyle(fontSize: 11, color: AppColors.danger, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ] else if (sub.isPastOnTime) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFFBEB),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFFCD34D)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.lock_open, size: 14, color: Color(0xFFD97706)),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              sub.isExtended
+                                  ? '🔓 Đã được GVHD mở khóa Nộp bù (Trễ hạn) đến 23:59 ngày ${sub.hanKhoaDate != null ? "${sub.hanKhoaDate!.day.toString().padLeft(2, '0')}/${sub.hanKhoaDate!.month.toString().padLeft(2, '0')}/${sub.hanKhoaDate!.year}" : ""}.'
+                                  : 'Cổng nộp bù (Trễ hạn) mở đến 23:59 ngày ${sub.hanKhoaDate != null ? "${sub.hanKhoaDate!.day.toString().padLeft(2, '0')}/${sub.hanKhoaDate!.month.toString().padLeft(2, '0')}/${sub.hanKhoaDate!.year}" : ""}.',
+                              style: const TextStyle(fontSize: 11, color: Color(0xFFB45309), fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ] else if (sub.isExtended) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFECFDF5),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFF6EE7B7)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.schedule, size: 14, color: AppColors.primary),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              '🎉 Đã được GVHD gia hạn nộp Đúng hạn đến 23:59 ngày ${sub.deadlineText}.',
+                              style: const TextStyle(fontSize: 11, color: Color(0xFF047857), fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
 
                 if (isGraded || (sub.gvhdComment != null && sub.gvhdComment!.isNotEmpty)) ...[
                   const SizedBox(height: 10),

@@ -32,6 +32,7 @@ import {
   LockGuidedReportsGradesDto,
   LockCouncilGradeDto,
   UpdateCouncilStudentNoteDto,
+  ExtendReportDeadlineDto,
 } from './dto/giang-vien.dto';
 
 @Controller('giang-vien')
@@ -225,6 +226,24 @@ export class GiangVienController {
       query.search,
       query.status,
     );
+  }
+
+  @Post('extend-report-deadline')
+  async extendReportDeadline(
+    @CurrentUser() user: JwtPayloadUser,
+    @Body() body: ExtendReportDeadlineDto,
+  ) {
+    const lecturerId = await this.resolveLecturerId(user);
+    return this.gvService.extendReportDeadline(lecturerId, body);
+  }
+
+  @Get('guided-student-trips/:studentId')
+  async getGuidedStudentTrips(
+    @CurrentUser() user: JwtPayloadUser,
+    @Param('studentId', ParseIntPipe) studentId: number,
+  ) {
+    const lecturerId = await this.resolveLecturerId(user);
+    return this.gvService.getGuidedStudentTrips(lecturerId, studentId);
   }
 
   @Post('grade-report')

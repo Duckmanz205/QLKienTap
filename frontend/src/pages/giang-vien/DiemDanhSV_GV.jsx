@@ -1,13 +1,63 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { 
   Search, ChevronDown, Check, CheckCircle2, XCircle, FileWarning, Save,
-  FileCheck, Eye, ZoomIn, ZoomOut, RotateCw, X, ExternalLink, AlertCircle, Building2
+  FileCheck, Eye, ZoomIn, ZoomOut, RotateCw, X, ExternalLink, AlertCircle, Building2, Lock
 } from 'lucide-react';
 import { giangVienApi } from '../../services/api';
 import Toast from '../../components/Toast';
 import SearchableDropdown from '../../components/SearchableDropdown';
 
+// Helper lấy YYYY-MM-DD theo giờ địa phương
+const toDateStr = (dateVal) => {
+  if (!dateVal) return '';
+  const d = new Date(dateVal);
+  if (isNaN(d.getTime())) return '';
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+// Helper format ngày hiển thị DD/MM/YYYY
+const toDisplayDate = (dateVal) => {
+  if (!dateVal) return '';
+  const d = new Date(dateVal);
+  if (isNaN(d.getTime())) return '';
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${day}/${month}/${year}`;
+};
+
+// Helper format giờ hiển thị HH:mm
+const toDisplayTime = (timeVal) => {
+  if (!timeVal) return '--:--';
+  if (typeof timeVal === 'string') {
+    if (timeVal.includes('T')) {
+      return timeVal.split('T')[1].substring(0, 5);
+    }
+    return timeVal.substring(0, 5);
+  }
+  if (timeVal instanceof Date) {
+    const hours = String(timeVal.getHours()).padStart(2, '0');
+    const mins = String(timeVal.getMinutes()).padStart(2, '0');
+    return `${hours}:${mins}`;
+  }
+  return String(timeVal);
+};
+
 export default function DiemDanhSV_GV() {
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const targetTripId = useMemo(() => {
+    const fromParam = searchParams.get('tripId');
+    if (fromParam) return Number(fromParam);
+    if (location.state?.selectedTripId) return Number(location.state.selectedTripId);
+    return null;
+  }, [searchParams, location.state]);
+
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -48,23 +98,137 @@ export default function DiemDanhSV_GV() {
     try {
       const res = await giangVienApi.getLedTrips(gvId);
       const tripsData = res.data || [];
-      const formattedTrips = tripsData.map(t => ({
-        id: t.id,
-        name: `${t.nhaMay?.ten_nha_may || 'Chuyến đi'} (${new Date(t.ngay_tham_quan || t.ngay_khoi_hanh || Date.now()).toLocaleDateString('vi-VN')})`,
-        cachToChuc: t.cach_to_chuc,
-        ngayThamQuan: t.ngay_tham_quan,
-        gioBatDau: t.gio_bat_dau,
-        trangThai: t.trang_thai,
-        rawTrip: t,
-      }));
+
+      const today = new Date();
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+      const formattedTrips = tripsData.map(t => {
+        const rawDate = t.ngay_tham_quan || t.ngay_khoi_hanh;
+        const tripDateStr = toDateStr(rawDate);
+        const isToday = tripDateStr === todayStr;
+        const isUpcoming = tripDateStr > todayStr;
+        const isPast = tripDateStr < todayStr;
+        const isLocked = Boolean(t.khoa_so_diem || t.trang_thai === 'DaKhoa');
+
+        let tagPrefix = '';
+        let sortGroup = 3; // 1: Today, 2: Upcoming, 3: Past
+
+        if (isToday) {
+          tagPrefix = '🔥 [HÔM NAY]';
+          sortGroup = 1;
+        } else if (isUpcoming) {
+          tagPrefix = '📅 [SẮP TỚI]';
+          sortGroup = 2;
+        } else if (isLocked) {
+          tagPrefix = '🔒 [ĐÃ KHÓA]';
+          sortGroup = 3;
+        } else {
+          tagPrefix = '✔ [ĐÃ QUA]';
+          sortGroup = 3;
+        }
+
+        const cachToChucPrefix = t.cach_to_chuc === 'TuDo' ? '[Tự do] ' : '';
+        const factoryName = t.nhaMay?.ten_nha_may || 'Chuyến đi';
+        const displayDate = toDisplayDate(rawDate);
+        const displayTime = toDisplayTime(t.gio_bat_dau);
+        const studentCount = `${t.so_luong_dang_ky_hien_tai ?? 0}/${t.so_luong_sinh_vien_toi_da ?? 0} SV`;
+        const lockStatus = isLocked ? 'Đã khóa sổ điểm' : 'Sổ điểm đang mở';
+
+        return {
+          id: t.id,
+          name: `${factoryName} (${displayDate})`,
+          dropdownLabel: `${tagPrefix} ${cachToChucPrefix}${factoryName} (${displayDate})`,
+          subLabel: `Khởi hành: ${displayTime} | Sĩ số: ${studentCount} | ${lockStatus}`,
+          cachToChuc: t.cach_to_chuc,
+          ngayThamQuan: t.ngay_tham_quan,
+          gioBatDau: t.gio_bat_dau,
+          trangThai: t.trang_thai,
+          tripDateStr,
+          isToday,
+          isUpcoming,
+          isPast,
+          isLocked,
+          sortGroup,
+          rawTrip: t,
+        };
+      });
+
+      // Sắp xếp phân nhóm thông minh:
+      // 1. Hôm nay (theo giờ bắt đầu)
+      // 2. Sắp tới (tăng dần: gần nhất -> xa hơn)
+      // 3. Đã qua / Đã khóa (giảm dần: mới nhất -> cũ hơn)
+      formattedTrips.sort((a, b) => {
+        if (a.sortGroup !== b.sortGroup) {
+          return a.sortGroup - b.sortGroup;
+        }
+        if (a.sortGroup === 1) {
+          return (a.gioBatDau || '').localeCompare(b.gioBatDau || '');
+        }
+        if (a.sortGroup === 2) {
+          if (a.tripDateStr !== b.tripDateStr) {
+            return a.tripDateStr.localeCompare(b.tripDateStr);
+          }
+          return (a.gioBatDau || '').localeCompare(b.gioBatDau || '');
+        }
+        // Nhóm 3 (Quá khứ / Đã khóa): Mới nhất lên đầu
+        if (b.tripDateStr !== a.tripDateStr) {
+          return b.tripDateStr.localeCompare(a.tripDateStr);
+        }
+        return (b.gioBatDau || '').localeCompare(a.gioBatDau || '');
+      });
+
       setTrips(formattedTrips);
+
       if (formattedTrips.length > 0) {
-        setSelectedTrip(formattedTrips[0]);
+        // Thuật toán chọn chuyến tối ưu
+        let optimal = null;
+
+        // 1. Khớp theo targetTripId nếu có
+        if (targetTripId) {
+          optimal = formattedTrips.find(t => Number(t.id) === Number(targetTripId));
+        }
+
+        // 2. Ưu tiên chuyến HÔM NAY chưa khóa điểm
+        if (!optimal) {
+          optimal = formattedTrips.find(t => t.isToday && !t.isLocked);
+        }
+
+        // 3. Ưu tiên chuyến HÔM NAY bất kỳ
+        if (!optimal) {
+          optimal = formattedTrips.find(t => t.isToday);
+        }
+
+        // 4. Ưu tiên chuyến SẮP TỚI gần nhất (đã sort ASC)
+        if (!optimal) {
+          optimal = formattedTrips.find(t => t.isUpcoming);
+        }
+
+        // 5. Fallback: chuyến đầu tiên trong danh sách
+        if (!optimal) {
+          optimal = formattedTrips[0];
+        }
+
+        setSelectedTrip(optimal);
+
+        // Đồng bộ URL param để khi F5 vẫn giữ chuyến
+        if (optimal) {
+          setSearchParams({ tripId: optimal.id }, { replace: true });
+        }
       }
     } catch (err) {
       console.error(err);
     }
   };
+
+  // Đồng bộ khi targetTripId thay đổi từ navigation bên ngoài
+  useEffect(() => {
+    if (targetTripId && trips.length > 0) {
+      const matched = trips.find(t => Number(t.id) === Number(targetTripId));
+      if (matched && matched.id !== selectedTrip?.id) {
+        setSelectedTrip(matched);
+      }
+    }
+  }, [targetTripId, trips]);
 
   const tripTimeInfo = useMemo(() => {
     if (!selectedTrip?.ngayThamQuan) return { isStarted: true, formattedDateTime: '', trangThai: '' };
@@ -129,6 +293,8 @@ export default function DiemDanhSV_GV() {
         fileBaoCao: phieu.file_bao_cao,
         ngayNop: phieu.ngay_nop_bao_cao,
         cachToChuc: phieu.cach_to_chuc,
+        da_khoa: phieu.diemPhieuThamQuan?.da_khoa ?? (['HoanThanh', 'KhongDat'].includes(phieu.trang_thai)),
+        phieuTrangThai: phieu.trang_thai,
       }));
       
       setStudents(mapped);
@@ -138,6 +304,14 @@ export default function DiemDanhSV_GV() {
       setLoading(false);
     }
   };
+
+  const isTripLocked = useMemo(() => {
+    if (selectedTrip?.rawTrip?.trang_thai === 'DaKhoa') return true;
+    if (selectedTrip?.rawTrip?.lichKienTap?.trang_thai === 'DaKhoa') return true;
+    if (selectedTrip?.rawTrip?.lichKienTap?.dotKienTap?.trang_thai === 'DaKhoa') return true;
+    if (students.length > 0 && students.every(s => s.da_khoa)) return true;
+    return false;
+  }, [selectedTrip, students]);
 
   const handleOpenPreview = async (student) => {
     if (!student.fileXacNhan) return;
@@ -184,6 +358,14 @@ export default function DiemDanhSV_GV() {
   };
 
   const handleStatusChange = (studentId, newStatus) => {
+    if (isTripLocked) {
+      setToast({
+        show: true,
+        message: 'Chuyến tham quan hoặc đợt kiến tập đã khóa sổ điểm. Không thể thay đổi trạng thái điểm danh.',
+        type: 'error'
+      });
+      return;
+    }
     if (!tripTimeInfo.isStarted) {
       setToast({
         show: true,
@@ -201,10 +383,19 @@ export default function DiemDanhSV_GV() {
   };
 
   const handleNoteChange = (studentId, newNote) => {
+    if (isTripLocked) return;
     setStudents(prev => prev.map(s => s.id === studentId ? { ...s, note: newNote } : s));
   };
 
   const handleMarkAllPresent = () => {
+    if (isTripLocked) {
+      setToast({
+        show: true,
+        message: 'Chuyến tham quan hoặc đợt kiến tập đã khóa sổ điểm. Không thể điểm danh.',
+        type: 'error'
+      });
+      return;
+    }
     if (!tripTimeInfo.isStarted) {
       setToast({
         show: true,
@@ -217,6 +408,14 @@ export default function DiemDanhSV_GV() {
   };
 
   const handleSaveAttendance = async () => {
+    if (isTripLocked) {
+      setToast({
+        show: true,
+        message: 'Chuyến tham quan hoặc đợt kiến tập đã khóa sổ điểm. Không thể lưu điểm danh.',
+        type: 'error'
+      });
+      return;
+    }
     if (!selectedTrip || students.length === 0) return;
     if (!tripTimeInfo.isStarted) {
       setToast({
@@ -314,16 +513,20 @@ export default function DiemDanhSV_GV() {
         <SearchableDropdown
           options={trips.map(t => ({
             value: t.id,
-            label: `${t.cachToChuc === 'TuDo' ? '[Tự do] ' : ''}${t.name}`
+            label: t.dropdownLabel || `${t.cachToChuc === 'TuDo' ? '[Tự do] ' : ''}${t.name}`,
+            subLabel: t.subLabel,
           }))}
           value={selectedTrip?.id || ''}
           onChange={(val) => {
             const found = trips.find(t => t.id === val);
-            if (found) setSelectedTrip(found);
+            if (found) {
+              setSelectedTrip(found);
+              setSearchParams({ tripId: found.id });
+            }
           }}
           placeholder={trips.length > 0 ? "Chọn chuyến đi..." : "Đang tải chuyến..."}
           searchPlaceholder="Tìm chuyến đi..."
-          className="min-w-[260px] flex-1"
+          className="min-w-[300px] flex-1"
         />
 
         {/* Status Filter Dropdown */}
@@ -370,12 +573,29 @@ export default function DiemDanhSV_GV() {
         </div>
       )}
 
+      {/* Banner khi chuyến đã khóa sổ điểm */}
+      {isTripLocked && (
+        <div className="bg-slate-100 border border-slate-300 rounded-xl p-4 mb-6 flex items-start gap-3.5 shadow-xs animate-in fade-in duration-300">
+          <div className="p-2 bg-slate-200 rounded-lg text-slate-700 shrink-0 mt-0.5">
+            <Lock className="w-5 h-5 text-slate-600" />
+          </div>
+          <div className="flex-1">
+            <h4 className="text-sm font-bold text-slate-800">
+              Chuyến tham quan đã kết thúc và chốt sổ điểm
+            </h4>
+            <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+              Dữ liệu điểm danh của chuyến tham quan này đã được khóa. Giao diện đang ở chế độ chỉ đọc để tra cứu thông tin và minh chứng.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Quick Action Row */}
       <div className="flex flex-col sm:flex-row justify-between items-center bg-white p-4 rounded-xl border border-[#E7E0C4] shadow-sm mb-6 gap-3">
         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
           <button 
             onClick={handleMarkAllPresent}
-            disabled={!tripTimeInfo.isStarted}
+            disabled={!tripTimeInfo.isStarted || isTripLocked}
             title={!tripTimeInfo.isStarted ? `Chưa đến thời gian tham quan (${tripTimeInfo.formattedDateTime})` : undefined}
             className={`w-full sm:w-auto px-5 py-2 border-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${
               !tripTimeInfo.isStarted
@@ -392,7 +612,7 @@ export default function DiemDanhSV_GV() {
 
         <button 
           onClick={handleSaveAttendance}
-          disabled={loading || students.length === 0 || !tripTimeInfo.isStarted}
+          disabled={loading || students.length === 0 || !tripTimeInfo.isStarted || isTripLocked}
           title={!tripTimeInfo.isStarted ? `Chưa đến thời gian tham quan (${tripTimeInfo.formattedDateTime})` : undefined}
           className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-xl shadow-sm hover:shadow-md transition-all cursor-pointer font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
         >
@@ -462,7 +682,7 @@ export default function DiemDanhSV_GV() {
                         
                         <button 
                           onClick={() => handleStatusChange(student.id, 'CoMat')}
-                          disabled={!tripTimeInfo.isStarted}
+                          disabled={!tripTimeInfo.isStarted || isTripLocked}
                           title={!tripTimeInfo.isStarted ? `Chưa đến thời gian tham quan (${tripTimeInfo.formattedDateTime})` : undefined}
                           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-bold transition-all ${
                             student.status === 'CoMat' 
@@ -475,7 +695,7 @@ export default function DiemDanhSV_GV() {
                         
                         <button 
                           onClick={() => handleStatusChange(student.id, 'Vang')}
-                          disabled={!tripTimeInfo.isStarted}
+                          disabled={!tripTimeInfo.isStarted || isTripLocked}
                           title={!tripTimeInfo.isStarted ? `Chưa đến thời gian tham quan (${tripTimeInfo.formattedDateTime})` : undefined}
                           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-bold transition-all mx-1 ${
                             student.status === 'Vang' 
@@ -488,7 +708,7 @@ export default function DiemDanhSV_GV() {
                         
                         <button 
                           onClick={() => handleStatusChange(student.id, 'TuChoiThamGia')}
-                          disabled={!tripTimeInfo.isStarted}
+                          disabled={!tripTimeInfo.isStarted || isTripLocked}
                           title={!tripTimeInfo.isStarted ? `Chưa đến thời gian tham quan (${tripTimeInfo.formattedDateTime})` : undefined}
                           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-bold transition-all ${
                             student.status === 'TuChoiThamGia' 
@@ -508,6 +728,7 @@ export default function DiemDanhSV_GV() {
                           type="text" 
                           value={student.note}
                           onChange={(e) => handleNoteChange(student.id, e.target.value)}
+                          disabled={isTripLocked || student.da_khoa}
                           placeholder="Lý do từ chối..."
                           className="w-full px-3 py-2 bg-white border border-[#E68A8C] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[#E68A8C] text-slate-800 placeholder-slate-400 shadow-sm animate-in fade-in duration-200"
                           autoFocus

@@ -17,6 +17,8 @@ export const giangVienApi = {
   lockTripPrepGrades: (data) => api.post('/giang-vien/lock-trip-prep-grades', data),
   getGuidedReports: (lecturerId, params) => api.get(`/giang-vien/guided-reports/${lecturerId}`, { params }),
   gradeReport: (data) => api.post('/giang-vien/grade-report', data),
+  extendReportDeadline: (data) => api.post('/giang-vien/extend-report-deadline', data),
+  getGuidedStudentTrips: (studentId) => api.get(`/giang-vien/guided-student-trips/${studentId}`),
   lockGuidedReportsGrades: (data) => api.post('/giang-vien/lock-guided-reports-grades', data),
   getBoardSessions: (lecturerId) => api.get(`/giang-vien/board-sessions/${lecturerId}`),
   submitBoardScore: (data) => api.post('/giang-vien/submit-board-score', data),
@@ -25,4 +27,6 @@ export const giangVienApi = {
   updateCouncilStudentNote: (data) => api.put('/giang-vien/council-student-note', data),
   getNotifications: (lecturerId) => api.get(`/giang-vien/notifications/${lecturerId}`),
   getDashboardStats: (lecturerId) => api.get(`/giang-vien/dashboard-stats/${lecturerId}`),
+  evaluateAi: (data) => api.post('/giang-vien/evaluate-ai', data),
+  reExtractReport: (data) => api.post('/upload/re-extract', data),
 };

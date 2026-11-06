@@ -802,6 +802,9 @@ export class DonHoanPhi {
 
   @Column({ type: 'datetime2', nullable: true })
   ngay_xu_ly: Date;
+
+  @Column({ type: 'nvarchar', length: 500, nullable: true })
+  ly_do_tu_choi: string;
 }
 
 @Entity('PhanCongGVHD')

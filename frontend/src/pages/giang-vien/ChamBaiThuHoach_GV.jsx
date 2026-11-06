@@ -3,11 +3,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   ArrowLeft, FileText, CheckCircle2, Save, Search, ChevronRight,
   ZoomIn, ZoomOut, Download, Sparkles, MessageSquareWarning, User,
-  Filter, Check, ChevronDown, X, Lock, Minus, Maximize2, Building2, Award, ExternalLink
+  Filter, Check, ChevronDown, X, Lock, Minus, Maximize2, Building2, Award, ExternalLink,
+  Calendar, Clock, RotateCw
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import api, { giangVienApi } from '../../services/api';
 import SearchableDropdown from '../../components/SearchableDropdown';
+import ExtendDeadlineModal from '../../components/ExtendDeadlineModal';
 
 export default function ChamBaiThuHoach_GV() {
   const navigate = useNavigate();
@@ -18,6 +20,7 @@ export default function ChamBaiThuHoach_GV() {
   const [selectedReport, setSelectedReport] = useState(null);
   const [activeViewerTab, setActiveViewerTab] = useState('report'); // 'report' | 'confirmation'
   const [confirmationFile, setConfirmationFile] = useState(null);
+  const [extendModalOpen, setExtendModalOpen] = useState(false);
 
   // Filter & Pagination states
   const [searchTerm, setSearchTerm] = useState(location.state?.filterMssv || '');
@@ -325,20 +328,14 @@ TRANG 38
   };
 
   const handleAIGrading = async () => {
+    if (!reportText || reportText.trim().length < 50) {
+      toast.error('Văn bản bài thu hoạch chưa sẵn sàng hoặc quá ngắn để AI chấm điểm (tối thiểu 50 ký tự).');
+      return;
+    }
     setIsGradingAI(true);
     try {
-      const response = await fetch('http://localhost:8000/grade', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer satori_2026_secure_key'
-        },
-        body: JSON.stringify({ document_text: reportText })
-      });
-      if (!response.ok) {
-        throw new Error('Lỗi khi gọi AI service');
-      }
-      const data = await response.json();
+      const res = await giangVienApi.evaluateAi({ document_text: reportText });
+      const data = res.data;
       setAiGradingResult(data);
 
       const diemHT = data.hinh_thuc_tong_quan?.diem_hinh_thuc ?? '';
@@ -377,7 +374,7 @@ TRANG 38
       toast.success('Đã chấm điểm xong bằng AI!');
     } catch (err) {
       console.error(err);
-      toast.error('Lỗi khi chấm điểm bằng AI');
+      toast.error(err.response?.data?.message || 'Lỗi khi chấm điểm bằng AI');
     } finally {
       setIsGradingAI(false);
     }
@@ -391,6 +388,77 @@ TRANG 38
   const [reportText, setReportText] = useState('');
   const [pdfBlobUrl, setPdfBlobUrl] = useState(null);
   const [isLoadingText, setIsLoadingText] = useState(false);
+  const [isExtractingText, setIsExtractingText] = useState(false);
+  const pollingRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, []);
+
+  const startPollingExtractedText = (txtApiPath) => {
+    if (pollingRef.current) clearInterval(pollingRef.current);
+    setIsExtractingText(true);
+    setReportText(''); // Không gán chuỗi JSON PROCESSING vào nội dung bài
+    let attempts = 0;
+    const maxAttempts = 20; // 20 * 4s = 80s
+
+    pollingRef.current = setInterval(async () => {
+      attempts++;
+      try {
+        const resp = await api.get(txtApiPath, { responseType: 'text' });
+        const data = resp.data;
+        const strData = typeof data === 'string' ? data : JSON.stringify(data || '');
+        const isProcessing = resp.status === 202 ||
+          strData.includes('"PROCESSING"') ||
+          strData.includes('PROCESSING') ||
+          (typeof data === 'object' && data?.status === 'PROCESSING');
+
+        if (!isProcessing && data) {
+          if (strData.trim().length > 10 && !strData.includes('Không thể trích xuất văn bản') && !strData.includes('"PROCESSING"')) {
+            setReportText(typeof data === 'string' ? data : strData);
+            setIsExtractingText(false);
+            clearInterval(pollingRef.current);
+            pollingRef.current = null;
+            toast.success('Đã nhận diện xong chữ viết tay OCR!');
+          }
+        }
+      } catch (err) {
+        // Tiếp tục chờ trong vòng lặp polling
+      }
+
+      if (attempts >= maxAttempts) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+        setIsExtractingText(false);
+        setReportText(prev => prev || 'Hệ thống đang tiếp tục trích xuất văn bản trong nền. Bạn có thể nhấn nút "Quét lại OCR" sau ít phút.');
+      }
+    }, 4000);
+  };
+
+  const handleReExtractOcr = async () => {
+    if (!selectedReport || !selectedReport.file_bao_cao) return;
+    try {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+      setIsExtractingText(true);
+      setReportText('');
+      toast.info('Đang kích hoạt trích xuất lại OCR dưới nền...');
+      await giangVienApi.reExtractReport({ fileBaoCao: selectedReport.file_bao_cao });
+
+      let apiPath = selectedReport.file_bao_cao;
+      if (apiPath.startsWith('/api/')) apiPath = apiPath.substring(5);
+      if (apiPath.startsWith('reports/')) apiPath = `upload/file/${apiPath}`;
+      else if (!apiPath.startsWith('upload/file/')) apiPath = `upload/file/reports/${apiPath}`;
+      if (apiPath.startsWith('/')) apiPath = apiPath.substring(1);
+      const txtApiPath = '/' + apiPath.replace(/\.\w+$/, '.txt');
+
+      startPollingExtractedText(txtApiPath);
+    } catch (err) {
+      toast.error('Lỗi khi kích hoạt trích xuất lại: ' + (err.response?.data?.message || err.message));
+      setIsExtractingText(false);
+    }
+  };
 
   const handleInsertTemplate = () => {
     if (aiGradingResult) {
@@ -522,6 +590,12 @@ TRANG 38
       setConfirmationFile(null);
     }
 
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+    setIsExtractingText(false);
+
     if (report.file_bao_cao) {
       setIsLoadingText(true);
       setReportText('');
@@ -549,15 +623,31 @@ TRANG 38
         }
 
         const txtApiPath = '/' + apiPath.replace(/\.\w+$/, '.txt');
-        const respTxt = await api.get(txtApiPath, { responseType: 'text' });
-        if (respTxt.data) {
-          setReportText(respTxt.data);
-        } else {
-          setReportText('Không tìm thấy nội dung bài thu hoạch.');
+        try {
+          const respTxt = await api.get(txtApiPath, { responseType: 'text' });
+          const data = respTxt.data;
+          const strData = typeof data === 'string' ? data : JSON.stringify(data || '');
+          const isProcessing = respTxt.status === 202 ||
+            strData.includes('"PROCESSING"') ||
+            strData.includes('PROCESSING') ||
+            (typeof data === 'object' && data?.status === 'PROCESSING');
+
+          if (isProcessing) {
+            setReportText('');
+            startPollingExtractedText(txtApiPath);
+          } else if (data && typeof data === 'string' && data.trim().length > 10 && !data.includes('Không thể trích xuất văn bản') && !data.includes('"PROCESSING"')) {
+            setReportText(data);
+          } else {
+            setReportText('');
+            startPollingExtractedText(txtApiPath);
+          }
+        } catch (err) {
+          // Khi gặp lỗi 404 hoặc mạng -> bật polling vì backend có thể đang kích hoạt self-healing
+          setReportText('');
+          startPollingExtractedText(txtApiPath);
         }
       } catch (err) {
         console.warn('Không tìm thấy file text trích xuất:', err);
-        setReportText('Hệ thống chưa trích xuất nội dung văn bản cho báo cáo này. Vui lòng tải file gốc để xem.');
       } finally {
         setIsLoadingText(false);
       }
@@ -1064,35 +1154,53 @@ TRANG 38
             <span className="text-[#407F3E] truncate">{nhaMay}</span>
           </div>
 
-          {/* Tab Selector between Report and Confirmation Paper */}
-          {confirmationFile && (
-            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 shrink-0">
-              <button
-                type="button"
-                onClick={() => setActiveViewerTab('report')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                  activeViewerTab === 'report'
-                    ? 'bg-white text-[#407F3E] shadow-xs'
-                    : 'text-slate-600 hover:text-slate-800'
-                }`}
-              >
-                <FileText className="w-3.5 h-3.5" />
-                <span>Bài thu hoạch</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveViewerTab('confirmation')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                  activeViewerTab === 'confirmation'
-                    ? 'bg-white text-indigo-700 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-800'
-                }`}
-              >
-                <Award className="w-3.5 h-3.5 text-indigo-600" />
-                <span>Giấy xác nhận tham quan (Mộc đỏ)</span>
-              </button>
-            </div>
-          )}
+          <div className="flex items-center gap-2.5 shrink-0">
+            {/* Nút Quét lại OCR */}
+            <button
+              type="button"
+              onClick={handleReExtractOcr}
+              disabled={isExtractingText || selectedReport.da_khoa || selectedReport.da_khoa_thu_hoach}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-2xs border ${
+                isExtractingText
+                  ? 'bg-amber-50 text-amber-800 border-amber-300 animate-pulse'
+                  : 'bg-white text-slate-700 hover:text-[#407F3E] hover:border-[#407F3E] border-slate-200 cursor-pointer'
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
+              title="Kích hoạt nhận diện lại chữ viết tay từ bản scan PDF"
+            >
+              <RotateCw className={`w-3.5 h-3.5 text-[#407F3E] ${isExtractingText ? 'animate-spin' : ''}`} />
+              <span>{isExtractingText ? 'Đang quét OCR...' : 'Quét lại OCR'}</span>
+            </button>
+
+            {/* Tab Selector between Report and Confirmation Paper */}
+            {confirmationFile && (
+              <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setActiveViewerTab('report')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    activeViewerTab === 'report'
+                      ? 'bg-white text-[#407F3E] shadow-xs'
+                      : 'text-slate-600 hover:text-slate-800'
+                  }`}
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>Bài thu hoạch</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveViewerTab('confirmation')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    activeViewerTab === 'confirmation'
+                      ? 'bg-white text-indigo-700 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-800'
+                  }`}
+                >
+                  <Award className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Giấy xác nhận tham quan (Mộc đỏ)</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex-1 flex overflow-hidden bg-[#E7E0C4]/20">
@@ -1160,13 +1268,12 @@ TRANG 38
           <div className="w-full md:w-[350px] lg:w-[400px] bg-[#fdfcf8] border-l border-[#E7E0C4] flex flex-col shrink-0 shadow-[-4px_0_15px_-3px_rgba(0,0,0,0.05)] z-20 overflow-y-auto custom-scrollbar p-5 space-y-5">
 
             {/* Student Info Card */}
-            <div className="bg-white rounded-xl p-4 border border-[#E7E0C4] shadow-sm flex items-start gap-3">
-
+            <div className="bg-white rounded-xl p-4 border border-[#E7E0C4] shadow-sm flex flex-col gap-3">
               <div>
-                <h3 className="font-bold text-slate-800 text-sm leading-tight mb-1 flex items-center gap-2">
-                  {sv.ho_ten}
-                  {selectedReport.da_khoa && (
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#E68A8C]/10 text-[#E68A8C] border border-[#E68A8C]/20">
+                <h3 className="font-bold text-slate-800 text-sm leading-tight mb-1 flex items-center justify-between">
+                  <span className="truncate">{sv.ho_ten}</span>
+                  {(selectedReport.da_khoa || selectedReport.da_khoa_thu_hoach) && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#E68A8C]/10 text-[#E68A8C] border border-[#E68A8C]/20 shrink-0">
                       <Lock className="w-3 h-3" /> Đã khóa
                     </span>
                   )}
@@ -1175,6 +1282,49 @@ TRANG 38
                 <p className="text-[11px] font-medium text-[#407F3E] flex items-center gap-1">
                   <CheckCircle2 className="w-3 h-3" /> {nhaMay}
                 </p>
+              </div>
+
+              {/* Submission Status & Deadline */}
+              <div className="pt-2 border-t border-slate-100 flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-slate-500 font-medium">Trạng thái nộp:</span>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
+                    selectedReport.trang_thai === 'TreHan'
+                      ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                      : 'bg-green-100 text-green-800 border border-green-200'
+                  }`}>
+                    {selectedReport.trang_thai === 'TreHan' ? 'Nộp trễ hạn' : 'Nộp đúng hạn'}
+                  </span>
+                </div>
+                {(selectedReport.han_nop_bao_cao || selectedReport.phieuThamQuan?.han_nop_bao_cao) && (
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-500 font-medium">Hạn đúng hạn:</span>
+                    <span className="font-semibold text-slate-700">
+                      23:59 {new Date(selectedReport.han_nop_bao_cao || selectedReport.phieuThamQuan?.han_nop_bao_cao).toLocaleDateString('vi-VN')}
+                    </span>
+                  </div>
+                )}
+
+                {/* Nút gia hạn nộp bài */}
+                {(() => {
+                  const isReportLocked = selectedReport.da_khoa || selectedReport.da_khoa_thu_hoach;
+                  return (
+                    <button
+                      type="button"
+                      disabled={isReportLocked}
+                      onClick={() => setExtendModalOpen(true)}
+                      title={isReportLocked ? 'Điểm bài thu hoạch đã bị khóa, không thể gia hạn' : 'Gia hạn nộp bài cho sinh viên này'}
+                      className={`mt-1.5 w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all shadow-2xs ${
+                        isReportLocked
+                          ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+                          : 'bg-white border border-[#407F3E] text-[#407F3E] hover:bg-[#407F3E] hover:text-white cursor-pointer'
+                      }`}
+                    >
+                      {isReportLocked ? <Lock className="w-3.5 h-3.5" /> : <Calendar className="w-3.5 h-3.5" />}
+                      <span>Gia hạn nộp bài</span>
+                    </button>
+                  );
+                })()}
               </div>
             </div>
 
@@ -1185,12 +1335,19 @@ TRANG 38
                 <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">AI đề xuất điểm</h4>
               </div>
 
+              {isExtractingText && (
+                <div className="mb-3 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold flex items-center gap-2">
+                  <div className="w-3.5 h-3.5 border-2 border-amber-600 border-t-transparent rounded-full animate-spin shrink-0"></div>
+                  <span>Đang nhận diện chữ viết tay OCR... Hệ thống sẽ tự cập nhật khi xong.</span>
+                </div>
+              )}
+
               {!aiGradingResult ? (
-                <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-2">
                   <button
                     onClick={handleAIGrading}
-                    disabled={isGradingAI || selectedReport.da_khoa}
-                    className="w-full flex justify-center items-center gap-2 text-sm font-bold text-white bg-[#407F3E] px-4 py-2.5 rounded-lg shadow-sm hover:bg-[#407F3E]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={isGradingAI || isExtractingText || selectedReport.da_khoa || selectedReport.da_khoa_thu_hoach || !reportText || reportText.trim().length < 50}
+                    className="w-full flex justify-center items-center gap-2 text-sm font-bold text-white bg-[#407F3E] px-4 py-2.5 rounded-lg shadow-sm hover:bg-[#407F3E]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                   >
                     {isGradingAI ? (
                       <>
@@ -1201,6 +1358,11 @@ TRANG 38
                       'Chấm tự động'
                     )}
                   </button>
+                  {!reportText && !isExtractingText && (
+                    <p className="text-[11px] text-amber-700 font-medium text-center">
+                      ⚠️ Chưa có text OCR. Nhấn nút <strong>"Quét lại OCR"</strong> ở thanh trên để nhận diện bài làm.
+                    </p>
+                  )}
                 </div>
               ) : (
                 <div className="flex flex-col gap-3">
@@ -1432,9 +1594,21 @@ TRANG 38
 
               {/* Autograded text content */}
               <div>
-                <h4 className="text-xs font-bold text-slate-800 uppercase mb-4">Nội dung được tự động chấm</h4>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-xs font-bold text-slate-800 uppercase">Văn bản nhận diện chữ viết tay (.txt)</h4>
+                  <button
+                    type="button"
+                    onClick={handleReExtractOcr}
+                    disabled={isExtractingText}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-[#407F3E] bg-[#407F3E]/10 hover:bg-[#407F3E]/20 rounded-lg transition-all cursor-pointer disabled:opacity-50"
+                    title="Kích hoạt nhận diện lại chữ viết tay từ bản scan PDF"
+                  >
+                    <RotateCw className={`w-3.5 h-3.5 ${isExtractingText ? 'animate-spin' : ''}`} />
+                    <span>{isExtractingText ? 'Đang quét lại...' : 'Trích xuất lại OCR'}</span>
+                  </button>
+                </div>
                 <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 font-mono whitespace-pre-wrap h-64 overflow-y-auto custom-scrollbar shadow-inner">
-                  {reportText || "Không có nội dung."}
+                  {reportText || (isExtractingText ? "⏳ Hệ thống đang nhận diện chữ viết tay từ bản scan (OCR)..." : "Không có nội dung.")}
                 </div>
               </div>
 
@@ -1645,6 +1819,27 @@ TRANG 38
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal Gia hạn nộp bài */}
+      {extendModalOpen && selectedReport && (
+        <ExtendDeadlineModal
+          isOpen={extendModalOpen}
+          onClose={() => setExtendModalOpen(false)}
+          phieuThamQuanId={selectedReport.phieu_tham_quan_id || selectedReport.phieuThamQuan?.id}
+          currentDeadline={selectedReport.han_nop_bao_cao || selectedReport.phieuThamQuan?.han_nop_bao_cao}
+          studentName={selectedReport.phieuThamQuan?.phieuDangKy?.sinhVien?.ho_ten || selectedReport.phieuDangKy?.sinhVien?.ho_ten}
+          studentMssv={selectedReport.phieuThamQuan?.phieuDangKy?.sinhVien?.mssv || selectedReport.phieuDangKy?.sinhVien?.mssv}
+          tripName={selectedReport.phieuThamQuan?.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || selectedReport.phieuDangKy?.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Chuyến tham quan'}
+          onSuccess={(resData) => {
+            if (lecturer) fetchReports(lecturer.id);
+            setSelectedReport(prev => prev ? {
+              ...prev,
+              han_nop_bao_cao: resData.phieuThamQuan?.han_nop_bao_cao || prev.han_nop_bao_cao,
+              trang_thai: resData.phieuThamQuan?.trang_thai_nop || (resData.mode === 'DungHan' ? 'DaNop' : prev.trang_thai),
+            } : null);
+          }}
+        />
       )}
 
     </div>

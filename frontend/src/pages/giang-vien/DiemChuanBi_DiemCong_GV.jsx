@@ -1,5 +1,6 @@
 import toast from 'react-hot-toast';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import {
   Info, Check, Save, Plus, Minus, Search, Lock,
   FileSpreadsheet, UploadCloud, Download, AlertCircle, CheckCircle2, X,
@@ -10,7 +11,56 @@ import { giangVienApi } from '../../services/api';
 import SearchableDropdown from '../../components/SearchableDropdown';
 import { exportPrepGradesTemplate } from '../../utils/exportExcel';
 
+// Helper lấy YYYY-MM-DD theo giờ địa phương
+const toDateStr = (dateVal) => {
+  if (!dateVal) return '';
+  const d = new Date(dateVal);
+  if (isNaN(d.getTime())) return '';
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+// Helper format ngày hiển thị DD/MM/YYYY
+const toDisplayDate = (dateVal) => {
+  if (!dateVal) return '';
+  const d = new Date(dateVal);
+  if (isNaN(d.getTime())) return '';
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${day}/${month}/${year}`;
+};
+
+// Helper format giờ hiển thị HH:mm
+const toDisplayTime = (timeVal) => {
+  if (!timeVal) return '--:--';
+  if (typeof timeVal === 'string') {
+    if (timeVal.includes('T')) {
+      return timeVal.split('T')[1].substring(0, 5);
+    }
+    return timeVal.substring(0, 5);
+  }
+  if (timeVal instanceof Date) {
+    const hours = String(timeVal.getHours()).padStart(2, '0');
+    const mins = String(timeVal.getMinutes()).padStart(2, '0');
+    return `${hours}:${mins}`;
+  }
+  return String(timeVal);
+};
+
 export default function DiemChuanBi_DiemCong_GV() {
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const targetTripId = useMemo(() => {
+    const fromParam = searchParams.get('tripId');
+    if (fromParam) return Number(fromParam);
+    if (location.state?.selectedTripId) return Number(location.state.selectedTripId);
+    return null;
+  }, [searchParams, location.state]);
+
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -52,18 +102,137 @@ export default function DiemChuanBi_DiemCong_GV() {
     try {
       const res = await giangVienApi.getLedTrips(gvId);
       const tripsData = res.data || [];
-      const formattedTrips = tripsData.map(t => ({
-        id: t.id,
-        name: `${t.nhaMay?.ten_nha_may || 'Chuyến đi'} (${new Date(t.ngay_tham_quan || t.ngay_khoi_hanh || Date.now()).toLocaleDateString('vi-VN')})`
-      }));
+
+      const today = new Date();
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+      const formattedTrips = tripsData.map(t => {
+        const rawDate = t.ngay_tham_quan || t.ngay_khoi_hanh;
+        const tripDateStr = toDateStr(rawDate);
+        const isToday = tripDateStr === todayStr;
+        const isUpcoming = tripDateStr > todayStr;
+        const isPast = tripDateStr < todayStr;
+        const isLocked = Boolean(t.khoa_so_diem || t.trang_thai === 'DaKhoa');
+
+        let tagPrefix = '';
+        let sortGroup = 3; // 1: Today, 2: Upcoming, 3: Past
+
+        if (isToday) {
+          tagPrefix = '🔥 [HÔM NAY]';
+          sortGroup = 1;
+        } else if (isUpcoming) {
+          tagPrefix = '📅 [SẮP TỚI]';
+          sortGroup = 2;
+        } else if (isLocked) {
+          tagPrefix = '🔒 [ĐÃ KHÓA]';
+          sortGroup = 3;
+        } else {
+          tagPrefix = '✔ [ĐÃ QUA]';
+          sortGroup = 3;
+        }
+
+        const cachToChucPrefix = t.cach_to_chuc === 'TuDo' ? '[Tự do] ' : '';
+        const factoryName = t.nhaMay?.ten_nha_may || 'Chuyến đi';
+        const displayDate = toDisplayDate(rawDate);
+        const displayTime = toDisplayTime(t.gio_bat_dau);
+        const studentCount = `${t.so_luong_dang_ky_hien_tai ?? 0}/${t.so_luong_sinh_vien_toi_da ?? 0} SV`;
+        const lockStatus = isLocked ? 'Đã khóa sổ điểm' : 'Sổ điểm đang mở';
+
+        return {
+          id: t.id,
+          name: `${factoryName} (${displayDate})`,
+          dropdownLabel: `${tagPrefix} ${cachToChucPrefix}${factoryName} (${displayDate})`,
+          subLabel: `Khởi hành: ${displayTime} | Sĩ số: ${studentCount} | ${lockStatus}`,
+          cachToChuc: t.cach_to_chuc,
+          ngayThamQuan: t.ngay_tham_quan,
+          gioBatDau: t.gio_bat_dau,
+          trangThai: t.trang_thai,
+          tripDateStr,
+          isToday,
+          isUpcoming,
+          isPast,
+          isLocked,
+          sortGroup,
+          rawTrip: t,
+        };
+      });
+
+      // Sắp xếp phân nhóm thông minh:
+      // 1. Hôm nay (theo giờ bắt đầu)
+      // 2. Sắp tới (tăng dần: gần nhất -> xa hơn)
+      // 3. Đã qua / Đã khóa (giảm dần: mới nhất -> cũ hơn)
+      formattedTrips.sort((a, b) => {
+        if (a.sortGroup !== b.sortGroup) {
+          return a.sortGroup - b.sortGroup;
+        }
+        if (a.sortGroup === 1) {
+          return (a.gioBatDau || '').localeCompare(b.gioBatDau || '');
+        }
+        if (a.sortGroup === 2) {
+          if (a.tripDateStr !== b.tripDateStr) {
+            return a.tripDateStr.localeCompare(b.tripDateStr);
+          }
+          return (a.gioBatDau || '').localeCompare(b.gioBatDau || '');
+        }
+        // Nhóm 3 (Quá khứ / Đã khóa): Mới nhất lên đầu
+        if (b.tripDateStr !== a.tripDateStr) {
+          return b.tripDateStr.localeCompare(a.tripDateStr);
+        }
+        return (b.gioBatDau || '').localeCompare(a.gioBatDau || '');
+      });
+
       setTrips(formattedTrips);
+
       if (formattedTrips.length > 0) {
-        setSelectedTrip(formattedTrips[0]);
+        // Thuật toán chọn chuyến tối ưu
+        let optimal = null;
+
+        // 1. Khớp theo targetTripId nếu có
+        if (targetTripId) {
+          optimal = formattedTrips.find(t => Number(t.id) === Number(targetTripId));
+        }
+
+        // 2. Ưu tiên chuyến HÔM NAY chưa khóa điểm
+        if (!optimal) {
+          optimal = formattedTrips.find(t => t.isToday && !t.isLocked);
+        }
+
+        // 3. Ưu tiên chuyến HÔM NAY bất kỳ
+        if (!optimal) {
+          optimal = formattedTrips.find(t => t.isToday);
+        }
+
+        // 4. Ưu tiên chuyến SẮP TỚI gần nhất (đã sort ASC)
+        if (!optimal) {
+          optimal = formattedTrips.find(t => t.isUpcoming);
+        }
+
+        // 5. Fallback: chuyến đầu tiên trong danh sách
+        if (!optimal) {
+          optimal = formattedTrips[0];
+        }
+
+        setSelectedTrip(optimal);
+
+        // Đồng bộ URL param để khi F5 vẫn giữ chuyến
+        if (optimal) {
+          setSearchParams({ tripId: optimal.id }, { replace: true });
+        }
       }
     } catch (err) {
       console.error(err);
     }
   };
+
+  // Đồng bộ khi targetTripId thay đổi từ navigation bên ngoài
+  useEffect(() => {
+    if (targetTripId && trips.length > 0) {
+      const matched = trips.find(t => Number(t.id) === Number(targetTripId));
+      if (matched && matched.id !== selectedTrip?.id) {
+        setSelectedTrip(matched);
+      }
+    }
+  }, [targetTripId, trips]);
 
   useEffect(() => {
     if (selectedTrip) {
@@ -133,18 +302,21 @@ export default function DiemChuanBi_DiemCong_GV() {
   };
 
   const isTripLocked = useMemo(() => {
+    if (selectedTrip?.rawTrip?.trang_thai === 'DaKhoa') return true;
+    if (selectedTrip?.rawTrip?.lichKienTap?.trang_thai === 'DaKhoa') return true;
+    if (selectedTrip?.rawTrip?.lichKienTap?.dotKienTap?.trang_thai === 'DaKhoa') return true;
     if (students.length === 0) return false;
     return students.every(s => s.da_khoa || s.da_khoa_chuan_bi);
-  }, [students]);
+  }, [selectedTrip, students]);
 
   const lockDate = useMemo(() => {
     const s = students.find(s => s.ngay_khoa_chuan_bi);
     return s?.ngay_khoa_chuan_bi ? new Date(s.ngay_khoa_chuan_bi).toLocaleDateString('vi-VN') : null;
-  }, [students]);
+  }, [selectedTrip, students]);
 
   const missingCount = useMemo(() => {
     return students.filter(s => s.diemChuanBi === '' || s.diemChuanBi === null || s.diemChuanBi === undefined).length;
-  }, [students]);
+  }, [selectedTrip, students]);
 
   const handleOpenLockConfirm = () => {
     if (students.length === 0 || !selectedTrip) {
@@ -177,7 +349,7 @@ export default function DiemChuanBi_DiemCong_GV() {
       const records = students.map(student => ({
         phieuId: student.id,
         diemChuanBi: Number(student.diemChuanBi),
-        diemCong: Number(student.diemCong || 0)
+        diemCong: Number(student.diemCong ?? 0)
       }));
       await giangVienApi.gradePrepAndBonusBatch({
         tripId: selectedTrip.id,
@@ -215,7 +387,7 @@ export default function DiemChuanBi_DiemCong_GV() {
       const records = students.map(student => ({
         phieuId: student.id,
         diemChuanBi: student.diemChuanBi !== '' && student.diemChuanBi !== null && student.diemChuanBi !== undefined ? Number(student.diemChuanBi) : 0,
-        diemCong: Number(student.diemCong || 0)
+        diemCong: Number(student.diemCong ?? 0)
       }));
       await giangVienApi.gradePrepAndBonusBatch({
         tripId: selectedTrip.id,
@@ -459,7 +631,7 @@ export default function DiemChuanBi_DiemCong_GV() {
       const records = importPreview.matched.map(m => ({
         phieuId: m.id,
         diemChuanBi: Number(m.newDiemChuanBi),
-        diemCong: Number(m.newDiemCong || 0)
+        diemCong: Number(m.newDiemCong ?? 0)
       }));
 
       await giangVienApi.gradePrepAndBonusBatch({
@@ -643,16 +815,20 @@ export default function DiemChuanBi_DiemCong_GV() {
         <SearchableDropdown
           options={trips.map(t => ({
             value: t.id,
-            label: t.name
+            label: t.dropdownLabel || t.name,
+            subLabel: t.subLabel,
           }))}
           value={selectedTrip?.id || ''}
           onChange={(val) => {
             const found = trips.find(t => t.id === val);
-            if (found) setSelectedTrip(found);
+            if (found) {
+              setSelectedTrip(found);
+              setSearchParams({ tripId: found.id });
+            }
           }}
           placeholder={trips.length > 0 ? "Chọn chuyến đi..." : "Đang tải chuyến..."}
           searchPlaceholder="Tìm chuyến đi..."
-          className="min-w-[280px] flex-1"
+          className="min-w-[300px] flex-1"
         />
 
       </div>
@@ -720,7 +896,7 @@ export default function DiemChuanBi_DiemCong_GV() {
                           type="number"
                           min="0" max="10" step="0.1"
                           disabled={isTripLocked || student.da_khoa}
-                          value={student.diemChuanBi}
+                          value={student.diemChuanBi ?? ''}
                           onKeyDown={(e) => {
                             if (['-', '+', 'e', 'E'].includes(e.key)) e.preventDefault();
                           }}

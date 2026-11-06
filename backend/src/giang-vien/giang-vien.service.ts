@@ -29,6 +29,7 @@ import {
   LockCouncilGradeDto,
   UpdateCouncilStudentNoteDto,
   PrepBonusRecordItemDto,
+  ExtendReportDeadlineDto,
 } from './dto/giang-vien.dto';
 import * as xlsx from 'xlsx';
 
@@ -151,12 +152,12 @@ export class GiangVienService implements OnModuleInit {
       },
     });
 
-    return await Promise.all(
+    const result = await Promise.all(
       mappings.map(async (m) => {
         const count = await this.phieuRepo.count({
           where: {
             chuyen_tham_quan_id: m.chuyen_tham_quan_id,
-            trang_thai: In(['ChoDuyet', 'HopLe', 'DaThamGia', 'HoanThanh']),
+            trang_thai: In(['ChoDuyet', 'HopLe', 'DaThamGia', 'HoanThanh', 'KhongDat']),
           },
         });
 
@@ -168,6 +169,14 @@ export class GiangVienService implements OnModuleInit {
         };
       }),
     );
+
+    // Sắp xếp các chuyến đi: Chuyến mới nhất / sắp tới lên đầu
+    return result.sort((a, b) => {
+      const dateA = new Date(a?.ngay_tham_quan || 0).getTime();
+      const dateB = new Date(b?.ngay_tham_quan || 0).getTime();
+      if (dateB !== dateA) return dateB - dateA;
+      return (b?.id || 0) - (a?.id || 0);
+    });
   }
 
   // Lay danh sach SV trong chuyen tham quan de diem danh/nhap diem
@@ -189,7 +198,7 @@ export class GiangVienService implements OnModuleInit {
     const phieus = await this.phieuRepo.find({
       where: {
         chuyen_tham_quan_id: tripId,
-        trang_thai: In(['HopLe', 'DaThamGia', 'VangMat']),
+        trang_thai: In(['HopLe', 'DaThamGia', 'VangMat', 'HoanThanh', 'KhongDat']),
       },
       relations: { sinhVien: true },
     });
@@ -351,6 +360,11 @@ export class GiangVienService implements OnModuleInit {
             `Phiếu đăng ký #${phieu.id} không thuộc chuyến tham quan này`,
           );
         }
+        if (['HoanThanh', 'KhongDat'].includes(phieu.trang_thai)) {
+          throw new BadRequestException(
+            `Phiếu đăng ký #${phieu.id} đã hoàn thành hoặc đã khóa sổ điểm, không thể thay đổi điểm danh`,
+          );
+        }
         if (!['HopLe', 'DaThamGia', 'VangMat'].includes(phieu.trang_thai)) {
           throw new BadRequestException(
             `Phiếu đăng ký #${phieu.id} chưa được duyệt tham gia chuyến tham quan`,
@@ -367,6 +381,19 @@ export class GiangVienService implements OnModuleInit {
       const ptqMapByPhieuId = new Map(
         phieuTQs.map((ptq) => [ptq.phieu_dang_ky_id, ptq]),
       );
+
+      // Chặn sửa điểm danh nếu chuyến/phiếu đã khóa sổ điểm (da_khoa == true)
+      if (phieuTQIds.length > 0) {
+        const existingScores = await manager.find(DiemPhieuThamQuan, {
+          where: { phieu_tham_quan_id: In(phieuTQIds) },
+        });
+        const isAnyLocked = existingScores.some((d) => d.da_khoa);
+        if (isAnyLocked) {
+          throw new BadRequestException(
+            'Chuyến tham quan này đã được khóa sổ điểm, không thể thay đổi điểm danh',
+          );
+        }
+      }
 
       const existingDiemDanhs =
         phieuTQIds.length > 0
@@ -751,7 +778,7 @@ export class GiangVienService implements OnModuleInit {
     const phieus = await this.phieuRepo.find({
       where: {
         chuyen_tham_quan_id: tripId,
-        trang_thai: In(['HopLe', 'DaThamGia', 'VangMat']),
+        trang_thai: In(['HopLe', 'DaThamGia', 'VangMat', 'HoanThanh', 'KhongDat']),
       },
       relations: { sinhVien: true },
     });
@@ -1065,6 +1092,8 @@ export class GiangVienService implements OnModuleInit {
         report.phieuThamQuan?.diemPhieuThamQuan?.da_khoa_thu_hoach ?? false,
       ngay_khoa_thu_hoach:
         report.phieuThamQuan?.diemPhieuThamQuan?.ngay_khoa_thu_hoach ?? null,
+      han_nop_bao_cao: report.phieuThamQuan?.han_nop_bao_cao ?? null,
+      phieu_tham_quan_id: report.phieu_tham_quan_id,
     }));
 
     return {
@@ -1955,7 +1984,7 @@ export class GiangVienService implements OnModuleInit {
     const phieus = await this.phieuRepo.find({
       where: {
         chuyen_tham_quan_id: tripId,
-        trang_thai: In(['HopLe', 'ChoDuyet', 'DaThamGia', 'HoanThanh']),
+        trang_thai: In(['HopLe', 'ChoDuyet', 'DaThamGia', 'HoanThanh', 'KhongDat']),
       },
     });
 
@@ -2113,6 +2142,154 @@ export class GiangVienService implements OnModuleInit {
       message: `Đã khóa và nộp bảng điểm thu hoạch thành công (${toSave.length} bài thu hoạch).`,
       ngay_khoa: now,
     };
+  }
+
+  // Gia hạn nộp bài thu hoạch (GVHD)
+  async extendReportDeadline(lecturerId: number, dto: ExtendReportDeadlineDto) {
+    const phieuTQ = await this.phieuTQRepo.findOne({
+      where: { id: dto.phieuThamQuanId },
+      relations: {
+        phieuDangKy: {
+          sinhVien: true,
+          chuyenThamQuan: {
+            lichKienTap: {
+              dotKienTap: true,
+            },
+            nhaMay: true,
+          },
+        },
+        diemPhieuThamQuan: true,
+        baiThuHoach: true,
+      },
+    });
+
+    if (!phieuTQ) {
+      throw new NotFoundException('Không tìm thấy phiếu tham quan');
+    }
+
+    // 1. Quy tắc bất biến: Khóa cứng khi da_khoa_thu_hoach = true hoặc da_khoa = true
+    const diemPhieu = phieuTQ.diemPhieuThamQuan;
+    if (diemPhieu?.da_khoa_thu_hoach || diemPhieu?.da_khoa) {
+      throw new BadRequestException('Điểm bài thu hoạch đã bị khóa, không thể chỉnh sửa điểm hoặc gia hạn nộp bài!');
+    }
+
+    const dot = phieuTQ.phieuDangKy?.chuyenThamQuan?.lichKienTap?.dotKienTap;
+    if (dot && (dot.trang_thai === 'DaKetThuc' || dot.trang_thai === 'DaKhoa')) {
+      throw new BadRequestException('Đợt kiến tập đã kết thúc hoặc đã khóa sổ, không thể gia hạn!');
+    }
+
+    // 2. Kiểm tra quyền GVHD
+    const studentId = phieuTQ.phieuDangKy?.sinh_vien_id;
+    const dotId = dot?.id;
+
+    const assignment = await this.phanCongRepo.findOne({
+      where: {
+        giang_vien_id: lecturerId,
+        trang_thai: 'DangHoatDong',
+        dotKienTapSinhVien: {
+          sinh_vien_id: studentId,
+          ...(dotId ? { dot_kien_tap_id: dotId } : {}),
+        },
+      },
+      relations: { dotKienTapSinhVien: true },
+    });
+
+    if (!assignment) {
+      throw new ForbiddenException('Bạn không phải là Giảng viên hướng dẫn của sinh viên này trong đợt kiến tập.');
+    }
+
+    // 3. Xử lý tính toán hạn nộp mới
+    const inputDate = new Date(dto.ngayGiaHanMoi);
+    if (isNaN(inputDate.getTime())) {
+      throw new BadRequestException('Ngày gia hạn mới không hợp lệ.');
+    }
+    inputDate.setHours(23, 59, 59, 999);
+    const now = new Date();
+
+    if (inputDate <= now) {
+      throw new BadRequestException('Ngày gia hạn mới phải lớn hơn thời điểm hiện tại.');
+    }
+
+    let newHanNop: Date;
+    if (dto.loaiGiaHan === 'Khoa') {
+      // Chế độ 2: Mở khóa cổng nộp bù (SV quá 20 ngày, vẫn tính Trễ hạn)
+      // Mốc khóa mới = inputDate -> han_nop_bao_cao = inputDate - 10 ngày
+      const calculated = new Date(inputDate);
+      calculated.setDate(calculated.getDate() - 10);
+      calculated.setHours(23, 59, 59, 999);
+      newHanNop = calculated;
+      phieuTQ.han_nop_bao_cao = newHanNop;
+      await this.phieuTQRepo.save(phieuTQ);
+      // TUYỆT ĐỐI KHÔNG hồi tố TreHan -> DaNop ở chế độ Khoa
+    } else {
+      // Chế độ 1: Gia hạn nộp Đúng hạn (DungHan / CaHai)
+      newHanNop = inputDate;
+      phieuTQ.han_nop_bao_cao = newHanNop;
+      await this.phieuTQRepo.save(phieuTQ);
+
+      // Hồi tố: nếu đã nộp bài trước đó mà mang trạng thái 'TreHan' và ngay_nop <= newHanNop -> chuyển thành 'DaNop'
+      if (phieuTQ.baiThuHoach && phieuTQ.baiThuHoach.trang_thai === 'TreHan') {
+        const submitDate = new Date(phieuTQ.baiThuHoach.ngay_nop);
+        if (submitDate <= newHanNop) {
+          phieuTQ.baiThuHoach.trang_thai = 'DaNop';
+          await this.baiThuRepo.save(phieuTQ.baiThuHoach);
+        }
+      }
+    }
+
+    // 4. Nếu trước đó bị Cron gán 0đ tạm thời mà chưa nộp bài -> Reset điểm 0 để chờ SV nộp
+    if (diemPhieu && !phieuTQ.baiThuHoach && Number(diemPhieu.diem_thu_hoach) === 0 && !diemPhieu.da_khoa_thu_hoach) {
+      diemPhieu.diem_thu_hoach = null as any;
+      diemPhieu.nhan_xet_thu_hoach = null as any;
+      await this.diemPhieuRepo.save(diemPhieu);
+    }
+
+    const lockDate = dto.loaiGiaHan === 'Khoa' ? inputDate : new Date(newHanNop.getTime() + 10 * 24 * 60 * 60 * 1000);
+    return {
+      success: true,
+      message: dto.loaiGiaHan === 'Khoa'
+        ? `Đã mở khóa cổng nộp bù thành công đến 23:59 ngày ${inputDate.toLocaleDateString('vi-VN')}`
+        : `Đã gia hạn nộp đúng hạn thành công đến 23:59 ngày ${inputDate.toLocaleDateString('vi-VN')}`,
+      han_nop_bao_cao: newHanNop,
+      han_khoa: lockDate,
+    };
+  }
+
+  // Lấy toàn bộ chuyến tham quan của sinh viên hướng dẫn (cho Modal Hồ sơ kiến tập)
+  async getGuidedStudentTrips(lecturerId: number, studentId: number) {
+    const assignment = await this.phanCongRepo.findOne({
+      where: {
+        giang_vien_id: lecturerId,
+        trang_thai: 'DangHoatDong',
+        dotKienTapSinhVien: { sinh_vien_id: studentId },
+      },
+      relations: { dotKienTapSinhVien: true },
+    });
+
+    if (!assignment) {
+      throw new ForbiddenException('Bạn không phải là Giảng viên hướng dẫn của sinh viên này.');
+    }
+
+    const registrations = await this.phieuRepo.find({
+      where: {
+        sinh_vien_id: studentId,
+        trang_thai: In(['HopLe', 'DaThamGia', 'HoanThanh', 'VangMat', 'KhongDat']),
+      },
+      relations: {
+        chuyenThamQuan: {
+          nhaMay: true,
+          lichKienTap: { dotKienTap: true },
+        },
+        phieuThamQuan: {
+          diemPhieuThamQuan: true,
+          baiThuHoach: true,
+          diemDanh: true,
+        },
+      },
+      order: { id: 'DESC' },
+    });
+
+    return registrations;
   }
 }
 

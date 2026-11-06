@@ -43,6 +43,7 @@ import {
   BatchAssignGvhdDto,
   AutoAssignGvhdDto,
   ConfirmAutoAssignGvhdDto,
+  ImportGvhdAssignmentsDto,
   CreateBoardDto,
   UpdateBoardDto,
   AddBoardMemberDto,
@@ -532,6 +533,15 @@ export class KhoaController {
   }
 
   @Roles('QuanLyKhoa')
+  @Post('import-gvhd-assignments')
+  async importGvhdAssignments(@Body() body: ImportGvhdAssignmentsDto) {
+    return this.khoaService.importGvhdAssignments(
+      body.dotKienTapId,
+      body.assignments,
+    );
+  }
+
+  @Roles('QuanLyKhoa')
   @Post('assign-gvdd')
   async assignGvdd(@Body() body: AssignGvddDto) {
     return this.khoaService.assignTourLeader(
@@ -836,7 +846,7 @@ export class KhoaController {
         ? body.isApproved
         : body.status === 'Approved';
     const approverId = body.approverId ?? user?.sub ?? 1;
-    return this.khoaService.approveRefund(refundId, approverId, isApproved);
+    return this.khoaService.approveRefund(refundId, approverId, isApproved, body.reason);
   }
 
   @Roles('QuanLyKhoa')

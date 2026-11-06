@@ -50,10 +50,10 @@ export class CronService implements OnModuleInit {
         this.logger.error('Failed to execute autoLockExpiredBoChuyen', autoLockErr?.stack || autoLockErr);
       }
 
-      // 1. Khởi tạo bản ghi điểm (nếu chưa có) cho những Phiếu Tham Quan quá hạn 20 ngày mà chưa nộp bài
+      // 1. Khởi tạo bản ghi điểm (nếu chưa có) cho những Phiếu Tham Quan quá hạn 20 ngày mà chưa nộp bài (ghi nhận 0đ tạm thời, KHÔNG khóa cứng da_khoa_thu_hoach để GVHD vẫn có thể gia hạn)
       await this.dataSource.query(`
-        INSERT INTO DiemPhieuThamQuan (phieu_tham_quan_id, diem_thu_hoach, da_khoa_thu_hoach, ngay_khoa_thu_hoach)
-        SELECT ptq.id, 0, 1, SYSDATETIME()
+        INSERT INTO DiemPhieuThamQuan (phieu_tham_quan_id, diem_thu_hoach, da_khoa_thu_hoach, nhan_xet_thu_hoach)
+        SELECT ptq.id, 0, 0, N'Quá hạn nộp bài 21 ngày'
         FROM PhieuThamQuan ptq
         LEFT JOIN BaiThuHoach bth ON bth.phieu_tham_quan_id = ptq.id
         LEFT JOIN DiemPhieuThamQuan d ON d.phieu_tham_quan_id = ptq.id
@@ -63,19 +63,19 @@ export class CronService implements OnModuleInit {
           AND d.id IS NULL
       `);
 
-      // 2. Cập nhật 0 điểm đối với các bản ghi đã có sẵn nhưng bị null điểm thu hoạch
+      // 2. Cập nhật 0 điểm tạm thời đối với các bản ghi đã có sẵn nhưng bị null điểm thu hoạch (giữ da_khoa_thu_hoach = 0)
       await this.dataSource.query(`
         UPDATE DiemPhieuThamQuan
         SET diem_thu_hoach = 0,
-            da_khoa_thu_hoach = 1,
-            ngay_khoa_thu_hoach = SYSDATETIME()
+            nhan_xet_thu_hoach = COALESCE(d.nhan_xet_thu_hoach, N'Quá hạn nộp bài 21 ngày')
         FROM DiemPhieuThamQuan d
         JOIN PhieuThamQuan ptq ON ptq.id = d.phieu_tham_quan_id
         LEFT JOIN BaiThuHoach bth ON bth.phieu_tham_quan_id = ptq.id
         WHERE ptq.han_nop_bao_cao IS NOT NULL 
           AND SYSDATETIME() > DATEADD(DAY, 10, ptq.han_nop_bao_cao)
           AND bth.id IS NULL
-          AND (d.diem_thu_hoach IS NULL OR d.da_khoa_thu_hoach = 0 OR d.da_khoa_thu_hoach IS NULL)
+          AND d.diem_thu_hoach IS NULL
+          AND (d.da_khoa_thu_hoach = 0 OR d.da_khoa_thu_hoach IS NULL)
       `);
 
       this.logger.log('Executed daily lifecycle updates successfully.');
