@@ -33,7 +33,9 @@ try:
         ACTIVE_GRADING_PROFILE,
         ACTIVE_OCR_PROFILE,
         PROFILE_GRADING_QWEN38_MAX,
-        PROFILE_GRADING_DEEPSEEK_FLASH_1017
+        PROFILE_GRADING_DEEPSEEK_FLASH_1017,
+        PROFILE_OCR_QWEN38_OMNI_FLASH,
+        PROFILE_OCR_DEEPSEEK_FLASH
     )
 except ImportError:
     try:
@@ -41,7 +43,9 @@ except ImportError:
             ACTIVE_GRADING_PROFILE,
             ACTIVE_OCR_PROFILE,
             PROFILE_GRADING_QWEN38_MAX,
-            PROFILE_GRADING_DEEPSEEK_FLASH_1017
+            PROFILE_GRADING_DEEPSEEK_FLASH_1017,
+            PROFILE_OCR_QWEN38_OMNI_FLASH,
+            PROFILE_OCR_DEEPSEEK_FLASH
         )
     except ImportError:
         # Fallback an toàn mặc định nếu chưa kéo file model_profiles.py
@@ -59,6 +63,15 @@ except ImportError:
             "response_format": {"type": "json_object"},
             "extra_body": {"enable_thinking": False}
         }
+        PROFILE_OCR_QWEN38_OMNI_FLASH = {
+            "model_name": "qwen3.8-omni-flash",
+            "fallback_model_name": "qwen3.8-max-0902",
+            "temperature": 0.01,
+            "max_tokens": 4000,
+            "modalities": ["text"],
+            "stream": False,
+            "extra_body": {"enable_thinking": False}
+        }
         PROFILE_OCR_DEEPSEEK_FLASH = {
             "model_name": "deepseek-v4.1-flash-1017",
             "fallback_model_name": "qwen3.8-max-0902",
@@ -68,7 +81,7 @@ except ImportError:
             "extra_body": {"enable_thinking": False}
         }
         ACTIVE_GRADING_PROFILE = PROFILE_GRADING_DEEPSEEK_FLASH_1017
-        ACTIVE_OCR_PROFILE = PROFILE_OCR_DEEPSEEK_FLASH
+        ACTIVE_OCR_PROFILE = PROFILE_OCR_QWEN38_OMNI_FLASH
 
 # ==========================================
 # CẤU HÌNH KHỞI TẠO & MÔI TRƯỜNG
@@ -181,20 +194,20 @@ async def ocr_single_page(
         return {"page_idx": page_idx, "text": "", "is_blank": True, "success": True}
 
     b64_url = pil_to_base64(pil_img)
-    primary_model = ACTIVE_OCR_PROFILE.get("model_name", "deepseek-v4.1-flash-1017")
+    primary_model = ACTIVE_OCR_PROFILE.get("model_name", "qwen3.8-omni-flash")
     fallback_model = ACTIVE_OCR_PROFILE.get("fallback_model_name", "qwen3.8-max-0902")
     temperature = ACTIVE_OCR_PROFILE.get("temperature", 0.01)
     max_tokens = ACTIVE_OCR_PROFILE.get("max_tokens", 4000)
     extra_body = ACTIVE_OCR_PROFILE.get("extra_body", {"enable_thinking": False})
+    modalities = ACTIVE_OCR_PROFILE.get("modalities")
 
     async with GLOBAL_OCR_SEMAPHORE:
         for attempt in range(3):
-            # Lần 1 và 2 dùng model chính (deepseek-v4.1-flash-1017), lần 3 fallback sang model dự phòng (qwen3.8-max-0902)
             current_model = primary_model if attempt < 2 else fallback_model
             try:
-                response = await client.chat.completions.create(
-                    model=current_model,
-                    messages=[
+                call_kwargs = {
+                    "model": current_model,
+                    "messages": [
                         {
                             "role": "user",
                             "content": [
@@ -203,11 +216,16 @@ async def ocr_single_page(
                             ]
                         }
                     ],
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    stream=False,
-                    extra_body=extra_body
-                )
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                    "stream": False
+                }
+                if modalities and "omni" in current_model:
+                    call_kwargs["modalities"] = modalities
+                if extra_body:
+                    call_kwargs["extra_body"] = extra_body
+
+                response = await client.chat.completions.create(**call_kwargs)
 
                 ocr_text = ""
                 if response.choices and len(response.choices) > 0:
@@ -264,41 +282,25 @@ async def process_pdf_endpoint(file: UploadFile = File(...)):
         if elem.get("type") == "handwritten_image":
             tasks.append(ocr_single_page(idx, elem["content"], vlm_prompt))
 
-    # Chạy song song toàn bộ các trang (được xếp hàng qua GLOBAL_OCR_SEMAPHORE)
+    # Chạy song song toàn bộ các trang (được kiểm soát bởi GLOBAL_OCR_SEMAPHORE)
     results = await asyncio.gather(*tasks)
 
-    # Sắp xếp lại theo đúng thứ tự số trang (page_idx: 0, 1, 2...)
+    # Ghép văn bản tuần tự đúng theo thứ tự trang
     sorted_results = sorted(results, key=lambda x: x["page_idx"])
-
-    extracted_pages = []
-    total_non_blank = 0
-    failed_pages_count = 0
+    final_text_blocks = []
+    failed_pages = []
 
     for res in sorted_results:
-        if not res["is_blank"]:
-            total_non_blank += 1
-            if not res["success"] or not res["text"]:
-                failed_pages_count += 1
-            else:
-                extracted_pages.append(res["text"].strip())
+        if not res["success"]:
+            failed_pages.append(res["page_idx"] + 1)
+        elif res["text"]:
+            final_text_blocks.append(res["text"])
 
-    final_text = "\n\n".join(extracted_pages).strip()
+    if failed_pages:
+        print(f"⚠️ Cảnh báo: Các trang sau trích xuất thất bại sau 3 lần retry: {failed_pages}")
 
-    # Dọn dẹp bộ nhớ ảnh sau khi xử lý xong
-    for elem in elements:
-        if "content" in elem:
-            del elem["content"]
-    del elements
-    gc.collect()
-
-    # Task 1: Nếu toàn bộ bài nộp không trích xuất được ký tự nào hoặc tỉ lệ lỗi > 50% số trang có nội dung
-    if total_non_blank > 0 and (len(final_text) < 10 or (failed_pages_count / total_non_blank) > 0.5):
-        raise HTTPException(
-            status_code=502,
-            detail="Không thể nhận diện nội dung văn bản từ các trang scan. Vui lòng kiểm tra lại chất lượng file PDF hoặc thử lại."
-        )
-
-    return {"extracted_text": final_text}
+    final_text = "\n\n".join(final_text_blocks)
+    return {"extracted_text": final_text.strip()}
 
 
 # ==========================================
