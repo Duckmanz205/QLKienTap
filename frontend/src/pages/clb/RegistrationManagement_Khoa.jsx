@@ -102,6 +102,10 @@ export default function RegistrationManagement_Khoa() {
     );
   };
 
+  // Helper kiểm tra chuyến đã hoàn tất chốt danh sách và không còn đơn chờ duyệt mới
+  const hasPendingStudents = registrations.some((r) => r.trang_thai === 'ChoDuyet');
+  const isAlreadyFinalized = selectedTripForReg?.trang_thai === 'DaChotDanhSach' && !hasPendingStudents;
+
   useEffect(() => {
     fetchTrips();
     fetchGlobalCancelRequests();
@@ -253,6 +257,10 @@ export default function RegistrationManagement_Khoa() {
     if (!selectedTripForReg) return;
     if (isTripLocked(selectedTripForReg)) {
       showPopup('Chuyến đi đã diễn ra, đã kết thúc hoặc đã khóa sổ điểm, không thể chốt lại danh sách', 'error');
+      return;
+    }
+    if (isAlreadyFinalized) {
+      showPopup('Chuyến tham quan này đã hoàn tất chốt danh sách chính thức và không có sinh viên chờ duyệt mới.', 'info');
       return;
     }
 
@@ -1188,26 +1196,40 @@ export default function RegistrationManagement_Khoa() {
                           <CheckCircle2 className="w-4 h-4 text-slate-400" />
                           Chuyến đã diễn ra / Đã khóa danh sách
                         </span>
+                      ) : isAlreadyFinalized ? (
+                        <span className="px-4 py-2 bg-emerald-50 text-[#407F3E] rounded-xl text-xs sm:text-sm font-bold border border-emerald-200 flex items-center gap-2 cursor-default select-none shadow-sm">
+                          <CheckCircle2 className="w-4 h-4 text-[#407F3E]" />
+                          Đã chốt danh sách chính thức ({selectedStudentIds.size} SV)
+                        </span>
                       ) : (
                         <button
                           onClick={handleConfirmAssignStudents}
                           className="px-5 py-2 bg-[#407F3E] hover:bg-[#407F3E]/90 text-white rounded-xl text-sm font-bold transition-colors shadow-sm flex items-center gap-2 cursor-pointer"
                         >
                           <CheckCircle2 className="w-4 h-4" />
-                          Chốt danh sách chính thức ({selectedStudentIds.size} SV)
+                          {selectedTripForReg?.trang_thai === 'DaChotDanhSach' && hasPendingStudents
+                            ? `Chốt danh sách bổ sung (${selectedStudentIds.size} SV)`
+                            : `Chốt danh sách chính thức (${selectedStudentIds.size} SV)`}
                         </button>
                       )}
                     </div>
                   </div>
 
-                  {isTripLocked(selectedTripForReg) && (
+                  {isTripLocked(selectedTripForReg) ? (
                     <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-xl p-3.5 text-xs sm:text-sm flex items-center gap-2.5">
                       <Info className="w-4 h-4 text-blue-600 shrink-0" />
                       <span>
                         Chuyến tham quan này <strong>đã diễn ra hoặc đã khóa sổ điểm</strong>. Danh sách sinh viên đã được chốt và khóa cố định, không thể thay đổi. Vui lòng chuyển sang tab <strong>"Danh sách sinh viên đã chốt"</strong> để xem hoặc xuất Excel danh sách sinh viên chính thức.
                       </span>
                     </div>
-                  )}
+                  ) : isAlreadyFinalized ? (
+                    <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl p-3.5 text-xs sm:text-sm flex items-center gap-2.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>
+                        Chuyến tham quan này <strong>đã hoàn tất chốt danh sách chính thức</strong>. Toàn bộ sinh viên hợp lệ đã được ghi nhận vào hệ thống. Bạn có thể chuyển sang tab <strong>"Danh sách sinh viên đã chốt"</strong> để xem thông tin chi tiết và xuất danh sách Excel.
+                      </span>
+                    </div>
+                  ) : null}
 
                   {/* Filter Toolbar: Search + Filter Tabs (Đã loại bỏ nút sort thừa) */}
                   <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-4">
@@ -1340,8 +1362,8 @@ export default function RegistrationManagement_Khoa() {
                                         {countAttended}/3 chuyến
                                       </span>
                                     ) : (
-                                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600 border border-slate-300 shadow-xs" title="Đã hoàn thành tối đa 3 chuyến">
-                                        3/3 (Đã đủ)
+                                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200 shadow-xs" title={`Đã hoàn thành ${countAttended} chuyến (Đăng ký đi cải thiện)`}>
+                                        {countAttended}/3 (Đi cải thiện)
                                       </span>
                                     )}
                                   </td>
@@ -1394,7 +1416,7 @@ export default function RegistrationManagement_Khoa() {
                                     {r.ngay_dang_ky ? new Date(r.ngay_dang_ky).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }) : '--'}
                                   </td>
                                   <td className="py-3 pr-6 pl-3 text-right" onClick={(e) => e.stopPropagation()}>
-                                    {!isTripLocked(selectedTripForReg) && (
+                                    {!isTripLocked(selectedTripForReg) && !isAlreadyFinalized ? (
                                       isAccepted ? (
                                         <button
                                           onClick={(e) => { e.stopPropagation(); moveStudent(studentId, false); }}
@@ -1420,7 +1442,11 @@ export default function RegistrationManagement_Khoa() {
                                           <ArrowUp className="w-3.5 h-3.5" /> Hợp lệ
                                         </button>
                                       )
-                                    )}
+                                    ) : isAlreadyFinalized ? (
+                                      <span className="text-xs font-semibold text-emerald-600 inline-flex items-center gap-1 justify-end">
+                                        <CheckCircle2 className="w-3.5 h-3.5" /> Đã chốt
+                                      </span>
+                                    ) : null}
                                   </td>
                                 </tr>
                               );

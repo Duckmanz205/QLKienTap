@@ -12,21 +12,71 @@ import SearchableDropdown from '../../components/SearchableDropdown';
 export default function LichTrinhDoan_SV() {
   const navigate = useNavigate();
   const [searchStudent, setSearchStudent] = useState('');
-  const [student, setStudent] = useState(null);
+  const [student, setStudent] = useState(() => {
+    try {
+      const userJson = localStorage.getItem('user');
+      if (userJson) {
+        const parsed = JSON.parse(userJson);
+        return parsed?.user?.details || null;
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  });
   const [trips, setTrips] = useState([]);
   const [selectedTrip, setSelectedTrip] = useState(null);
   const [students, setStudents] = useState([]);
   const [lecturers, setLecturers] = useState([]);
   const [enterpriseContact, setEnterpriseContact] = useState(null);
+  const [loading, setLoading] = useState(!student);
+  const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
     const userJson = localStorage.getItem('user');
-    if (userJson) {
-      const { user } = JSON.parse(userJson);
-      sinhVienApi.getProfile(user.id).then(res => {
-        setStudent(res.data);
-        fetchTrips(res.data.id);
-      }).catch(err => console.error(err));
+    if (!userJson) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(userJson);
+      const userObj = parsed?.user;
+      const accountId = userObj?.id;
+      const cachedStudentId = userObj?.details?.id;
+
+      if (cachedStudentId) {
+        fetchTrips(cachedStudentId);
+      }
+
+      if (accountId) {
+        sinhVienApi.getProfile(accountId).then(res => {
+          if (res.data) {
+            setStudent(res.data);
+            if (!cachedStudentId || cachedStudentId !== res.data.id) {
+              fetchTrips(res.data.id);
+            }
+            if (userObj && (!userObj.details || userObj.details.id !== res.data.id)) {
+              localStorage.setItem('user', JSON.stringify({
+                ...parsed,
+                user: { ...userObj, details: res.data }
+              }));
+            }
+          }
+        }).catch(err => {
+          console.error('Lỗi khi tải thông tin sinh viên:', err);
+          if (!student) {
+            setErrorMsg('Không thể tải thông tin sinh viên. Vui lòng thử lại sau.');
+          }
+        }).finally(() => {
+          setLoading(false);
+        });
+      } else {
+        setLoading(false);
+      }
+    } catch (err) {
+      console.error(err);
+      setLoading(false);
     }
   }, []);
 
@@ -157,7 +207,32 @@ export default function LichTrinhDoan_SV() {
     );
   };
 
-  if (!student) return <div className="p-6 text-slate-600">Đang tải dữ liệu...</div>;
+  if (loading && !student) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-slate-500 font-medium">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#407F3E] mb-3"></div>
+        <span>Đang tải dữ liệu lịch trình...</span>
+      </div>
+    );
+  }
+
+  if (!student) {
+    return (
+      <div className="p-6 max-w-lg mx-auto mt-12">
+        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-6 text-center text-rose-700 shadow-sm">
+          <AlertCircle className="w-10 h-10 text-rose-500 mx-auto mb-3" />
+          <p className="font-bold text-base mb-1">Không thể tải thông tin sinh viên</p>
+          <p className="text-xs text-rose-600 mb-4">{errorMsg || 'Vui lòng kiểm tra lại kết nối mạng hoặc thử đăng nhập lại.'}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="px-4 py-2 bg-[#407F3E] text-white rounded-xl font-bold text-xs hover:bg-[#326330] shadow-sm transition-all"
+          >
+            Tải lại trang
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const ctq = selectedTrip?.chuyenThamQuan;
   const ptq = selectedTrip?.phieuThamQuan;

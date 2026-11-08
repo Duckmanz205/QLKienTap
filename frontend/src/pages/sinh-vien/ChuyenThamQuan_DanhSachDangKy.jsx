@@ -11,7 +11,18 @@ import SearchableDropdown from '../../components/SearchableDropdown';
 export default function ChuyenThamQuan_DanhSachDangKy() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('coTheDangKy');
-  const [student, setStudent] = useState(null);
+  const [student, setStudent] = useState(() => {
+    try {
+      const userJson = localStorage.getItem('user');
+      if (userJson) {
+        const parsed = JSON.parse(userJson);
+        return parsed?.user?.details || null;
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  });
   const [factories, setFactories] = useState([]);
 
   const [availableTrips, setAvailableTrips] = useState([]);
@@ -73,11 +84,35 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
   useEffect(() => {
     const userJson = localStorage.getItem('user');
     if (userJson) {
-      const { user } = JSON.parse(userJson);
-      sinhVienApi.getProfile(user.id).then(res => {
-        setStudent(res.data);
-        fetchData(res.data.id);
-      }).catch(err => console.error(err));
+      try {
+        const parsed = JSON.parse(userJson);
+        const userObj = parsed?.user;
+        const accountId = userObj?.id;
+        const cachedStudentId = userObj?.details?.id;
+
+        if (cachedStudentId) {
+          fetchData(cachedStudentId);
+        }
+
+        if (accountId) {
+          sinhVienApi.getProfile(accountId).then(res => {
+            if (res.data) {
+              setStudent(res.data);
+              if (!cachedStudentId || cachedStudentId !== res.data.id) {
+                fetchData(res.data.id);
+              }
+              if (userObj && (!userObj.details || userObj.details.id !== res.data.id)) {
+                localStorage.setItem('user', JSON.stringify({
+                  ...parsed,
+                  user: { ...userObj, details: res.data }
+                }));
+              }
+            }
+          }).catch(err => console.error('Lỗi khi tải thông tin sinh viên:', err));
+        }
+      } catch (e) {
+        console.error(e);
+      }
     }
     sinhVienApi.getFactories().then(res => setFactories(res.data || [])).catch(err => console.error(err));
   }, []);
@@ -178,13 +213,27 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
     });
   };
 
-  const handleCancelRegistration = (registrationId) => {
+  const handleWithdrawRegistration = (reg) => {
+    const tenNhaMay = reg.chuyenThamQuan?.nhaMay?.ten_nha_may || 'này';
     setConfirmModal({
       isOpen: true,
-      title: 'Hủy đăng ký',
-      message: 'Vui lòng nhập lý do hủy đăng ký chuyến kiến tập này:',
+      title: 'Rút đơn đăng ký',
+      message: `Bạn có chắc chắn muốn rút đơn đăng ký chuyến tham quan tại ${tenNhaMay}? Chuyến đi chưa chốt danh sách nên việc rút đơn hoàn toàn tự do và bạn có thể đăng ký lại bất cứ lúc nào trước khi hết hạn.`,
+      type: 'withdraw',
+      targetId: reg.id,
+      reason: ''
+    });
+  };
+
+  const handleCancelRegistration = (regOrId) => {
+    let regId = typeof regOrId === 'object' ? regOrId.id : regOrId;
+    let tenNhaMay = typeof regOrId === 'object' ? (regOrId.chuyenThamQuan?.nhaMay?.ten_nha_may || 'này') : 'này';
+    setConfirmModal({
+      isOpen: true,
+      title: 'Yêu cầu hủy chuyến tham quan',
+      message: `Chuyến tham quan tại ${tenNhaMay} đã chốt danh sách chính thức. Nếu hủy không có minh chứng chính đáng (trùng lịch thi, ốm đau...), bạn sẽ bị xử phạt cấm đăng ký trong 03 chuyến tiếp theo theo quy chế CLB. Vui lòng nhập lý do hủy:`,
       type: 'cancel',
-      targetId: registrationId,
+      targetId: regId,
       reason: ''
     });
   };
@@ -212,6 +261,14 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
       } catch (err) {
         showPopup(err.response?.data?.message || 'Có lỗi xảy ra', 'error');
       }
+    } else if (confirmModal.type === 'withdraw') {
+      try {
+        const res = await sinhVienApi.requestCancel({ registrationId: confirmModal.targetId });
+        showPopup(res.data?.message || 'Đã rút đơn đăng ký thành công!', 'success');
+        fetchData(student.id);
+      } catch (err) {
+        showPopup(err.response?.data?.message || 'Có lỗi xảy ra', 'error');
+      }
     } else if (confirmModal.type === 'cancel') {
       if (!confirmModal.reason.trim()) {
         showPopup('Vui lòng nhập lý do hủy', 'error');
@@ -219,8 +276,8 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
         return;
       }
       try {
-        await sinhVienApi.requestCancel({ registrationId: confirmModal.targetId, lyDo: confirmModal.reason });
-        showPopup('Đã gửi yêu cầu hủy đăng ký', 'success');
+        const res = await sinhVienApi.requestCancel({ registrationId: confirmModal.targetId, lyDo: confirmModal.reason });
+        showPopup(res.data?.message || 'Đã gửi yêu cầu hủy đăng ký', 'success');
         fetchData(student.id);
       } catch (err) {
         showPopup(err.response?.data?.message || 'Có lỗi xảy ra', 'error');
@@ -392,9 +449,21 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
               <button
                 disabled={isActionSubmitting}
                 onClick={handleConfirmAction}
-                className={`px-6 py-2.5 text-white rounded-xl text-sm font-bold transition-colors shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${confirmModal.type === 'cancel' || confirmModal.type === 'cancel_proposal' ? 'bg-[#E68A8C] hover:bg-[#E68A8C]/90' : 'bg-[#407F3E] hover:bg-[#407F3E]/90'}`}
+                className={`px-6 py-2.5 text-white rounded-xl text-sm font-bold transition-colors shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                  confirmModal.type === 'withdraw'
+                    ? 'bg-amber-600 hover:bg-amber-700'
+                    : confirmModal.type === 'cancel' || confirmModal.type === 'cancel_proposal'
+                    ? 'bg-[#E68A8C] hover:bg-[#E68A8C]/90'
+                    : 'bg-[#407F3E] hover:bg-[#407F3E]/90'
+                }`}
               >
-                {isActionSubmitting ? 'Đang xử lý...' : 'Xác nhận'}
+                {isActionSubmitting
+                  ? 'Đang xử lý...'
+                  : confirmModal.type === 'withdraw'
+                  ? 'Rút đơn ngay'
+                  : confirmModal.type === 'cancel' || confirmModal.type === 'cancel_proposal'
+                  ? 'Xác nhận hủy'
+                  : 'Xác nhận'}
               </button>
             </div>
           </div>
@@ -1006,7 +1075,8 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                             const isOnline = trip?.hinh_thuc === 'TrucTuyen';
                             const tripDate = trip?.ngay_tham_quan ? new Date(trip.ngay_tham_quan) : null;
                             const isPastTrip = tripDate ? new Date(tripDate).setHours(0, 0, 0, 0) < new Date().setHours(0, 0, 0, 0) : false;
-                            const canCancel = (reg.trang_thai === 'ChoDuyet' || reg.trang_thai === 'HopLe') && !isPastTrip && trip?.trang_thai !== 'DaDienRa';
+                            const isWaitingApproval = reg.trang_thai === 'ChoDuyet';
+                            const isOfficialApproved = reg.trang_thai === 'HopLe';
 
                             return (
                               <tr key={reg.id} className="hover:bg-slate-50 transition-colors">
@@ -1064,12 +1134,21 @@ export default function ChuyenThamQuan_DanhSachDangKy() {
                                         Thanh toán ngay
                                       </button>
                                     )}
-                                    {canCancel ? (
+                                    {isWaitingApproval && !isPastTrip && trip?.trang_thai !== 'DaDienRa' ? (
                                       <button
-                                        onClick={() => handleCancelRegistration(reg.id)}
-                                        className="text-xs font-bold text-[#E68A8C] hover:text-[#E68A8C]/70 hover:underline transition-colors cursor-pointer"
+                                        onClick={() => handleWithdrawRegistration(reg)}
+                                        className="text-xs font-bold text-amber-600 hover:text-amber-700 hover:underline transition-colors cursor-pointer"
+                                        title="Rút đơn tự do khi chưa chốt danh sách, không bị phạt"
                                       >
-                                        Hủy đăng ký
+                                        Rút đăng ký
+                                      </button>
+                                    ) : isOfficialApproved && !isPastTrip && trip?.trang_thai !== 'DaDienRa' ? (
+                                      <button
+                                        onClick={() => handleCancelRegistration(reg)}
+                                        className="text-xs font-bold text-[#E68A8C] hover:text-[#E68A8C]/70 hover:underline transition-colors cursor-pointer"
+                                        title="Yêu cầu hủy chuyến đã chốt danh sách chính thức"
+                                      >
+                                        Yêu cầu hủy
                                       </button>
                                     ) : (reg.trang_thai === 'BiLoai' || reg.trang_thai === 'DaHuy') && trip?.trang_thai === 'MoDangKy' && !isPastTrip ? (
                                       <button

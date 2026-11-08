@@ -10,7 +10,18 @@ import { sinhVienApi } from '../../services/api';
 import Toast from '../../components/Toast';
 
 export default function NopBaiThuHoach_SV() {
-  const [student, setStudent] = useState(null);
+  const [student, setStudent] = useState(() => {
+    try {
+      const userJson = localStorage.getItem('user');
+      if (userJson) {
+        const parsed = JSON.parse(userJson);
+        return parsed?.user?.details || null;
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  });
   const [trips, setTrips] = useState([]);
   const [selectedTrip, setSelectedTrip] = useState(null);
   const [uploadedFile, setUploadedFile] = useState(null);
@@ -37,14 +48,38 @@ export default function NopBaiThuHoach_SV() {
   };
 
   useEffect(() => {
+    fetchRepStatus();
     const userJson = localStorage.getItem('user');
     if (userJson) {
-      const { user } = JSON.parse(userJson);
-      sinhVienApi.getProfile(user.id).then(res => {
-        setStudent(res.data);
-        fetchTrips(res.data.id);
-        fetchRepStatus();
-      }).catch(err => console.error(err));
+      try {
+        const parsed = JSON.parse(userJson);
+        const userObj = parsed?.user;
+        const accountId = userObj?.id;
+        const cachedStudentId = userObj?.details?.id;
+
+        if (cachedStudentId) {
+          fetchTrips(cachedStudentId);
+        }
+
+        if (accountId) {
+          sinhVienApi.getProfile(accountId).then(res => {
+            if (res.data) {
+              setStudent(res.data);
+              if (!cachedStudentId || cachedStudentId !== res.data.id) {
+                fetchTrips(res.data.id);
+              }
+              if (userObj && (!userObj.details || userObj.details.id !== res.data.id)) {
+                localStorage.setItem('user', JSON.stringify({
+                  ...parsed,
+                  user: { ...userObj, details: res.data }
+                }));
+              }
+            }
+          }).catch(err => console.error('Lỗi khi tải thông tin sinh viên:', err));
+        }
+      } catch (e) {
+        console.error(e);
+      }
     }
   }, []);
 
@@ -207,15 +242,17 @@ export default function NopBaiThuHoach_SV() {
       setUploadedFile({
         name: res.data.fileName || res.data.originalName || file.name,
         size: (file.size / (1024 * 1024)).toFixed(1) + ' MB',
-        text: res.data.extractedText || "",
+        text: res.data.extractedText || "⏳ Đang xếp hàng nhận diện chữ viết tay...",
         url: url,
         key: res.data.key,
         previewUrl: previewUrl,
         rawFile: file
       });
+      showPopup('Tải lên bài thu hoạch thành công!', 'success');
     } catch (err) {
       console.error(err);
-      showPopup('Lỗi tải tệp lên. Xin thử lại.', 'error');
+      const errMsg = err.response?.data?.message || 'Lỗi tải tệp lên. Xin thử lại.';
+      showPopup(errMsg, 'error');
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = null;
@@ -372,13 +409,13 @@ export default function NopBaiThuHoach_SV() {
             } else if (trip.baiThuHoach.noi_dung_trich_xuat) {
               extractedText = trip.baiThuHoach.noi_dung_trich_xuat;
             } else {
-              extractedText = '⏳ Hệ thống đang nhận diện chữ viết tay từ bản scan (OCR)...';
+              extractedText = '⏳ Đang xếp hàng nhận diện chữ viết tay từ bản scan (OCR)...';
             }
           } catch (txtErr) {
             if (trip.baiThuHoach.noi_dung_trich_xuat) {
               extractedText = trip.baiThuHoach.noi_dung_trich_xuat;
             } else {
-              extractedText = '⏳ Hệ thống đang nhận diện chữ viết tay từ bản scan (OCR)...';
+              extractedText = '⏳ Đang xếp hàng nhận diện chữ viết tay từ bản scan (OCR)...';
             }
           }
         }

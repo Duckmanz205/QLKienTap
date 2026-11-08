@@ -677,14 +677,14 @@ export default function SupervisorAssignment_Khoa() {
       {toast.show && <Toast message={toast.message} type={toast.type} onClose={() => setToast({ show: false, message: '', type: 'success' })} />}
 
       {/* Header & Filter */}
-      <div className="mb-4">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-4 mb-4">
-          <div>
+      <div className="mb-4 relative z-30">
+        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-end gap-4 mb-4">
+          <div className="shrink min-w-0">
             <h1 className="text-2xl font-bold text-slate-800">Phân công GVHD</h1>
             <p className="text-slate-500 text-sm mt-1">Quản lý và phân bổ sinh viên cho giảng viên hướng dẫn</p>
           </div>
 
-          <div className="flex flex-wrap items-end gap-3 w-full lg:w-auto">
+          <div className="flex items-end gap-2.5 sm:gap-3 shrink-0 flex-nowrap w-full sm:w-auto overflow-x-auto sm:overflow-visible pb-1 sm:pb-0">
             {/* Input file ẩn cho Import Excel */}
             <input
               type="file"
@@ -694,23 +694,23 @@ export default function SupervisorAssignment_Khoa() {
               className="hidden"
             />
 
-            {/* Nút Nhập Excel gọn gàng cạnh Xuất báo cáo */}
+            {/* 1. Nút Nhập Excel */}
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={!selectedCampaign || loading}
-              className="px-4 py-2 bg-white text-[#407F3E] border border-[#407F3E] hover:bg-[#407F3E]/5 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+              className="h-[42px] px-3.5 sm:px-4 bg-white text-[#407F3E] border border-[#407F3E] hover:bg-[#407F3E]/5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap shrink-0"
               title="Nhập danh sách phân công GVHD từ file Excel"
             >
               <Upload className="w-4 h-4" />
               Nhập Excel
             </button>
 
-            {/* Nút Xuất báo cáo (Đồng bộ chuẩn theo trang Kết quả kiến tập) */}
-            <div className="relative" ref={exportMenuRef}>
+            {/* 2. Nút Xuất báo cáo */}
+            <div className="relative shrink-0" ref={exportMenuRef}>
               <button
                 onClick={() => setIsExportDropdownOpen(prev => !prev)}
                 disabled={enrollments.length === 0}
-                className={`px-4 py-2 bg-white text-[#407F3E] border border-[#407F3E] hover:bg-[#407F3E]/5 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed`}
+                className="h-[42px] px-3.5 sm:px-4 bg-white text-[#407F3E] border border-[#407F3E] hover:bg-[#407F3E]/5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                 title="Xuất file Excel danh sách phân công GVHD"
               >
                 <Download className="w-4 h-4" />
@@ -768,8 +768,9 @@ export default function SupervisorAssignment_Khoa() {
                 </div>
               )}
             </div>
-            {/* Bộ lọc Đợt kiến tập */}
-            <div className="w-full sm:w-[300px]">
+
+            {/* 3. Bộ lọc Đợt kiến tập */}
+            <div className="w-[230px] sm:w-[260px] shrink-0">
               <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Đợt kiến tập</label>
               <SearchableDropdown
                 options={campaignOptions}

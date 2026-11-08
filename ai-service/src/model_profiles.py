@@ -62,14 +62,15 @@ PROFILE_GRADING_DEEPSEEK_FLASH_1017 = {
 }
 
 # ==============================================================================
-# PROFILE 3: DEEPSEEK V4.1 FLASH (BẢN GỐC) - OCR VISION TRÍCH XUẤT VĂN BẢN
+# PROFILE 3: DEEPSEEK V4.1 FLASH 1017 - OCR VISION TRÍCH XUẤT VĂN BẢN
 # ==============================================================================
 PROFILE_OCR_DEEPSEEK_FLASH = {
-    "model_name": "deepseek-v4.1-flash",
-    "description": "Mô hình trích xuất thị giác ảnh PDF tiếng Việt, sơ đồ khối, bảng kiểm tra VSATTP.",
+    "model_name": "deepseek-v4.1-flash-1017",
+    "fallback_model_name": "qwen3.8-max-0902",
+    "description": "Mô hình trích xuất thị giác ảnh PDF tiếng Việt, sơ đồ khối, bảng kiểm tra VSATTP snapshot 1017 ổn định và tốc độ cao.",
     "temperature": 0.01,
     "max_tokens": 4000,
-    "stream": True,
+    "stream": False,
     "extra_body": {
         "enable_thinking": False
     }

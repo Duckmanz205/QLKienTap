@@ -4718,42 +4718,12 @@ Mọi thắc mắc xin liên hệ page CLB. Cảm ơn các bạn.`;
         continue;
       }
 
+      // Chỉ duy nhất sinh viên trong Danh sách đen (còn nợ chuyến phạt) mới bị loại tự động vào autoRejected.
+      // Tất cả sinh viên khác (kể cả năm 1, khóa khác, đã đi đủ 3/3 chuyến đi cải thiện) đều được đưa vào eligibleStats để phân tầng ưu tiên.
+
       const studyYear = p.sinhVien?.khoaHoc?.nam_nhap_hoc
         ? startYear - p.sinhVien.khoaHoc.nam_nhap_hoc + 1
         : 3;
-      if (studyYear < 2) {
-        p.trang_thai = 'BiLoai';
-        (p as any).ly_do_loai = 'Sinh viên năm 1 chưa đủ điều kiện tham quan';
-        autoRejected.push(p);
-        continue;
-      }
-
-      if (finishedCount >= 3) {
-        p.trang_thai = 'BiLoai';
-        (p as any).ly_do_loai = 'Đã hoàn thành tối đa 3/3 chuyến kiến tập';
-        autoRejected.push(p);
-        continue;
-      }
-
-      const sameDayRegistered = await this.phieuRepo.find({
-        where: {
-          sinh_vien_id: p.sinh_vien_id,
-          trang_thai: In(['HopLe', 'DaThamGia', 'HoanThanh']),
-        },
-        relations: { chuyenThamQuan: true },
-      });
-      const overlap = sameDayRegistered.some(
-        (reg) =>
-          reg.chuyen_tham_quan_id !== tripId &&
-          new Date(reg.chuyenThamQuan.ngay_tham_quan).toDateString() ===
-          new Date(trip.ngay_tham_quan).toDateString(),
-      );
-      if (overlap) {
-        p.trang_thai = 'BiLoai';
-        (p as any).ly_do_loai = 'Trùng lịch với chuyến khác đã được duyệt';
-        autoRejected.push(p);
-        continue;
-      }
 
       const namNhapHoc = p.sinhVien?.khoaHoc?.nam_nhap_hoc || (startYear - 2);
       const dotKhoaHocNam =
@@ -4777,7 +4747,7 @@ Mọi thắc mắc xin liên hệ page CLB. Cảm ơn các bạn.`;
       });
     }
 
-    // Phân 6 tầng ưu tiên theo Mục 4 Tài liệu đặc tả:
+    // Phân tầng ưu tiên xét duyệt theo sức chứa:
     // 1. Năm cuối/Khóa cũ + Chưa từng tham quan
     const group1 = eligibleStats.filter(
       (e) =>
@@ -4789,11 +4759,12 @@ Mọi thắc mắc xin liên hệ page CLB. Cảm ơn các bạn.`;
       e.priorityDescription = 'Ưu tiên 1: Năm cuối/Khóa cũ - Chưa đi chuyến nào (0/3)';
     });
 
-    // 2. Năm cuối/Khóa cũ (Đã từng đi)
+    // 2. Năm cuối/Khóa cũ (Đã từng đi 1-2 chuyến)
     const group2 = eligibleStats.filter(
       (e) =>
         e.isSeniorOrOlder &&
         e.finishedCount > 0 &&
+        e.finishedCount < 3 &&
         !e.penalties.demotedPriority,
     );
     group2.forEach((e) => {
@@ -4811,25 +4782,44 @@ Mọi thắc mắc xin liên hệ page CLB. Cảm ơn các bạn.`;
       e.priorityDescription = 'Ưu tiên 3: Đúng khóa của đợt - Chưa đi chuyến nào (0/3)';
     });
 
-    // 4. Đúng khóa của đợt (Đã từng đi)
+    // 4. Đúng khóa của đợt (Đã từng đi 1-2 chuyến)
     const group4 = eligibleStats.filter(
       (e) =>
         e.isCurrentDotCohort &&
         e.finishedCount > 0 &&
+        e.finishedCount < 3 &&
         !e.penalties.demotedPriority,
     );
     group4.forEach((e) => {
       e.priorityDescription = `Ưu tiên 4: Đúng khóa của đợt - Đã đi ${e.finishedCount}/3 chuyến`;
     });
 
-    // 5. Khóa khác (không thuộc đợt, không phải năm cuối)
+    // 5. Khóa khác (không thuộc đợt, không phải năm cuối) và chưa đủ 3 chuyến
     const group5 = eligibleStats.filter(
       (e) =>
         !e.isSeniorOrOlder &&
-        !e.isCurrentDotCohort,
+        !e.isCurrentDotCohort &&
+        e.finishedCount < 3 &&
+        !e.penalties.demotedPriority,
     );
     group5.forEach((e) => {
       e.priorityDescription = `Ưu tiên 5: Khóa khác - Đã đi ${e.finishedCount}/3 chuyến`;
+    });
+
+    // 6. Sinh viên đi cải thiện (Đã hoàn thành >= 3 chuyến)
+    const group6 = eligibleStats.filter(
+      (e) =>
+        e.finishedCount >= 3 &&
+        !e.penalties.demotedPriority,
+    );
+    group6.forEach((e) => {
+      e.priorityDescription = `Ưu tiên 6: Đi cải thiện - Đã hoàn thành ${e.finishedCount}/3 chuyến`;
+    });
+
+    // 7. Nhóm bị hạ mức ưu tiên (demotedPriority)
+    const group7 = eligibleStats.filter((e) => e.penalties.demotedPriority);
+    group7.forEach((e) => {
+      e.priorityDescription = `Ưu tiên 7 (Hạ bậc ưu tiên): ${e.penalties.reasonSummary || 'Từng vi phạm nhẹ'}`;
     });
 
     const sortFn = (a: any, b: any) =>
@@ -4851,12 +4841,17 @@ Mọi thắc mắc xin liên hệ page CLB. Cảm ơn các bạn.`;
     group3.sort(sortFn);
     group4.sort(sortByCountThenDate);
     group5.sort(sortByCountThenDate);
+    group6.sort(sortByCountThenDate);
+    group7.sort(sortFn);
+
     const sortedList = [
       ...group1,
       ...group2,
       ...group3,
       ...group4,
       ...group5,
+      ...group6,
+      ...group7,
     ];
 
     let count = 0;
@@ -4926,6 +4921,15 @@ Mọi thắc mắc xin liên hệ page CLB. Cảm ơn các bạn.`;
       },
       relations: { sinhVien: true },
     });
+
+    if (trip.trang_thai === 'DaChotDanhSach') {
+      const hasPending = phieus.some((p) => p.trang_thai === 'ChoDuyet');
+      if (!hasPending) {
+        throw new BadRequestException(
+          'Chuyến tham quan này đã hoàn tất chốt danh sách chính thức và không có đơn đăng ký mới cần duyệt!',
+        );
+      }
+    }
 
     // 1. Tính toán hạn nộp lệ phí an toàn (bắt buộc phải ở tương lai để không bị tự động phạt)
     const now = new Date();
@@ -5081,10 +5085,12 @@ Mọi thắc mắc xin liên hệ page CLB. Cảm ơn các bạn.`;
                 hoaDon.trang_thai = 'ChuaDong';
                 await manager.save(HoaDonLePhi, hoaDon);
               } else {
-                // Đã có hóa đơn: cập nhật lại hạn nộp mới và chuyển trạng thái về ChuaDong
-                existingInvoice.han_dong = safeDeadline;
-                existingInvoice.trang_thai = 'ChuaDong';
-                await manager.save(HoaDonLePhi, existingInvoice);
+                // Đã có hóa đơn: chỉ cập nhật lại hạn nộp nếu chưa đóng tiền; nếu đã đóng (DaDongDungHan) thì bảo toàn nguyên vẹn
+                if (existingInvoice.trang_thai !== 'DaDongDungHan') {
+                  existingInvoice.han_dong = safeDeadline;
+                  existingInvoice.trang_thai = 'ChuaDong';
+                  await manager.save(HoaDonLePhi, existingInvoice);
+                }
               }
             }
             count++;
