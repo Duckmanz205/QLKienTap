@@ -4,6 +4,7 @@ import asyncio
 import io
 import base64
 import gc
+import random
 from fastapi import FastAPI, UploadFile, File, Security, HTTPException, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -59,10 +60,11 @@ except ImportError:
             "extra_body": {"enable_thinking": False}
         }
         PROFILE_OCR_DEEPSEEK_FLASH = {
-            "model_name": "deepseek-v4.1-flash",
+            "model_name": "deepseek-v4.1-flash-1017",
+            "fallback_model_name": "qwen3.8-max-0902",
             "temperature": 0.01,
             "max_tokens": 4000,
-            "stream": True,
+            "stream": False,
             "extra_body": {"enable_thinking": False}
         }
         ACTIVE_GRADING_PROFILE = PROFILE_GRADING_DEEPSEEK_FLASH_1017
@@ -106,6 +108,9 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Security(security))
 # ==========================================
 # MODULE 1: OCR ENGINE (TRÍCH XUẤT VĂN BẢN)
 # ==========================================
+# Task 1: Global Async Semaphore ở cấp module giữ tối đa 2 trang xử lý đồng thời qua DashScope
+GLOBAL_OCR_SEMAPHORE = asyncio.Semaphore(2)
+
 def extract_sequential_elements(pdf_bytes: bytes) -> list:
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     sequential_elements = []
@@ -169,24 +174,26 @@ def is_blank_page(img: Image.Image) -> bool:
 async def ocr_single_page(
     page_idx: int,
     pil_img: Image.Image,
-    semaphore: asyncio.Semaphore,
     vlm_prompt: str
-) -> tuple[int, str]:
-    """Hàm OCR song song từng trang PDF scan có giới hạn Semaphore và Retry 2 lần"""
+) -> dict:
+    """Hàm OCR từng trang PDF scan có giới hạn Global Semaphore(2) và Retry 3 lần với Exponential Backoff"""
     if is_blank_page(pil_img):
-        return (page_idx, "")
+        return {"page_idx": page_idx, "text": "", "is_blank": True, "success": True}
 
     b64_url = pil_to_base64(pil_img)
-    model_name = ACTIVE_OCR_PROFILE.get("model_name", "deepseek-v4.1-flash")
+    primary_model = ACTIVE_OCR_PROFILE.get("model_name", "deepseek-v4.1-flash-1017")
+    fallback_model = ACTIVE_OCR_PROFILE.get("fallback_model_name", "qwen3.8-max-0902")
     temperature = ACTIVE_OCR_PROFILE.get("temperature", 0.01)
     max_tokens = ACTIVE_OCR_PROFILE.get("max_tokens", 4000)
     extra_body = ACTIVE_OCR_PROFILE.get("extra_body", {"enable_thinking": False})
 
-    async with semaphore:
-        for attempt in range(2):
+    async with GLOBAL_OCR_SEMAPHORE:
+        for attempt in range(3):
+            # Lần 1 và 2 dùng model chính (deepseek-v4.1-flash-1017), lần 3 fallback sang model dự phòng (qwen3.8-max-0902)
+            current_model = primary_model if attempt < 2 else fallback_model
             try:
                 response = await client.chat.completions.create(
-                    model=model_name,
+                    model=current_model,
                     messages=[
                         {
                             "role": "user",
@@ -218,25 +225,29 @@ async def ocr_single_page(
                         ocr_text = ocr_text[:-3]
                     ocr_text = ocr_text.strip()
                     if ocr_text:
-                        return (page_idx, ocr_text)
+                        return {"page_idx": page_idx, "text": ocr_text, "is_blank": False, "success": True}
 
-                return (page_idx, "")
+                return {"page_idx": page_idx, "text": "", "is_blank": False, "success": True}
             except Exception as e:
-                print(f"[OCR Page {page_idx + 1}] Lỗi thử lần {attempt + 1}: {str(e)}")
-                if attempt == 0:
-                    await asyncio.sleep(1.5)
+                print(f"[OCR Page {page_idx + 1}] Lỗi thử lần {attempt + 1} (model {current_model}): {str(e)}")
+                if attempt < 2:
+                    backoff = (attempt + 1) * 2 + random.uniform(0.1, 0.5)
+                    await asyncio.sleep(backoff)
                 else:
-                    # Tuyệt đối không ghi thông báo lỗi kỹ thuật vào bài làm sinh viên
-                    return (page_idx, "")
+                    # Hết 3 lần retry vẫn lỗi -> đánh dấu thất bại trang này
+                    return {"page_idx": page_idx, "text": "", "is_blank": False, "success": False}
 
-    return (page_idx, "")
+    return {"page_idx": page_idx, "text": "", "is_blank": False, "success": False}
 
 
 @app.post("/process-pdf")
 async def process_pdf_endpoint(file: UploadFile = File(...)):
-    """API Nhận file PDF scan chữ viết tay và trả về toàn bộ văn bản qua Vision OCR song song 4 luồng"""
+    """API Nhận file PDF scan chữ viết tay và trả về toàn bộ văn bản qua Vision OCR song song có kiểm soát Global Semaphore(2)"""
     pdf_bytes = await file.read()
-    elements = extract_sequential_elements(pdf_bytes)
+
+    # Task 1: Giải phóng Event Loop cho tác vụ CPU-Bound render PDF thành ảnh
+    loop = asyncio.get_running_loop()
+    elements = await loop.run_in_executor(None, extract_sequential_elements, pdf_bytes)
 
     vlm_prompt = (
         "Bạn là hệ thống trích xuất văn bản (OCR) chính xác tuyệt đối. Hãy trích xuất nội dung văn bản tiếng Việt trong ảnh. "
@@ -248,24 +259,28 @@ async def process_pdf_endpoint(file: UploadFile = File(...)):
         "Nếu bức ảnh KHÔNG có chữ, trả về duy nhất chữ: EMPTY"
     )
 
-    # Sử dụng Semaphore để gọi đồng thời tối đa 4 trang cùng lúc
-    semaphore = asyncio.Semaphore(4)
     tasks = []
-
     for idx, elem in enumerate(elements):
         if elem.get("type") == "handwritten_image":
-            tasks.append(ocr_single_page(idx, elem["content"], semaphore, vlm_prompt))
+            tasks.append(ocr_single_page(idx, elem["content"], vlm_prompt))
 
-    # Chạy song song toàn bộ các trang
+    # Chạy song song toàn bộ các trang (được xếp hàng qua GLOBAL_OCR_SEMAPHORE)
     results = await asyncio.gather(*tasks)
 
     # Sắp xếp lại theo đúng thứ tự số trang (page_idx: 0, 1, 2...)
-    sorted_results = sorted(results, key=lambda x: x[0])
+    sorted_results = sorted(results, key=lambda x: x["page_idx"])
 
     extracted_pages = []
-    for _, page_text in sorted_results:
-        if page_text and page_text.strip():
-            extracted_pages.append(page_text.strip())
+    total_non_blank = 0
+    failed_pages_count = 0
+
+    for res in sorted_results:
+        if not res["is_blank"]:
+            total_non_blank += 1
+            if not res["success"] or not res["text"]:
+                failed_pages_count += 1
+            else:
+                extracted_pages.append(res["text"].strip())
 
     final_text = "\n\n".join(extracted_pages).strip()
 
@@ -275,6 +290,13 @@ async def process_pdf_endpoint(file: UploadFile = File(...)):
             del elem["content"]
     del elements
     gc.collect()
+
+    # Task 1: Nếu toàn bộ bài nộp không trích xuất được ký tự nào hoặc tỉ lệ lỗi > 50% số trang có nội dung
+    if total_non_blank > 0 and (len(final_text) < 10 or (failed_pages_count / total_non_blank) > 0.5):
+        raise HTTPException(
+            status_code=502,
+            detail="Không thể nhận diện nội dung văn bản từ các trang scan. Vui lòng kiểm tra lại chất lượng file PDF hoặc thử lại."
+        )
 
     return {"extracted_text": final_text}
 

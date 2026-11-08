@@ -32,7 +32,18 @@ export default function HoanPhi_SV() {
   const navigate = useNavigate();
   const activeTab = 'hoanPhi';
 
-  const [student, setStudent] = useState(null);
+  const [student, setStudent] = useState(() => {
+    try {
+      const userJson = localStorage.getItem('user');
+      if (userJson) {
+        const parsed = JSON.parse(userJson);
+        return parsed?.user?.details || null;
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  });
   const [invoices, setInvoices] = useState([]);
   const [refunds, setRefunds] = useState([]);
 
@@ -61,11 +72,35 @@ export default function HoanPhi_SV() {
   useEffect(() => {
     const userJson = localStorage.getItem('user');
     if (userJson) {
-      const { user } = JSON.parse(userJson);
-      sinhVienApi.getProfile(user.id).then(res => {
-        setStudent(res.data);
-        fetchData(res.data.id);
-      }).catch(err => console.error(err));
+      try {
+        const parsed = JSON.parse(userJson);
+        const userObj = parsed?.user;
+        const accountId = userObj?.id;
+        const cachedStudentId = userObj?.details?.id;
+
+        if (cachedStudentId) {
+          fetchData(cachedStudentId);
+        }
+
+        if (accountId) {
+          sinhVienApi.getProfile(accountId).then(res => {
+            if (res.data) {
+              setStudent(res.data);
+              if (!cachedStudentId || cachedStudentId !== res.data.id) {
+                fetchData(res.data.id);
+              }
+              if (userObj && (!userObj.details || userObj.details.id !== res.data.id)) {
+                localStorage.setItem('user', JSON.stringify({
+                  ...parsed,
+                  user: { ...userObj, details: res.data }
+                }));
+              }
+            }
+          }).catch(err => console.error('Lỗi khi tải thông tin sinh viên:', err));
+        }
+      } catch (e) {
+        console.error(e);
+      }
     }
   }, []);
 

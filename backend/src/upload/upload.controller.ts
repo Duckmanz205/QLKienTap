@@ -22,7 +22,7 @@ import { Repository } from 'typeorm';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
-import { existsSync, mkdirSync, createReadStream } from 'fs';
+import { promises as fsPromises, existsSync, mkdirSync, createReadStream } from 'fs';
 import * as crypto from 'crypto';
 import { R2StorageService } from './r2-storage.service';
 import { AuthGuard } from '../auth/guards/auth.guard';
@@ -207,7 +207,9 @@ export class UploadController {
       mkdirSync(newDest, { recursive: true });
     }
     const newPath = join(newDest, file.filename);
-    require('fs').renameSync(file.path, newPath);
+    if (file.path !== newPath) {
+      await fsPromises.rename(file.path, newPath);
+    }
 
     // Bước 2: Upload PDF lên Cloudflare R2 trước
     let keyPdf = '';
@@ -222,10 +224,11 @@ export class UploadController {
       );
       keyTxt = keyPdf.replace(/\.\w+$/, '.txt');
 
+      const fileBuffer = await fsPromises.readFile(newPath);
       await this.r2.uploadFile(
         this.r2.BUCKET_REPORTS,
         keyPdf,
-        require('fs').readFileSync(newPath),
+        fileBuffer,
         file.mimetype,
       );
 
@@ -237,8 +240,17 @@ export class UploadController {
       );
     }
 
+    // Task 2: Khóa theo định danh duy nhất (không bao giờ để chuỗi rỗng gây khóa nhầm)
+    const lockKey = keyTxt || `local_${userIdentifier}_${file.filename}`;
+    const isR2Storage = this.r2.isReady() && !!keyPdf;
+
     // Bước 3: Kích hoạt tiến trình trích xuất ngầm (fire-and-forget)
-    this.processAiExtractionInBackground(newPath, file.originalname, keyTxt).catch(e => 
+    this.processAiExtractionInBackground(
+      newPath,
+      file.originalname,
+      lockKey,
+      isR2Storage,
+    ).catch(e => 
       console.error('Lỗi khởi chạy tiến trình ngầm:', e)
     );
 
@@ -266,19 +278,20 @@ export class UploadController {
   private async processAiExtractionInBackground(
     pdfPath: string,
     originalName: string,
-    keyTxt: string,
+    lockKey: string,
+    isR2Storage: boolean,
   ) {
-    if (activeExtractions.has(keyTxt)) {
-      console.log(`[Upload Background AI] Đang có tiến trình OCR chạy cho file ${keyTxt}, bỏ qua gọi trùng.`);
+    if (activeExtractions.has(lockKey)) {
+      console.log(`[Upload Background AI] Đang có tiến trình OCR chạy cho file ${lockKey}, bỏ qua gọi trùng.`);
       return;
     }
-    activeExtractions.add(keyTxt);
+    activeExtractions.add(lockKey);
 
     try {
       let extractedText = '';
       if (originalName.toLowerCase().endsWith('.pdf')) {
-        console.log(`[Upload Background AI] Đang gửi PDF sang AI Service: ${originalName} (Key R2: ${keyTxt})`);
-        const fileBuffer = require('fs').readFileSync(pdfPath);
+        console.log(`[Upload Background AI] Đang gửi PDF sang AI Service: ${originalName} (Lock: ${lockKey})`);
+        const fileBuffer = await fsPromises.readFile(pdfPath);
         const blob = new Blob([fileBuffer]);
         const formData = new FormData();
         formData.append('file', blob, originalName);
@@ -299,36 +312,39 @@ export class UploadController {
         }
       }
 
-      // Task 3: Không bao giờ lưu file .txt rỗng hoặc câu lỗi kỹ thuật lên R2
+      // Task 2: Không bao giờ lưu file .txt rỗng hoặc câu lỗi kỹ thuật lên R2
       if (!extractedText || extractedText.length < 10) {
-        console.warn(`[Upload Background AI] Trích xuất rỗng hoặc quá ngắn (<10 ký tự) cho: ${originalName}. KHÔNG lưu file txt giả lên R2.`);
+        console.warn(`[Upload Background AI] Trích xuất rỗng hoặc quá ngắn (<10 ký tự) cho: ${originalName}. KHÔNG lưu file txt giả lên hệ thống.`);
       } else {
         const txtBuffer = Buffer.from('\uFEFF' + extractedText, 'utf-8');
 
-        if (this.r2.isReady() && keyTxt) {
+        if (isR2Storage && lockKey.endsWith('.txt')) {
           await this.r2.uploadFile(
             this.r2.BUCKET_REPORTS,
-            keyTxt,
+            lockKey,
             txtBuffer,
             'text/plain; charset=utf-8',
           );
-          console.log(`[Upload Background AI] Đã lưu file TXT lên Cloudflare R2: ${keyTxt}`);
+          console.log(`[Upload Background AI] Đã lưu file TXT lên Cloudflare R2: ${lockKey}`);
         } else {
           const txtPath = pdfPath.replace(/\.\w+$/, '.txt');
-          require('fs').writeFileSync(txtPath, txtBuffer);
+          await fsPromises.writeFile(txtPath, txtBuffer);
           console.log(`[Upload Background AI] Đã lưu file TXT local: ${txtPath}`);
         }
       }
     } catch (err: any) {
       console.error(`[Upload Background AI] Lỗi trong quá trình trích xuất ngầm cho ${originalName}:`, err?.message || err);
     } finally {
-      activeExtractions.delete(keyTxt);
-      try {
-        if (require('fs').existsSync(pdfPath)) {
-          require('fs').unlinkSync(pdfPath);
+      activeExtractions.delete(lockKey);
+      // Task 2: Chỉ xóa file tạm local nếu đã lưu thành công lên Cloudflare R2!
+      if (isR2Storage) {
+        try {
+          if (existsSync(pdfPath)) {
+            await fsPromises.unlink(pdfPath);
+          }
+        } catch (e) {
+          console.error('Failed to cleanup temp local PDF:', e);
         }
-      } catch (e) {
-        console.error('Failed to cleanup local PDF:', e);
       }
     }
   }
@@ -550,10 +566,11 @@ export class UploadController {
         folderName,
         file.originalname,
       );
+      const fileBuffer = await fsPromises.readFile(file.path);
       await this.r2.uploadFile(
         this.r2.BUCKET_PAYMENTS,
         key,
-        require('fs').readFileSync(file.path),
+        fileBuffer,
         file.mimetype,
       );
 
@@ -565,7 +582,7 @@ export class UploadController {
       );
 
       try {
-        require('fs').unlinkSync(file.path);
+        await fsPromises.unlink(file.path);
       } catch {}
 
       return {
@@ -635,14 +652,15 @@ export class UploadController {
         folderName,
         file.originalname,
       );
+      const fileBuffer = await fsPromises.readFile(file.path);
       const result = await this.r2.uploadFile(
         this.r2.BUCKET_ATTACHMENTS,
         key,
-        require('fs').readFileSync(file.path),
+        fileBuffer,
         file.mimetype,
       );
       try {
-        require('fs').unlinkSync(file.path);
+        await fsPromises.unlink(file.path);
       } catch {}
       return {
         message: 'Tải lên file đính kèm thành công (R2).',

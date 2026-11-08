@@ -39,13 +39,13 @@ export class SinhVienController {
     if (user.profileId) {
       return user.profileId;
     }
-    const student = await this.svService.getStudentByAccountId(user.sub);
+    const student = await this.svService.getStudentByAccountId(user.sub, user.username);
     return student.id;
   }
 
   @Get('profile')
   async getMyProfile(@CurrentUser() user: JwtPayloadUser) {
-    return this.svService.getStudentByAccountId(user.sub);
+    return this.svService.getStudentByAccountId(user.sub, user.username);
   }
 
   @Get('profile/:accountId')
@@ -54,7 +54,7 @@ export class SinhVienController {
     @Param('accountId', ParseIntPipe) accountId: number,
   ) {
     // Ep buoc luon lay profile cua sinh vien dang dang nhap de chong IDOR
-    return this.svService.getStudentByAccountId(user.sub);
+    return this.svService.getStudentByAccountId(user.sub, user.username);
   }
 
   @Get('factories/search')
@@ -167,7 +167,7 @@ export class SinhVienController {
     return this.svService.requestCancel(
       studentId,
       regId,
-      body.lyDo,
+      body.lyDo || '',
       body.fileMinhChung || '',
     );
   }
@@ -222,15 +222,27 @@ export class SinhVienController {
   }
 
   @Get('notifications')
-  async getMyNotifications(@CurrentUser() user: JwtPayloadUser) {
+  async getMyNotifications(
+    @CurrentUser() user: JwtPayloadUser,
+    @Query('limit') limit?: string,
+  ) {
     const studentId = await this.resolveStudentId(user);
-    return this.svService.getNotifications(studentId);
+    return this.svService.getNotifications(
+      studentId,
+      limit ? parseInt(limit, 10) : undefined,
+    );
   }
 
   @Get('notifications/:studentId')
-  async getNotifications(@CurrentUser() user: JwtPayloadUser) {
+  async getNotifications(
+    @CurrentUser() user: JwtPayloadUser,
+    @Query('limit') limit?: string,
+  ) {
     const studentId = await this.resolveStudentId(user);
-    return this.svService.getNotifications(studentId);
+    return this.svService.getNotifications(
+      studentId,
+      limit ? parseInt(limit, 10) : undefined,
+    );
   }
 
   @Post('submit-report')

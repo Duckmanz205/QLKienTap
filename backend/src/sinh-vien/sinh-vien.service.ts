@@ -92,10 +92,12 @@ export class SinhVienService {
     private readonly r2Storage: R2StorageService,
   ) { }
 
-  // Lay thong tin SV bang TaiKhoan ID
-  async getStudentByAccountId(accountId: number) {
+  // Lay thong tin SV bang TaiKhoan ID (Tuan thu tuyet doi RBAC, chi SELECT)
+  async getStudentByAccountId(accountId: number, username?: string) {
     const sv = await this.svRepo.findOne({
-      where: { taikhoan_id: accountId },
+      where: username
+        ? [{ taikhoan_id: accountId }, { mssv: username }]
+        : { taikhoan_id: accountId },
       relations: { khoaHoc: true },
     });
     if (!sv) throw new NotFoundException('Không tìm thấy sinh viên');
@@ -551,17 +553,9 @@ export class SinhVienService {
         relations: { chuyenThamQuan: { nhaMay: true } },
       });
 
-      // 1. Kiem tra khong duoc vuot qua toi da 3 chuyen da duoc duyet hoac hoan thanh
-      const confirmedCount = activePhieus.filter((p) =>
-        ['HopLe', 'DaThamGia', 'HoanThanh'].includes(p.trang_thai),
-      ).length;
-      if (confirmedCount >= 3) {
-        throw new BadRequestException(
-          'Bạn đã hoàn thành đủ 3 chuyến tham quan theo quy định của học phần.',
-        );
-      }
+      // Cho phep sinh vien da hoan thanh du 3 chuyen van duoc dang ky them de di cai thien diem/hoc hoi (khong chan cung)
 
-      // 2. Kiem tra khong duoc dang ky cac chuyen tham quan trung ngay (du khac lich kien tap)
+      // Kiem tra khong duoc dang ky cac chuyen tham quan trung ngay (du khac lich kien tap)
       const targetTripDateStr = toDateOnlyString(trip.ngay_tham_quan);
       const conflictSameDay = activePhieus.find(
         (p) =>
@@ -907,8 +901,8 @@ export class SinhVienService {
   async requestCancel(
     studentId: number,
     registrationId: number,
-    lyDo: string,
-    fileMinhChung: string,
+    lyDo?: string,
+    fileMinhChung?: string,
   ) {
     const phieu = await this.phieuRepo.findOne({
       where: { id: registrationId, sinh_vien_id: studentId },
@@ -926,21 +920,25 @@ export class SinhVienService {
     if (!trip) throw new NotFoundException('Không tìm thấy chuyến tham quan');
     const now = new Date();
 
-    // Leader's logic: if registration is still open, cancel immediately without approval or blacklist
-    if (trip.trang_thai === 'MoDangKy') {
+    // 1. Rút đơn tự do: Khi phiếu đang 'ChoDuyet' hoặc chuyến đi đang 'MoDangKy' (chưa chốt danh sách)
+    // Sinh viên được quyền rút đơn tự do ngay lập tức, không xét 24h, không cần minh chứng, không bị phạt Blacklist
+    if (phieu.trang_thai === 'ChoDuyet' || trip.trang_thai === 'MoDangKy') {
       phieu.trang_thai = 'DaHuy';
       await this.phieuRepo.save(phieu);
       return {
-        message: 'Đã hủy đăng ký thành công (Chuyến đi đang mở đăng ký)',
+        message: 'Đã rút đơn đăng ký thành công (Rút đơn tự do, không bị phạt)',
       };
     }
 
+    // 2. Chuyến đã diễn ra thì không thể hủy
     if (trip.trang_thai === 'DaDienRa' || new Date(trip.ngay_tham_quan) < now) {
       throw new BadRequestException(
         'Không thể hủy chuyến tham quan đã diễn ra',
       );
     }
 
+    // 3. Với phiếu đã được chốt duyệt chính thức ('HopLe'):
+    // Kiểm tra quy định không được hủy trong vòng 24 giờ trước giờ khởi hành
     const tripDeparture = new Date(trip.ngay_tham_quan);
     const [hours, minutes] = trip.gio_bat_dau.toString().split(':');
     tripDeparture.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
@@ -949,14 +947,6 @@ export class SinhVienService {
       throw new BadRequestException(
         'Không thể hủy trong vòng 24 giờ trước giờ khởi hành',
       );
-    }
-
-    if (phieu.trang_thai === 'ChoDuyet') {
-      phieu.trang_thai = 'DaHuy';
-      await this.phieuRepo.save(phieu);
-      return {
-        message: 'Đã hủy đăng ký thành công (Rút đơn tự do, không bị phạt)',
-      };
     }
 
     if (!fileMinhChung || fileMinhChung.trim() === '') {
@@ -989,8 +979,8 @@ export class SinhVienService {
 
     const cancelReq = new YeuCauHuyDangKy();
     cancelReq.phieu_dang_ky_id = registrationId;
-    cancelReq.ly_do = lyDo;
-    cancelReq.file_minh_chung = fileMinhChung;
+    cancelReq.ly_do = lyDo || '';
+    cancelReq.file_minh_chung = fileMinhChung || '';
     cancelReq.ngay_yeu_cau = new Date();
     cancelReq.trang_thai_duyet = 'ChoDuyet';
     await this.huyRepo.save(cancelReq);
@@ -1183,7 +1173,7 @@ export class SinhVienService {
   }
 
   // Xem thong bao gui toi khoa/SV (v13: newsfeed, không còn ThongBaoDaDoc)
-  async getNotifications(studentId: number) {
+  async getNotifications(studentId: number, limit?: number) {
     const sv = await this.svRepo.findOne({ where: { id: studentId } });
     if (!sv) throw new NotFoundException('Không tìm thấy sinh viên');
 
@@ -1198,6 +1188,7 @@ export class SinhVienService {
         files: true,
       },
       order: { ngay_gui: 'DESC' },
+      ...(limit && limit > 0 ? { take: limit } : {}),
     });
 
     return list.map((n) => ({
@@ -2560,16 +2551,23 @@ export class SinhVienService {
     return results;
   }
 
-  // Dashboard Stats
-  // Dashboard Stats
+  // Dashboard Stats (Tối ưu Promise.all song song)
   async getDashboardStats(studentId: number) {
-    const sv = await this.svRepo.findOne({ where: { id: studentId } });
-    if (!sv) throw new NotFoundException('Không tìm thấy sinh viên');
+    // Phase 1: Chạy song song 4 truy vấn độc lập
+    const [sv, trips, dksvs, penalty] = await Promise.all([
+      this.svRepo.findOne({ where: { id: studentId } }),
+      this.phieuRepo.find({
+        where: { sinh_vien_id: studentId },
+        relations: { phieuThamQuan: { baiThuHoach: true } },
+      }),
+      this.dksvRepo.find({
+        where: { sinh_vien_id: studentId },
+        order: { id: 'DESC' },
+      }),
+      this.checkAndUpdatePenalties(studentId),
+    ]);
 
-    const trips = await this.phieuRepo.find({
-      where: { sinh_vien_id: studentId },
-      relations: { phieuThamQuan: { baiThuHoach: true } },
-    });
+    if (!sv) throw new NotFoundException('Không tìm thấy sinh viên');
 
     const registered = trips.length;
     const completed = trips.filter(
@@ -2594,106 +2592,104 @@ export class SinhVienService {
       diaDiem: null,
     };
 
-    const dksvs = await this.dksvRepo.find({
-      where: { sinh_vien_id: studentId },
-      order: { id: 'DESC' },
-    });
-
-    if (dksvs.length > 0) {
-      const latestDksv = dksvs[0];
+    const latestDksv = dksvs.length > 0 ? dksvs[0] : null;
+    if (latestDksv) {
       termStatus = (latestDksv.trang_thai as any) || 'DangThucHien';
-
-      const boChuyen = await this.boChuyenRepo.findOne({
-        where: { dot_kien_tap_sinh_vien_id: latestDksv.id },
-        relations: { hoiDong: true },
-      });
-
-      if (boChuyen) {
-        const phieuTQs = await this.phieuTQRepo.find({
-          where: { bo_chuyen_bao_cao_id: boChuyen.id },
-          relations: { diemPhieuThamQuan: true },
-        });
-
-        boChuyenStatus.selectedCount = phieuTQs.length;
-        boChuyenStatus.isComplete = phieuTQs.length === 3;
-        if (boChuyen.hoiDong) {
-          boChuyenStatus.hasCouncil = true;
-          boChuyenStatus.tenHoiDong = boChuyen.hoiDong.ten_hoi_dong;
-          boChuyenStatus.ngayBaoCao = boChuyen.hoiDong.ngay_bao_cao;
-          boChuyenStatus.diaDiem = boChuyen.hoiDong.dia_diem;
-        }
-
-        if (phieuTQs.length > 0) {
-          const scores: number[] = [];
-          for (const ptq of phieuTQs) {
-            const diem = ptq.diemPhieuThamQuan;
-            if (!diem) continue;
-            if (diem.diem_tong_chuyen !== null && diem.diem_tong_chuyen !== undefined) {
-              scores.push(Number(diem.diem_tong_chuyen));
-            } else {
-              const isChuanBiLocked =
-                diem.da_khoa_chuan_bi === true || diem.da_khoa === true;
-              const isThuHoachLocked =
-                diem.da_khoa_thu_hoach === true || diem.da_khoa === true;
-              const isHoiDongLocked =
-                diem.da_khoa_hoi_dong === true || diem.da_khoa === true;
-
-              if (
-                isChuanBiLocked &&
-                isThuHoachLocked &&
-                isHoiDongLocked &&
-                diem.diem_chuan_bi !== null &&
-                diem.diem_thu_hoach !== null &&
-                diem.diem_hoi_dong_final !== null
-              ) {
-                scores.push(
-                  Number(diem.diem_chuan_bi) * 0.3 +
-                  Number(diem.diem_thu_hoach) * 0.3 +
-                  Number(diem.diem_hoi_dong_final) * 0.4 +
-                  Number(diem.diem_cong_final || 0),
-                );
-              }
-            }
-          }
-          if (scores.length === phieuTQs.length && scores.length > 0) {
-            const avg =
-              scores.reduce((sum, val) => sum + val, 0) / scores.length;
-            avgScore = avg.toFixed(1);
-          }
-        }
-      }
     }
 
-    // Nếu chưa có điểm từ bộ 3, kiểm tra trung bình các phiếu tham quan bất kỳ đã có điểm tổng chuyến
-    if (avgScore === 'Chưa có') {
-      const ptqIds = trips
-        .map((t) => t.phieuThamQuan?.id)
-        .filter((id): id is number => id != null);
-      if (ptqIds.length > 0) {
-        const diems = await this.diemPhieuRepo.find({
-          where: { phieu_tham_quan_id: In(ptqIds) },
-        });
-        const validScores = diems
-          .map((d) => (d.diem_tong_chuyen != null ? Number(d.diem_tong_chuyen) : null))
-          .filter((s): s is number => s != null);
-        if (validScores.length > 0) {
-          const avg =
-            validScores.reduce((sum, val) => sum + val, 0) / validScores.length;
+    const pdkIds = trips
+      .filter((t) => t.trang_thai !== 'ChoDuyet')
+      .map((t) => t.id);
+
+    const ptqIds = trips
+      .map((t) => t.phieuThamQuan?.id)
+      .filter((id): id is number => id != null);
+
+    // Phase 2: Chạy song song truy vấn BoChuyen, HoaDonLePhi, và DiemPhieu
+    const [boChuyen, unpaidInvoices, allDiems] = await Promise.all([
+      latestDksv
+        ? this.boChuyenRepo.findOne({
+            where: { dot_kien_tap_sinh_vien_id: latestDksv.id },
+            relations: { hoiDong: true },
+          })
+        : Promise.resolve(null),
+      pdkIds.length > 0
+        ? this.hoaDonRepo.find({
+            where: { phieu_dang_ky_id: In(pdkIds), trang_thai: 'ChuaDong' },
+          })
+        : Promise.resolve([]),
+      ptqIds.length > 0
+        ? this.diemPhieuRepo.find({
+            where: { phieu_tham_quan_id: In(ptqIds) },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    if (boChuyen) {
+      const phieuTQs = await this.phieuTQRepo.find({
+        where: { bo_chuyen_bao_cao_id: boChuyen.id },
+        relations: { diemPhieuThamQuan: true },
+      });
+
+      boChuyenStatus.selectedCount = phieuTQs.length;
+      boChuyenStatus.isComplete = phieuTQs.length === 3;
+      if (boChuyen.hoiDong) {
+        boChuyenStatus.hasCouncil = true;
+        boChuyenStatus.tenHoiDong = boChuyen.hoiDong.ten_hoi_dong;
+        boChuyenStatus.ngayBaoCao = boChuyen.hoiDong.ngay_bao_cao;
+        boChuyenStatus.diaDiem = boChuyen.hoiDong.dia_diem;
+      }
+
+      if (phieuTQs.length > 0) {
+        const scores: number[] = [];
+        for (const ptq of phieuTQs) {
+          const diem = ptq.diemPhieuThamQuan;
+          if (!diem) continue;
+          if (diem.diem_tong_chuyen !== null && diem.diem_tong_chuyen !== undefined) {
+            scores.push(Number(diem.diem_tong_chuyen));
+          } else {
+            const isChuanBiLocked =
+              diem.da_khoa_chuan_bi === true || diem.da_khoa === true;
+            const isThuHoachLocked =
+              diem.da_khoa_thu_hoach === true || diem.da_khoa === true;
+            const isHoiDongLocked =
+              diem.da_khoa_hoi_dong === true || diem.da_khoa === true;
+
+            if (
+              isChuanBiLocked &&
+              isThuHoachLocked &&
+              isHoiDongLocked &&
+              diem.diem_chuan_bi !== null &&
+              diem.diem_thu_hoach !== null &&
+              diem.diem_hoi_dong_final !== null
+            ) {
+              scores.push(
+                Number(diem.diem_chuan_bi) * 0.3 +
+                Number(diem.diem_thu_hoach) * 0.3 +
+                Number(diem.diem_hoi_dong_final) * 0.4 +
+                Number(diem.diem_cong_final || 0),
+              );
+            }
+          }
+        }
+        if (scores.length === phieuTQs.length && scores.length > 0) {
+          const avg = scores.reduce((sum, val) => sum + val, 0) / scores.length;
           avgScore = avg.toFixed(1);
         }
       }
     }
 
-    // Hóa đơn chưa thanh toán (chỉ tính các phiếu đã được duyệt hợp lệ)
-    const pdkIds = trips
-      .filter((t) => t.trang_thai !== 'ChoDuyet')
-      .map((t) => t.id);
-    const unpaidInvoices =
-      pdkIds.length > 0
-        ? await this.hoaDonRepo.find({
-          where: { phieu_dang_ky_id: In(pdkIds), trang_thai: 'ChuaDong' },
-        })
-        : [];
+    // Nếu chưa có điểm từ bộ 3, tính từ allDiems đã tải trước ở Phase 2
+    if (avgScore === 'Chưa có' && allDiems.length > 0) {
+      const validScores = allDiems
+        .map((d) => (d.diem_tong_chuyen != null ? Number(d.diem_tong_chuyen) : null))
+        .filter((s): s is number => s != null);
+      if (validScores.length > 0) {
+        const avg = validScores.reduce((sum, val) => sum + val, 0) / validScores.length;
+        avgScore = avg.toFixed(1);
+      }
+    }
+
     const unpaidInvoicesCount = unpaidInvoices.length;
     const totalUnpaidAmount = unpaidInvoices.reduce(
       (sum, inv) => sum + Number(inv.so_tien || 0),
@@ -2704,8 +2700,6 @@ export class SinhVienService {
       (t) => !!t.phieuThamQuan?.baiThuHoach,
     ).length;
 
-    // Xử lý kiểm tra kỷ luật / danh sách đen
-    const penalty = await this.checkAndUpdatePenalties(studentId);
     const isBlacklisted = penalty.totalRemainingTrips > 0;
     const bannedTripsCount = penalty.totalRemainingTrips;
     const blacklistReason = penalty.reasonSummary || null;

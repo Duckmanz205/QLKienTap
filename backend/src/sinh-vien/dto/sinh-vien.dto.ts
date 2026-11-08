@@ -69,10 +69,10 @@ export class RequestCancelDto {
   @Min(1)
   dangKyId?: number;
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty({ message: 'Lý do hủy không được để trống' })
-  @Length(1, 500)
-  lyDo: string;
+  @Length(0, 500)
+  lyDo?: string;
 
   @IsOptional()
   @IsString()
