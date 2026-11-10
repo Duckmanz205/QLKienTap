@@ -1494,7 +1494,7 @@ export class SinhVienService {
       report = new BaiThuHoach();
       report.phieu_tham_quan_id = phieuTQ.id;
       report.file_bao_cao = '';
-      report.trang_thai = 'ChoDiemDanh';
+      report.trang_thai = 'DaNop';
       report.ngay_nop = new Date();
     }
     report.file_xac_nhan_tham_quan = validXacNhanRef as any;

@@ -1184,8 +1184,9 @@ class _NopBaiThuHoachSVScreenState extends State<NopBaiThuHoachSVScreen> {
                         setState(() {
                           _uploadingConfirms[sub.id] = false;
                         });
+                        final cleanMsg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Lỗi chọn/tải file lên: $e'), backgroundColor: AppColors.danger),
+                          SnackBar(content: Text('Lỗi tải file lên: $cleanMsg'), backgroundColor: AppColors.danger),
                         );
                       }
                     },

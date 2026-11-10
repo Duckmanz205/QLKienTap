@@ -156,12 +156,14 @@ class ChuyenThamQuanSVScreen extends StatefulWidget {
   final Function(String) onTripTap;
   final String activeTab;
   final Function(String) onTabChanged;
+  final VoidCallback? onNavigateToReport;
 
   const ChuyenThamQuanSVScreen({
     super.key,
     required this.onTripTap,
     required this.activeTab,
     required this.onTabChanged,
+    this.onNavigateToReport,
   });
 
   @override
@@ -410,8 +412,9 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
       }
     } catch (e) {
       if (!mounted) return;
+      final cleanMsg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi tải tệp lên: $e'), backgroundColor: AppColors.danger),
+        SnackBar(content: Text('Lỗi tải tệp lên: $cleanMsg'), backgroundColor: AppColors.danger),
       );
     }
   }
@@ -947,25 +950,43 @@ class _ChuyenThamQuanSVScreenState extends State<ChuyenThamQuanSVScreen> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: ElevatedButton.icon(
-                            onPressed: () => _uploadConfirmationForTrip(trip, appStateProvider),
-                            icon: Icon(trip.fileXacNhanUrl != null ? Icons.file_upload_outlined : Icons.upload_file, size: 14),
-                            label: Text(
-                              trip.fileXacNhanUrl != null ? 'Tải tệp khác' : 'Nộp giấy xác nhận',
-                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            if (trip.fileXacNhanUrl == null && widget.onNavigateToReport != null) ...[
+                              OutlinedButton.icon(
+                                onPressed: widget.onNavigateToReport,
+                                icon: const Icon(Icons.assignment_outlined, size: 14),
+                                label: const Text('Nộp kèm bài báo cáo', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.primary,
+                                  side: const BorderSide(color: AppColors.primary),
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                            ElevatedButton.icon(
+                              onPressed: () => _uploadConfirmationForTrip(trip, appStateProvider),
+                              icon: Icon(trip.fileXacNhanUrl != null ? Icons.file_upload_outlined : Icons.upload_file, size: 14),
+                              label: Text(
+                                trip.fileXacNhanUrl != null ? 'Tải tệp khác' : 'Nộp giấy xác nhận',
+                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: trip.fileXacNhanUrl != null ? Colors.white : const Color(0xFFD97706),
+                                foregroundColor: trip.fileXacNhanUrl != null ? AppColors.primary : Colors.white,
+                                side: trip.fileXacNhanUrl != null ? const BorderSide(color: AppColors.primary) : null,
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                              ),
                             ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: trip.fileXacNhanUrl != null ? Colors.white : const Color(0xFFD97706),
-                              foregroundColor: trip.fileXacNhanUrl != null ? AppColors.primary : Colors.white,
-                              side: trip.fileXacNhanUrl != null ? const BorderSide(color: AppColors.primary) : null,
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                            ),
-                          ),
+                          ],
                         ),
                       ],
                     ),
