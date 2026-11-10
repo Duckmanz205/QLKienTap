@@ -669,6 +669,9 @@ export class PhieuThamQuan {
 
   @OneToOne(() => DiemPhieuThamQuan, (d) => d.phieuThamQuan)
   diemPhieuThamQuan: any;
+
+  @OneToOne(() => DiemDanh, (d) => d.phieuThamQuan)
+  diemDanh: any;
 }
 
 // (v9) Bỏ nguoi_duyet_id
@@ -838,7 +841,7 @@ export class DiemDanh {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @OneToOne(() => PhieuThamQuan)
+  @OneToOne(() => PhieuThamQuan, (p) => p.diemDanh)
   @JoinColumn({ name: 'phieu_tham_quan_id' })
   phieuThamQuan: PhieuThamQuan;
 
@@ -968,7 +971,7 @@ export class DiemPhieuThamQuan {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @OneToOne(() => PhieuThamQuan)
+  @OneToOne(() => PhieuThamQuan, (p) => p.diemPhieuThamQuan)
   @JoinColumn({ name: 'phieu_tham_quan_id' })
   phieuThamQuan: PhieuThamQuan;
 

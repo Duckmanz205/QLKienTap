@@ -2,7 +2,7 @@ import api from './axiosClient';
 
 export const giangVienApi = {
   getProfile: (accountId) => api.get(`/giang-vien/profile/${accountId}`),
-  getGuidedStudents: (lecturerId) => api.get(`/giang-vien/guided-students/${lecturerId}`),
+  getGuidedStudents: (lecturerId, params) => api.get(`/giang-vien/guided-students/${lecturerId}`, { params }),
   getLedTrips: (lecturerId) => api.get(`/giang-vien/led-trips/${lecturerId}`),
   getTripRegistrations: (tripId) => api.get(`/giang-vien/trip-registrations/${tripId}`),
   takeAttendance: (data) => api.post('/giang-vien/take-attendance', data),  // data: {tripId, records: [{phieuId, status, note?}]}
@@ -18,7 +18,7 @@ export const giangVienApi = {
   getGuidedReports: (lecturerId, params) => api.get(`/giang-vien/guided-reports/${lecturerId}`, { params }),
   gradeReport: (data) => api.post('/giang-vien/grade-report', data),
   extendReportDeadline: (data) => api.post('/giang-vien/extend-report-deadline', data),
-  getGuidedStudentTrips: (studentId) => api.get(`/giang-vien/guided-student-trips/${studentId}`),
+  getGuidedStudentTrips: (studentId, params) => api.get(`/giang-vien/guided-student-trips/${studentId}`, { params }),
   lockGuidedReportsGrades: (data) => api.post('/giang-vien/lock-guided-reports-grades', data),
   getBoardSessions: (lecturerId) => api.get(`/giang-vien/board-sessions/${lecturerId}`),
   submitBoardScore: (data) => api.post('/giang-vien/submit-board-score', data),

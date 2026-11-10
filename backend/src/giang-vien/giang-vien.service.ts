@@ -127,15 +127,27 @@ export class GiangVienService implements OnModuleInit {
   }
 
   // Danh sach sinh vien huong dan (GVHD)
-  async getGuidedStudents(lecturerId: number) {
+  async getGuidedStudents(lecturerId: number, dotKienTapId?: number) {
+    const whereCondition: any = {
+      giang_vien_id: lecturerId,
+      trang_thai: 'DangHoatDong',
+    };
+
+    if (dotKienTapId) {
+      whereCondition.dotKienTapSinhVien = {
+        dot_kien_tap_id: dotKienTapId,
+      };
+    }
+
     const assignments = await this.phanCongRepo.find({
-      where: { giang_vien_id: lecturerId, trang_thai: 'DangHoatDong' },
+      where: whereCondition,
       relations: {
         dotKienTapSinhVien: {
           sinhVien: true,
           dotKienTap: true,
         },
       },
+      order: { id: 'DESC' },
     });
     return assignments.map((a) => a.dotKienTapSinhVien);
   }
@@ -2256,25 +2268,44 @@ export class GiangVienService implements OnModuleInit {
   }
 
   // Lấy toàn bộ chuyến tham quan của sinh viên hướng dẫn (cho Modal Hồ sơ kiến tập)
-  async getGuidedStudentTrips(lecturerId: number, studentId: number) {
+  async getGuidedStudentTrips(
+    lecturerId: number,
+    studentId: number,
+    dotKienTapId?: number,
+  ) {
+    const whereAssignment: any = {
+      giang_vien_id: lecturerId,
+      trang_thai: 'DangHoatDong',
+      dotKienTapSinhVien: { sinh_vien_id: studentId },
+    };
+    if (dotKienTapId) {
+      whereAssignment.dotKienTapSinhVien.dot_kien_tap_id = dotKienTapId;
+    }
+
     const assignment = await this.phanCongRepo.findOne({
-      where: {
-        giang_vien_id: lecturerId,
-        trang_thai: 'DangHoatDong',
-        dotKienTapSinhVien: { sinh_vien_id: studentId },
+      where: whereAssignment,
+      relations: {
+        dotKienTapSinhVien: {
+          dotKienTap: true,
+        },
       },
-      relations: { dotKienTapSinhVien: true },
     });
 
     if (!assignment) {
-      throw new ForbiddenException('Bạn không phải là Giảng viên hướng dẫn của sinh viên này.');
+      throw new ForbiddenException(
+        dotKienTapId
+          ? 'Bạn không phải là Giảng viên hướng dẫn của sinh viên này trong đợt được chọn.'
+          : 'Bạn không phải là Giảng viên hướng dẫn của sinh viên này.',
+      );
     }
 
+    const whereReg: any = {
+      sinh_vien_id: studentId,
+      trang_thai: In(['HopLe', 'DaThamGia', 'HoanThanh', 'VangMat', 'KhongDat']),
+    };
+
     const registrations = await this.phieuRepo.find({
-      where: {
-        sinh_vien_id: studentId,
-        trang_thai: In(['HopLe', 'DaThamGia', 'HoanThanh', 'VangMat', 'KhongDat']),
-      },
+      where: whereReg,
       relations: {
         chuyenThamQuan: {
           nhaMay: true,
@@ -2289,7 +2320,65 @@ export class GiangVienService implements OnModuleInit {
       order: { id: 'DESC' },
     });
 
-    return registrations;
+    // Nếu có dotKienTapId, lọc các chuyến thuộc đợt đó (hoặc chuyến có lịch chung/null của đợt)
+    const filteredRegs = dotKienTapId
+      ? registrations.filter((reg) => {
+          const tripDotId = reg.chuyenThamQuan?.lichKienTap?.dot_kien_tap_id;
+          return tripDotId === dotKienTapId || tripDotId == null;
+        })
+      : registrations;
+
+    return filteredRegs.map((reg) => {
+      const cq = reg.chuyenThamQuan;
+      const ptq = reg.phieuThamQuan;
+      const bth = ptq?.baiThuHoach;
+      const dptq = ptq?.diemPhieuThamQuan;
+      const dd = ptq?.diemDanh;
+
+      const tenNhaMay = cq?.nhaMay?.ten_nha_may || 'Chưa xác định';
+      const dot = cq?.lichKienTap?.dotKienTap || assignment.dotKienTapSinhVien?.dotKienTap;
+
+      return {
+        id: reg.id,
+        phieuDangKyId: reg.id,
+        phieuThamQuanId: ptq?.id || null,
+        chuyenId: cq?.id || null,
+        dotKienTapId: dot?.id || assignment.dotKienTapSinhVien?.dot_kien_tap_id || null,
+        tenDot: dot?.ten_dot || 'Chưa xác định',
+        tenNhaMay,
+        tenChuyen: tenNhaMay,
+        ngayThamQuan: cq?.ngay_tham_quan || null,
+        trangThaiDiemDanh: dd?.trang_thai || 'ChuaDiemDanh',
+        diemChuanBi: dptq?.diem_chuan_bi ?? null,
+        hanNopBaoCao: ptq?.han_nop_bao_cao || null,
+        daKhoaThuHoach: dptq?.da_khoa_thu_hoach ?? false,
+        daKhoa: dptq?.da_khoa ?? false,
+        diemThuHoach: dptq?.diem_thu_hoach ?? null,
+        trangThaiDangKy: reg.trang_thai,
+        baiThuHoach: bth
+          ? {
+              id: bth.id,
+              fileBaoCao: bth.file_bao_cao,
+              file_bao_cao: bth.file_bao_cao,
+              trangThai: bth.trang_thai,
+              trang_thai: bth.trang_thai,
+              nhanXet: dptq?.nhan_xet_thu_hoach || '',
+              nhan_xet: dptq?.nhan_xet_thu_hoach || '',
+              ngayNop: bth.ngay_nop,
+              lanNop: bth.lan_nop,
+            }
+          : null,
+        diemPhieuThamQuan: dptq
+          ? {
+              diem_chuan_bi: dptq.diem_chuan_bi,
+              diem_thu_hoach: dptq.diem_thu_hoach,
+              nhan_xet_thu_hoach: dptq.nhan_xet_thu_hoach,
+              da_khoa_thu_hoach: dptq.da_khoa_thu_hoach,
+              da_khoa: dptq.da_khoa,
+            }
+          : null,
+      };
+    });
   }
 }
 

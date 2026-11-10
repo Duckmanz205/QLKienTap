@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Search, ChevronDown, Check, Eye, Edit3, X, FileText, Calendar, Clock, Lock
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { giangVienApi } from '../../services/api';
 import SearchableDropdown from '../../components/SearchableDropdown';
 import ExtendDeadlineModal from '../../components/ExtendDeadlineModal';
@@ -22,6 +23,9 @@ export default function SinhVienHuongDan_GV() {
   const [selectedTripForExtend, setSelectedTripForExtend] = useState(null);
 
   // Filter Popover States
+  const [selectedDotId, setSelectedDotId] = useState('ALL');
+  const [uniqueDots, setUniqueDots] = useState([]);
+  const hasInitializedDotRef = useRef(false);
   const [selectedClass, setSelectedClass] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
 
@@ -34,10 +38,12 @@ export default function SinhVienHuongDan_GV() {
     if (!student?.rawSv?.id) return;
     setLoadingTrips(true);
     try {
-      const res = await giangVienApi.getGuidedStudentTrips(student.rawSv.id);
+      const params = student.dotKienTapId ? { dotKienTapId: student.dotKienTapId } : {};
+      const res = await giangVienApi.getGuidedStudentTrips(student.rawSv.id, params);
       setStudentTrips(res.data || []);
     } catch (err) {
       console.error('Lỗi khi tải lịch sử chuyến đi của sinh viên:', err);
+      toast.error(err.response?.data?.message || 'Không thể tải lịch sử chuyến đi của sinh viên');
       setStudentTrips([]);
     } finally {
       setLoadingTrips(false);
@@ -67,13 +73,48 @@ export default function SinhVienHuongDan_GV() {
       const rpData = reportsRes.data?.data || reportsRes.data || [];
       
       setReports(rpData);
+
+      // Trích xuất danh sách các đợt kiến tập duy nhất mà giảng viên được phân công
+      const dotsMap = new Map();
+      stData.forEach(st => {
+        const dot = st.dotKienTap;
+        if (dot && !dotsMap.has(dot.id)) {
+          dotsMap.set(dot.id, {
+            id: dot.id,
+            name: dot.ten_dot || `Đợt ${dot.id}`,
+            status: dot.trang_thai,
+            statusLabel: dot.trang_thai === 'DangTrienKhai' ? 'Đang diễn ra' : dot.trang_thai === 'DaKhoa' ? 'Đã khóa' : dot.trang_thai
+          });
+        }
+      });
+      const dotsList = Array.from(dotsMap.values()).sort((a, b) => b.id - a.id);
+      setUniqueDots(dotsList);
+
+      // Tự động chọn đợt kiến tập mới nhất khi tải lần đầu
+      if (!hasInitializedDotRef.current && dotsList.length > 0) {
+        const activeDot = dotsList.find(d => d.status === 'DangTrienKhai') || dotsList[0];
+        if (activeDot) {
+          setSelectedDotId(activeDot.id);
+          hasInitializedDotRef.current = true;
+        }
+      }
       
       // Map to UI model
       const mappedStudents = stData.map(st => {
         const sv = st.sinhVien || {};
+        const dotId = st.dot_kien_tap_id;
         
-        // Find reports for this student
-        const studentReports = rpData.filter(r => (r.phieuThamQuan?.phieuDangKy?.sinhVien?.id === sv.id) || (r.phieuDangKy?.sinhVien?.id === sv.id));
+        // Find reports for this student matching this batch
+        const studentReports = rpData.filter(r => {
+          const rSvId = r.phieuThamQuan?.phieuDangKy?.sinhVien?.id || r.phieuDangKy?.sinhVien?.id;
+          if (rSvId !== sv.id) return false;
+          const ctq = r.phieuThamQuan?.phieuDangKy?.chuyenThamQuan || r.phieuDangKy?.chuyenThamQuan;
+          const rDotId = ctq?.lichKienTap?.dotKienTap?.id || ctq?.lichKienTap?.dot_kien_tap_id;
+          if (rDotId && dotId) {
+            return rDotId === dotId;
+          }
+          return true;
+        });
         const pendingReports = studentReports.filter(r => r.diem_thu_hoach === null);
         
         return {
@@ -81,19 +122,24 @@ export default function SinhVienHuongDan_GV() {
           mssv: sv.mssv,
           name: sv.ho_ten,
           lop: sv.ten_lop || '--',
+          dotKienTapId: dotId,
+          tenDot: st.dotKienTap?.ten_dot || `Đợt ${dotId || ''}`,
+          trangThaiDot: st.dotKienTap?.trang_thai,
           soChuyenHT: studentReports.length, 
           soChuyenYC: 3, 
           baiChoCham: pendingReports.length,
           rawSv: sv,
+          rawSt: st,
           studentReports: studentReports
         };
       });
       
-      // Deduplicate by student ID in case a student is assigned multiple times
+      // Deduplicate safely by combination of batch and student ID
       const uniqueStudentsMap = new Map();
       mappedStudents.forEach(st => {
-        if (!uniqueStudentsMap.has(st.mssv)) {
-          uniqueStudentsMap.set(st.mssv, st);
+        const key = `${st.dotKienTapId || 0}_${st.mssv}`;
+        if (!uniqueStudentsMap.has(key)) {
+          uniqueStudentsMap.set(key, st);
         }
       });
       
@@ -117,6 +163,7 @@ export default function SinhVienHuongDan_GV() {
   // Filtered & Paginated logic
   const filteredStudents = useMemo(() => {
     return students.filter(s => {
+      const matchDot = selectedDotId === 'ALL' || s.dotKienTapId === selectedDotId;
       const matchSearch = !searchQuery || 
         (s.name && s.name.toLowerCase().includes(searchQuery.toLowerCase())) || 
         (s.mssv && s.mssv.includes(searchQuery));
@@ -124,9 +171,9 @@ export default function SinhVienHuongDan_GV() {
       const matchStatus = selectedStatus === 'ALL' || 
         (selectedStatus === 'PENDING' && s.baiChoCham > 0) || 
         (selectedStatus === 'DONE' && s.baiChoCham === 0);
-      return matchSearch && matchClass && matchStatus;
+      return matchDot && matchSearch && matchClass && matchStatus;
     });
-  }, [students, searchQuery, selectedClass, selectedStatus]);
+  }, [students, selectedDotId, searchQuery, selectedClass, selectedStatus]);
 
   const totalPages = Math.ceil(filteredStudents.length / limit) || 1;
   const paginatedStudents = filteredStudents.slice((currentPage - 1) * limit, currentPage * limit);
@@ -136,13 +183,16 @@ export default function SinhVienHuongDan_GV() {
       
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-800">Sinh viên hướng dẫn</h1>
+        <p className="text-sm text-slate-500 mt-1">
+          Theo dõi tiến độ tham quan và chấm bài thu hoạch theo từng đợt kiến tập
+        </p>
       </div>
 
       {/* Filter Bar */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-[#E7E0C4] mb-6 flex flex-wrap gap-4 items-center relative z-20">
         
         {/* Search Input */}
-        <div className="relative flex-1 min-w-[260px]">
+        <div className="relative flex-1 min-w-[240px]">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input 
             type="text" 
@@ -155,6 +205,25 @@ export default function SinhVienHuongDan_GV() {
             className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-[#E7E0C4] rounded-lg text-sm focus:outline-none focus:border-[#407F3E] transition-all text-slate-800 font-medium"
           />
         </div>
+
+        {/* Đợt kiến tập Dropdown */}
+        <SearchableDropdown
+          options={[
+            { value: 'ALL', label: 'Tất cả các đợt' },
+            ...uniqueDots.map(dot => ({
+              value: dot.id,
+              label: `${dot.name} ${dot.status === 'DangTrienKhai' ? '• Đang diễn ra' : dot.status === 'DaKhoa' ? '• Đã khóa' : ''}`
+            }))
+          ]}
+          value={selectedDotId}
+          onChange={(val) => {
+            setSelectedDotId(val);
+            setCurrentPage(1);
+          }}
+          placeholder="Chọn đợt kiến tập"
+          searchPlaceholder="Tìm đợt..."
+          className="min-w-[220px]"
+        />
 
         {/* Lớp Dropdown */}
         <SearchableDropdown
@@ -169,7 +238,7 @@ export default function SinhVienHuongDan_GV() {
           }}
           placeholder="Tất cả lớp"
           searchPlaceholder="Tìm lớp..."
-          className="min-w-[200px]"
+          className="min-w-[180px]"
         />
 
         {/* Trạng thái bài thu hoạch Dropdown */}
@@ -186,22 +255,23 @@ export default function SinhVienHuongDan_GV() {
           }}
           placeholder="Tất cả trạng thái"
           searchPlaceholder="Tìm trạng thái..."
-          className="min-w-[200px]"
+          className="min-w-[180px]"
         />
       </div>
 
       {/* Main Table */}
       <div className="bg-white rounded-xl shadow-sm border border-[#E7E0C4] overflow-hidden">
         <div className="overflow-x-auto min-h-[300px]">
-          <table className="w-full text-left border-collapse table-fixed">
+          <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-[#E7E0C4] text-slate-800 text-xs font-bold uppercase tracking-wider border-b border-[#E7E0C4]">
-                <th className="p-4 pl-6 w-[15%]">MSSV</th>
-                <th className="p-4 w-[25%]">Họ tên</th>
-                <th className="p-4 w-[15%]">Lớp</th>
-                <th className="p-4 text-center w-[15%]">Số chuyến đã đi</th>
-                <th className="p-4 text-center w-[15%]">Bài chờ chấm</th>
-                <th className="p-4 pr-6 text-right w-[15%]">Hành động</th>
+                <th className="p-4 pl-6">MSSV</th>
+                <th className="p-4">Họ tên</th>
+                <th className="p-4">Lớp</th>
+                <th className="p-4">Đợt kiến tập</th>
+                <th className="p-4 text-center">Số chuyến đã đi</th>
+                <th className="p-4 text-center">Bài chờ chấm</th>
+                <th className="p-4 pr-6 text-right whitespace-nowrap">Hành động</th>
               </tr>
             </thead>
             <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
@@ -228,6 +298,20 @@ export default function SinhVienHuongDan_GV() {
                       <td className="p-4 font-bold text-slate-800 truncate">{student.name}</td>
                       <td className="p-4 font-medium text-slate-500 truncate">{student.lop}</td>
                       
+                      {/* Đợt kiến tập badge */}
+                      <td className="p-4 truncate">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${
+                          student.trangThaiDot === 'DangTrienKhai'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : student.trangThaiDot === 'DaKhoa'
+                            ? 'bg-slate-100 text-slate-600 border-slate-200'
+                            : 'bg-amber-50 text-amber-700 border-amber-200'
+                        }`}>
+                          <Calendar className="w-3 h-3 shrink-0" />
+                          <span className="truncate">{student.tenDot}</span>
+                        </span>
+                      </td>
+
                       {/* Số chuyến hoàn thành */}
                       <td className="p-4 text-center">
                         <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-bold shadow-sm border ${
@@ -258,13 +342,16 @@ export default function SinhVienHuongDan_GV() {
                       </td>
 
                       {/* Hành động */}
-                      <td className="p-4 pr-6 text-right">
+                      <td className="p-4 pr-6 text-right whitespace-nowrap">
                         <button 
                           onClick={() => handleOpenProfile(student)}
-                          className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-lg text-xs font-bold transition-colors shadow-sm cursor-pointer"
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-[#407F3E] text-white hover:bg-[#407F3E]/90 rounded-lg text-xs font-bold transition-colors shadow-xs cursor-pointer text-left"
                         >
-                          <FileText className="w-3.5 h-3.5" />
-                          Hồ sơ kiến tập
+                          <FileText className="w-3.5 h-3.5 shrink-0" />
+                          <span className="flex flex-col text-left leading-tight">
+                            <span>Hồ sơ</span>
+                            <span>kiến tập</span>
+                          </span>
                         </button>
                       </td>
 
@@ -341,8 +428,16 @@ export default function SinhVienHuongDan_GV() {
             {/* Modal Header */}
             <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-slate-50/50">
               <div>
-                <h2 className="text-xl font-bold text-slate-800">{selectedStudentProfile.name}</h2>
-                <p className="text-sm text-slate-500 font-medium mt-0.5">MSSV: {selectedStudentProfile.mssv} • Lớp: {selectedStudentProfile.lop}</p>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl font-bold text-slate-800">{selectedStudentProfile.name}</h2>
+                  {selectedStudentProfile.tenDot && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#407F3E]/10 text-[#407F3E] border border-[#407F3E]/20">
+                      <Calendar className="w-3 h-3" />
+                      {selectedStudentProfile.tenDot}
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-slate-500 font-medium mt-1">MSSV: <span className="font-semibold text-slate-700">{selectedStudentProfile.mssv}</span> • Lớp: <span className="font-semibold text-slate-700">{selectedStudentProfile.lop}</span></p>
               </div>
               <button 
                 onClick={() => setSelectedStudentProfile(null)}
@@ -385,16 +480,19 @@ export default function SinhVienHuongDan_GV() {
                         <tr><td colSpan="6" className="p-6 text-center text-slate-500">Chưa tham gia chuyến đi nào.</td></tr>
                       ) : (
                         studentTrips.map((trip, idx) => {
-                          const nhaMay = trip.tenNhaMay || trip.tenChuyen || 'N/A';
-                          const thoiGian = trip.ngayThamQuan;
-                          const diemDanh = trip.trangThaiDiemDanh;
-                          const diemChuanBi = trip.diemChuanBi;
-                          const isLocked = trip.daKhoaThuHoach || trip.daKhoa;
+                          const nhaMay = trip.tenNhaMay || trip.tenChuyen || trip.chuyenThamQuan?.nhaMay?.ten_nha_may || 'N/A';
+                          const thoiGian = trip.ngayThamQuan || trip.chuyenThamQuan?.ngay_tham_quan;
+                          const diemDanh = trip.trangThaiDiemDanh || trip.phieuThamQuan?.diemDanh?.trang_thai;
+                          const diemChuanBi = trip.diemChuanBi !== undefined && trip.diemChuanBi !== null
+                            ? trip.diemChuanBi
+                            : trip.phieuThamQuan?.diemPhieuThamQuan?.diem_chuan_bi;
+                          const isLocked = trip.daKhoaThuHoach || trip.daKhoa || trip.phieuThamQuan?.diemPhieuThamQuan?.da_khoa_thu_hoach;
+                          const hanNop = trip.hanNopBaoCao || trip.phieuThamQuan?.han_nop_bao_cao;
                           
                           // Deadline badge calculation
                           let deadlineBadge = <span className="text-slate-400 text-xs italic">Chưa xác định</span>;
-                          if (trip.hanNopBaoCao) {
-                            const deadline = new Date(trip.hanNopBaoCao);
+                          if (hanNop) {
+                            const deadline = new Date(hanNop);
                             const now = new Date();
                             const deadlineLock = new Date(deadline.getTime() + 10 * 86400000);
                             const dStr = deadline.toLocaleDateString('vi-VN');
@@ -499,10 +597,16 @@ export default function SinhVienHuongDan_GV() {
                         <tr><td colSpan="4" className="p-6 text-center text-slate-500">Chưa nộp bài thu hoạch nào.</td></tr>
                       ) : (
                         studentTrips.map((trip, idx) => {
-                          const bth = trip.baiThuHoach;
-                          const tenBai = bth?.fileBaoCao?.split('/').pop() || `${trip.tenNhaMay || trip.tenChuyen} (Chưa nộp)`;
+                          const bth = trip.baiThuHoach || trip.phieuThamQuan?.baiThuHoach;
+                          const rawFile = bth?.fileBaoCao || bth?.file_bao_cao;
+                          const nhaMay = trip.tenNhaMay || trip.tenChuyen || trip.chuyenThamQuan?.nhaMay?.ten_nha_may || 'Chuyến đi';
+                          const tenBai = rawFile?.split('/').pop() || `${nhaMay} (Chưa nộp)`;
                           const daNop = !!bth;
-                          const isTreHan = bth?.trangThai === 'TreHan';
+                          const isTreHan = (bth?.trangThai || bth?.trang_thai) === 'TreHan';
+                          const diemSo = trip.diemThuHoach !== null && trip.diemThuHoach !== undefined
+                            ? trip.diemThuHoach
+                            : trip.phieuThamQuan?.diemPhieuThamQuan?.diem_thu_hoach;
+                          const nhanXet = bth?.nhanXet || bth?.nhan_xet || trip.diemPhieuThamQuan?.nhan_xet_thu_hoach || 'Chưa có nhận xét';
                           
                           return (
                             <tr key={idx} className="hover:bg-slate-50 transition-colors">
@@ -529,11 +633,11 @@ export default function SinhVienHuongDan_GV() {
                               </td>
                               <td className="p-4 text-center">
                                 <span className="font-black text-lg text-[#407F3E]">
-                                  {trip.diemThuHoach !== null && trip.diemThuHoach !== undefined ? trip.diemThuHoach : '--'}
+                                  {diemSo !== null && diemSo !== undefined ? diemSo : '--'}
                                 </span>
                               </td>
-                              <td className="p-4 text-slate-600 text-xs italic max-w-[250px] truncate" title={bth?.nhanXet || ''}>
-                                {bth?.nhanXet || 'Chưa có nhận xét'}
+                              <td className="p-4 text-slate-600 text-xs italic max-w-[250px] truncate" title={nhanXet}>
+                                {nhanXet}
                               </td>
                             </tr>
                           );
@@ -557,8 +661,8 @@ export default function SinhVienHuongDan_GV() {
             setExtendModalOpen(false);
             setSelectedTripForExtend(null);
           }}
-          phieuThamQuanId={selectedTripForExtend.phieuThamQuanId}
-          currentDeadline={selectedTripForExtend.hanNopBaoCao}
+          phieuThamQuanId={selectedTripForExtend.phieuThamQuanId || selectedTripForExtend.phieuThamQuan?.id}
+          currentDeadline={selectedTripForExtend.hanNopBaoCao || selectedTripForExtend.phieuThamQuan?.han_nop_bao_cao}
           studentName={selectedStudentProfile?.name}
           studentMssv={selectedStudentProfile?.mssv}
           tripName={selectedTripForExtend.tenNhaMay || selectedTripForExtend.tenChuyen}

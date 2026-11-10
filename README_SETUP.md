@@ -1,202 +1,167 @@
-# 📘 Hướng dẫn chạy đồ án Quản lý Kiến tập (QLKienTap)
+# 📘 Hướng dẫn Cài đặt, Khởi chạy & Đóng gói Dự án Quản lý Kiến tập (QLKienTap)
 
-## Tổng quan kiến trúc
+Hệ thống quản lý toàn diện quy trình kiến tập nhà máy cho sinh viên HUIT, tích hợp chấm điểm AI tự động, trích xuất chữ viết tay OCR và ứng dụng di động.
+
+---
+
+## 🏗️ 1. Tổng quan Kiến trúc Hệ thống
 
 ```
-Frontend (React + Vite)  ──▶  Backend (NestJS)  ──▶  SQL Server
-     Port 5173           API    Port 3000        TypeORM  Port 1433
-                    http://localhost:3000/api          DB: QLKienTap
+┌─────────────────────────────────┐       ┌─────────────────────────────────┐
+│        Frontend Web             │       │          Mobile App             │
+│        React + Vite             │       │            Flutter              │
+│       Port 5173 (Local)         │       │         Android / iOS           │
+└────────────────┬────────────────┘       └────────────────┬────────────────┘
+                 │                                         │
+                 │ HTTP REST /api                          │ HTTP REST /api
+                 ▼                                         ▼
+┌───────────────────────────────────────────────────────────────────────────┐
+│                           Backend API Server                              │
+│                      NestJS (TypeScript) - Port 3000                      │
+│                                                                           │
+│   • Auth (JWT Guard & Roles)              • Quản lý Chuyến & Điểm danh    │
+│   • Phân công GVHD & Chấm điểm            • R2 Storage (Cloudflare S3)    │
+└──────────────────┬───────────────────────────────────────┬────────────────┘
+                   │                                       │
+                   │ TypeORM (Port 1433)                   │ HTTP Multi-part
+                   ▼                                       ▼
+┌─────────────────────────────────┐       ┌─────────────────────────────────┐
+│           Database              │       │         AI Microservice         │
+│     Microsoft SQL Server        │       │         Python + FastAPI        │
+│         DB: QLKienTap           │       │         Port 8000 (Local)       │
+│                                 │       │   • Vision OCR (DeepSeek/Qwen)  │
+│  • 33 Bảng quan hệ              │       │   • Global Semaphore (2 luồng)  │
+│  • Triggers & Constraints       │       │   • Chấm Rubric Đa tác tử (CoT) │
+└─────────────────────────────────┘       └─────────────────────────────────┘
 ```
 
 ---
 
-## 📋 Yêu cầu hệ thống (Prerequisites)
+## 📋 2. Yêu cầu Hệ thống (Prerequisites)
 
-| Phần mềm | Phiên bản tối thiểu | Kiểm tra bằng lệnh |
-| :--- | :--- | :--- |
-| **Node.js** | v18+ | `node -v` |
-| **npm** | v9+ | `npm -v` |
-| **SQL Server** | 2019+ | Kiểm tra qua SSMS |
-| **SSMS** hoặc **Azure Data Studio** | Bất kỳ | Dùng để chạy script SQL |
+| Phần mềm / Môi trường | Phiên bản tối thiểu | Lệnh kiểm tra | Ghi chú |
+| :--- | :---: | :--- | :--- |
+| **Node.js** | v18+ | `node -v` | Chạy Backend & Frontend |
+| **npm** | v9+ | `npm -v` | Trình quản lý gói Node |
+| **Python** | 3.9+ hoặc 3.10+ | `python --version` | Chạy AI Microservice |
+| **Flutter SDK** | 3.10+ | `flutter --version` | Chạy Mobile App |
+| **Microsoft SQL Server** | 2019+ | Kiểm tra qua SSMS | Port 1433, bật TCP/IP |
+| **SSMS / Azure Data Studio** | Bất kỳ | Mở giao diện SSMS | Quản trị CSDL |
 
-> ⚠️ SQL Server phải đang chạy và cho phép kết nối TCP/IP trên cổng **1433**.  
-> Bật TCP/IP trong **SQL Server Configuration Manager** nếu chưa bật.
-
----
-
-## 🛠️ Bước 1: Chuẩn bị Database
-
-Hệ thống sử dụng CSDL với nhiều Trigger và Constraint phức tạp, do đó **không sử dụng tính năng tự động tạo bảng (synchronize) của TypeORM**.
-
-### 1.1. Khởi tạo Schema và Dữ liệu
-
-Mở SQL Server Management Studio (SSMS) và thực thi lần lượt 2 script sau (nằm trong thư mục `TaiLieu/`):
-
-1. **`QLKienTap_Database_v2.sql`**: Chạy script này trước để tạo database `QLKienTap`, các bảng, view, constraint và triggers theo cấu trúc V2 mới nhất.
-2. **`QLKienTap_ImportData.sql`**: Chạy script này sau khi đã tạo schema để insert dữ liệu mẫu (danh mục, tài khoản, sinh viên, giảng viên...). Mật khẩu của admin và clb đã được đưa về mặc định là `123456`.
+> [!IMPORTANT]
+> SQL Server phải đang chạy service và đã bật kết nối **TCP/IP trên cổng 1433** trong *SQL Server Configuration Manager*.
 
 ---
 
-## ⚙️ Bước 2: Cấu hình & Chạy Backend
+## 🗄️ 3. Bước 1: Khởi tạo Cơ sở Dữ liệu
 
-### 2.1. Cấu hình file `.env`
+Dự án cung cấp 2 phương án cài đặt CSDL trong thư mục [TaiLieu/](TaiLieu):
 
-Mở file `backend/.env` và cập nhật thông tin kết nối SQL Server:
+### Phương án A: Dùng file Mock Data Demo hoàn chỉnh (Khuyên dùng)
+Mở SSMS, mở file [Backup_Demo.sql](TaiLieu/Tai_Lieu_Test_Du_An/Backup_Demo.sql) và nhấn **Execute** (F5).
+- File này đã tạo sẵn 33 bảng, dữ liệu các đợt kiến tập, nhà máy, sinh viên, phân công GVHD và 3 bài nộp mẫu hoàn chỉnh đã có sẵn file scan PDF và text OCR trên R2.
 
-```env
-# Cau hinh ket noi SQL Server
-DB_HOST=localhost
-DB_PORT=1433
-DB_USERNAME=sa
-DB_PASSWORD=123          ← Đổi thành mật khẩu SQL Server của bạn
-DB_DATABASE=QLKienTap
+### Phương án B: Cài đặt từng bước Schema + Import
+1. Chạy file `TaiLieu/QLKienTap_Database_v2.sql` để tạo toàn bộ bảng, khóa chính, khóa ngoại, triggers.
+2. Chạy file `TaiLieu/QLKienTap_ImportData.sql` để nạp dữ liệu mẫu ban đầu.
 
-# Cau hinh ung dung
-PORT=3000                ← Backend sẽ chạy ở port này
+### 🕒 Tiện ích dời ngày Demo tự động
+Nếu ngày diễn ra demo khác với ngày trong dữ liệu mẫu, bạn có thể đồng bộ toàn bộ ngày của 21 bảng trong CSDL chỉ với 1 cú click:
+- Mở file [DoiNgayDemo_DirectDB.sql](TaiLieu/Tai_Lieu_Test_Du_An/DoiNgayDemo_DirectDB.sql)
+- Đổi biến `@NgayDemoMongMuon` sang ngày bạn thuyết trình (VD: `2026-11-20`) và bấm **Execute**.
+- Toàn bộ thời hạn đăng ký, ngày tham quan, hạn nộp bài và mã hóa đơn sẽ được dời chính xác. Chi tiết xem tại [Huong_Dan_Doi_Ngay_Demo.md](TaiLieu/Tai_Lieu_Test_Du_An/Huong_Dan_Doi_Ngay_Demo.md).
 
-# JWT
-JWT_SECRET=default_secret_key_123456
-JWT_EXPIRES_IN=24h
-```
+---
 
-> 🔴 **Lưu ý về PORT**: File `.env` hiện đặt `PORT=3000`.  
-> Frontend (`frontend/src/services/api.js`) đang gọi API tới `http://localhost:3000/api`.  
-> Hai giá trị này **phải khớp nhau**. Nếu bạn đổi PORT, nhớ cập nhật cả `api.js`.
+## ⚙️ 4. Bước 2: Cấu hình & Chạy Backend (NestJS)
 
-### 2.2. Cài đặt thư viện & khởi chạy
-
-Mở **Terminal 1** (PowerShell hoặc CMD):
-
+### 4.1. Cài đặt và khởi chạy
+Mở **Terminal 1**:
 ```bash
-cd e:\Khoa_Luan\CodeDoAn\backend
-npm install
+cd backend
+npm install --no-audit --no-fund --verbose
 npm run start:dev
 ```
-
-### 2.3. Xác nhận thành công
-
-Khi thấy dòng sau, backend đã sẵn sàng:
-
-```
-🚀 Backend dang chay tai: http://localhost:3000/api
-```
-
-Kiểm tra nhanh bằng trình duyệt: truy cập `http://localhost:3000/api` → thấy **"Hello World!"** là thành công.
+Backend sẵn sàng tại: `http://localhost:3000/api`
 
 ---
 
-## 💻 Bước 3: Cài đặt & Chạy Frontend
+## 💻 5. Bước 3: Cài đặt & Chạy Frontend Web (React + Vite)
 
-Mở **Terminal 2** (giữ Terminal 1 đang chạy backend):
-
+Mở **Terminal 2**:
 ```bash
-cd e:\Khoa_Luan\CodeDoAn\frontend
-npm install
+cd frontend
+npm install --no-audit --no-fund --verbose
 npm run dev
 ```
-
-Khi thấy dòng:
-
-```
-VITE v8.x.x  ready in xxx ms
-➜  Local:   http://localhost:5173/
-```
-
-Mở trình duyệt truy cập: **http://localhost:5173**
-
-→ Trang đăng nhập sẽ hiện lên.
+Truy cập giao diện: **http://localhost:5173**
 
 ---
 
-## 🔑 Bước 4: Đăng nhập thử nghiệm
+## 🤖 6. Bước 4: Cài đặt & Chạy AI Service (FastAPI)
 
-Database đã có sẵn dữ liệu. Các tài khoản sử dụng **mật khẩu mặc định** theo cơ chế trong `backend/src/auth/auth.service.ts`:
+Dịch vụ AI phục vụ tác vụ chấm điểm báo cáo Rubric chuyên sâu và OCR nhận diện chữ viết tay qua mô hình DeepSeek Flash / Qwen Max.
 
-| Vai trò | Tên đăng nhập (ví dụ) | Mật khẩu | Ghi chú |
+### 6.1. Cài đặt và khởi chạy
+Mở **Terminal 3**:
+```bash
+cd ai-service
+python -m venv venv
+.\venv\Scripts\pip install -r requirements.txt
+.\venv\Scripts\uvicorn src.main:app --reload --port 8000
+```
+Swagger UI tài liệu API: `http://localhost:8000/docs`
+
+---
+
+## 📱 7. Bước 5: Chạy Mobile App (Flutter - Tùy chọn)
+
+Mở **Terminal 4**:
+```bash
+cd mobile
+flutter pub get
+flutter run
+```
+
+---
+
+## 🔑 8. Danh sách Tài khoản Đăng nhập Thử nghiệm
+
+| Vai trò | Tên đăng nhập | Mật khẩu | Quyền hạn chính |
 | :--- | :--- | :--- | :--- |
-| **Quản trị viên** | `admin` | `123456` | Quản trị viên hệ thống (Admin tổng) |
-| **Quản lý Khoa** | `admin01` | `123456` | Quản lý học thuật, duyệt lịch |
-| **Quản lý CLB** | `clb01` | `123456` | Vận hành, điều phối chuyến đi |
-| **Sinh viên** | `2005190573` (MSSV bất kỳ) | `SvHuit2025` | Mật khẩu cho SV từ dữ liệu mẫu |
-| **Giảng viên** | `GV001` (Mã GV bất kỳ) | `GvHuit2025` | Dùng mã GV trong DB |
-
-> 💡 **Lưu ý**: Đối với sinh viên được **import mới** vào hệ thống sau này (thông qua tính năng Import Sinh viên), mật khẩu mặc định tự động tạo sẽ là **Mã số sinh viên (MSSV)** của sinh viên đó. Mật khẩu mẫu `SvHuit2025` chỉ áp dụng cho tài khoản từ file mock data.
-
----
-
-## 🔧 Tổng hợp lệnh chạy nhanh
-
-Nếu mọi thứ đã được cài đặt, chỉ cần mở **2 terminal** và chạy:
-
-**Terminal 1 — Backend:**
-```bash
-cd e:\Khoa_Luan\CodeDoAn\backend
-npm run start:dev
-```
-
-**Terminal 2 — Frontend:**
-```bash
-cd e:\Khoa_Luan\CodeDoAn\frontend
-npm run dev
-```
-
-Sau đó mở trình duyệt → **http://localhost:5173**
+| **Quản trị viên (Admin)** | `admin` | `123456` | Quản trị tài khoản, danh mục hệ thống |
+| **Quản lý Khoa** | `admin01` | `123456` | Lập đợt, duyệt chuyến, phân công GVHD, chấm HĐ |
+| **Quản lý CLB** | `clb01` | `123456` | Mở đăng ký, lọc danh sách 3 tầng, chốt danh sách |
+| **Giảng viên** | `GV001` | `GvHuit2025` | Điểm danh chuyến, chấm bài thu hoạch, chấm HĐ |
+| **Sinh viên (Demo)** | `2001230000` | `123456` | Đã nộp đủ 3 chuyến, xem điểm, hóa đơn |
+| **Sinh viên khác** | `2005190573` (MSSV) | `SvHuit2025` | Sinh viên mẫu thử nghiệm đăng ký chuyến mới |
 
 ---
 
-## ❌ Xử lý lỗi thường gặp
+## 📦 9. Hướng dẫn Dọn dẹp Dự án Siêu nhẹ trước khi Di chuyển (Move / Backup)
 
-### Lỗi 1: `ConnectionError: Failed to connect to localhost:1433`
-- **Nguyên nhân**: SQL Server chưa chạy hoặc chưa bật TCP/IP.
-- **Cách sửa**:
-  1. Mở **SQL Server Configuration Manager**
-  2. Vào **SQL Server Network Configuration** → **Protocols for MSSQLSERVER**
-  3. Bật **TCP/IP** → Khởi động lại SQL Server service
+Dự án đầy đủ sau khi build có thể nặng hơn **2.2 GB** với hơn **120,000 tệp tin** (rất lâu khi nén zip hoặc chép qua USB/Drive).
 
-### Lỗi 2: `Login failed for user 'sa'`
-- **Nguyên nhân**: Sai mật khẩu hoặc tài khoản `sa` chưa được bật.
-- **Cách sửa**: Kiểm tra lại `DB_PASSWORD` trong `backend/.env`
+Trước khi nén hoặc sao chép, bạn hãy chạy các lệnh sau tại thư mục gốc để thu gọn dự án về **chỉ còn ~500 MB (giảm 80%)**:
 
-### Lỗi 3: Frontend bị lỗi trắng / không load
-- **Nguyên nhân**: Thiếu thư viện (lucide-react, axios, react-router-dom...).
-- **Cách sửa**:
-  ```bash
-  cd frontend
-  npm install
-  ```
-  Sau đó **tắt** và **khởi động lại** `npm run dev`.
+```powershell
+# 1. Dọn dẹp Flutter mobile (xóa hơn 1GB thư mục build tạm)
+cd mobile; flutter clean; cd ..
 
-### Lỗi 4: API trả về lỗi CORS
-- **Nguyên nhân**: Backend chạy sai port so với cấu hình CORS.
-- **Cách sửa**: Đảm bảo backend chạy ở port **3000** (khớp với `API_BASE_URL` trong `frontend/src/services/api.js`).
+# 2. Xóa các thư mục build sản phẩm
+Remove-Item -Recurse -Force backend/dist, frontend/dist -ErrorAction SilentlyContinue
 
----
-
-## 📂 Cấu trúc thư mục chính
-
+# 3. Xóa các thư mục thư viện dependencies (có thể tải lại trong vài chục giây)
+Remove-Item -Recurse -Force backend/node_modules, frontend/node_modules, ai-service/venv -ErrorAction SilentlyContinue
 ```
-CodeDoAn/
-├── backend/                    ← NestJS API Server
-│   ├── src/
-│   │   ├── auth/               ← Xác thực (Login, đổi MK)
-│   │   ├── entities/           ← TypeORM Entities (33 bảng)
-│   │   ├── giang-vien/         ← Module Giảng viên
-│   │   ├── khoa/               ← Module Quản lý Khoa & Quản lý CLB (Admin)
-│   │   ├── sinh-vien/          ← Module Sinh viên
-│   │   ├── app.module.ts       ← Module gốc (cấu hình DB)
-│   │   └── main.ts             ← Entry point (CORS, port)
-│   ├── .env                    ← Biến môi trường
-│   └── package.json
-│
-└── frontend/                   ← React + Vite
-    ├── src/
-    │   ├── pages/
-    │   │   ├── Login.jsx       ← Trang đăng nhập
-    │   │   ├── sinh-vien/      ← 8 trang Sinh viên
-    │   │   ├── giang-vien/     ← 8 trang Giảng viên
-    │   │   └── khoa/           ← 17 trang Admin (Khoa & CLB)
-    │   ├── services/api.js     ← Axios API client
-    │   └── App.jsx             ← Router chính
-    ├── vite.config.js
-    └── package.json
-```
+
+### ⚠️ Lưu ý sống còn khi sao lưu:
+- **TUYỆT ĐỐI KHÔNG XÓA**:
+  - File môi trường: `backend/.env`, `ai-service/.env`
+  - Thư mục tài liệu & CSDL: `TaiLieu/` (chứa `Backup_Demo.sql`)
+  - Toàn bộ thư mục `src/`, `lib/`, `android/`, `ios/`
+- **Khôi phục nhanh trên máy mới:** Chỉ cần mở từng thư mục và chạy:
+  - `backend` $\rightarrow$ `npm install --no-audit --no-fund --verbose`
+  - `frontend` $\rightarrow$ `npm install --no-audit --no-fund --verbose`
+  - `ai-service` $\rightarrow$ `python -m venv venv` và `pip install -r requirements.txt`
+  - `mobile` $\rightarrow$ `flutter pub get`

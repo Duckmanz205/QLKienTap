@@ -28,6 +28,14 @@ class NotificationService {
   static const String channelDescription =
       'Thông báo nhắc nhở chuyến đi, hạn nộp bài và đóng lệ phí kiến tập';
 
+  static const String announcementChannelId = 'qlkt_announcements';
+  static const String announcementChannelName = 'Thông báo Khoa & Chuyến đi';
+  static const String announcementChannelDescription =
+      'Thông báo chính thức từ Khoa, đợt kiến tập và chuyến tham quan';
+
+  /// Callback toàn cục để hiển thị In-App Notification Banner nổi khi đang mở app
+  static void Function(String title, String body, String? type)? onInAppNotification;
+
   Future<void> initialize() async {
     if (_isInitialized) return;
 
@@ -58,8 +66,8 @@ class NotificationService {
     if (androidImplementation != null) {
       await androidImplementation.requestNotificationsPermission();
       
-      // Tạo trước NotificationChannel với mức ưu tiên cao nhất để kích hoạt Heads-up banner
-      const androidChannel = AndroidNotificationChannel(
+      // Tạo trước NotificationChannels với mức ưu tiên cao nhất để kích hoạt Heads-up banner
+      const reminderChannel = AndroidNotificationChannel(
         channelId,
         channelName,
         description: channelDescription,
@@ -68,7 +76,18 @@ class NotificationService {
         enableVibration: true,
         showBadge: true,
       );
-      await androidImplementation.createNotificationChannel(androidChannel);
+      await androidImplementation.createNotificationChannel(reminderChannel);
+
+      const announcementChannel = AndroidNotificationChannel(
+        announcementChannelId,
+        announcementChannelName,
+        description: announcementChannelDescription,
+        importance: Importance.max,
+        playSound: true,
+        enableVibration: true,
+        showBadge: true,
+      );
+      await androidImplementation.createNotificationChannel(announcementChannel);
     }
 
     _startConnectivityMonitoring();
@@ -113,22 +132,38 @@ class NotificationService {
     required String title,
     required String body,
     String? payload,
+    String? channel,
+    String? type,
   }) async {
     if (!_isInitialized) {
       await initialize();
     }
 
-    const androidDetails = AndroidNotificationDetails(
-      channelId,
-      channelName,
-      channelDescription: channelDescription,
+    final targetChannelId = channel ??
+        ((type == 'ThongBao' || type == 'ChuyenDi' || type == 'PhanCong')
+            ? announcementChannelId
+            : channelId);
+    final targetChannelName = targetChannelId == announcementChannelId
+        ? announcementChannelName
+        : channelName;
+    final targetDescription = targetChannelId == announcementChannelId
+        ? announcementChannelDescription
+        : channelDescription;
+
+    final androidDetails = AndroidNotificationDetails(
+      targetChannelId,
+      targetChannelName,
+      channelDescription: targetDescription,
       importance: Importance.max,
       priority: Priority.high,
-      ticker: 'Nhắc nhở kiến tập',
+      ticker: 'Thông báo Quản lý kiến tập',
       playSound: true,
       enableVibration: true,
       icon: '@mipmap/ic_launcher',
-      styleInformation: BigTextStyleInformation(''),
+      styleInformation: BigTextStyleInformation(
+        body,
+        contentTitle: title,
+      ),
     );
 
     const darwinDetails = DarwinNotificationDetails(
@@ -137,7 +172,7 @@ class NotificationService {
       presentSound: true,
     );
 
-    const details = NotificationDetails(
+    final details = NotificationDetails(
       android: androidDetails,
       iOS: darwinDetails,
     );
@@ -149,6 +184,23 @@ class NotificationService {
       notificationDetails: details,
       payload: payload,
     );
+
+    // Kích hoạt In-App Banner nổi nếu ứng dụng đang ở tiền cảnh (Foreground)
+    try {
+      onInAppNotification?.call(title, body, type);
+    } catch (_) {}
+  }
+
+  /// Bắn thông báo thử nghiệm tức thì
+  Future<void> testInstantNotification({String? title, String? body}) async {
+    final notifId = DateTime.now().millisecondsSinceEpoch & 0x7FFFFFFF;
+    await showInstantNotification(
+      id: notifId,
+      title: title ?? '🔔 Kiểm tra thông báo thành công!',
+      body: body ??
+          'Hệ thống thông báo đẩy (Local Notifications & Banner nổi) hoạt động hoàn hảo trên thiết bị.',
+      type: 'ThongBao',
+    );
   }
 
   /// Lưu trữ thông báo vào Hàng đợi ngoại tuyến (Offline Pending Queue) khi mất mạng
@@ -157,6 +209,7 @@ class NotificationService {
     required String title,
     required String body,
     String? payload,
+    String? type,
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -166,6 +219,7 @@ class NotificationService {
         'title': title,
         'body': body,
         'payload': payload,
+        'type': type,
       });
 
       if (!queue.contains(item)) {
@@ -194,6 +248,7 @@ class NotificationService {
             title: item['title'] as String,
             body: item['body'] as String,
             payload: item['payload'] as String?,
+            type: item['type'] as String?,
           );
         } catch (e) {
           debugPrint('[NotificationService] Lỗi khi xả thông báo: $e');
@@ -207,9 +262,9 @@ class NotificationService {
     }
   }
 
-  /// Quét và tự động đẩy thông báo nhắc nhở cho Sinh viên (kèm cơ chế bảo lưu khi mất mạng)
-  Future<void> notifyStudentReminders(List<StudentNotification> reminders) async {
-    if (reminders.isEmpty) return;
+  /// Quét và tự động đẩy thông báo cho Sinh viên (Hỗ trợ toàn bộ thông báo Khoa & Nhắc nhở)
+  Future<void> notifyStudentNotifications(List<StudentNotification> notifications) async {
+    if (notifications.isEmpty) return;
 
     try {
       final online = await isNetworkConnected();
@@ -218,37 +273,32 @@ class NotificationService {
       final notifiedSet = notifiedList.toSet();
 
       bool hasNew = false;
-      for (var reminder in reminders) {
-        if (!reminder.id.startsWith('auto-') &&
-            reminder.type != 'NhacNho' &&
-            reminder.type != 'CanhBao') {
-          continue;
-        }
-
-        if (!notifiedSet.contains(reminder.id)) {
-          final int notifId = reminder.id.hashCode & 0x7FFFFFFF;
-          final payload = jsonEncode({'id': reminder.id, 'type': reminder.type});
+      for (var notif in notifications) {
+        if (!notifiedSet.contains(notif.id)) {
+          final int notifId = notif.id.hashCode & 0x7FFFFFFF;
+          final payload = jsonEncode({'id': notif.id, 'type': notif.type});
 
           if (online) {
             // Khi có mạng: bắn ngay lập tức Heads-up popup
             await showInstantNotification(
               id: notifId,
-              title: reminder.title,
-              body: reminder.content,
+              title: notif.title,
+              body: notif.content,
               payload: payload,
+              type: notif.type,
             );
           } else {
-            // Khi mất mạng: CHỈ bảo lưu vào Hàng đợi ngoại tuyến, KHÔNG hiển thị ngay
-            // Chờ đến khi có mạng trở lại sẽ tự động xả hàng đợi và đẩy thông báo lên màn hình
+            // Khi mất mạng: bảo lưu vào Hàng đợi ngoại tuyến
             await enqueueOfflineNotification(
               id: notifId,
-              title: reminder.title,
-              body: reminder.content,
+              title: notif.title,
+              body: notif.content,
               payload: payload,
+              type: notif.type,
             );
           }
 
-          notifiedSet.add(reminder.id);
+          notifiedSet.add(notif.id);
           hasNew = true;
         }
       }
@@ -257,13 +307,17 @@ class NotificationService {
         await prefs.setStringList(_notifiedKeysPref, notifiedSet.toList());
       }
     } catch (e) {
-      debugPrint('[NotificationService] Error notifying student reminders: $e');
+      debugPrint('[NotificationService] Error notifying student notifications: $e');
     }
   }
 
-  /// Quét và tự động đẩy thông báo nhắc nhở cho Giảng viên (kèm cơ chế bảo lưu khi mất mạng)
-  Future<void> notifyLecturerReminders(List<LecturerNotification> reminders) async {
-    if (reminders.isEmpty) return;
+  /// Alias tương thích ngược
+  Future<void> notifyStudentReminders(List<StudentNotification> reminders) =>
+      notifyStudentNotifications(reminders);
+
+  /// Quét và tự động đẩy thông báo cho Giảng viên (Hỗ trợ toàn bộ thông báo Khoa & Nhắc nhở)
+  Future<void> notifyLecturerNotifications(List<LecturerNotification> notifications) async {
+    if (notifications.isEmpty) return;
 
     try {
       final online = await isNetworkConnected();
@@ -272,35 +326,30 @@ class NotificationService {
       final notifiedSet = notifiedList.toSet();
 
       bool hasNew = false;
-      for (var reminder in reminders) {
-        if (!reminder.id.startsWith('auto-') &&
-            reminder.type != 'NhacNho' &&
-            reminder.type != 'CanhBao') {
-          continue;
-        }
-
-        if (!notifiedSet.contains(reminder.id)) {
-          final int notifId = reminder.id.hashCode & 0x7FFFFFFF;
-          final payload = jsonEncode({'id': reminder.id, 'type': reminder.type});
+      for (var notif in notifications) {
+        if (!notifiedSet.contains(notif.id)) {
+          final int notifId = notif.id.hashCode & 0x7FFFFFFF;
+          final payload = jsonEncode({'id': notif.id, 'type': notif.type});
 
           if (online) {
             await showInstantNotification(
               id: notifId,
-              title: reminder.title,
-              body: reminder.body,
+              title: notif.title,
+              body: notif.body,
               payload: payload,
+              type: notif.type,
             );
           } else {
-            // Khi mất mạng: CHỈ bảo lưu vào Hàng đợi ngoại tuyến, KHÔNG hiển thị ngay
             await enqueueOfflineNotification(
               id: notifId,
-              title: reminder.title,
-              body: reminder.body,
+              title: notif.title,
+              body: notif.body,
               payload: payload,
+              type: notif.type,
             );
           }
 
-          notifiedSet.add(reminder.id);
+          notifiedSet.add(notif.id);
           hasNew = true;
         }
       }
@@ -309,9 +358,13 @@ class NotificationService {
         await prefs.setStringList(_notifiedKeysPref, notifiedSet.toList());
       }
     } catch (e) {
-      debugPrint('[NotificationService] Error notifying lecturer reminders: $e');
+      debugPrint('[NotificationService] Error notifying lecturer notifications: $e');
     }
   }
+
+  /// Alias tương thích ngược
+  Future<void> notifyLecturerReminders(List<LecturerNotification> reminders) =>
+      notifyLecturerNotifications(reminders);
 
   /// Xóa lịch sử đã thông báo (dùng khi đăng xuất hoặc reset)
   Future<void> clearNotificationHistory() async {

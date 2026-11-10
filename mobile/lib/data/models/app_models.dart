@@ -126,6 +126,11 @@ class Trip {
   final String? tripStatus;
   final String? cachToChuc;
   final String? fileXacNhanUrl;
+  final String? diaDiemTapTrung;
+  final String? gioBatDau;
+  final String? gioKetThuc;
+  final String? hinhThuc;
+  final DateTime? rawNgayThamQuan;
 
   Trip({
     required this.id,
@@ -147,6 +152,11 @@ class Trip {
     this.tripStatus,
     this.cachToChuc,
     this.fileXacNhanUrl,
+    this.diaDiemTapTrung,
+    this.gioBatDau,
+    this.gioKetThuc,
+    this.hinhThuc,
+    this.rawNgayThamQuan,
   });
 
   bool get isTuDo => cachToChuc == 'TuDo' || type == 'Tự do' || type.toLowerCase().contains('tự do');
@@ -162,6 +172,11 @@ class Trip {
     String? tripStatus,
     String? cachToChuc,
     String? fileXacNhanUrl,
+    String? diaDiemTapTrung,
+    String? gioBatDau,
+    String? gioKetThuc,
+    String? hinhThuc,
+    DateTime? rawNgayThamQuan,
   }) {
     return Trip(
       id: id,
@@ -183,6 +198,11 @@ class Trip {
       tripStatus: tripStatus ?? this.tripStatus,
       cachToChuc: cachToChuc ?? this.cachToChuc,
       fileXacNhanUrl: fileXacNhanUrl ?? this.fileXacNhanUrl,
+      diaDiemTapTrung: diaDiemTapTrung ?? this.diaDiemTapTrung,
+      gioBatDau: gioBatDau ?? this.gioBatDau,
+      gioKetThuc: gioKetThuc ?? this.gioKetThuc,
+      hinhThuc: hinhThuc ?? this.hinhThuc,
+      rawNgayThamQuan: rawNgayThamQuan ?? this.rawNgayThamQuan,
     );
   }
 }
@@ -271,6 +291,11 @@ class Submission {
   final DateTime? hanNopDate;
   final DateTime? hanKhoaDate;
   final bool isExtended;
+  final DateTime? diemDanhNgay;
+  final String? diemDanhNguoi;
+  final String? diemDanhGhiChu;
+  final int? lanNop;
+  final String? diaDiemTapTrung;
 
   Submission({
     required this.id,
@@ -301,6 +326,11 @@ class Submission {
     this.hanNopDate,
     this.hanKhoaDate,
     this.isExtended = false,
+    this.diemDanhNgay,
+    this.diemDanhNguoi,
+    this.diemDanhGhiChu,
+    this.lanNop,
+    this.diaDiemTapTrung,
   });
 
   bool get isGraded => reportScore != null;
@@ -352,6 +382,11 @@ class Submission {
     DateTime? hanNopDate,
     DateTime? hanKhoaDate,
     bool? isExtended,
+    DateTime? diemDanhNgay,
+    String? diemDanhNguoi,
+    String? diemDanhGhiChu,
+    int? lanNop,
+    String? diaDiemTapTrung,
   }) {
     return Submission(
       id: id,
@@ -382,6 +417,11 @@ class Submission {
       hanNopDate: hanNopDate ?? this.hanNopDate,
       hanKhoaDate: hanKhoaDate ?? this.hanKhoaDate,
       isExtended: isExtended ?? this.isExtended,
+      diemDanhNgay: diemDanhNgay ?? this.diemDanhNgay,
+      diemDanhNguoi: diemDanhNguoi ?? this.diemDanhNguoi,
+      diemDanhGhiChu: diemDanhGhiChu ?? this.diemDanhGhiChu,
+      lanNop: lanNop ?? this.lanNop,
+      diaDiemTapTrung: diaDiemTapTrung ?? this.diaDiemTapTrung,
     );
   }
 }
@@ -596,6 +636,35 @@ class RepresentativeTripsStatus {
 }
 
 // --- Trip Bus Info & Members ---
+class TripLecturer {
+  final int id;
+  final String hoTen;
+  final String? email;
+  final String? soDienThoai;
+  final bool laTruongDoan;
+  final String? vaiTro;
+
+  TripLecturer({
+    required this.id,
+    required this.hoTen,
+    this.email,
+    this.soDienThoai,
+    this.laTruongDoan = false,
+    this.vaiTro,
+  });
+
+  factory TripLecturer.fromJson(Map<String, dynamic> json) {
+    return TripLecturer(
+      id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
+      hoTen: json['ho_ten']?.toString() ?? json['name']?.toString() ?? '',
+      email: json['email']?.toString(),
+      soDienThoai: json['so_dien_thoai']?.toString() ?? json['sdt']?.toString() ?? json['phone']?.toString(),
+      laTruongDoan: json['la_truong_doan'] == true,
+      vaiTro: json['vai_tro']?.toString() ?? 'Giảng viên dẫn đoàn',
+    );
+  }
+}
+
 class TripBusMember {
   final int id;
   final String hoTen;
@@ -618,9 +687,15 @@ class TripBusInfo {
   final String hinhThuc;
   final String? lecturerName;
   final String? lecturerPhone;
+  final List<TripLecturer> lecturers;
   final List<TripBusMember> students;
   final String? enterpriseContactPerson;
   final String? enterpriseContactPhone;
+  final String? enterpriseContactEmail;
+  final String? diaDiemTapTrung;
+  final String? ngayThamQuan;
+  final String? diaChiNhaMay;
+  final String? cachToChuc;
 
   TripBusInfo({
     required this.tripId,
@@ -630,9 +705,15 @@ class TripBusInfo {
     required this.hinhThuc,
     this.lecturerName,
     this.lecturerPhone,
+    this.lecturers = const [],
     required this.students,
     this.enterpriseContactPerson,
     this.enterpriseContactPhone,
+    this.enterpriseContactEmail,
+    this.diaDiemTapTrung,
+    this.ngayThamQuan,
+    this.diaChiNhaMay,
+    this.cachToChuc,
   });
 }
 

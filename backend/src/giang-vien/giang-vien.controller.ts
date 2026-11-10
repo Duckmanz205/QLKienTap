@@ -64,15 +64,23 @@ export class GiangVienController {
   }
 
   @Get('guided-students')
-  async getMyGuidedStudents(@CurrentUser() user: JwtPayloadUser) {
+  async getMyGuidedStudents(
+    @CurrentUser() user: JwtPayloadUser,
+    @Query('dotKienTapId') dotKienTapId?: string,
+  ) {
     const lecturerId = await this.resolveLecturerId(user);
-    return this.gvService.getGuidedStudents(lecturerId);
+    const dotId = dotKienTapId ? parseInt(dotKienTapId, 10) : undefined;
+    return this.gvService.getGuidedStudents(lecturerId, dotId);
   }
 
   @Get('guided-students/:lecturerId')
-  async getGuidedStudents(@CurrentUser() user: JwtPayloadUser) {
+  async getGuidedStudents(
+    @CurrentUser() user: JwtPayloadUser,
+    @Query('dotKienTapId') dotKienTapId?: string,
+  ) {
     const lecturerId = await this.resolveLecturerId(user);
-    return this.gvService.getGuidedStudents(lecturerId);
+    const dotId = dotKienTapId ? parseInt(dotKienTapId, 10) : undefined;
+    return this.gvService.getGuidedStudents(lecturerId, dotId);
   }
 
   @Get('led-trips')
@@ -241,9 +249,11 @@ export class GiangVienController {
   async getGuidedStudentTrips(
     @CurrentUser() user: JwtPayloadUser,
     @Param('studentId', ParseIntPipe) studentId: number,
+    @Query('dotKienTapId') dotKienTapId?: string,
   ) {
     const lecturerId = await this.resolveLecturerId(user);
-    return this.gvService.getGuidedStudentTrips(lecturerId, studentId);
+    const dotId = dotKienTapId ? parseInt(dotKienTapId, 10) : undefined;
+    return this.gvService.getGuidedStudentTrips(lecturerId, studentId, dotId);
   }
 
   @Post('grade-report')
