@@ -25,6 +25,7 @@ export default function LeaderAssignment_Khoa() {
   const statusOptions = ["Tất cả", "Chưa phân công", "Đã phân công", "Đã từ chối / Đã hủy"];
   const [selectedType, setSelectedType] = useState('');
   const typeOptions = ["Tất cả", "Trường tổ chức", "Sinh viên đề xuất"];
+  const [selectedHinhThuc, setSelectedHinhThuc] = useState('');
   const [factories, setFactories] = useState([]);
   const [selectedFactory, setSelectedFactory] = useState('');
   const [selectedLeader, setSelectedLeader] = useState('');
@@ -242,6 +243,14 @@ export default function LeaderAssignment_Khoa() {
     if (selectedType === 'Trường tổ chức' && t.cach_to_chuc !== 'DoKhoaToChuc') return false;
     if (selectedType === 'Sinh viên đề xuất' && t.cach_to_chuc !== 'TuDo') return false;
 
+    if (selectedHinhThuc) {
+      const isDirect = t.hinh_thuc === 'TrucTiep' 
+        || String(t.hinh_thuc).toUpperCase() === 'OFFLINE' 
+        || t.hinh_thuc === 'Trực tiếp';
+      if (selectedHinhThuc === 'TrucTiep' && !isDirect) return false;
+      if (selectedHinhThuc === 'TrucTuyen' && isDirect) return false;
+    }
+
     if (selectedFactory && (t.nha_may_id !== selectedFactory && t.nhaMay?.id !== selectedFactory)) return false;
 
     const gvdd = t.giaoVienDanDoan || [];
@@ -345,11 +354,30 @@ export default function LeaderAssignment_Khoa() {
         </div>
 
         {/* Hình thức Dropdown */}
-        <div className="flex-1 min-w-[150px]">
+        <div className="flex-1 min-w-[140px]">
           <SearchableDropdown
             options={[
               { value: '', label: 'Tất cả hình thức' },
-              { value: 'Trường tổ chức', label: 'Trường tổ chức' },
+              { value: 'TrucTiep', label: 'Trực tiếp' },
+              { value: 'TrucTuyen', label: 'Trực tuyến' }
+            ]}
+            value={selectedHinhThuc}
+            onChange={(val) => {
+              setSelectedHinhThuc(val);
+              setCurrentPage(1);
+            }}
+            placeholder="Hình thức"
+            searchPlaceholder="Tìm hình thức..."
+            className="w-full"
+          />
+        </div>
+
+        {/* Cách tổ chức Dropdown */}
+        <div className="flex-1 min-w-[150px]">
+          <SearchableDropdown
+            options={[
+              { value: '', label: 'Tất cả cách tổ chức' },
+              { value: 'Trường tổ chức', label: 'Do khoa tổ chức' },
               { value: 'Sinh viên đề xuất', label: 'Sinh viên đề xuất' }
             ]}
             value={selectedType}
@@ -357,8 +385,8 @@ export default function LeaderAssignment_Khoa() {
               setSelectedType(val);
               setCurrentPage(1);
             }}
-            placeholder="Tất cả hình thức"
-            searchPlaceholder="Tìm hình thức..."
+            placeholder="Cách tổ chức"
+            searchPlaceholder="Tìm cách tổ chức..."
             className="w-full"
           />
         </div>
@@ -416,7 +444,10 @@ export default function LeaderAssignment_Khoa() {
             <tbody className="text-sm text-slate-700 divide-y divide-[#E7E0C4]/50">
               {paginatedTrips.map(t => {
                 const isKhoa = t.cach_to_chuc === 'DoKhoaToChuc';
-                const hinhThuc = t.hinh_thuc === 'OFFLINE' ? 'Trực tiếp' : 'Trực tuyến';
+                const isDirect = t.hinh_thuc === 'TrucTiep' 
+                  || String(t.hinh_thuc).toUpperCase() === 'OFFLINE' 
+                  || t.hinh_thuc === 'Trực tiếp';
+                const hinhThuc = isDirect ? 'Trực tiếp' : 'Trực tuyến';
                 const gvdd = t.giaoVienDanDoan || [];
                 const isRejected = isTripRejected(t);
                 const rejectLabel = t.cach_to_chuc === 'TuDo' ? 'Đã từ chối' : 'Đã hủy';
@@ -440,8 +471,8 @@ export default function LeaderAssignment_Khoa() {
                       </div>
                     </td>
                     <td className="p-4 text-center">
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-bold border whitespace-nowrap ${
-                        hinhThuc === 'Trực tiếp' ? 'bg-[#89B449]/10 text-[#407F3E] border-[#89B449]/20' : 'bg-slate-100 text-slate-600 border-slate-200'
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold border whitespace-nowrap ${
+                        isDirect ? 'bg-[#89B449]/10 text-[#407F3E] border-[#89B449]/20' : 'bg-blue-50 text-blue-700 border-blue-200'
                       }`}>
                         {hinhThuc}
                       </span>
