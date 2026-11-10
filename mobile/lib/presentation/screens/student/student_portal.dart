@@ -288,7 +288,14 @@ class _StudentPortalState extends State<StudentPortal> {
 
   Widget _buildSubScreen(AppState appState, AppStateProviderState appStateProvider) {
     if (_moreSubScreen == 'schedule') {
-      return const LichTrinhDoanSVScreen();
+      return LichTrinhDoanSVScreen(
+        onNavigateToReports: () {
+          setState(() {
+            _moreSubScreen = null;
+          });
+          _navigateTo(2);
+        },
+      );
     }
     if (_moreSubScreen == 'finance' || _moreSubScreen == 'finance_payment' || _moreSubScreen == 'finance_refund') {
       return const TaiChinhSVScreen();
