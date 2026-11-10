@@ -257,6 +257,7 @@ class _StudentPortalState extends State<StudentPortal> {
           onTripTap: _openTripDetail,
           activeTab: _tripsTab,
           onTabChanged: (tab) => setState(() => _tripsTab = tab),
+          onNavigateToReport: () => _navigateTo(2),
         );
       case 2:
         return const NopBaiThuHoachSVScreen();

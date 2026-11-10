@@ -1921,7 +1921,7 @@ class AppStateProviderState extends State<AppStateContainer> {
             fileXacNhanUrl: fileReference,
             status: (s.fileBaoCaoUrl != null && s.fileBaoCaoUrl!.isNotEmpty)
                 ? 'Đã nộp'
-                : 'Chưa nộp',
+                : 'Chờ duyệt điểm danh',
           );
         }
         return s;
