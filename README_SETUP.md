@@ -149,10 +149,13 @@ Trước khi nén hoặc sao chép, bạn hãy chạy các lệnh sau tại thư
 cd mobile; flutter clean; cd ..
 
 # 2. Xóa các thư mục build sản phẩm
-Remove-Item -Recurse -Force backend/dist, frontend/dist -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force backend/dist -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force frontend/dist -ErrorAction SilentlyContinue
 
 # 3. Xóa các thư mục thư viện dependencies (có thể tải lại trong vài chục giây)
-Remove-Item -Recurse -Force backend/node_modules, frontend/node_modules, ai-service/venv -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force backend/node_modules -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force frontend/node_modules -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force ai-service/venv -ErrorAction SilentlyContinue
 ```
 
 ### ⚠️ Lưu ý sống còn khi sao lưu:

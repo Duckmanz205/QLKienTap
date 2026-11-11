@@ -6706,6 +6706,17 @@ Mọi thắc mắc xin liên hệ page CLB. Cảm ơn các bạn.`;
 
   // Tự động gom & chốt Bộ 3 chuyến cho toàn bộ sinh viên đủ điều kiện trong đợt (Tối ưu bulk-load, in-memory)
   async autoPickRepresentativeTripsForDot(dotKienTapId: number) {
+    const dot = await this.dotRepo.findOne({
+      where: { id: dotKienTapId },
+      select: { id: true, trang_thai: true },
+    });
+    if (dot && dot.trang_thai === 'DaKhoa') {
+      this.logger.log(
+        `Đợt #${dotKienTapId} đã khóa điểm tổng kết ('DaKhoa'). Bỏ qua auto-pick bộ 3 để bảo toàn dữ liệu.`,
+      );
+      return { dotKienTapId, autoPickedCount: 0 };
+    }
+
     const dksvs = await this.dksvRepo.find({
       where: { dot_kien_tap_id: dotKienTapId },
     });
@@ -6715,7 +6726,7 @@ Mọi thắc mắc xin liên hệ page CLB. Cảm ơn các bạn.`;
 
     // 1. Bulk-load kiểm tra bộ 3 đã tồn tại
     const existingBos: BoChuyenBaoCao[] = [];
-    const chunkSize = 1000;
+    const chunkSize = 200; // Tối ưu an toàn tránh vượt quá giới hạn tham số SQL Server
     for (let i = 0; i < dksvIds.length; i += chunkSize) {
       const slice = dksvIds.slice(i, i + chunkSize);
       const bos = await this.boRepo.find({
@@ -6791,30 +6802,42 @@ Mọi thắc mắc xin liên hệ page CLB. Cảm ơn các bạn.`;
       }
     }
 
-    // 5. Batch database transaction để lưu kết quả
+    // 5. Database transaction an toàn từng sinh viên để tránh race condition hoặc lỗi trùng khóa
     let autoPickedCount = 0;
     if (boInserts.length > 0) {
-      await this.dataSource.transaction(async (manager: EntityManager) => {
-        const boRepo = manager.getRepository(BoChuyenBaoCao);
-        const ptqRepo = manager.getRepository(PhieuThamQuan);
+      for (const item of boInserts) {
+        try {
+          await this.dataSource.transaction(async (manager: EntityManager) => {
+            const boRepo = manager.getRepository(BoChuyenBaoCao);
+            const ptqRepo = manager.getRepository(PhieuThamQuan);
 
-        for (const item of boInserts) {
-          const bo = new BoChuyenBaoCao();
-          bo.dot_kien_tap_sinh_vien_id = item.termStudentId;
-          bo.ngay_chon = new Date();
-          bo.ghi_chu = 'Hệ thống tự động chốt bộ 3 chuyến khi hết hạn đợt kiến tập';
-          const savedBo = await boRepo.save(bo);
+            // Kiểm tra lại lần nữa trong transaction (chống race condition)
+            const existed = await boRepo.findOne({
+              where: { dot_kien_tap_sinh_vien_id: item.termStudentId },
+            });
+            if (existed) return;
 
-          for (const trip of item.selectedTrips) {
-            if (trip.phieuThamQuan) {
-              await ptqRepo.update(trip.phieuThamQuan.id, {
-                bo_chuyen_bao_cao_id: savedBo.id,
-              });
+            const bo = new BoChuyenBaoCao();
+            bo.dot_kien_tap_sinh_vien_id = item.termStudentId;
+            bo.ngay_chon = new Date();
+            bo.ghi_chu = 'Hệ thống tự động chốt bộ 3 chuyến khi hết hạn đợt kiến tập';
+            const savedBo = await boRepo.save(bo);
+
+            for (const trip of item.selectedTrips) {
+              if (trip.phieuThamQuan) {
+                await ptqRepo.update(trip.phieuThamQuan.id, {
+                  bo_chuyen_bao_cao_id: savedBo.id,
+                });
+              }
             }
-          }
-          autoPickedCount++;
+            autoPickedCount++;
+          });
+        } catch (studentErr: any) {
+          this.logger.warn(
+            `Bỏ qua lỗi auto-pick cho sinh viên dksv #${item.termStudentId}: ${studentErr?.message || studentErr}`,
+          );
         }
-      });
+      }
     }
 
     this.logger.log(`Đã tự động chốt Bộ 3 chuyến cho ${autoPickedCount} sinh viên trong đợt #${dotKienTapId}`);
@@ -6842,23 +6865,67 @@ Mọi thắc mắc xin liên hệ page CLB. Cảm ơn các bạn.`;
       for (const dot of expiredDots) {
         dot.is_bo_chuyen_locked = true;
         await this.dotRepo.save(dot);
-        try {
-          await this.autoPickRepresentativeTripsForDot(dot.id);
-        } catch (err: any) {
-          this.logger.error(`Lỗi khi auto-pick đợt #${dot.id}:`, err?.stack || err);
+        if (dot.trang_thai !== 'DaKhoa') {
+          try {
+            await this.autoPickRepresentativeTripsForDot(dot.id);
+          } catch (err: any) {
+            this.logger.error(`Lỗi khi auto-pick đợt #${dot.id}:`, err?.stack || err);
+          }
         }
       }
     }
   }
 
+  // Kiểm tra xem đã có bất kỳ điểm chấm hội đồng chi tiết hoặc chốt điểm hội đồng nào cho đợt này chưa
+  async checkCouncilGradedForDot(dotKienTapId: number): Promise<boolean> {
+    // 1. Kiểm tra có điểm chi tiết của thành viên Hội đồng trong đợt này
+    const countChiTiet = await this.hdCtRepo
+      .createQueryBuilder('ct')
+      .innerJoin('ct.hoiDongThanhVien', 'hdtv')
+      .innerJoin('hdtv.hoiDong', 'hd')
+      .where('hd.dot_kien_tap_id = :dotKienTapId', { dotKienTapId })
+      .getCount();
+
+    if (countChiTiet > 0) return true;
+
+    // 2. Kiểm tra có điểm hội đồng chốt/khóa trong phiếu điểm thuộc bộ chuyến của đợt này
+    const countDiemKhoa = await this.diemPhieuRepo
+      .createQueryBuilder('dp')
+      .innerJoin('dp.phieuThamQuan', 'ptq')
+      .innerJoin('ptq.boChuyenBaoCao', 'bo')
+      .innerJoin('bo.dotKienTapSinhVien', 'dksv')
+      .where('dksv.dot_kien_tap_id = :dotKienTapId', { dotKienTapId })
+      .andWhere('(dp.da_khoa_hoi_dong = 1 OR dp.diem_hoi_dong_final IS NOT NULL)')
+      .getCount();
+
+    return countDiemKhoa > 0;
+  }
+
   async toggleLockBoChuyen(dotKienTapId: number, isLocked: boolean) {
     const dot = await this.dotRepo.findOne({ where: { id: dotKienTapId } });
     if (!dot) throw new NotFoundException('Không tìm thấy đợt kiến tập');
+
+    if (!isLocked) {
+      // Yêu cầu MỞ KHÓA: Kiểm tra các ràng buộc nghiệp vụ
+      if (dot.trang_thai === 'DaKhoa') {
+        throw new BadRequestException(
+          'Đợt kiến tập này đã được khóa điểm tổng kết. Không thể mở khóa bộ 3 chuyến báo cáo.',
+        );
+      }
+
+      const hasGraded = await this.checkCouncilGradedForDot(dotKienTapId);
+      if (hasGraded) {
+        throw new BadRequestException(
+          'Hội đồng đã chấm điểm báo cáo cho sinh viên trong đợt này. Không thể mở khóa bộ 3 chuyến báo cáo.',
+        );
+      }
+    }
+
     dot.is_bo_chuyen_locked = isLocked;
     await this.dotRepo.save(dot);
 
-    // Khi Khoa chủ động bấm Khóa cổng, tự động gom Bộ 3 cho SV đủ điều kiện chưa chọn
-    if (isLocked) {
+    // Khi Khoa chủ động bấm Khóa cổng, tự động gom Bộ 3 cho SV đủ điều kiện chưa chọn (nếu đợt chưa khóa điểm tổng kết)
+    if (isLocked && dot.trang_thai !== 'DaKhoa') {
       try {
         await this.autoPickRepresentativeTripsForDot(dotKienTapId);
       } catch (err: any) {
@@ -6884,23 +6951,44 @@ Mọi thắc mắc xin liên hệ page CLB. Cảm ơn các bạn.`;
     const deadline = dot.ngay_ket_thuc ? this.getEndOfDayVietnam(dot.ngay_ket_thuc) : null;
     const isExpired = deadline ? now > deadline : false;
 
-    // Lazy evaluation: Nếu đã quá hạn mà chưa khóa, tự động khóa và gom bộ 3 cho SV đủ điều kiện
+    // Lazy evaluation: Nếu đã quá hạn mà chưa khóa, tự động khóa và gom bộ 3 cho SV đủ điều kiện (nếu đợt chưa DaKhoa)
     if (isExpired && !dot.is_bo_chuyen_locked) {
       dot.is_bo_chuyen_locked = true;
       await this.dotRepo.save(dot);
-      try {
-        await this.autoPickRepresentativeTripsForDot(dot.id);
-      } catch (err: any) {
-        this.logger.error(`Lỗi khi auto-pick bộ 3 đợt #${dot.id}:`, err?.stack || err);
+      if (dot.trang_thai !== 'DaKhoa') {
+        try {
+          await this.autoPickRepresentativeTripsForDot(dot.id);
+        } catch (err: any) {
+          this.logger.error(`Lỗi khi auto-pick bộ 3 đợt #${dot.id}:`, err?.stack || err);
+        }
       }
     }
 
     const isLocked = dot.is_bo_chuyen_locked || isExpired;
+
+    // Kiểm tra điều kiện có thể mở khóa không
+    let canUnlock = true;
+    let lockReason: string | null = null;
+
+    if (dot.trang_thai === 'DaKhoa') {
+      canUnlock = false;
+      lockReason = 'Đợt kiến tập đã được khóa điểm tổng kết';
+    } else {
+      const hasCouncilGraded = await this.checkCouncilGradedForDot(dotKienTapId);
+      if (hasCouncilGraded) {
+        canUnlock = false;
+        lockReason = 'Hội đồng đã chấm điểm báo cáo cho sinh viên trong đợt';
+      }
+    }
+
     return {
       dotKienTapId,
       isLocked,
       isDeadlineExpired: isExpired,
       deadline: deadline ? deadline.toISOString() : null,
+      canUnlock,
+      lockReason,
+      trangThaiDot: dot.trang_thai,
     };
   }
 
