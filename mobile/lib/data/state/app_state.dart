@@ -576,6 +576,17 @@ class AppStateProviderState extends State<AppStateContainer> {
     }
   }
 
+  bool _isStudentTripRegistration(dynamic title, dynamic content) {
+    final t = (title ?? '').toString().toUpperCase();
+    final c = (content ?? '').toString().toUpperCase();
+    return t.contains('ĐĂNG KÝ THAM QUAN') ||
+        t.contains('DANG KY THAM QUAN') ||
+        t.contains('ĐĂNG KÝ CHUYẾN') ||
+        t.contains('DANG KY CHUYEN') ||
+        c.contains('THỜI GIAN ĐĂNG KÍ') ||
+        c.contains('THOI GIAN DANG KY');
+  }
+
   Future<List<LecturerNotification>> _loadLecturerNotificationsCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -583,6 +594,7 @@ class AppStateProviderState extends State<AppStateContainer> {
       if (cachedStr != null && cachedStr.isNotEmpty) {
         final List<dynamic> list = jsonDecode(cachedStr);
         return list
+            .where((item) => !_isStudentTripRegistration(item['title'], item['body']))
             .map(
               (item) => LecturerNotification(
                 id: item['id']?.toString() ?? '',
@@ -1221,10 +1233,13 @@ class AppStateProviderState extends State<AppStateContainer> {
         _state.studentNotifications = [...autoReminders, ...backendNotifs];
       });
       _saveStudentNotificationsCache(_state.studentNotifications);
-      NotificationService.instance.notifyStudentNotifications([
-        ...autoReminders,
-        ...backendNotifs,
-      ]);
+      NotificationService.instance.notifyStudentNotifications(
+        [
+          ...autoReminders,
+          ...backendNotifs,
+        ],
+        userId: studentId.toString(),
+      );
 
       final Map<String, dynamic> statsJson =
           await ApiService.getStudentDashboardStats(studentId);
@@ -1487,7 +1502,9 @@ class AppStateProviderState extends State<AppStateContainer> {
         );
         final List<LecturerNotification> backendLecturerNotifs =
             (notifsJson is List && notifsJson.isNotEmpty)
-            ? notifsJson.map((n) {
+            ? notifsJson
+                .where((n) => !_isStudentTripRegistration(n['tieu_de'], n['noi_dung']))
+                .map((n) {
                 final rawDate = n['ngay_gui'] ?? n['created_at'];
                 String formattedTime = 'Vừa xong';
                 if (rawDate != null) {
@@ -1542,10 +1559,13 @@ class AppStateProviderState extends State<AppStateContainer> {
           ];
         });
         _saveLecturerNotificationsCache(_state.lecturerNotifications);
-        NotificationService.instance.notifyLecturerNotifications([
-          ...autoLecturerReminders,
-          ...backendLecturerNotifs,
-        ]);
+        NotificationService.instance.notifyLecturerNotifications(
+          [
+            ...autoLecturerReminders,
+            ...backendLecturerNotifs,
+          ],
+          userId: lecturerId.toString(),
+        );
       } catch (e) {
         print('Error fetching notifications: $e');
       }
@@ -1662,7 +1682,7 @@ class AppStateProviderState extends State<AppStateContainer> {
 
   void logout() {
     ApiService.clearSession();
-    NotificationService.instance.clearNotificationHistory();
+    NotificationService.instance.dismissActiveSystemNotifications();
     setState(() {
       _resetToDefaults(notify: true);
       _state.currentRole = null;

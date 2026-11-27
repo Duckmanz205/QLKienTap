@@ -99,7 +99,15 @@ export default function KetQuaKienTap_Khoa() {
         if (urlDotId) {
           target = list.find(c => String(c.id) === String(urlDotId));
         } else if (urlLichId) {
-          target = list.find(c => String(c.id) === String(urlLichId));
+          try {
+            const schRes = await khoaApi.getSchedules();
+            const matchingSch = schRes.data?.find(s => String(s.id) === String(urlLichId));
+            if (matchingSch?.dot_kien_tap_id) {
+              target = list.find(c => String(c.id) === String(matchingSch.dot_kien_tap_id));
+            }
+          } catch (e) {
+            console.error('Không thể tìm đợt từ lichKienTapId:', e);
+          }
         }
 
         if (target) {

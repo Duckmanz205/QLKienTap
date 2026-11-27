@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/models/app_models.dart';
+import '../network/api_service.dart';
 
 class NotificationService {
   NotificationService._internal();
@@ -20,8 +21,12 @@ class NotificationService {
   bool _isInitialized = false;
   bool _wasOffline = false;
 
-  static const String _notifiedKeysPref = 'qlkt_notified_reminder_keys';
   static const String _offlineQueuePref = 'qlkt_offline_pending_notifications';
+
+  String _getNotifiedKey(String? userId) =>
+      'qlkt_notified_keys_${userId ?? ApiService.userId ?? "common"}';
+  String _getInitKey(String? userId) =>
+      'qlkt_notif_initialized_${userId ?? ApiService.userId ?? "common"}';
 
   static const String channelId = 'qlkt_smart_reminders';
   static const String channelName = 'Nhắc nhở kiến tập';
@@ -134,6 +139,7 @@ class NotificationService {
     String? payload,
     String? channel,
     String? type,
+    bool skipInAppBanner = false,
   }) async {
     if (!_isInitialized) {
       await initialize();
@@ -186,9 +192,11 @@ class NotificationService {
     );
 
     // Kích hoạt In-App Banner nổi nếu ứng dụng đang ở tiền cảnh (Foreground)
-    try {
-      onInAppNotification?.call(title, body, type);
-    } catch (_) {}
+    if (!skipInAppBanner) {
+      try {
+        onInAppNotification?.call(title, body, type);
+      } catch (_) {}
+    }
   }
 
   /// Bắn thông báo thử nghiệm tức thì
@@ -263,113 +271,190 @@ class NotificationService {
   }
 
   /// Quét và tự động đẩy thông báo cho Sinh viên (Hỗ trợ toàn bộ thông báo Khoa & Nhắc nhở)
-  Future<void> notifyStudentNotifications(List<StudentNotification> notifications) async {
+  Future<void> notifyStudentNotifications(
+    List<StudentNotification> notifications, {
+    String? userId,
+  }) async {
     if (notifications.isEmpty) return;
 
     try {
-      final online = await isNetworkConnected();
+      final effectiveUserId =
+          userId ?? ApiService.userId?.toString() ?? 'student_common';
+      final storageKey = _getNotifiedKey(effectiveUserId);
+      final initKey = _getInitKey(effectiveUserId);
+
       final prefs = await SharedPreferences.getInstance();
-      final notifiedList = prefs.getStringList(_notifiedKeysPref) ?? [];
+      final bool isInitialized = prefs.getBool(initKey) ?? false;
+      final notifiedList = prefs.getStringList(storageKey) ?? [];
       final notifiedSet = notifiedList.toSet();
 
-      bool hasNew = false;
-      for (var notif in notifications) {
-        if (!notifiedSet.contains(notif.id)) {
-          final int notifId = notif.id.hashCode & 0x7FFFFFFF;
-          final payload = jsonEncode({'id': notif.id, 'type': notif.type});
-
-          if (online) {
-            // Khi có mạng: bắn ngay lập tức Heads-up popup
-            await showInstantNotification(
-              id: notifId,
-              title: notif.title,
-              body: notif.content,
-              payload: payload,
-              type: notif.type,
-            );
-          } else {
-            // Khi mất mạng: bảo lưu vào Hàng đợi ngoại tuyến
-            await enqueueOfflineNotification(
-              id: notifId,
-              title: notif.title,
-              body: notif.content,
-              payload: payload,
-              type: notif.type,
-            );
-          }
-
+      // Lần đầu đăng nhập trên thiết bị (First Sync):
+      // Chỉ lập chỉ mục toàn bộ thông báo lịch sử cũ vào notifiedSet để không bắn spam hàng chục thông báo cũ
+      if (!isInitialized) {
+        for (var notif in notifications) {
           notifiedSet.add(notif.id);
-          hasNew = true;
+        }
+        await prefs.setStringList(storageKey, notifiedSet.toList());
+        await prefs.setBool(initKey, true);
+        debugPrint(
+            '[NotificationService] First sync for student $effectiveUserId: Indexed ${notifiedSet.length} existing notifications.');
+        return;
+      }
+
+      // Các lần sync sau: Lọc các thông báo thực sự mới chưa từng được push
+      final newNotifs =
+          notifications.where((n) => !notifiedSet.contains(n.id)).toList();
+      if (newNotifs.isEmpty) return;
+
+      final online = await isNetworkConnected();
+
+      // Đánh dấu đã thông báo ngay lập tức để tránh trùng lặp
+      for (var notif in newNotifs) {
+        notifiedSet.add(notif.id);
+      }
+      await prefs.setStringList(storageKey, notifiedSet.toList());
+
+      // Bắn Local Notifications cho từng thông báo mới (Heads-up trong status bar)
+      for (var notif in newNotifs) {
+        final int notifId = notif.id.hashCode & 0x7FFFFFFF;
+        final payload = jsonEncode({'id': notif.id, 'type': notif.type});
+
+        if (online) {
+          await showInstantNotification(
+            id: notifId,
+            title: notif.title,
+            body: notif.content,
+            payload: payload,
+            type: notif.type,
+            skipInAppBanner: true,
+          );
+        } else {
+          await enqueueOfflineNotification(
+            id: notifId,
+            title: notif.title,
+            body: notif.content,
+            payload: payload,
+            type: notif.type,
+          );
         }
       }
 
-      if (hasNew) {
-        await prefs.setStringList(_notifiedKeysPref, notifiedSet.toList());
+      // Hiển thị In-App banner nổi 1 lần cho thông báo mới nhất
+      if (online && newNotifs.isNotEmpty) {
+        final latest = newNotifs.first;
+        try {
+          onInAppNotification?.call(latest.title, latest.content, latest.type);
+        } catch (_) {}
       }
     } catch (e) {
-      debugPrint('[NotificationService] Error notifying student notifications: $e');
+      debugPrint(
+          '[NotificationService] Error notifying student notifications: $e');
     }
   }
 
   /// Alias tương thích ngược
-  Future<void> notifyStudentReminders(List<StudentNotification> reminders) =>
-      notifyStudentNotifications(reminders);
+  Future<void> notifyStudentReminders(
+    List<StudentNotification> reminders, {
+    String? userId,
+  }) =>
+      notifyStudentNotifications(reminders, userId: userId);
 
   /// Quét và tự động đẩy thông báo cho Giảng viên (Hỗ trợ toàn bộ thông báo Khoa & Nhắc nhở)
-  Future<void> notifyLecturerNotifications(List<LecturerNotification> notifications) async {
+  Future<void> notifyLecturerNotifications(
+    List<LecturerNotification> notifications, {
+    String? userId,
+  }) async {
     if (notifications.isEmpty) return;
 
     try {
-      final online = await isNetworkConnected();
+      final effectiveUserId =
+          userId ?? ApiService.userId?.toString() ?? 'lecturer_common';
+      final storageKey = _getNotifiedKey(effectiveUserId);
+      final initKey = _getInitKey(effectiveUserId);
+
       final prefs = await SharedPreferences.getInstance();
-      final notifiedList = prefs.getStringList(_notifiedKeysPref) ?? [];
+      final bool isInitialized = prefs.getBool(initKey) ?? false;
+      final notifiedList = prefs.getStringList(storageKey) ?? [];
       final notifiedSet = notifiedList.toSet();
 
-      bool hasNew = false;
-      for (var notif in notifications) {
-        if (!notifiedSet.contains(notif.id)) {
-          final int notifId = notif.id.hashCode & 0x7FFFFFFF;
-          final payload = jsonEncode({'id': notif.id, 'type': notif.type});
-
-          if (online) {
-            await showInstantNotification(
-              id: notifId,
-              title: notif.title,
-              body: notif.body,
-              payload: payload,
-              type: notif.type,
-            );
-          } else {
-            await enqueueOfflineNotification(
-              id: notifId,
-              title: notif.title,
-              body: notif.body,
-              payload: payload,
-              type: notif.type,
-            );
-          }
-
+      // Lần đầu đăng nhập trên thiết bị (First Sync):
+      if (!isInitialized) {
+        for (var notif in notifications) {
           notifiedSet.add(notif.id);
-          hasNew = true;
+        }
+        await prefs.setStringList(storageKey, notifiedSet.toList());
+        await prefs.setBool(initKey, true);
+        debugPrint(
+            '[NotificationService] First sync for lecturer $effectiveUserId: Indexed ${notifiedSet.length} existing notifications.');
+        return;
+      }
+
+      final newNotifs =
+          notifications.where((n) => !notifiedSet.contains(n.id)).toList();
+      if (newNotifs.isEmpty) return;
+
+      final online = await isNetworkConnected();
+
+      for (var notif in newNotifs) {
+        notifiedSet.add(notif.id);
+      }
+      await prefs.setStringList(storageKey, notifiedSet.toList());
+
+      for (var notif in newNotifs) {
+        final int notifId = notif.id.hashCode & 0x7FFFFFFF;
+        final payload = jsonEncode({'id': notif.id, 'type': notif.type});
+
+        if (online) {
+          await showInstantNotification(
+            id: notifId,
+            title: notif.title,
+            body: notif.body,
+            payload: payload,
+            type: notif.type,
+            skipInAppBanner: true,
+          );
+        } else {
+          await enqueueOfflineNotification(
+            id: notifId,
+            title: notif.title,
+            body: notif.body,
+            payload: payload,
+            type: notif.type,
+          );
         }
       }
 
-      if (hasNew) {
-        await prefs.setStringList(_notifiedKeysPref, notifiedSet.toList());
+      if (online && newNotifs.isNotEmpty) {
+        final latest = newNotifs.first;
+        try {
+          onInAppNotification?.call(latest.title, latest.body, latest.type);
+        } catch (_) {}
       }
     } catch (e) {
-      debugPrint('[NotificationService] Error notifying lecturer notifications: $e');
+      debugPrint(
+          '[NotificationService] Error notifying lecturer notifications: $e');
     }
   }
 
   /// Alias tương thích ngược
-  Future<void> notifyLecturerReminders(List<LecturerNotification> reminders) =>
-      notifyLecturerNotifications(reminders);
+  Future<void> notifyLecturerReminders(
+    List<LecturerNotification> reminders, {
+    String? userId,
+  }) =>
+      notifyLecturerNotifications(reminders, userId: userId);
 
-  /// Xóa lịch sử đã thông báo (dùng khi đăng xuất hoặc reset)
-  Future<void> clearNotificationHistory() async {
+  /// Đóng toàn bộ thông báo đang hiển thị trên thanh trạng thái thiết bị mà KHÔNG xóa lịch sử ID đã nhận
+  Future<void> dismissActiveSystemNotifications() async {
+    await _localNotifications.cancelAll();
+  }
+
+  /// Xóa lịch sử đã thông báo (khi thực sự muốn reset hoàn toàn dữ liệu push)
+  Future<void> clearNotificationHistory({String? userId}) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_notifiedKeysPref);
+    final effectiveUserId =
+        userId ?? ApiService.userId?.toString() ?? 'common';
+    await prefs.remove(_getNotifiedKey(effectiveUserId));
+    await prefs.remove(_getInitKey(effectiveUserId));
     await prefs.remove(_offlineQueuePref);
     await _localNotifications.cancelAll();
   }

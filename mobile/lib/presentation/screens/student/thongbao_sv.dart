@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/network/api_service.dart';
-import '../../../core/services/notification_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/state/app_state.dart';
 import '../../../data/models/app_models.dart';
@@ -234,71 +233,6 @@ class _ThongBaoSVScreenState extends State<ThongBaoSVScreen> {
       },
       child: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.notifications_active_outlined, color: AppColors.primary, size: 20),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Thông báo đẩy Dart/Flutter',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.darkSlate),
-                        ),
-                        Text(
-                          'Kiểm tra âm thanh, rung & banner nổi',
-                          style: TextStyle(fontSize: 10, color: AppColors.textMuted),
-                        ),
-                      ],
-                    ),
-                  ),
-                  InkWell(
-                    onTap: () async {
-                      await NotificationService.instance.testInstantNotification();
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('🔔 Đã kích hoạt thông báo thử nghiệm thành công!'),
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
-                      }
-                    },
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.play_arrow_rounded, color: Colors.white, size: 14),
-                          SizedBox(width: 3),
-                          Text(
-                            'Thử ngay',
-                            style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 4),
           Expanded(
             child: PaginatedList<StudentNotification>(
               items: allNotifs,

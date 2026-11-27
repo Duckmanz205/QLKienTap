@@ -7072,9 +7072,31 @@ Mọi thắc mắc xin liên hệ page CLB. Cảm ơn các bạn.`;
     throw new NotFoundException('Không tìm thấy đợt hoặc lịch kiến tập');
   }
 
-  async lockAndFinalizeGrades(lichOrDotId: number) {
+  async lockAndFinalizeGrades(target: { dotKienTapId?: number; lichKienTapId?: number } | number) {
     const startTime = Date.now();
-    const dotKienTapId = await this.resolveDotKienTapId(lichOrDotId);
+    let dotKienTapId: number;
+
+    if (typeof target === 'object') {
+      if (target.dotKienTapId) {
+        dotKienTapId = target.dotKienTapId;
+      } else if (target.lichKienTapId) {
+        const lich = await this.lichRepo.findOne({ where: { id: target.lichKienTapId } });
+        if (!lich) {
+          throw new NotFoundException('Không tìm thấy lịch kiến tập');
+        }
+        if (lich.trang_thai === 'DaKhoa') {
+          throw new BadRequestException('Lịch kiến tập này đã được khóa điểm trước đó.');
+        }
+        if (!lich.dot_kien_tap_id) {
+          throw new BadRequestException('Lịch kiến tập không thuộc đợt kiến tập nào để khóa điểm.');
+        }
+        dotKienTapId = lich.dot_kien_tap_id;
+      } else {
+        throw new BadRequestException('Vui lòng cung cấp dotKienTapId hoặc lichKienTapId');
+      }
+    } else {
+      dotKienTapId = await this.resolveDotKienTapId(target);
+    }
 
     return this.dataSource.transaction(async (manager: EntityManager) => {
       const dotRepo = manager.getRepository(DotKienTap);
@@ -7096,11 +7118,6 @@ Mọi thắc mắc xin liên hệ page CLB. Cảm ơn các bạn.`;
       }
       if (dot.trang_thai === 'DaKhoa') {
         throw new BadRequestException('Đợt kiến tập này đã được khóa điểm trước đó.');
-      }
-
-      const lich = await lichRepo.findOne({ where: { id: lichOrDotId } });
-      if (lich?.trang_thai === 'DaKhoa') {
-        throw new BadRequestException('Đợt/lịch kiến tập này đã được khóa điểm trước đó.');
       }
 
       // 1. Lấy toàn bộ danh sách sinh viên đăng ký thuộc đợt kiến tập (1 query)
@@ -7968,8 +7985,14 @@ Mọi thắc mắc xin liên hệ page CLB. Cảm ơn các bạn.`;
   }
 
   async getFinalResultsReport(lichOrDotId: number) {
-    const lich = await this.lichRepo.findOne({ where: { id: lichOrDotId } });
-    const dotKienTapId = lich ? lich.dot_kien_tap_id : lichOrDotId;
+    const dot = await this.dotRepo.findOne({ where: { id: lichOrDotId } });
+    let dotKienTapId: number | null | undefined;
+    if (dot) {
+      dotKienTapId = dot.id;
+    } else {
+      const lich = await this.lichRepo.findOne({ where: { id: lichOrDotId } });
+      dotKienTapId = lich ? lich.dot_kien_tap_id : lichOrDotId;
+    }
     if (!dotKienTapId) return [];
 
     const enrollments = await this.dksvRepo.find({
