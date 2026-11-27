@@ -5,14 +5,20 @@ import io
 import base64
 import gc
 import random
-from fastapi import FastAPI, UploadFile, File, Security, HTTPException, status, Depends
+from pathlib import Path
+from fastapi import FastAPI, UploadFile, File, Security, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, BadRequestError, RateLimitError
 from PIL import Image
 import fitz  # PyMuPDF
 from dotenv import load_dotenv
+
+# Tải .env trước khi import model_profiles để mọi biến cấu hình có hiệu lực ngay
+ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(dotenv_path=ENV_PATH)
+load_dotenv()
 
 try:
     from src.schemas import (
@@ -28,66 +34,67 @@ except ImportError:
         DanhGia_VSATTP,
         KetQua_KiemToan_Rubric
     )
+
 try:
     from src.model_profiles import (
         ACTIVE_GRADING_PROFILE,
         ACTIVE_OCR_PROFILE,
-        PROFILE_GRADING_QWEN38_MAX,
-        PROFILE_GRADING_DEEPSEEK_FLASH_1017
     )
 except ImportError:
     try:
         from model_profiles import (
             ACTIVE_GRADING_PROFILE,
             ACTIVE_OCR_PROFILE,
-            PROFILE_GRADING_QWEN38_MAX,
-            PROFILE_GRADING_DEEPSEEK_FLASH_1017
         )
     except ImportError:
-        # Fallback an toàn mặc định nếu chưa kéo file model_profiles.py
-        PROFILE_GRADING_QWEN38_MAX = {
-            "model_name": "qwen3.8-max-0902",
+        # Fallback an toàn mặc định trỏ tới Deploy API dùng chung 1 model
+        _DEFAULT_MODEL = os.getenv("DEPLOY_MODEL", "deepseek-ai/deepseek-v4.1-flash-1017")
+        ACTIVE_GRADING_PROFILE = {
+            "model_name": _DEFAULT_MODEL,
             "temperature": 0.05,
-            "max_tokens": 4000,
+            "max_completion_tokens": 2500,
             "response_format": {"type": "json_object"},
-            "extra_body": {"enable_thinking": True}
+            "extra_body": {
+                "reasoning_effort": os.getenv("GRADING_REASONING_EFFORT", "none").lower(),
+                "cache_preference": 2,
+            },
         }
-        PROFILE_GRADING_DEEPSEEK_FLASH_1017 = {
-            "model_name": "deepseek-v4.1-flash-1017",
-            "temperature": 0.05,
-            "max_tokens": 2500,
-            "response_format": {"type": "json_object"},
-            "extra_body": {"enable_thinking": False}
-        }
-        PROFILE_OCR_DEEPSEEK_FLASH = {
-            "model_name": "deepseek-v4.1-flash-1017",
-            "fallback_model_name": "qwen3.8-max-0902",
+        ACTIVE_OCR_PROFILE = {
+            "model_name": _DEFAULT_MODEL,
             "temperature": 0.01,
-            "max_tokens": 4000,
+            "max_completion_tokens": 4000,
             "stream": False,
-            "extra_body": {"enable_thinking": False}
+            "extra_body": {
+                "reasoning_effort": os.getenv("OCR_REASONING_EFFORT", "none").lower(),
+                "cache_preference": 1,
+            },
         }
-        ACTIVE_GRADING_PROFILE = PROFILE_GRADING_DEEPSEEK_FLASH_1017
-        ACTIVE_OCR_PROFILE = PROFILE_OCR_DEEPSEEK_FLASH
 
 # ==========================================
-# CẤU HÌNH KHỞI TẠO & MÔI TRƯỜNG
+# CẤU HÌNH KHỞI TẠO & MÔI TRƯỜNG (DEPLOY API)
 # ==========================================
-from pathlib import Path
-ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
-load_dotenv(dotenv_path=ENV_PATH)
-load_dotenv()
-
-QWEN_API_KEY = os.getenv("QWEN_API_KEY")
-QWEN_BASE_URL = os.getenv("QWEN_BASE_URL", "https://dashscope-intl.aliyuncs.com/compatible-mode/v1")
+DEPLOY_API_KEY = (
+    os.getenv("DEPLOY_API_KEY")
+    or os.getenv("AI_API_KEY")
+    or os.getenv("QWEN_API_KEY")
+)
+DEPLOY_BASE_URL = (
+    os.getenv("DEPLOY_BASE_URL")
+    or os.getenv("AI_BASE_URL")
+    or "https://api-cdn.deploy.com/api/v1"
+)
 SECRET_API_KEY = os.getenv("GRADING_API_KEY", "satori_2026_secure_key")
 
-if not QWEN_API_KEY:
-    raise ValueError("⚠️ CẢNH BÁO: Chưa cấu hình QWEN_API_KEY trong file .env!")
+if not DEPLOY_API_KEY:
+    raise ValueError("⚠️ CẢNH BÁO: Chưa cấu hình DEPLOY_API_KEY trong file .env!")
 
-client = AsyncOpenAI(api_key=QWEN_API_KEY, base_url=QWEN_BASE_URL)
+client = AsyncOpenAI(
+    api_key=DEPLOY_API_KEY,
+    base_url=DEPLOY_BASE_URL,
+    timeout=120.0,
+)
 
-app = FastAPI(title="HUIT - AI Grader & OCR Microservice", version="1.0")
+app = FastAPI(title="HUIT - AI Grader & OCR Microservice", version="1.1")
 
 # THÊM CORS (CỰC KỲ QUAN TRỌNG ĐỂ REACT GỌI ĐƯỢC API)
 app.add_middleware(
@@ -100,45 +107,76 @@ app.add_middleware(
 
 security = HTTPBearer()
 
+
 def verify_token(credentials: HTTPAuthorizationCredentials = Security(security)):
+    """Xác thực Bearer Token nội bộ giữa Backend/Frontend và AI Service."""
     if credentials.credentials != SECRET_API_KEY:
         raise HTTPException(status_code=401, detail="Sai API Key!")
     return credentials.credentials
 
+
+# ==========================================
+# ĐIỀU TIẾT LUỒNG DÙNG CHUNG API KEY (OCR + GRADING)
+# ==========================================
+# Giới hạn mặc định của Deploy là 5 req/s trên mỗi API key/org.
+# GLOBAL_AI_SEMAPHORE điều phối tổng số request đồng thời của cả OCR và Grading.
+GLOBAL_AI_SEMAPHORE = asyncio.Semaphore(int(os.getenv("AI_MAX_CONCURRENT_REQUESTS", "3")))
+GLOBAL_OCR_SEMAPHORE = asyncio.Semaphore(int(os.getenv("OCR_MAX_CONCURRENT_PAGES", "2")))
+
+
+def _compute_backoff(attempt: int, exc: Exception) -> float:
+    """Tính thời gian chờ Exponential Backoff + Jitter, tăng chờ khi gặp 429 Rate Limit."""
+    is_rate_limit = isinstance(exc, RateLimitError) or "429" in str(exc)
+    base_wait = (attempt + 1) * (3.0 if is_rate_limit else 2.0)
+    return base_wait + random.uniform(0.2, 0.8)
+
+
+def clean_json_response(raw_content: str) -> str:
+    """Làm sạch markdown code fence hoặc văn bản thừa trước khi validate Pydantic JSON."""
+    text = (raw_content or "").strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"\s*```$", "", text)
+        text = text.strip()
+
+    if not text.startswith("{"):
+        start = text.find("{")
+        end = text.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            text = text[start:end + 1]
+    return text
+
+
 # ==========================================
 # MODULE 1: OCR ENGINE (TRÍCH XUẤT VĂN BẢN)
 # ==========================================
-# Task 1: Global Async Semaphore ở cấp module giữ tối đa 2 trang xử lý đồng thời qua DashScope
-GLOBAL_OCR_SEMAPHORE = asyncio.Semaphore(2)
-
 def extract_sequential_elements(pdf_bytes: bytes) -> list:
+    """Render từng trang PDF thành ảnh PIL RGB ở 150 DPI để gửi OCR Vision."""
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     sequential_elements = []
 
     for page_num in range(len(doc)):
         page = doc[page_num]
-        
-        # RENDER TOÀN BỘ TRANG THÀNH ẢNH BẮT BUỘC:
-        # Điều này đảm bảo toàn bộ layout, text chìm, và bảng biểu trên trang đều được xử lý chính xác bởi Qwen-VL
         pix = page.get_pixmap(dpi=150)
         mode = "RGBA" if pix.alpha else "RGB"
         pil_img = Image.frombytes(mode, [pix.width, pix.height], pix.samples)
         if mode == "RGBA":
-            background = Image.new('RGB', pil_img.size, (255, 255, 255))
+            background = Image.new("RGB", pil_img.size, (255, 255, 255))
             background.paste(pil_img, mask=pil_img.split()[3])
             pil_img = background
-            
+
         sequential_elements.append({
             "type": "handwritten_image",
             "content": pil_img,
             "y_coord": 0,
-            "x_coord": 0
+            "x_coord": 0,
         })
 
     return sequential_elements
 
 
 def pil_to_base64(img: Image.Image) -> str:
+    """Chuyển ảnh PIL sang Data URI JPEG tối đa 1536px."""
     max_edge = 1536
     if max(img.size) > max_edge:
         ratio = max_edge / max(img.size)
@@ -146,8 +184,8 @@ def pil_to_base64(img: Image.Image) -> str:
         img = img.resize(new_size, Image.Resampling.LANCZOS)
 
     buffered = io.BytesIO()
-    if img.mode != 'RGB':
-        img = img.convert('RGB')
+    if img.mode != "RGB":
+        img = img.convert("RGB")
     img.save(buffered, format="JPEG", quality=85)
     return f"data:image/jpeg;base64,{base64.b64encode(buffered.getvalue()).decode('utf-8')}"
 
@@ -155,7 +193,7 @@ def pil_to_base64(img: Image.Image) -> str:
 def is_blank_page(img: Image.Image) -> bool:
     """Kiểm tra nhanh trang trắng/trống hoàn toàn để tiết kiệm chi phí và thời gian gọi API."""
     try:
-        gray = img.convert('L')
+        gray = img.convert("L")
         extrema = gray.getextrema()
         if extrema and extrema[0] >= 250:
             return True
@@ -176,38 +214,40 @@ async def ocr_single_page(
     pil_img: Image.Image,
     vlm_prompt: str
 ) -> dict:
-    """Hàm OCR từng trang PDF scan có giới hạn Global Semaphore(2) và Retry 3 lần với Exponential Backoff"""
+    """Hàm OCR từng trang PDF scan qua Deploy API dùng Semaphore dùng chung và Retry 3 lần."""
     if is_blank_page(pil_img):
         return {"page_idx": page_idx, "text": "", "is_blank": True, "success": True}
 
     b64_url = pil_to_base64(pil_img)
-    primary_model = ACTIVE_OCR_PROFILE.get("model_name", "deepseek-v4.1-flash-1017")
-    fallback_model = ACTIVE_OCR_PROFILE.get("fallback_model_name", "qwen3.8-max-0902")
+    ocr_model = ACTIVE_OCR_PROFILE.get("model_name", "deepseek-ai/deepseek-v4.1-flash-1017")
     temperature = ACTIVE_OCR_PROFILE.get("temperature", 0.01)
-    max_tokens = ACTIVE_OCR_PROFILE.get("max_tokens", 4000)
-    extra_body = ACTIVE_OCR_PROFILE.get("extra_body", {"enable_thinking": False})
+    max_completion_tokens = ACTIVE_OCR_PROFILE.get(
+        "max_completion_tokens", ACTIVE_OCR_PROFILE.get("max_tokens", 4000)
+    )
+    extra_body = ACTIVE_OCR_PROFILE.get(
+        "extra_body", {"reasoning_effort": "none", "cache_preference": 1}
+    )
 
     async with GLOBAL_OCR_SEMAPHORE:
         for attempt in range(3):
-            # Lần 1 và 2 dùng model chính (deepseek-v4.1-flash-1017), lần 3 fallback sang model dự phòng (qwen3.8-max-0902)
-            current_model = primary_model if attempt < 2 else fallback_model
             try:
-                response = await client.chat.completions.create(
-                    model=current_model,
-                    messages=[
-                        {
-                            "role": "user",
-                            "content": [
-                                {"type": "text", "text": vlm_prompt},
-                                {"type": "image_url", "image_url": {"url": b64_url}}
-                            ]
-                        }
-                    ],
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    stream=False,
-                    extra_body=extra_body
-                )
+                async with GLOBAL_AI_SEMAPHORE:
+                    response = await client.chat.completions.create(
+                        model=ocr_model,
+                        messages=[
+                            {
+                                "role": "user",
+                                "content": [
+                                    {"type": "text", "text": vlm_prompt},
+                                    {"type": "image_url", "image_url": {"url": b64_url}},
+                                ],
+                            }
+                        ],
+                        temperature=temperature,
+                        max_completion_tokens=max_completion_tokens,
+                        stream=False,
+                        extra_body=extra_body,
+                    )
 
                 ocr_text = ""
                 if response.choices and len(response.choices) > 0:
@@ -216,11 +256,11 @@ async def ocr_single_page(
                         ocr_text = msg.content.strip()
 
                 if "EMPTY" not in ocr_text.upper() and len(ocr_text) >= 3:
-                    ocr_text = re.sub(r'(?i)^(.*?trích xuất.*?:|.*?như sau:)\s*', '', ocr_text)
+                    ocr_text = re.sub(r"(?i)^(.*?trích xuất.*?:|.*?như sau:)\s*", "", ocr_text)
                     if ocr_text.startswith("```markdown"):
-                        ocr_text = ocr_text.replace('```markdown\n', '')
+                        ocr_text = ocr_text.replace("```markdown\n", "")
                     if ocr_text.startswith("```"):
-                        ocr_text = ocr_text.replace('```\n', '').replace('```', '')
+                        ocr_text = ocr_text.replace("```\n", "").replace("```", "")
                     if ocr_text.endswith("```"):
                         ocr_text = ocr_text[:-3]
                     ocr_text = ocr_text.strip()
@@ -229,12 +269,10 @@ async def ocr_single_page(
 
                 return {"page_idx": page_idx, "text": "", "is_blank": False, "success": True}
             except Exception as e:
-                print(f"[OCR Page {page_idx + 1}] Lỗi thử lần {attempt + 1} (model {current_model}): {str(e)}")
+                print(f"[OCR Page {page_idx + 1}] Lỗi thử lần {attempt + 1} (model {ocr_model}): {str(e)}")
                 if attempt < 2:
-                    backoff = (attempt + 1) * 2 + random.uniform(0.1, 0.5)
-                    await asyncio.sleep(backoff)
+                    await asyncio.sleep(_compute_backoff(attempt, e))
                 else:
-                    # Hết 3 lần retry vẫn lỗi -> đánh dấu thất bại trang này
                     return {"page_idx": page_idx, "text": "", "is_blank": False, "success": False}
 
     return {"page_idx": page_idx, "text": "", "is_blank": False, "success": False}
@@ -242,10 +280,10 @@ async def ocr_single_page(
 
 @app.post("/process-pdf")
 async def process_pdf_endpoint(file: UploadFile = File(...)):
-    """API Nhận file PDF scan chữ viết tay và trả về toàn bộ văn bản qua Vision OCR song song có kiểm soát Global Semaphore(2)"""
+    """API Nhận file PDF scan chữ viết tay và trả về toàn bộ văn bản qua Vision OCR song song."""
     pdf_bytes = await file.read()
 
-    # Task 1: Giải phóng Event Loop cho tác vụ CPU-Bound render PDF thành ảnh
+    # Giải phóng Event Loop cho tác vụ CPU-Bound render PDF thành ảnh
     loop = asyncio.get_running_loop()
     elements = await loop.run_in_executor(None, extract_sequential_elements, pdf_bytes)
 
@@ -264,7 +302,7 @@ async def process_pdf_endpoint(file: UploadFile = File(...)):
         if elem.get("type") == "handwritten_image":
             tasks.append(ocr_single_page(idx, elem["content"], vlm_prompt))
 
-    # Chạy song song toàn bộ các trang (được xếp hàng qua GLOBAL_OCR_SEMAPHORE)
+    # Chạy song song toàn bộ các trang (được xếp hàng qua GLOBAL_OCR_SEMAPHORE & GLOBAL_AI_SEMAPHORE)
     results = await asyncio.gather(*tasks)
 
     # Sắp xếp lại theo đúng thứ tự số trang (page_idx: 0, 1, 2...)
@@ -291,7 +329,7 @@ async def process_pdf_endpoint(file: UploadFile = File(...)):
     del elements
     gc.collect()
 
-    # Task 1: Nếu toàn bộ bài nộp không trích xuất được ký tự nào hoặc tỉ lệ lỗi > 50% số trang có nội dung
+    # Nếu toàn bộ bài nộp không trích xuất được ký tự nào hoặc tỉ lệ lỗi > 50% số trang có nội dung
     if total_non_blank > 0 and (len(final_text) < 10 or (failed_pages_count / total_non_blank) > 0.5):
         raise HTTPException(
             status_code=502,
@@ -304,10 +342,12 @@ async def process_pdf_endpoint(file: UploadFile = File(...)):
 # ==========================================
 # MODULE 2: GRADING ENGINE (HỘI ĐỒNG CHẤM AI)
 # ==========================================
-EXPERT_MODEL = ACTIVE_GRADING_PROFILE["model_name"]  # Được cấu hình tự động qua src/model_profiles.py
+EXPERT_MODEL = ACTIVE_GRADING_PROFILE["model_name"]
+
 
 class GradingRequest(BaseModel):
     document_text: str
+
 
 PROMPT_AGENT_1 = """Bạn là Giám khảo số 1. Nhiệm vụ của bạn là đọc báo cáo thực tập và chấm 2 tiêu chí: HÌNH THỨC và TỔNG QUAN.
 [KHÁNG THỂ OCR - LƯU Ý TỐI QUAN TRỌNG]: Văn bản bạn đang đọc được trích xuất từ chữ viết tay bằng công nghệ máy quét (OCR). Sẽ có RẤT NHIỀU từ bị sai chính tả vô lý, sai dấu, hoặc ngắt dòng lộn xộn do máy đọc nhầm (VD: "Tiến xu lý", "thẩm thải", "Nục dich"). TUYỆT ĐỐI BỎ QUA và KHÔNG TRỪ ĐIỂM HÌNH THỨC cho những lỗi chính tả này. Chỉ trừ điểm hình thức nếu cấu trúc bài làm thực sự thiếu logic các phần.
@@ -370,28 +410,59 @@ TRẢ VỀ KẾT QUẢ DƯỚI DẠNG JSON TUYỆT ĐỐI TUÂN THỦ CẤU TRÚ
 }
 """
 
+
 async def call_and_parse_json(system_prompt: str, document_text: str, pydantic_model):
-    try:
-        response = await client.chat.completions.create(
-            model=ACTIVE_GRADING_PROFILE["model_name"],
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"BÁO CÁO CỦA SINH VIÊN:\n\n{document_text}"}
-            ],
-            temperature=ACTIVE_GRADING_PROFILE.get("temperature", 0.05),
-            max_tokens=ACTIVE_GRADING_PROFILE.get("max_tokens", 2500),
-            response_format=ACTIVE_GRADING_PROFILE.get("response_format", {"type": "json_object"}),
-            extra_body=ACTIVE_GRADING_PROFILE.get("extra_body", {"enable_thinking": False})
-        )
-        msg = response.choices[0].message
-        reasoning = getattr(msg, "reasoning_content", "") or ""
-        if reasoning:
-            print(f"🧠 [Thinking/Suy luận - {pydantic_model.__name__}]: Đã suy luận {len(reasoning)} ký tự.")
-        raw_content = msg.content
-        return pydantic_model.model_validate_json(raw_content)
-    except Exception as e:
-        print(f"❌ Lỗi AI Agent chi tiết: {str(e)}")
-        return None
+    """Gọi Deploy API cho từng Giám khảo AI kèm điều tiết Semaphore, Retry và Fallback response_format."""
+    model_name = ACTIVE_GRADING_PROFILE["model_name"]
+    temperature = ACTIVE_GRADING_PROFILE.get("temperature", 0.05)
+    max_completion_tokens = ACTIVE_GRADING_PROFILE.get(
+        "max_completion_tokens", ACTIVE_GRADING_PROFILE.get("max_tokens", 2500)
+    )
+    extra_body = ACTIVE_GRADING_PROFILE.get(
+        "extra_body", {"reasoning_effort": "none", "cache_preference": 2}
+    )
+    use_response_format = ACTIVE_GRADING_PROFILE.get("response_format", {"type": "json_object"})
+
+    for attempt in range(3):
+        try:
+            create_kwargs = {
+                "model": model_name,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": f"BÁO CÁO CỦA SINH VIÊN:\n\n{document_text}"},
+                ],
+                "temperature": temperature,
+                "max_completion_tokens": max_completion_tokens,
+                "extra_body": extra_body,
+            }
+            if use_response_format:
+                create_kwargs["response_format"] = use_response_format
+
+            async with GLOBAL_AI_SEMAPHORE:
+                response = await client.chat.completions.create(**create_kwargs)
+
+            msg = response.choices[0].message
+            reasoning = getattr(msg, "reasoning_content", "") or ""
+            if reasoning:
+                print(f"🧠 [Thinking/Suy luận - {pydantic_model.__name__}]: Đã suy luận {len(reasoning)} ký tự.")
+
+            cleaned_json = clean_json_response(msg.content)
+            return pydantic_model.model_validate_json(cleaned_json)
+        except BadRequestError as e:
+            print(f"⚠️ [Agent {pydantic_model.__name__}] BadRequestError lần {attempt + 1}: {str(e)}")
+            # Nếu endpoint không hỗ trợ response_format, bỏ ra và thử lại ngay
+            if use_response_format and "response_format" in str(e).lower():
+                use_response_format = None
+                continue
+            if attempt < 2:
+                await asyncio.sleep(_compute_backoff(attempt, e))
+        except Exception as e:
+            print(f"❌ Lỗi AI Agent [{pydantic_model.__name__}] lần {attempt + 1}: {str(e)}")
+            if attempt < 2:
+                await asyncio.sleep(_compute_backoff(attempt, e))
+
+    return None
+
 
 @app.post("/grade", response_model=KetQua_KiemToan_Rubric)
 async def grade_report_api(request: GradingRequest, token: str = Depends(verify_token)):
@@ -404,11 +475,21 @@ async def grade_report_api(request: GradingRequest, token: str = Depends(verify_
 
     ket_qua1, ket_qua2, ket_qua3 = await asyncio.gather(task1, task2, task3)
 
-    if not ket_qua1: ket_qua1 = DanhGia_HinhThuc_TongQuan(diem_hinh_thuc=0, ly_do_hinh_thuc="Lỗi API", diem_tong_quan=0, ly_do_tong_quan="Lỗi API")
-    if not ket_qua2: ket_qua2 = DanhGia_QuyTrinh(diem_quy_trinh=0, ly_do_quy_trinh="Lỗi API")
-    if not ket_qua3: ket_qua3 = DanhGia_VSATTP(diem_vsattp=0, ly_do_vsattp="Lỗi API")
+    if not ket_qua1:
+        ket_qua1 = DanhGia_HinhThuc_TongQuan(
+            diem_hinh_thuc=0, ly_do_hinh_thuc="Lỗi API", diem_tong_quan=0, ly_do_tong_quan="Lỗi API"
+        )
+    if not ket_qua2:
+        ket_qua2 = DanhGia_QuyTrinh(diem_quy_trinh=0, ly_do_quy_trinh="Lỗi API")
+    if not ket_qua3:
+        ket_qua3 = DanhGia_VSATTP(diem_vsattp=0, ly_do_vsattp="Lỗi API")
 
-    diem_trung_binh = (ket_qua1.diem_hinh_thuc + ket_qua1.diem_tong_quan + ket_qua2.diem_quy_trinh + ket_qua3.diem_vsattp) / 4.0
+    diem_trung_binh = (
+        ket_qua1.diem_hinh_thuc
+        + ket_qua1.diem_tong_quan
+        + ket_qua2.diem_quy_trinh
+        + ket_qua3.diem_vsattp
+    ) / 4.0
     print(f"✅ [Hoàn Thành] Điểm tổng kết: {round(diem_trung_binh, 1)}/10")
 
     return KetQua_KiemToan_Rubric(
