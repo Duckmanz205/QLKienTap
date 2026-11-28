@@ -233,7 +233,6 @@ class _ThongBaoSVScreenState extends State<ThongBaoSVScreen> {
       },
       child: Column(
         children: [
-          const SizedBox(height: 8),
           Expanded(
             child: PaginatedList<StudentNotification>(
               items: allNotifs,

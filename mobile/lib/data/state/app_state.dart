@@ -576,6 +576,17 @@ class AppStateProviderState extends State<AppStateContainer> {
     }
   }
 
+  bool _isStudentTripRegistration(dynamic title, dynamic content) {
+    final t = (title ?? '').toString().toUpperCase();
+    final c = (content ?? '').toString().toUpperCase();
+    return t.contains('ĐĂNG KÝ THAM QUAN') ||
+        t.contains('DANG KY THAM QUAN') ||
+        t.contains('ĐĂNG KÝ CHUYẾN') ||
+        t.contains('DANG KY CHUYEN') ||
+        c.contains('THỜI GIAN ĐĂNG KÍ') ||
+        c.contains('THOI GIAN DANG KY');
+  }
+
   Future<List<LecturerNotification>> _loadLecturerNotificationsCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -583,6 +594,7 @@ class AppStateProviderState extends State<AppStateContainer> {
       if (cachedStr != null && cachedStr.isNotEmpty) {
         final List<dynamic> list = jsonDecode(cachedStr);
         return list
+            .where((item) => !_isStudentTripRegistration(item['title'], item['body']))
             .map(
               (item) => LecturerNotification(
                 id: item['id']?.toString() ?? '',
@@ -853,6 +865,10 @@ class AppStateProviderState extends State<AppStateContainer> {
           final cachToChuc = chuyenJson['cach_to_chuc']?.toString() ?? trip.cachToChuc;
           final isTuDo = cachToChuc == 'TuDo' || chuyenJson['loai_chuyen'] == 'tu_do' || trip.isTuDo;
           final diemDanhStatus = diemDanh?['trang_thai']?.toString();
+          final rawNgayThamQuan = chuyenJson['ngay_tham_quan'];
+          final tripDate = rawNgayThamQuan != null
+              ? DateTime.tryParse(rawNgayThamQuan.toString())
+              : null;
 
           realTrips.add(
             trip.copyWith(
@@ -863,14 +879,15 @@ class AppStateProviderState extends State<AppStateContainer> {
               tripStatus: tripStatus,
               cachToChuc: cachToChuc,
               fileXacNhanUrl: fileXacNhan,
+              diaDiemTapTrung: chuyenJson['dia_diem_tap_trung']?.toString(),
+              gioBatDau: _safeSub(chuyenJson['gio_bat_dau'], 5),
+              gioKetThuc: _safeSub(chuyenJson['gio_ket_thuc'], 5),
+              hinhThuc: chuyenJson['hinh_thuc']?.toString(),
+              rawNgayThamQuan: tripDate,
             ),
           );
 
           if (isCompleted || regStatus == 'HopLe' || regStatus == 'DaThamGia') {
-            final rawNgayThamQuan = chuyenJson['ngay_tham_quan'];
-            final tripDate = rawNgayThamQuan != null
-                ? DateTime.tryParse(rawNgayThamQuan.toString())
-                : null;
 
             final rawScore = diemPhieu?['diem_thu_hoach'];
             final double? reportScore = rawScore != null
@@ -939,6 +956,17 @@ class AppStateProviderState extends State<AppStateContainer> {
               calculatedStatus = 'Chưa nộp';
             }
 
+            final rawDiemDanhNgay = diemDanh?['ngay_diem_danh'] ?? diemDanh?['thoi_gian_diem_danh'];
+            final DateTime? diemDanhNgay = rawDiemDanhNgay != null
+                ? DateTime.tryParse(rawDiemDanhNgay.toString())?.toLocal()
+                : null;
+            final nguoiDiemDanhMap = _extractMap(diemDanh?['nguoiDiemDanh']);
+            final String? diemDanhNguoi = nguoiDiemDanhMap?['ho_ten']?.toString();
+            final String? diemDanhGhiChu = diemDanh?['ghi_chu']?.toString();
+            final int? lanNop = bth?['lan_nop'] is int
+                ? bth!['lan_nop']
+                : int.tryParse(bth?['lan_nop']?.toString() ?? '1') ?? 1;
+
             realSubmissions.add(
               Submission(
                 id: reg['id'].toString(),
@@ -981,6 +1009,11 @@ class AppStateProviderState extends State<AppStateContainer> {
                 hanNopDate: hanNopDate,
                 hanKhoaDate: hanKhoaDate,
                 isExtended: isExtended,
+                diemDanhNgay: diemDanhNgay,
+                diemDanhNguoi: diemDanhNguoi,
+                diemDanhGhiChu: diemDanhGhiChu,
+                lanNop: lanNop,
+                diaDiemTapTrung: chuyenJson['dia_diem_tap_trung']?.toString(),
               ),
             );
           }
@@ -1200,7 +1233,13 @@ class AppStateProviderState extends State<AppStateContainer> {
         _state.studentNotifications = [...autoReminders, ...backendNotifs];
       });
       _saveStudentNotificationsCache(_state.studentNotifications);
-      NotificationService.instance.notifyStudentReminders(autoReminders);
+      NotificationService.instance.notifyStudentNotifications(
+        [
+          ...autoReminders,
+          ...backendNotifs,
+        ],
+        userId: studentId.toString(),
+      );
 
       final Map<String, dynamic> statsJson =
           await ApiService.getStudentDashboardStats(studentId);
@@ -1254,6 +1293,8 @@ class AppStateProviderState extends State<AppStateContainer> {
 
   Trip _mapJsonToTrip(Map<String, dynamic> json, {required bool isRegistered}) {
     final nhaMay = json['nhaMay'] ?? {};
+    final rawNgay = json['ngay_tham_quan'];
+    final tripDate = rawNgay != null ? DateTime.tryParse(rawNgay.toString())?.toLocal() : null;
 
     return Trip(
       id: json['id'].toString(),
@@ -1293,6 +1334,11 @@ class AppStateProviderState extends State<AppStateContainer> {
       isCompleted:
           json['trang_thai'] == 'DaDienRa' || json['trang_thai'] == 'HoanThanh',
       cachToChuc: json['cach_to_chuc']?.toString(),
+      diaDiemTapTrung: json['dia_diem_tap_trung']?.toString(),
+      gioBatDau: _safeSub(json['gio_bat_dau'], 5),
+      gioKetThuc: _safeSub(json['gio_ket_thuc'], 5),
+      hinhThuc: json['hinh_thuc']?.toString(),
+      rawNgayThamQuan: tripDate,
     );
   }
 
@@ -1456,7 +1502,9 @@ class AppStateProviderState extends State<AppStateContainer> {
         );
         final List<LecturerNotification> backendLecturerNotifs =
             (notifsJson is List && notifsJson.isNotEmpty)
-            ? notifsJson.map((n) {
+            ? notifsJson
+                .where((n) => !_isStudentTripRegistration(n['tieu_de'], n['noi_dung']))
+                .map((n) {
                 final rawDate = n['ngay_gui'] ?? n['created_at'];
                 String formattedTime = 'Vừa xong';
                 if (rawDate != null) {
@@ -1511,8 +1559,12 @@ class AppStateProviderState extends State<AppStateContainer> {
           ];
         });
         _saveLecturerNotificationsCache(_state.lecturerNotifications);
-        NotificationService.instance.notifyLecturerReminders(
-          autoLecturerReminders,
+        NotificationService.instance.notifyLecturerNotifications(
+          [
+            ...autoLecturerReminders,
+            ...backendLecturerNotifs,
+          ],
+          userId: lecturerId.toString(),
         );
       } catch (e) {
         print('Error fetching notifications: $e');
@@ -1630,7 +1682,7 @@ class AppStateProviderState extends State<AppStateContainer> {
 
   void logout() {
     ApiService.clearSession();
-    NotificationService.instance.clearNotificationHistory();
+    NotificationService.instance.dismissActiveSystemNotifications();
     setState(() {
       _resetToDefaults(notify: true);
       _state.currentRole = null;
@@ -1921,7 +1973,7 @@ class AppStateProviderState extends State<AppStateContainer> {
             fileXacNhanUrl: fileReference,
             status: (s.fileBaoCaoUrl != null && s.fileBaoCaoUrl!.isNotEmpty)
                 ? 'Đã nộp'
-                : 'Chưa nộp',
+                : 'Chờ duyệt điểm danh',
           );
         }
         return s;
@@ -2396,17 +2448,29 @@ class AppStateProviderState extends State<AppStateContainer> {
                 id: s['id'] ?? 0,
                 hoTen: s['ho_ten'] ?? s['name'] ?? '',
                 mssv: s['mssv'] ?? '',
-                isLeader: s['truong_nhom'] == true,
+                isLeader: s['truong_nhom'] == true || s['role'] == 'Trưởng nhóm',
               ),
             )
             .toList();
 
-        final leadGv = rawLecturers.isNotEmpty ? rawLecturers[0] : null;
+        final lecturers = rawLecturers
+            .map(
+              (l) => TripLecturer.fromJson(
+                l is Map<String, dynamic> ? l : Map<String, dynamic>.from(l as Map),
+              ),
+            )
+            .toList();
+
+        final leadGv = lecturers.firstWhere(
+          (l) => l.laTruongDoan,
+          orElse: () => lecturers.isNotEmpty
+              ? lecturers.first
+              : TripLecturer(id: 0, hoTen: ''),
+        );
         final enterpriseContact = res['enterpriseContact'] is Map
             ? res['enterpriseContact']
             : null;
-        final enterprisePerson = enterpriseContact?['nguoi_lien_he']
-            ?.toString();
+        final enterprisePerson = enterpriseContact?['nguoi_lien_he']?.toString();
         final enterprisePhone = enterpriseContact?['sdt_lien_he']?.toString();
 
         return TripBusInfo(
@@ -2422,11 +2486,16 @@ class AppStateProviderState extends State<AppStateContainer> {
               ? _safeSub(chuyen['gio_ket_thuc'], 5)
               : '12:00',
           hinhThuc: chuyen['hinh_thuc'] ?? 'TrucTiep',
-          lecturerName: leadGv?['ho_ten'],
-          lecturerPhone: leadGv?['so_dien_thoai'],
+          lecturerName: leadGv.hoTen.isNotEmpty ? leadGv.hoTen : null,
+          lecturerPhone: leadGv.soDienThoai,
+          lecturers: lecturers,
           students: students,
           enterpriseContactPerson: enterprisePerson,
           enterpriseContactPhone: enterprisePhone,
+          diaDiemTapTrung: chuyen['dia_diem_tap_trung']?.toString(),
+          ngayThamQuan: chuyen['ngay_tham_quan']?.toString(),
+          diaChiNhaMay: chuyen['dia_chi']?.toString() ?? chuyen['nhaMay']?['dia_chi']?.toString(),
+          cachToChuc: chuyen['cach_to_chuc']?.toString(),
         );
       }
     } catch (e) {

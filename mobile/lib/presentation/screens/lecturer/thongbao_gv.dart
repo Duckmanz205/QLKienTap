@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../core/network/api_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/state/app_state.dart';
 import '../../../data/models/app_models.dart';
-import '../../../core/network/api_service.dart';
 import '../../widgets/paginated_list.dart';
 
 class ThongBaoGVScreen extends StatefulWidget {
@@ -232,7 +232,6 @@ class _ThongBaoGVScreenState extends State<ThongBaoGVScreen> {
       },
       child: Column(
         children: [
-          const SizedBox(height: 8),
           Expanded(
             child: PaginatedList<LecturerNotification>(
               items: allNotifs,
