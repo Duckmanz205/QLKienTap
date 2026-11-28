@@ -850,6 +850,7 @@ export default function ChuyenThamQuan_DSLoc() {
                   { value: 'ALL', label: 'Tất cả trạng thái' },
                   { value: 'Nhap', label: 'Nháp' },
                   { value: 'MoDangKy', label: 'Mở đăng ký' },
+                  { value: 'ChoChotDanhSach', label: 'Chờ chốt danh sách' },
                   { value: 'DaChotDanhSach', label: 'Đã chốt danh sách' },
                   { value: 'DaDienRa', label: 'Đã diễn ra' },
                   { value: 'DaHuy', label: 'Đã huỷ' },
@@ -947,11 +948,13 @@ export default function ChuyenThamQuan_DSLoc() {
                               <td className="p-4 text-center">
                                 <div className="flex flex-col items-center gap-1">
                                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold shadow-sm border whitespace-nowrap ${t.trang_thai === 'MoDangKy' ? 'bg-[#89B449] text-white border-[#89B449]/20' :
+                                    t.trang_thai === 'ChoChotDanhSach' ? 'bg-amber-500 text-white border-amber-600/20' :
                                     t.trang_thai === 'Nhap' ? 'bg-slate-400 text-white border-slate-400/20' :
                                       t.trang_thai === 'DaHuy' ? 'bg-[#E68A8C] text-white border-[#E68A8C]/20' :
                                         'bg-[#407F3E] text-white border-[#407F3E]/20'
                                     }`}>
                                     {t.trang_thai === 'MoDangKy' ? 'Mở đăng ký' :
+                                      t.trang_thai === 'ChoChotDanhSach' ? 'Chờ chốt danh sách' :
                                       t.trang_thai === 'DaChotDanhSach' ? 'Đã chốt danh sách' :
                                         t.trang_thai === 'DaDienRa' ? 'Đã diễn ra' :
                                           t.trang_thai === 'DaHuy' ? 'Đã huỷ' : 'Nháp'}
@@ -1021,10 +1024,10 @@ export default function ChuyenThamQuan_DSLoc() {
                                           </>
                                         )}
 
-                                        {t.trang_thai === 'DaChotDanhSach' && (
+                                        {(t.trang_thai === 'ChoChotDanhSach' || t.trang_thai === 'DaChotDanhSach') && (
                                           <>
-                                            <button onClick={(e) => { e.stopPropagation(); navigate('/clb/registrations'); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#407F3E] hover:bg-green-50 flex items-center gap-2 transition-colors border-b border-slate-100">
-                                              <Users className="w-4 h-4 text-[#407F3E]" /> Quản lý duyệt / Chốt SV
+                                            <button onClick={(e) => { e.stopPropagation(); navigate('/clb/registrations'); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#407F3E] hover:bg-green-50 flex items-center gap-2 transition-colors border-b border-slate-100 cursor-pointer">
+                                              <Users className="w-4 h-4 text-[#407F3E]" /> {t.trang_thai === 'ChoChotDanhSach' ? 'Lọc & chốt danh sách SV' : 'Quản lý duyệt / Chốt SV'}
                                             </button>
                                             {t.trang_thai_sua_doi !== 'ChoDuyet' && (
                                               <button onClick={(e) => { e.stopPropagation(); handleEditClick(t); setActiveDropdown(null); }} className="w-full text-left px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors border-b border-slate-100">
@@ -1982,6 +1985,7 @@ export default function ChuyenThamQuan_DSLoc() {
                                 viewingDetail.trang_thai_duyet === 'TuChoi' ? 'Đã từ chối' : viewingDetail.trang_thai_duyet
                         ) : (
                           viewingDetail.trang_thai === 'MoDangKy' ? 'Mở đăng ký' :
+                            viewingDetail.trang_thai === 'ChoChotDanhSach' ? 'Chờ chốt danh sách' :
                             viewingDetail.trang_thai === 'DaChotDanhSach' ? 'Đã chốt danh sách' :
                               viewingDetail.trang_thai === 'DaDienRa' ? 'Đã diễn ra' :
                                 viewingDetail.trang_thai === 'DaHuy' ? 'Đã huỷ' : 'Nháp'

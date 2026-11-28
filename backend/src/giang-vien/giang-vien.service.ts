@@ -2249,8 +2249,8 @@ export class GiangVienService implements OnModuleInit {
       }
     }
 
-    // 4. Nếu trước đó bị Cron gán 0đ tạm thời mà chưa nộp bài -> Reset điểm 0 để chờ SV nộp
-    if (diemPhieu && !phieuTQ.baiThuHoach && Number(diemPhieu.diem_thu_hoach) === 0 && !diemPhieu.da_khoa_thu_hoach) {
+    // 4. Nếu trước đó bị Cron hoặc hệ thống gán 0đ tạm thời mà chưa khóa sổ -> Reset điểm 0 để chờ SV nộp
+    if (diemPhieu && Number(diemPhieu.diem_thu_hoach) === 0 && !diemPhieu.da_khoa_thu_hoach) {
       diemPhieu.diem_thu_hoach = null as any;
       diemPhieu.nhan_xet_thu_hoach = null as any;
       await this.diemPhieuRepo.save(diemPhieu);
@@ -2264,6 +2264,10 @@ export class GiangVienService implements OnModuleInit {
         : `Đã gia hạn nộp đúng hạn thành công đến 23:59 ngày ${inputDate.toLocaleDateString('vi-VN')}`,
       han_nop_bao_cao: newHanNop,
       han_khoa: lockDate,
+      phieuThamQuan: {
+        id: phieuTQ.id,
+        han_nop_bao_cao: newHanNop,
+      },
     };
   }
 
@@ -2337,6 +2341,8 @@ export class GiangVienService implements OnModuleInit {
 
       const tenNhaMay = cq?.nhaMay?.ten_nha_may || 'Chưa xác định';
       const dot = cq?.lichKienTap?.dotKienTap || assignment.dotKienTapSinhVien?.dotKienTap;
+      const hanNopBaoCao = ptq?.han_nop_bao_cao || (cq?.ngay_tham_quan ? new Date(new Date(cq.ngay_tham_quan).getTime() + 10 * 86400000) : null);
+      const hanKhoaCong = hanNopBaoCao ? new Date(new Date(hanNopBaoCao).getTime() + 10 * 86400000) : null;
 
       return {
         id: reg.id,
@@ -2350,7 +2356,8 @@ export class GiangVienService implements OnModuleInit {
         ngayThamQuan: cq?.ngay_tham_quan || null,
         trangThaiDiemDanh: dd?.trang_thai || 'ChuaDiemDanh',
         diemChuanBi: dptq?.diem_chuan_bi ?? null,
-        hanNopBaoCao: ptq?.han_nop_bao_cao || null,
+        hanNopBaoCao,
+        hanKhoaCong,
         daKhoaThuHoach: dptq?.da_khoa_thu_hoach ?? false,
         daKhoa: dptq?.da_khoa ?? false,
         diemThuHoach: dptq?.diem_thu_hoach ?? null,

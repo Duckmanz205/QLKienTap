@@ -124,6 +124,8 @@ export default function HoiDongChamBaoCao_Khoa() {
   // Lock Bo Chuyen & Export State
   const [selectedDotForLock, setSelectedDotForLock] = useState(null);
   const [isBoChuyenLocked, setIsBoChuyenLocked] = useState(false);
+  const [canUnlockBoChuyen, setCanUnlockBoChuyen] = useState(true);
+  const [boChuyenLockReason, setBoChuyenLockReason] = useState(null);
   const [isTogglingLock, setIsTogglingLock] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -190,6 +192,8 @@ export default function HoiDongChamBaoCao_Khoa() {
     try {
       const res = await khoaApi.getBoChuyenLockStatus(dotId);
       setIsBoChuyenLocked(res.data?.isLocked || false);
+      setCanUnlockBoChuyen(res.data?.canUnlock ?? true);
+      setBoChuyenLockReason(res.data?.lockReason || null);
     } catch (err) {
       console.error(err);
     }
@@ -203,6 +207,14 @@ export default function HoiDongChamBaoCao_Khoa() {
     const dot = campaigns.find(c => c.id === Number(selectedDotForLock));
     const dotName = dot?.ten_dot || `Đợt #${selectedDotForLock}`;
     const nextLocked = !isBoChuyenLocked;
+
+    if (!nextLocked && !canUnlockBoChuyen) {
+      toast.error(
+        boChuyenLockReason ||
+          'Không thể mở khóa bộ 3 chuyến do điểm đã được chốt hoặc Hội đồng đã chấm điểm.',
+      );
+      return;
+    }
 
     setConfirmModal({
       isOpen: true,
@@ -218,6 +230,7 @@ export default function HoiDongChamBaoCao_Khoa() {
           setIsTogglingLock(true);
           const res = await khoaApi.toggleLockBoChuyen(selectedDotForLock, { isLocked: nextLocked });
           setIsBoChuyenLocked(nextLocked);
+          await checkBoChuyenLock(selectedDotForLock);
           toast.success(res.data?.message || (nextLocked ? 'Đã khóa cổng đăng ký bộ chuyến' : 'Đã mở khóa cổng đăng ký bộ chuyến'));
           setConfirmModal(prev => ({ ...prev, isOpen: false }));
         } catch (err) {
@@ -762,6 +775,8 @@ export default function HoiDongChamBaoCao_Khoa() {
                   checkBoChuyenLock(numVal);
                 } else {
                   setIsBoChuyenLocked(false);
+                  setCanUnlockBoChuyen(true);
+                  setBoChuyenLockReason(null);
                 }
                 setCurrentPage(1);
               }}
@@ -774,17 +789,21 @@ export default function HoiDongChamBaoCao_Khoa() {
           <button
             type="button"
             onClick={handleToggleLockBoChuyen}
-            disabled={isTogglingLock || !selectedDotForLock}
-            className={`px-3 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 transition-all cursor-pointer border shadow-2xs ${
+            disabled={isTogglingLock || !selectedDotForLock || (isBoChuyenLocked && !canUnlockBoChuyen)}
+            className={`px-3 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 transition-all border shadow-2xs ${
               !selectedDotForLock
                 ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-60'
+                : isBoChuyenLocked && !canUnlockBoChuyen
+                ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-75'
                 : isBoChuyenLocked
-                ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
-                : 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200'
-            } active:scale-[0.98]`}
+                ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200 cursor-pointer active:scale-[0.98]'
+                : 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200 cursor-pointer active:scale-[0.98]'
+            }`}
             title={
               !selectedDotForLock
                 ? 'Vui lòng chọn một đợt kiến tập cụ thể để khóa/mở khóa cổng bộ chuyến'
+                : isBoChuyenLocked && !canUnlockBoChuyen
+                ? `Không thể mở khóa: ${boChuyenLockReason || 'Điểm tổng kết đã khóa hoặc Hội đồng đã chấm điểm'}`
                 : isBoChuyenLocked
                 ? 'Nhấn để mở khóa cho sinh viên chọn bộ chuyến'
                 : 'Nhấn để khóa không cho sinh viên chọn bộ chuyến'
@@ -792,7 +811,11 @@ export default function HoiDongChamBaoCao_Khoa() {
           >
             {isBoChuyenLocked ? (
               <>
-                <Unlock className="w-4 h-4 text-emerald-600" />
+                {canUnlockBoChuyen ? (
+                  <Unlock className="w-4 h-4 text-emerald-600" />
+                ) : (
+                  <Lock className="w-4 h-4 text-slate-400" />
+                )}
                 <span>Mở khóa bộ chuyến</span>
               </>
             ) : (

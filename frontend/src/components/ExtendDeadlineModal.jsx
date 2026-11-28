@@ -20,12 +20,22 @@ export default function ExtendDeadlineModal({
 
   if (!isOpen) return null;
 
+  const isValidPtq = Boolean(phieuThamQuanId && Number(phieuThamQuanId) >= 1);
+
   const currentDeadlineFormatted = currentDeadline 
     ? new Date(currentDeadline).toLocaleDateString('vi-VN') 
     : 'Chưa xác định';
 
+  const currentLockFormatted = currentDeadline
+    ? new Date(new Date(currentDeadline).getTime() + 10 * 86400000).toLocaleDateString('vi-VN')
+    : null;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!isValidPtq) {
+      toast.error('Chuyến đi chưa có Phiếu tham quan hợp lệ, không thể gia hạn!');
+      return;
+    }
     if (!ngayGiaHanMoi) {
       toast.error('Vui lòng chọn ngày gia hạn mới!');
       return;
@@ -52,15 +62,15 @@ export default function ExtendDeadlineModal({
 
   return (
     <div 
-      className="fixed inset-0 bg-black/60 z-[120] flex items-center justify-center p-4 backdrop-blur-xs animate-in fade-in duration-200"
+      className="fixed inset-0 bg-black/60 z-[120] flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div 
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100 flex flex-col"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] border border-slate-100 flex flex-col my-auto overflow-hidden animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-[#fdfcf8]">
+        {/* Header (Cố định ở đỉnh) */}
+        <div className="shrink-0 flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-[#fdfcf8]">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-[#89B449]/20 flex items-center justify-center text-[#407F3E]">
               <Calendar className="w-5 h-5" />
@@ -79,8 +89,10 @@ export default function ExtendDeadlineModal({
           </button>
         </div>
 
-        {/* Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        {/* Body Form */}
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          {/* Scrollable Content */}
+          <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4 sm:space-y-5">
           {/* Target Student & Trip Info */}
           <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1.5">
             <div className="flex justify-between">
@@ -95,8 +107,22 @@ export default function ExtendDeadlineModal({
             )}
             <div className="flex justify-between">
               <span className="text-slate-500">Hạn đúng hạn hiện tại:</span>
-              <span className="font-bold text-[#407F3E]">23:59 ngày {currentDeadlineFormatted}</span>
+              <span className="font-bold text-[#407F3E]">
+                {currentDeadlineFormatted !== 'Chưa xác định' ? `23:59 ngày ${currentDeadlineFormatted}` : 'Chưa xác định'}
+              </span>
             </div>
+            {currentLockFormatted && (
+              <div className="flex justify-between">
+                <span className="text-slate-500">Hạn đóng cổng nộp bù:</span>
+                <span className="font-bold text-amber-700">23:59 ngày {currentLockFormatted}</span>
+              </div>
+            )}
+            {!isValidPtq && (
+              <div className="mt-2 p-2.5 bg-red-50 text-red-700 rounded-lg text-xs font-semibold flex items-center gap-2 border border-red-200">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                <span>Chuyến đi chưa được cấp Phiếu tham quan (chưa diễn ra hoặc chưa hoàn tất thủ tục). Không thể gia hạn.</span>
+              </div>
+            )}
           </div>
 
           {/* Mode Selector */}
@@ -176,8 +202,10 @@ export default function ExtendDeadlineModal({
             </div>
           </div>
 
-          {/* Modal Footer Buttons */}
-          <div className="flex items-center justify-end gap-3 pt-2">
+          </div>
+
+          {/* Modal Footer Buttons (Cố định ở đáy modal, không bao giờ bị tràn/cắt cụt) */}
+          <div className="shrink-0 flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-[#fdfcf8]">
             <button
               type="button"
               onClick={onClose}
@@ -188,8 +216,12 @@ export default function ExtendDeadlineModal({
             </button>
             <button
               type="submit"
-              disabled={loading}
-              className="px-5 py-2.5 rounded-xl bg-[#407F3E] hover:bg-[#407F3E]/90 text-white text-xs font-bold shadow-sm transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              disabled={loading || !isValidPtq}
+              className={`px-5 py-2.5 rounded-xl text-white text-xs font-bold shadow-sm transition-all flex items-center gap-2 ${
+                !isValidPtq
+                  ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                  : 'bg-[#407F3E] hover:bg-[#407F3E]/90 cursor-pointer disabled:opacity-50'
+              }`}
             >
               {loading ? (
                 <>

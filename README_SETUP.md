@@ -149,10 +149,13 @@ Trước khi nén hoặc sao chép, bạn hãy chạy các lệnh sau tại thư
 cd mobile; flutter clean; cd ..
 
 # 2. Xóa các thư mục build sản phẩm
-Remove-Item -Recurse -Force backend/dist, frontend/dist -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force backend/dist -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force frontend/dist -ErrorAction SilentlyContinue
 
 # 3. Xóa các thư mục thư viện dependencies (có thể tải lại trong vài chục giây)
-Remove-Item -Recurse -Force backend/node_modules, frontend/node_modules, ai-service/venv -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force backend/node_modules -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force frontend/node_modules -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force ai-service/venv -ErrorAction SilentlyContinue
 ```
 
 ### ⚠️ Lưu ý sống còn khi sao lưu:
@@ -165,3 +168,43 @@ Remove-Item -Recurse -Force backend/node_modules, frontend/node_modules, ai-serv
   - `frontend` $\rightarrow$ `npm install --no-audit --no-fund --verbose`
   - `ai-service` $\rightarrow$ `python -m venv venv` và `pip install -r requirements.txt`
   - `mobile` $\rightarrow$ `flutter pub get`
+
+---
+
+## 🛠️ 10. Xử lý Sự cố Thường gặp (Troubleshooting)
+
+### 10.1. Lỗi TypeScript TS2551 (`destroy` on `Socket`) hoặc TS2339 (`pipe` on `ReadStream`)
+- **Dấu hiệu:** Khi chạy `npm run start:dev` hoặc `nest build` trong backend, trình biên dịch báo lỗi:
+  ```
+  src/queue/task-queue.service.ts:73:16 - error TS2551: Property 'destroy' does not exist on type 'Socket'. Did you mean 'destroyed'?
+  src/upload/upload.controller.ts:162:16 - error TS2339: Property 'pipe' does not exist on type 'ReadStream'.
+  ```
+- **Nguyên nhân:** File định nghĩa kiểu `backend/node_modules/@types/node/stream.d.ts` bị rỗng (0 bytes) do quá trình giải nén hoặc cache npm bị gián đoạn, khiến các lớp kế thừa `stream.Readable`, `stream.Duplex` bị mất các phương thức chuẩn như `.destroy()` và `.pipe()`.
+- **Cách khắc phục nhanh:** Chạy lệnh sau tại thư mục gốc dự án:
+  ```powershell
+  Remove-Item -Recurse -Force backend/node_modules/@types/node
+  npm --prefix backend install --save-dev @types/node@22.20.5 --no-audit --no-fund
+  npm --prefix backend run build
+  ```
+
+### 10.2. Lỗi PowerShell không cho chạy `activate` của Virtualenv (AI Service)
+- **Dấu hiệu:** `.\venv\Scripts\activate : File ... cannot be loaded because running scripts is disabled on this system.`
+- **Cách khắc phục:**
+  - Không cần activate môi trường, bạn có thể gọi thẳng binary uvicorn trong virtualenv:
+    ```powershell
+    cd ai-service
+    .\venv\Scripts\uvicorn src.main:app --reload --port 8000
+    ```
+  - Hoặc mở quyền thực thi script cho user hiện tại:
+    ```powershell
+    Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+    ```
+
+### 10.3. Lỗi kết nối CSDL (Connection Error / Port 1433)
+- **Dấu hiệu:** Backend báo lỗi `ConnectionError: Failed to connect to localhost:1433`.
+- **Cách khắc phục:**
+  1. Mở **SQL Server Configuration Manager**.
+  2. Chọn **SQL Server Network Configuration** $\rightarrow$ **Protocols for MSSQLSERVER (hoặc SQLEXPRESS)**.
+  3. Chuột phải vào **TCP/IP** chọn **Enable**.
+  4. Chuột phải vào **TCP/IP** chọn **Properties** $\rightarrow$ sang tab **IP Addresses** $\rightarrow$ cuộn xuống mục **IPAll** $\rightarrow$ đặt **TCP Port** là `1433` (xóa trắng ô TCP Dynamic Ports nếu có).
+  5. Restart lại service **SQL Server** trong mục *SQL Server Services*.

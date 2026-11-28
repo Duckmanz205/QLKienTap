@@ -87,20 +87,20 @@ export default function DashBoard_CLB() {
   const todayTripsCount = todayDepartures.filter(t => t.isToday).length;
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <div className="p-4 sm:p-6 space-y-6 animate-in fade-in duration-300">
       {/* Top Welcome Panel */}
-      <div className="bg-gradient-to-r from-[#407F3E] via-[#407F3E]/90 to-[#89B449]/80 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
-          <Compass size={180} className="animate-spin-slow text-white" />
+      <div className="bg-gradient-to-r from-[#407F3E] via-[#407F3E]/90 to-[#89B449]/80 rounded-2xl py-4 px-5 sm:py-5 sm:px-6 text-white shadow-sm relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-4 sm:p-6 opacity-10 pointer-events-none">
+          <Compass size={120} className="animate-spin-slow text-white" />
         </div>
         <div className="relative z-10 max-w-2xl">
-          <span className="bg-white/20 text-white text-[11px] px-3 py-1 rounded-full font-bold tracking-wide uppercase">
+          <span className="bg-white/20 text-white text-[10px] sm:text-[11px] px-2.5 py-0.5 rounded-full font-bold tracking-wide uppercase inline-block">
             HỆ THỐNG QUẢN LÝ KIẾN TẬP - CÂU LẠC BỘ
           </span>
-          <h1 className="text-2xl sm:text-3xl font-black font-sans tracking-tight mt-3 text-white">
+          <h1 className="text-xl sm:text-2xl font-black font-sans tracking-tight mt-1.5 text-white">
             Tổng quan Hoạt động Kiến tập CLB
           </h1>
-          <p className="text-white/90 text-sm mt-2 leading-relaxed font-medium">
+          <p className="text-white/90 text-xs sm:text-sm mt-1 leading-relaxed font-medium">
             Chào mừng Thầy/Cô <strong className="text-white font-bold">{userProfile.ho_ten}</strong>. Hệ thống vận hành kiến tập hiện tại đang hoạt động ổn định.
             {todayTripsCount > 0 ? (
               <span> Hôm nay có <strong className="text-[#DBD468] font-bold">{todayTripsCount} chuyến tham quan</strong> đang diễn ra.</span>
