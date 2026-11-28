@@ -32,6 +32,10 @@ export class CronService implements OnModuleInit {
   // 2. Chạy mỗi ngày lúc Nửa đêm (00:00): Chốt sổ các Lịch/Đợt đã hoàn tất
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
   async handleLifecycleStatus() {
+    if (process.env.DEMO_BYPASS_TIME_GATES === 'true') {
+      this.logger.log('[DEMO_BYPASS_TIME_GATES] Bỏ qua handleLifecycleStatus (00:00).');
+      return;
+    }
     try {
       await this.dataSource.query('EXEC sp_TuDongCapNhatChuyenThamQuan');
       await this.dataSource.query('EXEC sp_TuDongKetThucLichKienTap');

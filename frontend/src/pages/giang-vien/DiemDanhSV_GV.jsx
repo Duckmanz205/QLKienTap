@@ -257,7 +257,8 @@ export default function DiemDanhSV_GV() {
 
     const startDateTime = new Date(year, month - 1, day, hours, minutes, seconds);
     const now = new Date();
-    const isStarted = now >= startDateTime;
+    const isDemoBypassTimeGates = import.meta.env.VITE_DEMO_BYPASS_TIME_GATES === 'true';
+    const isStarted = isDemoBypassTimeGates || now >= startDateTime;
 
     const formattedDate = `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
     const formattedTime = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;

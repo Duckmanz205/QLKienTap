@@ -1526,7 +1526,7 @@ export class SinhVienService {
       );
     }
 
-    if (phieuTQ.han_nop_bao_cao) {
+    if (process.env.DEMO_BYPASS_TIME_GATES !== 'true' && phieuTQ.han_nop_bao_cao) {
       const lockDeadline = new Date(
         new Date(phieuTQ.han_nop_bao_cao).getTime() + 10 * 86400000,
       );
@@ -1845,7 +1845,10 @@ export class SinhVienService {
     const deadline = dotCheck?.ngay_ket_thuc
       ? this.getEndOfDayVietnam(dotCheck.ngay_ket_thuc)
       : null;
-    const isDeadlineExpired = deadline ? new Date() > deadline : false;
+    const isDeadlineExpired =
+      process.env.DEMO_BYPASS_TIME_GATES !== 'true' && deadline
+        ? new Date() > deadline
+        : false;
 
     if (dotCheck?.is_bo_chuyen_locked || isDeadlineExpired) {
       throw new BadRequestException(
@@ -2055,7 +2058,8 @@ export class SinhVienService {
       isFacultyMasterLocked = dotForLock?.is_bo_chuyen_locked ?? false;
       if (dotForLock?.ngay_ket_thuc) {
         deadline = this.getEndOfDayVietnam(dotForLock.ngay_ket_thuc);
-        isDeadlineExpired = new Date() > deadline;
+        isDeadlineExpired =
+          process.env.DEMO_BYPASS_TIME_GATES !== 'true' && new Date() > deadline;
       }
     }
 

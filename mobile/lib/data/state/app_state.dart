@@ -2654,8 +2654,9 @@ class AppStateProviderState extends State<AppStateContainer> {
     double score,
   ) async {
     await ApiService.submitBoardScoresBatch(memberId, phieuIds, score);
-    if (ApiService.userId != null) {
-      await fetchBoardSessions(ApiService.userId!);
+    final activeId = ApiService.profileId ?? ApiService.userId;
+    if (activeId != null) {
+      await fetchBoardSessions(activeId);
     }
   }
 
@@ -2664,8 +2665,9 @@ class AppStateProviderState extends State<AppStateContainer> {
       'boardId': boardId,
       if (boChuyenId != null) 'boChuyenId': boChuyenId,
     });
-    if (ApiService.userId != null) {
-      await fetchBoardSessions(ApiService.userId!);
+    final activeId = ApiService.profileId ?? ApiService.userId;
+    if (activeId != null) {
+      await fetchBoardSessions(activeId);
     }
   }
 

@@ -162,12 +162,13 @@ class _SinhVienHuongDanGVScreenState extends State<SinhVienHuongDanGVScreen> {
                 child: OutlinedButton.icon(
                   onPressed: _isLocking ? null : () {
                     final students = AppStateProvider.of(context).state.lecturerStudents;
+                    if (students.isEmpty) return;
                     final activeStudent = students.firstWhere(
                       (s) => !s.isScoreLocked && s.dotKienTapId != null && s.dotKienTapId! > 0,
                       orElse: () => students.firstWhere((s) => s.dotKienTapId != null && s.dotKienTapId! > 0, orElse: () => students.first),
                     );
-                    final dotId = activeStudent.dotKienTapId ?? 7;
-                    _lockAllGuidedReports(dotId);
+                    if (activeStudent.dotKienTapId == null || activeStudent.dotKienTapId! <= 0) return;
+                    _lockAllGuidedReports(activeStudent.dotKienTapId!);
                   },
                   icon: _isLocking
                       ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(color: AppColors.danger, strokeWidth: 2))

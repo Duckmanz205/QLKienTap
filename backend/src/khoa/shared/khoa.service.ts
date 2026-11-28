@@ -6882,7 +6882,10 @@ Mọi thắc mắc xin liên hệ page CLB. Cảm ơn các bạn.`;
 
     const now = new Date();
     const deadline = dot.ngay_ket_thuc ? this.getEndOfDayVietnam(dot.ngay_ket_thuc) : null;
-    const isExpired = deadline ? now > deadline : false;
+    const isExpired =
+      process.env.DEMO_BYPASS_TIME_GATES !== 'true' && deadline
+        ? now > deadline
+        : false;
 
     // Lazy evaluation: Nếu đã quá hạn mà chưa khóa, tự động khóa và gom bộ 3 cho SV đủ điều kiện
     if (isExpired && !dot.is_bo_chuyen_locked) {

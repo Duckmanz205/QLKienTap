@@ -332,10 +332,11 @@ export class GiangVienService implements OnModuleInit {
         throw new BadRequestException('Không thể điểm danh chuyến tham quan đã bị hủy');
       }
 
-      // Kiểm tra thời gian bắt đầu của chuyến tham quan
+      // Kiểm tra thời gian bắt đầu của chuyến tham quan (bỏ qua nếu bật DEMO_BYPASS_TIME_GATES)
+      const isDemoBypass = process.env.DEMO_BYPASS_TIME_GATES === 'true';
       const tripStartDate = getTripStartDateTime(trip.ngay_tham_quan, trip.gio_bat_dau);
       const now = new Date();
-      if (now < tripStartDate) {
+      if (!isDemoBypass && now < tripStartDate) {
         const dayStr = tripStartDate.getDate().toString().padStart(2, '0');
         const monthStr = (tripStartDate.getMonth() + 1).toString().padStart(2, '0');
         const yearStr = tripStartDate.getFullYear();
@@ -647,9 +648,20 @@ export class GiangVienService implements OnModuleInit {
 
       let ptq = phieuTQMap.get(rec.phieuId);
       if (!ptq) {
-        ptq = new PhieuThamQuan();
-        ptq.phieu_dang_ky_id = phieu.id;
-        ptq = await this.phieuTQRepo.save(ptq);
+        // Dùng raw INSERT + findOne để tránh lỗi OUTPUT clause khi PhieuThamQuan có trigger AFTER INSERT
+        await this.dataSource.query(
+          `INSERT INTO PhieuThamQuan (phieu_dang_ky_id, trang_thai) VALUES (@0, N'HopLe')`,
+          [phieu.id],
+        );
+        const createdPtq = await this.phieuTQRepo.findOne({
+          where: { phieu_dang_ky_id: phieu.id },
+        });
+        if (!createdPtq) {
+          throw new BadRequestException(
+            `Không thể khởi tạo phiếu tham quan cho phiếu đăng ký ID ${phieu.id}`,
+          );
+        }
+        ptq = createdPtq;
         phieuTQMap.set(rec.phieuId, ptq);
       }
 
@@ -1055,8 +1067,11 @@ export class GiangVienService implements OnModuleInit {
         'diemDanh',
         'diemDanh.phieu_tham_quan_id = phieuTQ.id',
       )
-      .where('phieu.sinh_vien_id IN (:...guidedSvIds)', { guidedSvIds })
-      .andWhere('CURRENT_TIMESTAMP > phieuTQ.han_nop_bao_cao');
+      .where('phieu.sinh_vien_id IN (:...guidedSvIds)', { guidedSvIds });
+
+    if (process.env.DEMO_BYPASS_TIME_GATES !== 'true') {
+      queryBuilder.andWhere('CURRENT_TIMESTAMP > phieuTQ.han_nop_bao_cao');
+    }
 
     if (search) {
       queryBuilder.andWhere(

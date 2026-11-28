@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/config/app_config.dart';
 
 // --- Smart Reminders & Entities ---
 
@@ -336,7 +337,10 @@ class Submission {
   bool get isGraded => reportScore != null;
   bool get isTuDo => cachToChuc == 'TuDo' || typeText.toLowerCase().contains('tự do') || typeText.toLowerCase().contains('tudo');
   bool get isChoDuyetDiemDanh => status == 'Chờ duyệt điểm danh';
-  bool get isPastLock => hanKhoaDate != null && DateTime.now().isAfter(hanKhoaDate!);
+  bool get isPastLock {
+    if (AppConfig.demoBypassTimeGates) return false;
+    return hanKhoaDate != null && DateTime.now().isAfter(hanKhoaDate!);
+  }
   bool get isPastOnTime => hanNopDate != null && DateTime.now().isAfter(hanNopDate!);
   bool get canSubmitReport {
     if (!hasPhieuThamQuan) return false;
@@ -1019,6 +1023,7 @@ class LecturerTour {
   });
 
   bool get isStarted {
+    if (AppConfig.demoBypassTimeGates) return true;
     if (rawTripDate == null) return true;
     final d = rawTripDate!;
     int hours = 0;

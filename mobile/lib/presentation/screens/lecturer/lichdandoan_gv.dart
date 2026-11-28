@@ -19,7 +19,7 @@ class LichDanDoanGVScreen extends StatelessWidget {
       items: appState.lecturerTours,
       searchHint: 'Tìm chuyến đi...',
       dropdownTitle: 'Trạng thái',
-      dropdownOptions: const ['Tất cả', 'completed', 'pending'],
+      dropdownOptions: const ['Tất cả', 'upcoming', 'completed'],
       itemName: 'chuyến đi',
       filter: (tour, query, status) {
         final matchQuery = tour.name.toLowerCase().contains(query.toLowerCase());

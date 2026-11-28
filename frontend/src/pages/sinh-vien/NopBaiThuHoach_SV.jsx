@@ -491,7 +491,8 @@ export default function NopBaiThuHoach_SV() {
               let disabledReason = '';
               
               const now = new Date();
-              const isPastLock = trip.hanKhoaDate && now > trip.hanKhoaDate;
+              const isDemoBypassTimeGates = import.meta.env.VITE_DEMO_BYPASS_TIME_GATES === 'true';
+              const isPastLock = !isDemoBypassTimeGates && Boolean(trip.hanKhoaDate && now > trip.hanKhoaDate);
               const isPastOnTime = trip.hanNopDate && now > trip.hanNopDate;
 
               if (!trip.hasPhieuThamQuan) {
