@@ -1296,14 +1296,28 @@ TRANG 38
                     {selectedReport.trang_thai === 'TreHan' ? 'Nộp trễ hạn' : 'Nộp đúng hạn'}
                   </span>
                 </div>
-                {(selectedReport.han_nop_bao_cao || selectedReport.phieuThamQuan?.han_nop_bao_cao) && (
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-slate-500 font-medium">Hạn đúng hạn:</span>
-                    <span className="font-semibold text-slate-700">
-                      23:59 {new Date(selectedReport.han_nop_bao_cao || selectedReport.phieuThamQuan?.han_nop_bao_cao).toLocaleDateString('vi-VN')}
-                    </span>
-                  </div>
-                )}
+                {(() => {
+                  const hanNop = selectedReport.han_nop_bao_cao || selectedReport.phieuThamQuan?.han_nop_bao_cao;
+                  if (!hanNop) return null;
+                  const deadlineDate = new Date(hanNop);
+                  const lockDate = new Date(deadlineDate.getTime() + 10 * 86400000);
+                  return (
+                    <div className="space-y-1 text-[11px] pt-1 border-t border-slate-100">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500 font-medium">Hạn đúng hạn:</span>
+                        <span className="font-semibold text-slate-700">
+                          23:59 {deadlineDate.toLocaleDateString('vi-VN')}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500 font-medium">Khóa cổng nộp bù:</span>
+                        <span className="font-semibold text-amber-700">
+                          23:59 {lockDate.toLocaleDateString('vi-VN')}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Nút gia hạn nộp bài */}
                 {(() => {
@@ -1835,8 +1849,8 @@ TRANG 38
             if (lecturer) fetchReports(lecturer.id);
             setSelectedReport(prev => prev ? {
               ...prev,
-              han_nop_bao_cao: resData.phieuThamQuan?.han_nop_bao_cao || prev.han_nop_bao_cao,
-              trang_thai: resData.phieuThamQuan?.trang_thai_nop || (resData.mode === 'DungHan' ? 'DaNop' : prev.trang_thai),
+              han_nop_bao_cao: resData?.han_nop_bao_cao || resData?.phieuThamQuan?.han_nop_bao_cao || prev.han_nop_bao_cao,
+              trang_thai: resData?.phieuThamQuan?.trang_thai_nop || (resData?.mode === 'DungHan' ? 'DaNop' : prev.trang_thai),
             } : null);
           }}
         />

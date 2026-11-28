@@ -318,6 +318,7 @@ export class CreateTripDto {
       'ChoDuyet',
       'DaDuyet',
       'MoDangKy',
+      'ChoChotDanhSach',
       'DaChotDanhSach',
       'DaDienRa',
       'DaHuy',

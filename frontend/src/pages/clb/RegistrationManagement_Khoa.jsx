@@ -31,6 +31,7 @@ export default function RegistrationManagement_Khoa() {
   const [searchNhaMay, setSearchNhaMay] = useState('');
   const [filterDot, setFilterDot] = useState('ALL');
   const [filterLich, setFilterLich] = useState('ALL');
+  const [filterStatusTrip, setFilterStatusTrip] = useState('ALL');
   const [currentPageTrips, setCurrentPageTrips] = useState(1);
   const [limitTrips, setLimitTrips] = useState(15);
 
@@ -133,7 +134,7 @@ export default function RegistrationManagement_Khoa() {
       const res = await khoaApi.getTrips();
       const allTrips = Array.isArray(res.data) ? res.data : (res.data?.data || []);
       // Filter only trips that have opened registration or further
-      const openTrips = allTrips.filter(t => ['MoDangKy', 'DaChotDanhSach', 'DaDienRa', 'DaKetThuc', 'HoanThanh', 'DaKhoa', 'DaHuy'].includes(t.trang_thai));
+      const openTrips = allTrips.filter(t => ['MoDangKy', 'ChoChotDanhSach', 'DaChotDanhSach', 'DaDienRa', 'DaKetThuc', 'HoanThanh', 'DaKhoa', 'DaHuy'].includes(t.trang_thai));
       setTrips(openTrips);
     } catch (err) {
       console.error(err);
@@ -428,12 +429,14 @@ export default function RegistrationManagement_Khoa() {
   // 1. Trips filtering & pagination
   const uniqueDots = Array.from(new Set(trips.map(t => t.lichKienTap?.dotKienTap?.ten_dot).filter(Boolean)));
   const uniqueLichs = Array.from(new Set(trips.map(t => t.lichKienTap?.ten_lich).filter(Boolean)));
+  const pendingFinalizeTripsCount = trips.filter(t => t.trang_thai === 'ChoChotDanhSach').length;
 
   const filteredTrips = trips.filter(t => {
     const nameMatch = (t.nhaMay?.ten_nha_may || '').toLowerCase().includes(searchNhaMay.toLowerCase());
     const dotMatch = filterDot === 'ALL' || t.lichKienTap?.dotKienTap?.ten_dot === filterDot;
     const lichMatch = filterLich === 'ALL' || t.lichKienTap?.ten_lich === filterLich;
-    return nameMatch && dotMatch && lichMatch;
+    const statusMatch = filterStatusTrip === 'ALL' || t.trang_thai === filterStatusTrip;
+    return nameMatch && dotMatch && lichMatch && statusMatch;
   });
   const totalTrips = filteredTrips.length;
   const totalPagesTrips = Math.ceil(totalTrips / limitTrips) || 1;
@@ -605,7 +608,47 @@ export default function RegistrationManagement_Khoa() {
                   searchPlaceholder="Tìm lịch..."
                   className="min-w-[190px]"
                 />
+
+                {/* Filter Trạng thái Chuyến */}
+                <SearchableDropdown
+                  options={[
+                    { value: 'ALL', label: 'Tất cả trạng thái' },
+                    { value: 'MoDangKy', label: 'Mở đăng ký' },
+                    { value: 'ChoChotDanhSach', label: 'Chờ chốt danh sách' },
+                    { value: 'DaChotDanhSach', label: 'Đã chốt danh sách' },
+                    { value: 'DaDienRa', label: 'Đã diễn ra' },
+                    { value: 'DaHuy', label: 'Đã hủy' }
+                  ]}
+                  value={filterStatusTrip}
+                  onChange={(val) => {
+                    setFilterStatusTrip(val);
+                    setCurrentPageTrips(1);
+                  }}
+                  placeholder="Tất cả trạng thái"
+                  searchPlaceholder="Tìm trạng thái..."
+                  className="min-w-[180px]"
+                />
               </div>
+
+              {/* Quick filter shortcut: Chờ chốt danh sách */}
+              {pendingFinalizeTripsCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilterStatusTrip(prev => prev === 'ChoChotDanhSach' ? 'ALL' : 'ChoChotDanhSach');
+                    setCurrentPageTrips(1);
+                  }}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border cursor-pointer shrink-0 shadow-xs ${
+                    filterStatusTrip === 'ChoChotDanhSach'
+                      ? 'bg-amber-500 text-white border-amber-600 shadow-sm'
+                      : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100 hover:border-amber-300'
+                  }`}
+                  title="Nhấp để lọc nhanh các chuyến đang chờ chốt danh sách"
+                >
+                  <AlertCircle className={`w-4 h-4 ${filterStatusTrip === 'ChoChotDanhSach' ? 'text-white' : 'text-amber-600'}`} />
+                  <span>Cần chốt danh sách: <strong className="underline">{pendingFinalizeTripsCount}</strong></span>
+                </button>
+              )}
             </div>
 
             {/* Bảng danh sách */}
@@ -638,7 +681,9 @@ export default function RegistrationManagement_Khoa() {
                             key={trip.id}
                             onClick={() => {
                               setSelectedTripForReg(trip);
-                              const defaultTab = hasFinalizedTab(trip) ? 'dachot' : 'danhsach';
+                              const defaultTab = trip.trang_thai === 'ChoChotDanhSach'
+                                ? 'chot'
+                                : (hasFinalizedTab(trip) ? 'dachot' : 'danhsach');
                               setActiveTab(defaultTab);
                             }}
                             className="hover:bg-slate-50 transition-colors cursor-pointer group"
@@ -669,6 +714,7 @@ export default function RegistrationManagement_Khoa() {
                             </td>
                             <td className="p-4 text-center">
                               {trip.trang_thai === 'MoDangKy' && <span className="bg-[#DBD468] text-slate-800 text-[11px] px-3 py-1.5 rounded-full font-bold shadow-sm whitespace-nowrap">Mở đăng ký</span>}
+                              {trip.trang_thai === 'ChoChotDanhSach' && <span className="bg-amber-500 text-white text-[11px] px-3 py-1.5 rounded-full font-bold shadow-sm whitespace-nowrap">Chờ chốt danh sách</span>}
                               {trip.trang_thai === 'DaChotDanhSach' && <span className="bg-[#407F3E] text-white text-[11px] px-3 py-1.5 rounded-full font-bold shadow-sm whitespace-nowrap">Đã chốt danh sách</span>}
                               {trip.trang_thai === 'DaDienRa' && <span className="bg-[#5A87B6] text-white text-[11px] px-3 py-1.5 rounded-full font-bold shadow-sm whitespace-nowrap">Đã diễn ra</span>}
                               {trip.trang_thai === 'DaHuy' && <span className="bg-[#E68A8C] text-white text-[11px] px-3 py-1.5 rounded-full font-bold shadow-sm border border-[#E68A8C]/20 whitespace-nowrap">Đã hủy</span>}
@@ -678,7 +724,9 @@ export default function RegistrationManagement_Khoa() {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setSelectedTripForReg(trip);
-                                  const defaultTab = hasFinalizedTab(trip) ? 'dachot' : 'danhsach';
+                                  const defaultTab = trip.trang_thai === 'ChoChotDanhSach'
+                                    ? 'chot'
+                                    : (hasFinalizedTab(trip) ? 'dachot' : 'danhsach');
                                   setActiveTab(defaultTab);
                                 }}
                                 className="px-3 py-1.5 bg-slate-100 text-slate-600 group-hover:bg-[#407F3E] group-hover:text-white rounded-lg text-xs font-bold transition-all shadow-sm inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
@@ -979,6 +1027,7 @@ export default function RegistrationManagement_Khoa() {
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Trạng thái</label>
                       <p className="text-sm font-medium text-slate-700 mt-0.5">
                         {selectedTripForReg.trang_thai === 'MoDangKy' ? 'Mở đăng ký' :
+                          selectedTripForReg.trang_thai === 'ChoChotDanhSach' ? 'Chờ chốt danh sách' :
                           selectedTripForReg.trang_thai === 'DaChotDanhSach' ? 'Đã chốt danh sách' :
                             selectedTripForReg.trang_thai === 'DaDienRa' ? 'Đã diễn ra' :
                               selectedTripForReg.trang_thai === 'DaHuy' ? 'Đã huỷ' : 'Nháp'}
@@ -1214,6 +1263,15 @@ export default function RegistrationManagement_Khoa() {
                       )}
                     </div>
                   </div>
+
+                  {selectedTripForReg?.trang_thai === 'ChoChotDanhSach' && (
+                    <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-3.5 text-xs sm:text-sm flex items-center gap-2.5">
+                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span>
+                        Chuyến tham quan đã <strong>kết thúc thời gian đăng ký và đang ở trạng thái Chờ chốt danh sách</strong>. Vui lòng rà soát danh sách gợi ý hợp lệ ({selectedStudentIds.size}/{selectedTripForReg?.suc_chua} SV) và nhấn <strong>"Chốt danh sách chính thức"</strong> để hoàn tất và phát hành hóa đơn lệ phí.
+                      </span>
+                    </div>
+                  )}
 
                   {isTripLocked(selectedTripForReg) ? (
                     <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-xl p-3.5 text-xs sm:text-sm flex items-center gap-2.5">

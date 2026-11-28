@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
-  ChevronDown, Check, Info, Search, UserCircle, RefreshCw, X, Filter, AlertCircle, ChevronLeft, ChevronRight, UserPlus, Users, Download, FileSpreadsheet, Upload, CheckCircle2, AlertTriangle
+  ChevronDown, Check, Info, Search, UserCircle, RefreshCw, X, Filter, AlertCircle, ChevronLeft, ChevronRight, UserPlus, Users, Download, FileSpreadsheet, Upload, CloudUpload, CheckCircle2, AlertTriangle
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { khoaApi } from '../../services/api';
@@ -57,6 +57,7 @@ export default function SupervisorAssignment_Khoa() {
   // Import Excel State
   const fileInputRef = useRef(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [importFileName, setImportFileName] = useState('');
   const [importParsedList, setImportParsedList] = useState([]);
   const [importWorkloadList, setImportWorkloadList] = useState([]);
@@ -387,14 +388,34 @@ export default function SupervisorAssignment_Khoa() {
     showToast('Đã tải xuống file mẫu phân công GVHD (.xlsx)');
   };
 
-  // Xử lý đọc và phân tích file Excel
-  const handleFileSelected = async (e) => {
-    const file = e.target.files?.[0];
+  // Mở Form Nhập Excel
+  const handleOpenImportModal = () => {
+    if (!selectedCampaign) {
+      showToast('Vui lòng chọn đợt kiến tập trước khi nhập file Excel', 'warning');
+      return;
+    }
+    setImportFileName('');
+    setImportParsedList([]);
+    setImportWorkloadList([]);
+    setImportActiveTab('students');
+    setImportFilterStatus('ALL');
+    setIsDraggingFile(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    setIsImportModalOpen(true);
+  };
+
+  // Xử lý đọc và phân tích file Excel (dùng chung cho Input & Drag-Drop)
+  const processImportFile = async (file) => {
     if (!file) return;
 
     if (!selectedCampaign) {
       showToast('Vui lòng chọn đợt kiến tập trước khi nhập file Excel', 'warning');
-      e.target.value = '';
+      return;
+    }
+
+    const lowerName = file.name.toLowerCase();
+    if (!lowerName.endsWith('.xlsx') && !lowerName.endsWith('.xls')) {
+      showToast('Vui lòng chọn file Excel có định dạng .xlsx hoặc .xls', 'warning');
       return;
     }
 
@@ -409,7 +430,6 @@ export default function SupervisorAssignment_Khoa() {
 
       if (!rawRows || rawRows.length === 0) {
         showToast('File Excel trống không có dữ liệu', 'warning');
-        e.target.value = '';
         return;
       }
 
@@ -424,8 +444,7 @@ export default function SupervisorAssignment_Khoa() {
       }
 
       if (headerRowIndex === -1) {
-        showToast('Không tìm thấy dòng tiêu đề chứa cột MSSV trong file Excel', 'error');
-        e.target.value = '';
+        showToast('Không tìm thấy dòng tiêu đề chứa cột MSSV / Mã HS-SV trong file Excel', 'error');
         return;
       }
 
@@ -587,7 +606,6 @@ export default function SupervisorAssignment_Khoa() {
 
       if (parsedList.length === 0) {
         showToast('Không đọc được dữ liệu sinh viên nào từ file Excel', 'warning');
-        e.target.value = '';
         return;
       }
 
@@ -635,8 +653,36 @@ export default function SupervisorAssignment_Khoa() {
     } catch (err) {
       console.error(err);
       showToast('Lỗi khi đọc file Excel: ' + (err.message || 'File không đúng định dạng'), 'error');
-    } finally {
-      e.target.value = '';
+    }
+  };
+
+  const handleFileSelected = async (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      await processImportFile(file);
+    }
+    if (e.target) e.target.value = '';
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDraggingFile) setIsDraggingFile(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingFile(false);
+  };
+
+  const handleDrop = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingFile(false);
+    const file = e.dataTransfer?.files?.[0];
+    if (file) {
+      await processImportFile(file);
     }
   };
 
@@ -696,10 +742,10 @@ export default function SupervisorAssignment_Khoa() {
 
             {/* 1. Nút Nhập Excel */}
             <button
-              onClick={() => fileInputRef.current?.click()}
+              onClick={handleOpenImportModal}
               disabled={!selectedCampaign || loading}
               className="h-[42px] px-3.5 sm:px-4 bg-white text-[#407F3E] border border-[#407F3E] hover:bg-[#407F3E]/5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap shrink-0"
-              title="Nhập danh sách phân công GVHD từ file Excel"
+              title="Mở form tải mẫu và nhập danh sách phân công GVHD từ Excel"
             >
               <Upload className="w-4 h-4" />
               Nhập Excel
@@ -1296,23 +1342,42 @@ export default function SupervisorAssignment_Khoa() {
         </div>
       )}
 
-      {/* Import Excel Preview Modal */}
+      {/* Import Excel Modal */}
       {isImportModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[88vh] flex flex-col overflow-hidden animate-in zoom-in-95">
             {/* Modal Header */}
             <div className="bg-slate-50 border-b border-slate-200 px-5 py-3.5 flex justify-between items-center shrink-0">
               <div>
                 <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
                   <FileSpreadsheet className="w-5 h-5 text-[#407F3E]" />
-                  Xem trước phân công GVHD từ Excel
+                  {importParsedList.length > 0 ? 'Xem trước phân công GVHD từ Excel' : 'Nhập danh sách phân công GVHD từ Excel'}
                 </h3>
                 <p className="text-xs text-slate-500 font-medium mt-0.5">
-                  File: <span className="font-semibold text-slate-700">{importFileName}</span> • Tổng số: <span className="font-semibold text-slate-700">{importParsedList.length}</span> dòng
+                  {importParsedList.length > 0 ? (
+                    <>
+                      File: <span className="font-semibold text-slate-700">{importFileName}</span> • Tổng số: <span className="font-semibold text-slate-700">{importParsedList.length}</span> dòng
+                    </>
+                  ) : (
+                    'Tải file mẫu, kiểm tra tên cột và tải lên file Excel (.xlsx, .xls) để phân công GVHD'
+                  )}
                 </p>
               </div>
               <div className="flex items-center gap-2">
+                {importParsedList.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isImporting}
+                    className="px-3 py-1.5 bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer disabled:opacity-50"
+                    title="Chọn file Excel khác"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    Chọn file khác
+                  </button>
+                )}
                 <button
+                  type="button"
                   onClick={handleDownloadTemplate}
                   className="px-3 py-1.5 bg-white border border-[#407F3E] text-[#407F3E] hover:bg-[#407F3E]/5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
                   title="Tải file Excel mẫu chuẩn"
@@ -1321,16 +1386,83 @@ export default function SupervisorAssignment_Khoa() {
                   Tải file mẫu (.xlsx)
                 </button>
                 <button
-                  onClick={() => setIsImportModalOpen(false)}
-                  className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                  type="button"
+                  disabled={isImporting}
+                  onClick={() => {
+                    setIsImportModalOpen(false);
+                    if (fileInputRef.current) fileInputRef.current.value = '';
+                  }}
+                  className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer disabled:opacity-50"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
             </div>
 
-            {/* Switchable Tabs & Filter Pills */}
-            <div className="px-5 pt-3 pb-2 border-b border-slate-200 bg-white flex flex-wrap items-center justify-between gap-2 shrink-0">
+            {importParsedList.length === 0 ? (
+              /* Upload & Hướng dẫn khi chưa có dữ liệu xem trước */
+              <div className="p-5 sm:p-6 space-y-5 overflow-y-auto flex-1 bg-slate-50/70">
+                {/* Banner tải file mẫu */}
+                <div className="bg-[#407F3E]/5 border border-[#407F3E]/20 rounded-xl p-4 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-white rounded-lg shadow-xs border border-[#407F3E]/15 shrink-0">
+                      <FileSpreadsheet className="w-6 h-6 text-[#407F3E]" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-800 text-sm">Chưa có file đúng định dạng?</p>
+                      <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
+                        Tải file mẫu để có sẵn danh sách sinh viên của đợt và đúng tên cột chuẩn.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleDownloadTemplate}
+                    className="shrink-0 flex items-center gap-2 bg-[#407F3E] text-white hover:bg-[#2b5829] rounded-xl px-4 py-2 text-xs sm:text-sm font-bold transition-colors shadow-xs cursor-pointer"
+                  >
+                    <Download className="w-4 h-4" />
+                    Tải file mẫu (.xlsx)
+                  </button>
+                </div>
+
+                {/* Ghi chú định dạng giá trị GVHD */}
+                <div className="bg-white border border-[#E7E0C4] rounded-xl px-4 py-3 shadow-xs text-xs text-slate-600 leading-relaxed flex items-start gap-2">
+                  <Info className="w-4 h-4 text-[#407F3E] shrink-0 mt-0.5" />
+                  <p>
+                    <strong className="text-slate-800">Định dạng giá trị GVHD hỗ trợ:</strong>{' '}
+                    <span className="font-mono text-slate-700">GV001</span> (Mã GV),{' '}
+                    <span className="font-mono text-slate-700">GV001 - Lê Văn Tám</span>, hoặc{' '}
+                    <span className="font-mono text-slate-700">Lê Văn Tám</span> (Họ tên). Để trống ô GVHD nếu muốn giữ nguyên phân công hiện tại của sinh viên.
+                  </p>
+                </div>
+
+                {/* Khung kéo thả / chọn file Excel */}
+                <div
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  onClick={() => !isImporting && fileInputRef.current?.click()}
+                  className={`border-2 border-dashed rounded-2xl p-8 bg-white flex flex-col items-center justify-center text-center transition-all cursor-pointer group ${
+                    isDraggingFile
+                      ? 'border-[#407F3E] bg-[#407F3E]/5 scale-[1.01]'
+                      : 'border-[#E7E0C4] hover:bg-slate-50 hover:border-[#89B449]'
+                  }`}
+                >
+                  <div className="w-14 h-14 rounded-full bg-[#407F3E]/10 flex items-center justify-center shadow-xs mb-3 group-hover:scale-110 transition-transform">
+                    <CloudUpload className="w-7 h-7 text-[#407F3E]" />
+                  </div>
+                  <p className="text-sm font-bold text-slate-700 mb-1">
+                    Kéo thả file Excel vào đây, hoặc bấm để chọn file từ máy tính
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    Hỗ trợ định dạng <span className="font-semibold text-slate-500">.xlsx, .xls</span> • Hệ thống sẽ hiển thị bảng xem trước trước khi lưu
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Switchable Tabs & Filter Pills */}
+                <div className="px-5 pt-3 pb-2 border-b border-slate-200 bg-white flex flex-wrap items-center justify-between gap-2 shrink-0">
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setImportActiveTab('students')}
@@ -1597,6 +1729,8 @@ export default function SupervisorAssignment_Khoa() {
                 </button>
               </div>
             </div>
+              </>
+            )}
           </div>
         </div>
       )}

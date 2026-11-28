@@ -487,41 +487,66 @@ export default function SinhVienHuongDan_GV() {
                             ? trip.diemChuanBi
                             : trip.phieuThamQuan?.diemPhieuThamQuan?.diem_chuan_bi;
                           const isLocked = trip.daKhoaThuHoach || trip.daKhoa || trip.phieuThamQuan?.diemPhieuThamQuan?.da_khoa_thu_hoach;
+                          const hasPtq = Boolean(trip.phieuThamQuanId || trip.phieuThamQuan?.id);
                           const hanNop = trip.hanNopBaoCao || trip.phieuThamQuan?.han_nop_bao_cao;
+                          const canExtend = !isLocked && hasPtq;
                           
                           // Deadline badge calculation
-                          let deadlineBadge = <span className="text-slate-400 text-xs italic">Chưa xác định</span>;
-                          if (hanNop) {
-                            const deadline = new Date(hanNop);
-                            const now = new Date();
-                            const deadlineLock = new Date(deadline.getTime() + 10 * 86400000);
-                            const dStr = deadline.toLocaleDateString('vi-VN');
-                            const lStr = deadlineLock.toLocaleDateString('vi-VN');
-
-                            if (now <= deadline) {
-                              deadlineBadge = (
-                                <div className="flex flex-col gap-0.5">
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-green-50 text-green-700 border border-green-200">
-                                    <Clock className="w-3 h-3 text-green-600" /> Đúng hạn: 23:59 {dStr}
-                                  </span>
-                                  <span className="text-[10px] text-slate-400">Khóa cổng: 23:59 {lStr}</span>
-                                </div>
-                              );
-                            } else if (now <= deadlineLock) {
-                              deadlineBadge = (
-                                <div className="flex flex-col gap-0.5">
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                                    <Clock className="w-3 h-3 text-amber-600" /> Nộp bù: đến 23:59 {lStr}
-                                  </span>
-                                  <span className="text-[10px] text-slate-400">Đã hết hạn đúng ({dStr})</span>
-                                </div>
-                              );
-                            } else {
-                              deadlineBadge = (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-red-50 text-red-700 border border-red-200">
-                                  <Lock className="w-3 h-3 text-red-500" /> Khóa cổng ({lStr})
+                          let deadlineBadge = null;
+                          if (!hasPtq) {
+                            deadlineBadge = (
+                              <div className="flex flex-col gap-0.5">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
+                                  Chưa cấp PTQ
                                 </span>
-                              );
+                                {thoiGian && (
+                                  <span className="text-[10px] text-slate-400">
+                                    Dự kiến: {new Date(new Date(thoiGian).getTime() + 10 * 86400000).toLocaleDateString('vi-VN')}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          } else {
+                            const deadlineDate = hanNop
+                              ? new Date(hanNop)
+                              : thoiGian
+                              ? new Date(new Date(thoiGian).getTime() + 10 * 86400000)
+                              : null;
+
+                            if (deadlineDate) {
+                              const deadline = deadlineDate;
+                              const now = new Date();
+                              const deadlineLock = new Date(deadline.getTime() + 10 * 86400000);
+                              const dStr = deadline.toLocaleDateString('vi-VN');
+                              const lStr = deadlineLock.toLocaleDateString('vi-VN');
+
+                              if (now <= deadline) {
+                                deadlineBadge = (
+                                  <div className="flex flex-col gap-0.5">
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-green-50 text-green-700 border border-green-200">
+                                      <Clock className="w-3 h-3 text-green-600" /> Đúng hạn: 23:59 {dStr}
+                                    </span>
+                                    <span className="text-[10px] text-slate-400">Khóa cổng: 23:59 {lStr}</span>
+                                  </div>
+                                );
+                              } else if (now <= deadlineLock) {
+                                deadlineBadge = (
+                                  <div className="flex flex-col gap-0.5">
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                      <Clock className="w-3 h-3 text-amber-600" /> Nộp bù: đến 23:59 {lStr}
+                                    </span>
+                                    <span className="text-[10px] text-slate-400">Đã hết hạn đúng ({dStr})</span>
+                                  </div>
+                                );
+                              } else {
+                                deadlineBadge = (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-red-50 text-red-700 border border-red-200">
+                                    <Lock className="w-3 h-3 text-red-500" /> Khóa cổng ({lStr})
+                                  </span>
+                                );
+                              }
+                            } else {
+                              deadlineBadge = <span className="text-slate-400 text-xs italic">Chưa xác định</span>;
                             }
                           }
 
@@ -549,19 +574,25 @@ export default function SinhVienHuongDan_GV() {
                               <td className="p-4 text-center">
                                 <button
                                   type="button"
-                                  disabled={isLocked}
+                                  disabled={!canExtend}
                                   onClick={() => {
                                     setSelectedTripForExtend(trip);
                                     setExtendModalOpen(true);
                                   }}
-                                  title={isLocked ? 'Điểm bài thu hoạch đã bị khóa, không thể gia hạn' : 'Gia hạn nộp bài'}
-                                  className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                  title={
                                     isLocked
-                                      ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+                                      ? 'Điểm bài thu hoạch đã bị khóa, không thể gia hạn'
+                                      : !hasPtq
+                                      ? 'Chuyến đi chưa được cấp Phiếu tham quan (chưa diễn ra hoặc chưa hoàn tất thủ tục), không thể gia hạn'
+                                      : 'Gia hạn nộp bài'
+                                  }
+                                  className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                    !canExtend
+                                      ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60'
                                       : 'bg-[#407F3E]/10 border border-[#407F3E]/30 text-[#407F3E] hover:bg-[#407F3E] hover:text-white cursor-pointer'
                                   }`}
                                 >
-                                  {isLocked ? <Lock className="w-3.5 h-3.5" /> : <Calendar className="w-3.5 h-3.5" />}
+                                  {!canExtend ? <Lock className="w-3.5 h-3.5" /> : <Calendar className="w-3.5 h-3.5" />}
                                   <span>Gia hạn</span>
                                 </button>
                               </td>

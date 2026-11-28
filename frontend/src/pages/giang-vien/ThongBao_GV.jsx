@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Bell, FileText, CheckCircle2, AlertTriangle, 
-  Paperclip, Clock, Trash2, Check, Search, ChevronDown,
+  Paperclip, Clock, Check, Search, ChevronDown,
   Download, X, User
 } from 'lucide-react';
 import { giangVienApi } from '../../services/api';
@@ -16,7 +16,6 @@ export default function ThongBao_GV() {
 
   const [notifications, setNotifications] = useState([]);
   const [lecturer, setLecturer] = useState(null);
-  const [dismissedIds, setDismissedIds] = useState([]);
   const [viewingDetail, setViewingDetail] = useState(null);
 
   useEffect(() => {
@@ -43,21 +42,14 @@ export default function ThongBao_GV() {
     setViewingDetail(notif);
   };
 
-  const handleDismiss = (e, notifId) => {
-    e.stopPropagation();
-    setDismissedIds(prev => [...prev, notifId]);
-  };
-
   const resolveFileUrl = (url) => {
     if (!url) return '';
     if (url.startsWith('http://') || url.startsWith('https://')) return url;
     return `http://localhost:3000${url.startsWith('/') ? '' : '/'}${url}`;
   };
 
-  const visibleNotifications = notifications.filter(n => !dismissedIds.includes(n.id));
-
   const filteredNotifications = useMemo(() => {
-    return visibleNotifications.filter(n => {
+    return notifications.filter(n => {
       const q = searchQuery.toLowerCase();
       const matchSearch = !searchQuery || 
         (n.tieu_de && n.tieu_de.toLowerCase().includes(q)) ||
@@ -66,7 +58,7 @@ export default function ThongBao_GV() {
       const matchType = selectedType === 'ALL' || nType === selectedType;
       return matchSearch && matchType;
     });
-  }, [visibleNotifications, searchQuery, selectedType]);
+  }, [notifications, searchQuery, selectedType]);
 
   const totalPages = Math.ceil(filteredNotifications.length / limit) || 1;
   const paginatedNotifications = filteredNotifications.slice((currentPage - 1) * limit, currentPage * limit);
@@ -220,17 +212,6 @@ export default function ThongBao_GV() {
                           <Download className="w-3 h-3 shrink-0 ml-1 text-slate-500" />
                         </div>
                       )}
-                    </div>
-
-                    {/* Actions (Hover) */}
-                    <div className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity pl-2">
-                      <button 
-                        onClick={(e) => handleDismiss(e, notif.id)}
-                        className="p-2 text-slate-300 hover:text-[#E68A8C] hover:bg-red-50 rounded-lg transition-colors cursor-pointer" 
-                        title="Ẩn thông báo"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
                     </div>
 
                   </div>

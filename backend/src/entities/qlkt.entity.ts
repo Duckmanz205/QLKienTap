@@ -490,7 +490,7 @@ export class ChuyenThamQuan {
   dia_diem_tap_trung: string;
 
   @Column({ length: 50, default: 'Nhap' })
-  trang_thai: string; // 'Nhap' | 'ChoDuyet' | 'DaDuyet' | 'MoDangKy' | 'DaChotDanhSach' | 'DaDienRa' | 'DaHuy'
+  trang_thai: string; // 'Nhap' | 'ChoDuyet' | 'DaDuyet' | 'MoDangKy' | 'ChoChotDanhSach' | 'DaChotDanhSach' | 'DaDienRa' | 'DaHuy'
 
   @Column({ type: 'date', nullable: true })
   ngay_tham_quan_moi: Date | null;

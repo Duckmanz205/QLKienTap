@@ -1373,6 +1373,7 @@ export class SinhVienService {
         if (
           diemPhieu.diem_thu_hoach !== null &&
           diemPhieu.diem_thu_hoach !== undefined &&
+          Number(diemPhieu.diem_thu_hoach) > 0 &&
           existingReport?.trang_thai !== 'ChoBoSung'
         ) {
           throw new BadRequestException(
@@ -1537,22 +1538,28 @@ export class SinhVienService {
       }
     }
 
-    // Kiểm tra xem đã có điểm chưa hoặc đã khóa điểm bài thu hoạch chưa
+    // Kiểm tra xem đã khóa điểm bài thu hoạch hoặc đã có điểm chính thức chưa
     const diem = await this.diemPhieuRepo.findOne({
       where: { phieu_tham_quan_id: phieuTQ.id },
     });
 
-    if (
-      diem &&
-      (diem.diem_chuan_bi != null ||
-        diem.diem_thu_hoach != null ||
-        diem.diem_hoi_dong_final != null ||
-        diem.da_khoa_thu_hoach ||
-        diem.da_khoa)
-    ) {
-      throw new BadRequestException(
-        'Bài thu hoạch này đã được chấm điểm hoặc đã khóa sổ điểm, không thể xóa để nộp lại.',
-      );
+    if (diem) {
+      // 1. Nếu đã khóa sổ điểm bài thu hoạch hoặc khóa toàn phần
+      if (diem.da_khoa_thu_hoach || diem.da_khoa) {
+        throw new BadRequestException(
+          'Bài thu hoạch này đã được khóa sổ điểm, không thể xóa để nộp lại.',
+        );
+      }
+      // 2. Nếu đã có điểm bài thu hoạch chính thức (> 0) và không có yêu cầu nộp bổ sung
+      if (
+        diem.diem_thu_hoach != null &&
+        Number(diem.diem_thu_hoach) > 0 &&
+        report.trang_thai !== 'ChoBoSung'
+      ) {
+        throw new BadRequestException(
+          'Bài thu hoạch này đã được Giảng viên chấm điểm chính thức, không thể xóa để nộp lại trừ khi có yêu cầu bổ sung.',
+        );
+      }
     }
 
     // Xóa file trên R2

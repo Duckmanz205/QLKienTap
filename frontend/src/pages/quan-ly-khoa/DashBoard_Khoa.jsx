@@ -199,7 +199,7 @@ export default function DashBoard_Khoa() {
     : 0;
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <div className="p-4 sm:p-6 space-y-6 animate-in fade-in duration-300">
       
       {/* Modal xác nhận Khóa / Mở cổng Bộ 3 chuyến */}
       {confirmLockModal.isOpen && (
@@ -250,25 +250,25 @@ export default function DashBoard_Khoa() {
       )}
 
       {/* Top Welcome Panel */}
-      <div className="bg-gradient-to-r from-[#407F3E] via-[#407F3E]/95 to-[#89B449] rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
-          <Compass size={180} className="animate-spin-slow text-white" />
+      <div className="bg-gradient-to-r from-[#407F3E] via-[#407F3E]/95 to-[#89B449] rounded-2xl py-4 px-5 sm:py-5 sm:px-6 text-white shadow-sm relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-4 sm:p-6 opacity-10 pointer-events-none">
+          <Compass size={120} className="animate-spin-slow text-white" />
         </div>
         <div className="relative z-10 max-w-3xl">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="bg-white/20 text-white text-[11px] px-3 py-1 rounded-full font-bold tracking-wide uppercase">
+            <span className="bg-white/20 text-white text-[10px] sm:text-[11px] px-2.5 py-0.5 rounded-full font-bold tracking-wide uppercase inline-block">
               HỆ THỐNG QUẢN LÝ KIẾN TẬP - KHOA CÔNG NGHỆ THỰC PHẨM
             </span>
             {stats.currentCampaign && (
-              <span className="bg-[#DBD468] text-slate-900 text-[11px] px-3 py-1 rounded-full font-extrabold tracking-wide uppercase shadow-xs">
+              <span className="bg-[#DBD468] text-slate-900 text-[10px] sm:text-[11px] px-2.5 py-0.5 rounded-full font-extrabold tracking-wide uppercase shadow-xs inline-block">
                 {stats.currentCampaign.tenDot}
               </span>
             )}
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black font-sans tracking-tight mt-3 text-white">
+          <h1 className="text-xl sm:text-2xl font-black font-sans tracking-tight mt-1.5 text-white">
             Trung Tâm Điều Hành & Giám Sát Kiến Tập
           </h1>
-          <p className="text-white/90 text-sm mt-2 leading-relaxed font-medium">
+          <p className="text-white/90 text-xs sm:text-sm mt-1 leading-relaxed font-medium">
             Xin chào Thầy/Cô <strong className="text-white font-bold">{userProfile.ho_ten}</strong>. 
             Học phần kiến tập đang có <strong className="text-white underline font-bold">{stats.studentCount} sinh viên</strong> tham gia. 
             Đã có <strong className="text-[#DBD468] font-bold">{stats.pipeline?.eligibleCount || 0} sinh viên</strong> hoàn thành đủ điều kiện bảo vệ trước Hội đồng.

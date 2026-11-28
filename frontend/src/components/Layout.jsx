@@ -190,7 +190,7 @@ export default function Layout() {
       { to: '/khoa/lecturers', label: 'Giảng viên', icon: User, category: 'QUẢN LÝ DANH MỤC' },
       { to: '/khoa/plans', label: 'Đợt kiến tập', icon: Calendar, category: 'TỔ CHỨC KIẾN TẬP' },
       { to: '/khoa/lich-kien-tap', label: 'Lịch kiến tập', icon: Layers, category: 'TỔ CHỨC KIẾN TẬP' },
-      { to: '/khoa/trips', label: 'Duyệt chuyến khẩn cấp', icon: Compass, category: 'TỔ CHỨC KIẾN TẬP' },
+      { to: '/khoa/trips', label: 'Duyệt chuyến tham quan', icon: Compass, category: 'TỔ CHỨC KIẾN TẬP' },
       { to: '/khoa/supervisors', label: 'Phân công GVHD', icon: GraduationCap, category: 'TỔ CHỨC KIẾN TẬP' },
       { to: '/khoa/boards', label: 'Hội đồng chấm báo cáo', icon: Presentation, category: 'ĐÁNH GIÁ & KẾT QUẢ' },
       { to: '/khoa/results', label: 'Kết quả kiến tập', icon: Award, category: 'ĐÁNH GIÁ & KẾT QUẢ' },
@@ -292,7 +292,7 @@ export default function Layout() {
     if (path === '/khoa/students') return 'Quản lý Sinh viên';
     if (path === '/khoa/lecturers') return 'Quản lý Giảng viên';
     if (path === '/khoa/plans') return 'Đợt kiến tập';
-    if (path === '/khoa/trips') return 'Duyệt chuyến khẩn cấp';
+    if (path === '/khoa/trips') return 'Duyệt chuyến tham quan';
     if (path === '/khoa/registrations') return 'Quản lý đăng ký';
     if (path === '/khoa/supervisors') return 'Phân công GVHD';
     if (path === '/khoa/leaders') return 'Phân công GV dẫn đoàn';

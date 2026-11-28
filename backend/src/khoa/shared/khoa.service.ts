@@ -2010,7 +2010,7 @@ export class KhoaService implements OnModuleInit {
 
               if (
                 activeRegCount > 0 ||
-                ['MoDangKy', 'DaChotDanhSach', 'DaDienRa'].includes(trip.trang_thai)
+                ['MoDangKy', 'ChoChotDanhSach', 'DaChotDanhSach', 'DaDienRa'].includes(trip.trang_thai)
               ) {
                 const tripName = trip.nhaMay?.ten_nha_may || `#${trip.id}`;
                 throw new BadRequestException(
@@ -2651,6 +2651,7 @@ Mọi thắc mắc xin liên hệ page CLB. Cảm ơn các bạn.`;
       'ChoDuyet',
       'DaDuyet',
       'MoDangKy',
+      'ChoChotDanhSach',
       'DaChotDanhSach',
       'DangDienRa',
       'DaDienRa',
@@ -2987,17 +2988,17 @@ Mọi thắc mắc xin liên hệ page CLB. Cảm ơn các bạn.`;
       );
     }
 
-    const isRequiresApproval = ['MoDangKy', 'DaChotDanhSach', 'DaDuyet'].includes(trip.trang_thai);
+    const isRequiresApproval = ['MoDangKy', 'ChoChotDanhSach', 'DaChotDanhSach', 'DaDuyet'].includes(trip.trang_thai);
 
     if (
       !isRequiresApproval &&
       data.suc_chua &&
       data.suc_chua < trip.suc_chua &&
-      ['MoDangKy', 'DaChotDanhSach'].includes(trip.trang_thai) // This is basically always false now because of !isRequiresApproval
+      ['MoDangKy', 'ChoChotDanhSach', 'DaChotDanhSach'].includes(trip.trang_thai) // This is basically always false now because of !isRequiresApproval
     ) {
       // Logic for reducing capacity immediately is blocked here, but for ChoDuyet we validate later or now
     }
-    if (data.suc_chua && data.suc_chua < trip.suc_chua && ['MoDangKy', 'DaChotDanhSach'].includes(trip.trang_thai)) {
+    if (data.suc_chua && data.suc_chua < trip.suc_chua && ['MoDangKy', 'ChoChotDanhSach', 'DaChotDanhSach'].includes(trip.trang_thai)) {
       const acceptedCount = await this.phieuRepo.count({
         where: { chuyen_tham_quan_id: id, trang_thai: 'HopLe' },
       });
@@ -3324,7 +3325,7 @@ Mọi thắc mắc xin liên hệ page CLB. Cảm ơn các bạn.`;
     if (trip.trang_thai === 'DaDienRa') {
       throw new BadRequestException('Không thể hủy chuyến tham quan đã diễn ra!');
     }
-    const allowedStatuses = ['ChoDuyet', 'DaDuyet', 'MoDangKy', 'DaChotDanhSach'];
+    const allowedStatuses = ['ChoDuyet', 'DaDuyet', 'MoDangKy', 'ChoChotDanhSach', 'DaChotDanhSach'];
     if (!allowedStatuses.includes(trip.trang_thai)) {
       throw new BadRequestException(
         `Không thể hủy chuyến ở trạng thái "${trip.trang_thai}". Chỉ cho phép hủy khi chuyến đang ở: ${allowedStatuses.join(', ')}`,
@@ -3413,9 +3414,9 @@ Mọi thắc mắc xin liên hệ page CLB. Cảm ơn các bạn.`;
     const trip = await this.chuyenRepo.findOne({ where: { id } });
     if (!trip) throw new NotFoundException('Không tìm thấy chuyến tham quan');
 
-    if (trip.trang_thai !== 'DaChotDanhSach') {
+    if (trip.trang_thai !== 'DaChotDanhSach' && trip.trang_thai !== 'ChoChotDanhSach') {
       throw new BadRequestException(
-        'Chỉ có thể mở đăng ký bổ sung khi chuyến tham quan ở trạng thái Đã chốt danh sách',
+        'Chỉ có thể mở đăng ký bổ sung khi chuyến tham quan ở trạng thái Chờ chốt danh sách hoặc Đã chốt danh sách',
       );
     }
 
